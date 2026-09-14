@@ -387,9 +387,8 @@ void v1MixerAndPitchPipelineMatchesSuperBomberman3() {
       attack == nullptr ? nullptr : std::get_if<FixedDurationPitchSlideTiming>(&attack->timing.physical);
   expect(pitched.diagnostics.empty() && notes.size() == 2 && !notes.back()->restartsLfoPhase && attacks.size() == 1 &&
              timing != nullptr && timing->milliseconds == 508.0 && attack->targetKey - attack->startKey > 10.0 &&
-             vibrato != nullptr && vibrato->context.delayTicks == 0 &&
-             vibrato->context.pitchRangeSemitones->minimum < 0.0 &&
-             vibrato->context.pitchRangeSemitones->maximum > 0.0,
+             vibrato != nullptr && vibrato->context.delay && vibrato->context.delay->ticks == 0 &&
+             vibrato->context.pitchRangeSemitones->minimum < 0.0 && vibrato->context.pitchRangeSemitones->maximum > 0.0,
          "Hudson 1.x should retain pitch state across slurs and express raw DSP pitch envelopes and vibrato");
 }
 

@@ -125,10 +125,10 @@ public:
   void pitchBend(double semitones, PitchBendLayerId layer = kPrimaryPitchBendLayer);
   void pitchBendRange(PitchBendRangePerformanceEvent event);
   void pitchBendRange(u8 semitones);
-  void vibratoDelay(VibratoDelayPerformanceEvent event);
+  void vibratoDelay(LfoDelay delay);
   void vibratoDelayTicks(u32 delayTicks);
   void vibratoDelayPhysical(u32 delayTicks, double milliseconds);
-  void tremoloDelay(TremoloDelayPerformanceEvent event);
+  void tremoloDelay(LfoDelay delay);
   void tremoloDelayTicks(u32 delayTicks);
   void tremoloDelayPhysical(u32 delayTicks, double milliseconds);
   void portamentoEnable(bool enabled);

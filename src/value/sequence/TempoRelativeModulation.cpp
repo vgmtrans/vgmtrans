@@ -12,7 +12,6 @@
 #include <cmath>
 #include <iterator>
 #include <map>
-#include <optional>
 #include <utility>
 #include <vector>
 
@@ -23,14 +22,6 @@ namespace {
 struct EventRef {
   PerformanceEvent* event = nullptr;
   size_t trackIndex = 0;
-};
-
-struct TrackModulationState {
-  // Vibrato rates are independent per pitch layer; tremolo and pan have one
-  // rate each. Ordering by target then layer preserves derived event order.
-  std::map<std::pair<ModulationPerformanceTarget, u32>, ModulationPerformanceEvent> rates;
-  std::optional<VibratoDelayPerformanceEvent> vibratoDelay;
-  std::optional<TremoloDelayPerformanceEvent> tremoloDelay;
 };
 
 [[nodiscard]] double tickSeconds(const PerformanceSequence& performance, u32 microsecondsPerQuarter) {
@@ -67,29 +58,22 @@ void resolveContext(ModulationPerformanceEvent& event, double secondsPerTick) {
   if (event.context.cyclesPerTick) {
     event.context.frequencyHz = hertz(*event.context.cyclesPerTick, secondsPerTick);
   }
-  if (event.context.delayIsTempoRelative && event.context.delayTicks) {
-    event.context.delayMilliseconds = delayMilliseconds(*event.context.delayTicks, secondsPerTick);
+  if (event.context.delay && event.context.delay->tempoRelative) {
+    event.context.delay->milliseconds = delayMilliseconds(event.context.delay->ticks, secondsPerTick);
   }
 }
 
 [[nodiscard]] bool isTempoRelative(const PerformanceEvent& event) {
   if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
-    return modulation->context.cyclesPerTick.has_value() || modulation->context.delayIsTempoRelative;
-  }
-  if (const auto* delay = std::get_if<VibratoDelayPerformanceEvent>(&event)) {
-    return delay->tempoRelative;
-  }
-  if (const auto* delay = std::get_if<TremoloDelayPerformanceEvent>(&event)) {
-    return delay->tempoRelative;
+    return modulation->context.cyclesPerTick.has_value() ||
+           (modulation->context.delay && modulation->context.delay->tempoRelative);
   }
   return false;
 }
 
 [[nodiscard]] bool belongsInTimeline(const PerformanceEvent& event) {
   return std::holds_alternative<TempoPerformanceEvent>(event) ||
-         std::holds_alternative<ModulationPerformanceEvent>(event) ||
-         std::holds_alternative<VibratoDelayPerformanceEvent>(event) ||
-         std::holds_alternative<TremoloDelayPerformanceEvent>(event);
+         std::holds_alternative<ModulationPerformanceEvent>(event);
 }
 
 }  // namespace
@@ -114,7 +98,10 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
   std::ranges::stable_sort(timeline, {},
                            [](const EventRef& ref) { return performanceEventHeader(*ref.event).order(); });
 
-  std::vector<TrackModulationState> states(performance.tracks.size());
+  // Rates and delays are independent controls. Keep source events by target
+  // and pitch layer; their storage stays stable until derived events are appended.
+  using ActiveModulation = std::map<std::pair<ModulationPerformanceTarget, u32>, const ModulationPerformanceEvent*>;
+  std::vector<ActiveModulation> states(performance.tracks.size());
   std::vector<std::vector<PerformanceEvent>> derived(performance.tracks.size());
   u32 currentTempo = performance.initialTempoMicrosecondsPerQuarter;
   double secondsPerTick = tickSeconds(performance, currentTempo);
@@ -135,56 +122,35 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
         if (tempo->header.tick > track.endTick && track.endTick != 0) {
           continue;
         }
-        auto& trackState = states[trackIndex];
-        for (const auto& [key, rate] : trackState.rates) {
-          auto& update = std::get<ModulationPerformanceEvent>(derived[trackIndex].emplace_back(rate));
+        for (const auto& [key, modulation] : states[trackIndex]) {
+          auto update = *modulation;
           update.header = derivedHeader(*tempo, track);
           resolveContext(update, secondsPerTick);
-        }
-
-        const auto appendDelay = [&](const auto& delay) {
-          if (delay) {
-            auto update = *delay;
-            update.header = derivedHeader(*tempo, track);
-            update.milliseconds = delayMilliseconds(update.delayTicks, secondsPerTick);
-            derived[trackIndex].emplace_back(std::move(update));
-          }
-        };
-        appendDelay(trackState.vibratoDelay);
-        appendDelay(trackState.tremoloDelay);
-      }
-      continue;
-    }
-
-    if (auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
-      resolveContext(*modulation, secondsPerTick);
-      if (modulation->target == ModulationPerformanceTarget::VibratoRate ||
-          modulation->target == ModulationPerformanceTarget::TremoloRate ||
-          modulation->target == ModulationPerformanceTarget::PanRate) {
-        const u32 layer =
-            modulation->target == ModulationPerformanceTarget::VibratoRate ? modulation->pitchLayer.value : 0;
-        const auto key = std::pair{modulation->target, layer};
-        if (modulation->context.cyclesPerTick) {
-          state.rates.insert_or_assign(key, *modulation);
-        } else {
-          state.rates.erase(key);
+          derived[trackIndex].emplace_back(std::move(update));
         }
       }
       continue;
     }
 
-    const auto resolveDelay = [&](auto& delay, auto& stored) {
-      if (delay.tempoRelative) {
-        delay.milliseconds = delayMilliseconds(delay.delayTicks, secondsPerTick);
-        stored = delay;
+    auto& modulation = std::get<ModulationPerformanceEvent>(event);
+    resolveContext(modulation, secondsPerTick);
+    const auto target = modulation.target;
+    const bool rate = target == ModulationPerformanceTarget::VibratoRate ||
+                      target == ModulationPerformanceTarget::TremoloRate ||
+                      target == ModulationPerformanceTarget::PanRate;
+    const bool delay =
+        target == ModulationPerformanceTarget::VibratoDelay || target == ModulationPerformanceTarget::TremoloDelay;
+    if (rate || delay) {
+      const bool vibrato =
+          target == ModulationPerformanceTarget::VibratoRate || target == ModulationPerformanceTarget::VibratoDelay;
+      const auto key = std::pair{target, vibrato ? modulation.pitchLayer.value : 0};
+      const bool relative = rate ? modulation.context.cyclesPerTick.has_value()
+                                 : modulation.context.delay && modulation.context.delay->tempoRelative;
+      if (relative) {
+        state.insert_or_assign(key, &modulation);
       } else {
-        stored.reset();
+        state.erase(key);
       }
-    };
-    if (auto* vibrato = std::get_if<VibratoDelayPerformanceEvent>(&event)) {
-      resolveDelay(*vibrato, state.vibratoDelay);
-    } else if (auto* tremolo = std::get_if<TremoloDelayPerformanceEvent>(&event)) {
-      resolveDelay(*tremolo, state.tremoloDelay);
     }
   }
 

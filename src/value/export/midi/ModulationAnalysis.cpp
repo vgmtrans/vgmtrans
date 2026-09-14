@@ -39,6 +39,9 @@ void observePerformanceModulation(MidiModulationUsage& usage, const ModulationPe
       // MIDI has no standard pan-LFO controller pair. These targets are
       // retained for sequence-event simulation instead.
       break;
+    case ModulationPerformanceTarget::VibratoDelay:
+    case ModulationPerformanceTarget::TremoloDelay:
+      break;
   }
 }
 

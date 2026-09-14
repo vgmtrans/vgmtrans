@@ -192,13 +192,13 @@ struct Playback : SequencePlayback<TrackState> {
 
   [[nodiscard]] LfoPerformanceContext lfoContext(const LfoState& lfo) const {
     return LfoPerformanceContext{
-        .delayTicks = driverTicksToSequenceTicks(static_cast<u32>(lfo.delay) * 2),
-        .delayMilliseconds = lfo.delay * (2000.0 / programState.timing.voiceHz),
+        .delay = LfoDelay{.ticks = driverTicksToSequenceTicks(static_cast<u32>(lfo.delay) * 2),
+                          .milliseconds = lfo.delay * (2000.0 / programState.timing.voiceHz),
+                          .updateMode = LfoDelayUpdateMode::FutureNotesOnly},
         .shape = LfoShape{.waveform = LfoWaveform::Triangle},
         .initialPhaseCycles = 0.0,
         .noteRestartInitialPhaseCycles = 0.0,
         .sampleImmediatelyOnNote = false,
-        .delayUpdateMode = LfoDelayUpdateMode::FutureNotesOnly,
         .restartMode = LfoRestartMode::PhaseAndDelay,
         .phaseRunsAtZeroDepth = false,
         .delayRunsWhileInactive = false,

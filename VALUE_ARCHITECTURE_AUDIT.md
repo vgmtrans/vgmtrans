@@ -2440,6 +2440,39 @@ retargeting, completion, clearing, and non-finite floating-point values.
 All returned statuses, values, change flags, raw callbacks, and active states
 match. Temporary MIDI capture instrumentation was removed.
 
+## One LFO delay value and modulation event path
+
+Vibrato and tremolo delays now use `LfoDelay` inside the existing modulation
+context. Independent delay commands are `VibratoDelay` and `TremoloDelay`
+modulation targets. This removes two performance event types, their duplicated
+fields, the MIDI simulator's private delay type, and separate delay-controller
+normalization functions. Delay commands update only delay state; they do not
+apply the other context defaults or restart an already-running oscillator.
+
+Tempo-relative rates and delays now share one ordered map of active controls.
+The map borrows original event pointers until all derived events have been
+computed, avoiding another copy of each retained LFO context. Target/layer
+ordering, cross-track tempo order, fixed-clock replacement, track-end limits,
+and future-note-only updates are preserved. Embedded rate/depth context delays
+still do not independently contribute synth delay observations or MIDI delay
+controllers. Non-primary pitch layers retain their own delay in simulation.
+
+Nineteen format families use the shared delay value. Itikiti passes its existing
+context delay directly to the independent delay emitter, and NDS emits its three
+rate targets without a dispatch switch. Physical timing formulas and driver
+counter explanations remain intact. This change removes **107 production lines**;
+existing test migrations add **one line net**, with no new committed test harness.
+
+Validation: all 20 test targets pass (10.76 seconds). Captured exports match the
+baseline exactly: 304 MIDI and 100 SF2/DLS files. An ignored differential probe
+compares 2,400 generated performances, including their resolved event ordering,
+physical timing, modulation profiles, and 4,800 MIDI exports under both policies.
+A further 432 comparisons verify independent-layer delay commands against the
+same delay supplied in LFO context. The final probes and changed tempo resolver,
+modulation profile, and MIDI renderer run with ASan/UBSan. Temporary capture hooks
+are removed before committing. This is fixture/generated-input coverage; no
+real-file corpus was available.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding

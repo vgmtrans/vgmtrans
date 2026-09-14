@@ -32,11 +32,6 @@ struct SequenceModulationProfile {
 // source control amount.
 [[nodiscard]] double modulationControllerAmount(const ModulationPerformanceEvent& event,
                                                 const SequenceModulationProfile* profile) noexcept;
-[[nodiscard]] u8 vibratoDelayControllerValue(const VibratoDelayPerformanceEvent& event,
-                                             const SequenceModulationProfile* profile) noexcept;
-[[nodiscard]] u8 tremoloDelayControllerValue(const TremoloDelayPerformanceEvent& event,
-                                             const SequenceModulationProfile* profile) noexcept;
-
 // Adds the song-derived LFO behavior to every playable instrument in a
 // collection. Targets absent from the profile are left unchanged.
 void applySequenceModulation(SoundBankAsset& soundBank, const SequenceModulationProfile& profile);

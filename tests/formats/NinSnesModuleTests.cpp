@@ -506,16 +506,16 @@ void ninSnesProfilesEmitSubtractiveTremolo() {
     const PerformanceSequence performance = render(std::move(bytes), layout);
     std::vector<const ModulationPerformanceEvent*> depths;
     const ModulationPerformanceEvent* rate = nullptr;
-    const TremoloDelayPerformanceEvent* delay = nullptr;
+    const LfoDelay* delay = nullptr;
     for (const PerformanceEvent& event : performance.tracks[0].events) {
       if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
         if (modulation->target == ModulationPerformanceTarget::TremoloDepth) {
           depths.push_back(modulation);
         } else if (modulation->target == ModulationPerformanceTarget::TremoloRate) {
           rate = modulation;
+        } else if (modulation->target == ModulationPerformanceTarget::TremoloDelay && modulation->context.delay) {
+          delay = &*modulation->context.delay;
         }
-      } else if (const auto* tremoloDelay = std::get_if<TremoloDelayPerformanceEvent>(&event)) {
-        delay = tremoloDelay;
       }
     }
 
@@ -534,7 +534,7 @@ void ninSnesProfilesEmitSubtractiveTremolo() {
                std::abs(*rate->context.cyclesPerTick - 0.125) < 0.0001 &&
                std::abs(*rate->context.frequencyHz - 7.8125) < 0.0001 && rate->context.initialPhaseCycles == 0.25,
            label + " should use the sequence-clocked N-SPC tremolo rate");
-    expect(delay != nullptr && delay->delayTicks == kDelay && delay->milliseconds &&
+    expect(delay != nullptr && delay->ticks == kDelay && delay->milliseconds &&
                std::abs(*delay->milliseconds - 48.0) < 0.0001 && delay->tempoRelative,
            label + " should resolve the N-SPC tremolo delay against tempo");
   }

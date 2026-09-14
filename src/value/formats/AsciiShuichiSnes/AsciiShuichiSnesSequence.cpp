@@ -204,12 +204,12 @@ struct Playback : SequencePlayback<TrackState> {
         .cyclesPerTick = 1.0 / period,
         // Both additions and counters are eight-bit in the driver. Zero is a
         // complete 256-tick DBNZ cycle, not an immediate update.
-        .delayTicks = math::counter(static_cast<u8>(track.vibrato.delay + track.vibrato.rate)),
+        .delay = LfoDelay{.ticks = math::counter(static_cast<u8>(track.vibrato.delay + track.vibrato.rate)),
+                          .updateMode = LfoDelayUpdateMode::FutureNotesOnly},
         .shape = LfoShape{.waveform = LfoWaveform::Triangle},
         .initialPhaseCycles = 0.0,
         .noteRestartInitialPhaseCycles = 0.0,
         .directionReversalTicks = math::counter(track.vibrato.width) * math::counter(track.vibrato.rate),
-        .delayUpdateMode = LfoDelayUpdateMode::FutureNotesOnly,
         .restartMode = LfoRestartMode::PhaseAndDelay,
     };
   }
@@ -222,7 +222,7 @@ struct Playback : SequencePlayback<TrackState> {
                              : 0.0;
     output.vibratoDepth(depth, context);
     output.vibratoRateCyclesPerTick(context.cyclesPerTick.value_or(0.0), context);
-    output.vibratoDelayTicks(context.delayTicks.value_or(0));
+    output.vibratoDelayTicks(context.delay->ticks);
   }
 
   [[nodiscard]] Effects note(u8 sourceKey, std::optional<u8> length, bool followedByRest) {

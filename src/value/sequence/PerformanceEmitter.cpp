@@ -380,38 +380,44 @@ void PerformanceEmitter::pitchBendRange(u8 semitones) {
   });
 }
 
-void PerformanceEmitter::vibratoDelay(VibratoDelayPerformanceEvent event) {
-  append(std::move(event));
+void PerformanceEmitter::vibratoDelay(LfoDelay delay) {
+  modulation(ModulationPerformanceEvent{
+      .target = ModulationPerformanceTarget::VibratoDelay,
+      .context = {.delay = delay},
+  });
 }
 
 void PerformanceEmitter::vibratoDelayTicks(u32 delayTicks) {
-  vibratoDelay(VibratoDelayPerformanceEvent{
-      .delayTicks = delayTicks,
+  vibratoDelay(LfoDelay{
+      .ticks = delayTicks,
       .tempoRelative = true,
   });
 }
 
 void PerformanceEmitter::vibratoDelayPhysical(u32 delayTicks, double milliseconds) {
-  vibratoDelay(VibratoDelayPerformanceEvent{
-      .delayTicks = delayTicks,
+  vibratoDelay(LfoDelay{
+      .ticks = delayTicks,
       .milliseconds = milliseconds,
   });
 }
 
-void PerformanceEmitter::tremoloDelay(TremoloDelayPerformanceEvent event) {
-  append(std::move(event));
+void PerformanceEmitter::tremoloDelay(LfoDelay delay) {
+  modulation(ModulationPerformanceEvent{
+      .target = ModulationPerformanceTarget::TremoloDelay,
+      .context = {.delay = delay},
+  });
 }
 
 void PerformanceEmitter::tremoloDelayTicks(u32 delayTicks) {
-  tremoloDelay(TremoloDelayPerformanceEvent{
-      .delayTicks = delayTicks,
+  tremoloDelay(LfoDelay{
+      .ticks = delayTicks,
       .tempoRelative = true,
   });
 }
 
 void PerformanceEmitter::tremoloDelayPhysical(u32 delayTicks, double milliseconds) {
-  tremoloDelay(TremoloDelayPerformanceEvent{
-      .delayTicks = delayTicks,
+  tremoloDelay(LfoDelay{
+      .ticks = delayTicks,
       .milliseconds = milliseconds,
   });
 }

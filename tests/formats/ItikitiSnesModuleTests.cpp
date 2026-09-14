@@ -198,7 +198,7 @@ void lfoModesFollowTheDriverStateMachine() {
   const auto depth = modulationEvents(performance.tracks.front(), ModulationPerformanceTarget::VibratoDepth);
   const auto rate = modulationEvents(performance.tracks.front(), ModulationPerformanceTarget::VibratoRate);
   const auto continuousDepth = modulationEvents(continuous.tracks.front(), ModulationPerformanceTarget::VibratoDepth);
-  const auto continuousDelay = events<VibratoDelayPerformanceEvent>(continuous.tracks.front());
+  const auto continuousDelay = modulationEvents(continuous.tracks.front(), ModulationPerformanceTarget::VibratoDelay);
   const auto portamentoDepth = modulationEvents(portamento.tracks.front(), ModulationPerformanceTarget::VibratoDepth);
   const auto portamentoNotes = events<NotePerformanceEvent>(portamento.tracks.front());
   const auto tremoloDepth = modulationEvents(stoppedTremolo.tracks.front(), ModulationPerformanceTarget::TremoloDepth);
@@ -229,12 +229,12 @@ void lfoModesFollowTheDriverStateMachine() {
              depth[1]->context.pitchRangeSemitones->maximum == 0.0 && rate[1]->context.frequencyHz &&
              std::abs(*rate[1]->context.frequencyHz - 8000.0 / (39.0 * 16.0 * 2.0)) < 0.000001,
          "the negative-lobe mode should retain its signed phase and pitch range");
-  expect(
-      depth[2]->context.polarity == LfoPolarity::Bipolar && depth[2]->context.initialPhaseCycles == 0.0 &&
+  expect(depth[2]->context.polarity == LfoPolarity::Bipolar && depth[2]->context.initialPhaseCycles == 0.0 &&
              depth[2]->context.pitchRangeSemitones &&
              std::abs(depth[2]->context.pitchRangeSemitones->minimum - minimum) < 0.000001 &&
              std::abs(depth[2]->context.pitchRangeSemitones->maximum - maximum) < 0.000001 &&
-          rate[2]->context.frequencyHz && std::abs(*rate[2]->context.frequencyHz - 8000.0 / (39.0 * 32.0)) < 0.000001 &&
+             rate[2]->context.frequencyHz &&
+             std::abs(*rate[2]->context.frequencyHz - 8000.0 / (39.0 * 32.0)) < 0.000001 &&
              depth[3]->context.polarity == LfoPolarity::Bipolar && depth[3]->context.initialPhaseCycles == 0.0 &&
              depth[4]->pitchDepthSemitones == 0.0 && depth[4]->context.polarity == LfoPolarity::Bipolar &&
              depth[4]->context.zeroDepthBehavior == LfoZeroDepthBehavior::HoldOutputUntilNextNote &&
@@ -242,10 +242,11 @@ void lfoModesFollowTheDriverStateMachine() {
              continuousDepth.front()->context.initialPhaseCycles == 0.5 &&
              continuousDepth.front()->context.restartMode == LfoRestartMode::Phase &&
              continuousDepth.front()->context.noteRestartInitialPhaseCycles == 0.0 && continuousDelay.size() == 1 &&
-          continuousDelay.front()->updateMode == LfoDelayUpdateMode::FutureNotesOnly && portamentoDepth.size() == 1 &&
-          portamentoDepth.front()->context.shape && portamentoDepth.front()->context.shape->samples.at(2) == 0.0 &&
-          portamentoDepth.front()->context.shape->samples.at(3) > 0.0 && !hasNonzeroBendAt(1) && hasNonzeroBendAt(2) &&
-             portamentoNotes.size() == 2 && !portamentoNotes.back()->restartsEnvelope &&
+             continuousDelay.front()->context.delay->updateMode == LfoDelayUpdateMode::FutureNotesOnly &&
+             portamentoDepth.size() == 1 && portamentoDepth.front()->context.shape &&
+             portamentoDepth.front()->context.shape->samples.at(2) == 0.0 &&
+             portamentoDepth.front()->context.shape->samples.at(3) > 0.0 && !hasNonzeroBendAt(1) &&
+             hasNonzeroBendAt(2) && portamentoNotes.size() == 2 && !portamentoNotes.back()->restartsEnvelope &&
              portamentoNotes.back()->restartsVibratoLfoPhase == true && !portamentoNotes.back()->restartsLfoPhase &&
              tremoloDepth.size() == 2 && tremoloDepth.back()->volumeDepthLinearGain == 0.0 &&
              tremoloDepth.back()->context.zeroDepthBehavior == LfoZeroDepthBehavior::HoldOutputUntilNextNote,

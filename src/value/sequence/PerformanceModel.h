@@ -247,28 +247,13 @@ enum class LfoDelayUpdateMode {
   FutureNotesOnly,
 };
 
-struct VibratoDelayPerformanceEvent {
-  PerformanceEventHeader header;
-  // Delay in rendered sequence ticks, used when vibrato is simulated as pitch bend.
-  u32 delayTicks = 0;
-  // Some source LFOs run on a fixed driver clock rather than sequence time.
-  // When present, simulation uses this physical duration instead of delayTicks.
-  std::optional<double> milliseconds;
-  // Sequence-relative delays remain exact in event simulation. The shared
-  // resolver also supplies milliseconds for synth-modulator lowering.
-  bool tempoRelative = false;
-  // Controls whether this delay affects the LFO already playing or only later
-  // notes that restart it.
-  LfoDelayUpdateMode updateMode = LfoDelayUpdateMode::CurrentAndFutureNotes;
-};
-
-struct TremoloDelayPerformanceEvent {
-  PerformanceEventHeader header;
-  u32 delayTicks = 0;
+// One delay description for LFO configuration and independent delay commands.
+struct LfoDelay {
+  u32 ticks = 0;
+  // Fixed-clock delays use milliseconds in playback. Tempo-relative delays use
+  // ticks; the shared resolver supplies milliseconds for synth export.
   std::optional<double> milliseconds;
   bool tempoRelative = false;
-  // Controls whether this delay affects the LFO already playing or only later
-  // notes that restart it.
   LfoDelayUpdateMode updateMode = LfoDelayUpdateMode::CurrentAndFutureNotes;
 };
 
@@ -309,6 +294,9 @@ enum class ModulationPerformanceTarget {
   TremoloRate,
   PanDepth,
   PanRate,
+  // Delay commands update context.delay without applying other LFO settings.
+  VibratoDelay,
+  TremoloDelay,
 };
 
 // Defines the repeating shape of a vibrato, tremolo, or pan LFO. Most formats
@@ -359,9 +347,8 @@ struct LfoPerformanceContext {
   // Oscillator cycles advanced by one sequence tick. The shared resolver
   // derives frequencyHz from the global tempo timeline.
   std::optional<double> cyclesPerTick;
-  std::optional<u32> delayTicks;
-  std::optional<double> delayMilliseconds;
-  bool delayIsTempoRelative = false;
+  // A missing delay retains the current setting.
+  std::optional<LfoDelay> delay;
   // Replaces the current LFO shape, including both its standard waveform and
   // its exact sample table. A missing value leaves the current shape unchanged.
   std::optional<LfoShape> shape;
@@ -387,9 +374,6 @@ struct LfoPerformanceContext {
   // Reverse the oscillator's phase advance after this many active source
   // ticks. Folded accumulator LFOs use this to alternate sawtooth direction.
   std::optional<u32> directionReversalTicks;
-  // Controls whether this delay affects the LFO already playing or only later
-  // notes that restart it.
-  LfoDelayUpdateMode delayUpdateMode = LfoDelayUpdateMode::CurrentAndFutureNotes;
   // Controls whether this event continues the LFO, moves it back to the start
   // of its waveform, or also begins its delay again.
   LfoRestartMode restartMode = LfoRestartMode::None;
@@ -441,9 +425,8 @@ using PerformanceEvent =
                  ChannelPanPerformanceEvent, StereoBalancePerformanceEvent, MasterLevelPerformanceEvent,
                  ReverbPerformanceEvent, MonoModePerformanceEvent, TuningPerformanceEvent,
                  GlobalTransposePerformanceEvent, PortamentoPerformanceEvent, PortamentoEnablePerformanceEvent,
-                 PitchBendPerformanceEvent, PitchBendRangePerformanceEvent, VibratoDelayPerformanceEvent,
-                 TremoloDelayPerformanceEvent, PitchTransitionSettingsPerformanceEvent, LegatoPedalPerformanceEvent,
-                 ModulationPerformanceEvent, MarkerPerformanceEvent>;
+                 PitchBendPerformanceEvent, PitchBendRangePerformanceEvent, PitchTransitionSettingsPerformanceEvent,
+                 LegatoPedalPerformanceEvent, ModulationPerformanceEvent, MarkerPerformanceEvent>;
 
 enum class PerformanceAutomationTarget {
   Tempo,

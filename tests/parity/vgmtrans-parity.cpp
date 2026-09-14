@@ -4078,14 +4078,15 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
           stats.maxSourcePitchBendSemitones = semitones;
           stats.maxSourcePitchBendLocation = performanceEventLocation(program, pitchBend->header);
         }
-      } else if (const auto* delay = std::get_if<VibratoDelayPerformanceEvent>(&event)) {
-        ++stats.vibratoDelayEvents;
-        stats.maxVibratoDelayTicks = std::max(stats.maxVibratoDelayTicks, delay->delayTicks);
-        if (delay->delayTicks > 0 || delay->milliseconds.value_or(0.0) > 0.0) {
-          ++stats.activeVibratoDelayEvents;
-        }
       } else if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
-        if (modulation->target == ModulationPerformanceTarget::VibratoDepth) {
+        if (modulation->target == ModulationPerformanceTarget::VibratoDelay && modulation->context.delay) {
+          const auto& delay = *modulation->context.delay;
+          ++stats.vibratoDelayEvents;
+          stats.maxVibratoDelayTicks = std::max(stats.maxVibratoDelayTicks, delay.ticks);
+          if (delay.ticks > 0 || delay.milliseconds.value_or(0.0) > 0.0) {
+            ++stats.activeVibratoDelayEvents;
+          }
+        } else if (modulation->target == ModulationPerformanceTarget::VibratoDepth) {
           ++stats.vibratoDepthEvents;
           const double amount = modulationControllerAmount(*modulation, &modulationProfile);
           if (amount > 0.0001) {

@@ -285,14 +285,14 @@ struct Playback : SequencePlayback<TrackState> {
     }
     return LfoPerformanceContext{
         .cyclesPerTick = 1.0 / (curveSteps * interval),
-        .delayTicks = track.vibrato.delay,
-        .delayIsTempoRelative = true,
+        .delay = LfoDelay{.ticks = track.vibrato.delay,
+                          .tempoRelative = true,
+                          .updateMode = LfoDelayUpdateMode::FutureNotesOnly},
         .shape = LfoShape{.waveform = LfoWaveform::Triangle, .samples = std::move(curve)},
         .initialPhaseCycles = 0.0,
         .noteRestartInitialPhaseCycles = 0.0,
         .pitchRangeSemitones = range,
         .sampleImmediatelyOnNote = false,
-        .delayUpdateMode = LfoDelayUpdateMode::FutureNotesOnly,
         .restartMode = LfoRestartMode::None,
         .zeroDepthBehavior = LfoZeroDepthBehavior::HoldOutputUntilNextNote,
     };

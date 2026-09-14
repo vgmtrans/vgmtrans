@@ -670,9 +670,10 @@ struct Playback : SequencePlayback<TrackState> {
     // same music tick, so a value of one starts immediately.
     const u8 effectiveDelay = track.version != Version::V2 && delay != 0 ? delay - 1 : delay;
     return LfoPerformanceContext{
-        .delayTicks = normalized(effectiveDelay),
-        .delayMilliseconds = effectiveDelay * math::driverTickMilliseconds(program.tempo, track.timebaseShift),
-        .delayIsTempoRelative = true,
+        .delay =
+            LfoDelay{.ticks = normalized(effectiveDelay),
+                     .milliseconds = effectiveDelay * math::driverTickMilliseconds(program.tempo, track.timebaseShift),
+                     .tempoRelative = true},
         .shape = LfoShape{.waveform = LfoWaveform::Triangle},
         .sampleImmediatelyOnNote = true,
     };
@@ -743,7 +744,7 @@ struct Playback : SequencePlayback<TrackState> {
     const double depth = configureVibratoDepth(context);
     out.vibratoDepth(depth, context);
     out.vibratoRate(context.frequencyHz.value_or(0.0), context);
-    out.vibratoDelayPhysical(context.delayTicks.value_or(0), context.delayMilliseconds.value_or(0.0));
+    out.vibratoDelayPhysical(context.delay->ticks, context.delay->milliseconds.value_or(0.0));
   }
 
   void vibrato(u8 rate, u8 depth, u8 mode) {
@@ -787,7 +788,7 @@ struct Playback : SequencePlayback<TrackState> {
     out.vibratoDepth(0.0, context);
     out.tremoloLinearGainDepth(depth, context);
     out.tremoloRate(context.frequencyHz.value_or(0.0), context);
-    out.tremoloDelayPhysical(context.delayTicks.value_or(0), context.delayMilliseconds.value_or(0.0));
+    out.tremoloDelayPhysical(context.delay->ticks, context.delay->milliseconds.value_or(0.0));
   }
 
   void tremolo(u8 delay) {

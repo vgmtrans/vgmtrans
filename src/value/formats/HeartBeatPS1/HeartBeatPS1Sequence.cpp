@@ -180,7 +180,7 @@ struct Playback : SequencePlayback<TrackState> {
 
   void emitTremolo(PerformanceEmitter& delayed) const {
     auto context = lfoContext(track.tremolo);
-    context.delayMilliseconds = track.tremolo.delay * (1000.0 / 60.0);
+    context.delay = LfoDelay{.milliseconds = track.tremolo.delay * (1000.0 / 60.0)};
     context.tremoloGainMode = TremoloGainMode::BipolarAroundNominal;
     const double depth = track.tremolo.enabled ? track.tremolo.depth / 256.0 : 0.0;
     delayed.tremoloRate(*context.frequencyHz, context);

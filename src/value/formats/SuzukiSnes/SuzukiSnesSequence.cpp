@@ -88,8 +88,7 @@ namespace math {
   const double cycles = period == 0 ? 0.0 : 1.0 / (4.0 * period);
   return LfoPerformanceContext{
       .cyclesPerTick = cycles,
-      .delayTicks = delay,
-      .delayIsTempoRelative = true,
+      .delay = LfoDelay{.ticks = delay, .tempoRelative = true},
       .shape = LfoShape{.waveform = LfoWaveform::Triangle},
       .initialPhaseCycles = initialPhase,
   };
@@ -120,8 +119,7 @@ struct TremoloLfo {
   }
   const LfoPerformanceContext context{
       .cyclesPerTick = cycles,
-      .delayTicks = delay,
-      .delayIsTempoRelative = true,
+      .delay = LfoDelay{.ticks = delay, .tempoRelative = true},
       .shape = LfoShape{.waveform = folded ? LfoWaveform::SawtoothDown : LfoWaveform::Triangle},
       .polarity = LfoPolarity::Negative,
       .initialPhaseCycles = folded ? 0.0 : 0.25,

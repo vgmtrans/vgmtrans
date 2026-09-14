@@ -314,8 +314,8 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
                                return event->context.shape && event->context.shape->waveform == LfoWaveform::Triangle &&
                                       event->context.cyclesPerTick &&
                                       std::abs(*event->context.cyclesPerTick - 22.0 / 256.0) < 1e-12 &&
-                                      event->context.delayTicks == 3 &&
-                                      event->context.delayUpdateMode == LfoDelayUpdateMode::FutureNotesOnly &&
+                                      event->context.delay && event->context.delay->ticks == 3 &&
+                                      event->context.delay->updateMode == LfoDelayUpdateMode::FutureNotesOnly &&
                                       !event->context.delayRunsWhileInactive &&
                                       event->context.initialPhaseCycles == 22.0 / 256.0;
                              }),

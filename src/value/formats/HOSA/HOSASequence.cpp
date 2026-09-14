@@ -298,8 +298,7 @@ struct Playback : SequencePlayback<PlaybackTrack> {
     const double scaledDepth = (depth & 0x80) != 0 ? (depth & 0x7f) * 12.0 : depth;
     LfoPerformanceContext context{
         .cyclesPerTick = cycles,
-        .delayTicks = delay,
-        .delayIsTempoRelative = true,
+        .delay = LfoDelay{.ticks = delay, .tempoRelative = true},
         .shape = std::move(shape),
         .restartMode = LfoRestartMode::PhaseAndDelay,
     };

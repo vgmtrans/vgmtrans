@@ -545,9 +545,12 @@ void physicalTimingUsesTheFullInternalDivision() {
         .tracks = {PerformanceTrack{
             .events =
                 {
-                    ModulationPerformanceEvent{
-                        .target = ModulationPerformanceTarget::VibratoRate,
-                        .context = {.cyclesPerTick = 2.0 / ppqn, .delayTicks = ppqn / 4, .delayIsTempoRelative = true}},
+                    ModulationPerformanceEvent{.target = ModulationPerformanceTarget::VibratoRate,
+                                               .context =
+                                                   {
+                                                       .cyclesPerTick = 2.0 / ppqn,
+                                                       .delay = LfoDelay{.ticks = ppqn / 4, .tempoRelative = true},
+                                                   }},
                     TempoPerformanceEvent{.header = {.tick = ppqn / 2}, .microsecondsPerQuarter = 1000000},
                 }}},
     };
@@ -562,8 +565,9 @@ void physicalTimingUsesTheFullInternalDivision() {
 
     resolveTempoRelativeModulation(performance);
     const auto rates = orderedPerformanceEvents<ModulationPerformanceEvent>(performance);
-    expect(rates.size() == 2 && rates[0]->context.frequencyHz == 4.0 && rates[0]->context.delayMilliseconds == 125.0 &&
-               rates[1]->context.frequencyHz == 2.0 && rates[1]->context.delayMilliseconds == 250.0,
+    expect(rates.size() == 2 && rates[0]->context.frequencyHz == 4.0 && rates[0]->context.delay &&
+               rates[0]->context.delay->milliseconds == 125.0 && rates[1]->context.frequencyHz == 2.0 &&
+               rates[1]->context.delay && rates[1]->context.delay->milliseconds == 250.0,
            "tempo-relative modulation must preserve physical rates and delays at large internal divisions");
   }
 }

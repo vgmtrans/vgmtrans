@@ -219,19 +219,19 @@ struct Playback : SequencePlayback<TrackState> {
     // the delay already in progress, so only the waveform position is reset.
     return LfoPerformanceContext{
         .frequencyHz = math::lfoFrequency(interval, polarity),
-        .delayTicks = delay,
-        .delayIsTempoRelative = true,
+        .delay = LfoDelay{.ticks = delay,
+                          .tempoRelative = true,
+                          .updateMode = program.globalLfo ? LfoDelayUpdateMode::FutureNotesOnly
+                                                          : LfoDelayUpdateMode::CurrentAndFutureNotes},
         .shape =
             LfoShape{
-            .waveform = LfoWaveform::Sine,
-            .samples = math::lfoCycleSamples(rawDepth & 0x3f, polarity, target),
-        },
+                .waveform = LfoWaveform::Sine,
+                .samples = math::lfoCycleSamples(rawDepth & 0x3f, polarity, target),
+            },
         .polarity = polarity,
         .initialPhaseCycles = math::lfoInitialPhase(polarity, startsNegative),
         .noteRestartInitialPhaseCycles = 0.0,
         .sampleImmediatelyOnNote = true,
-        .delayUpdateMode =
-            program.globalLfo ? LfoDelayUpdateMode::FutureNotesOnly : LfoDelayUpdateMode::CurrentAndFutureNotes,
         .restartMode = !restart ? LfoRestartMode::None
                                 : (program.globalLfo ? LfoRestartMode::Phase : LfoRestartMode::PhaseAndDelay),
         .phaseRunsAtZeroDepth = false,
@@ -427,12 +427,7 @@ struct Playback : SequencePlayback<TrackState> {
     out.vibratoDepth(std::max(std::abs(range.minimum), std::abs(range.maximum)), context);
     context.restartMode = LfoRestartMode::None;
     out.vibratoRate(*context.frequencyHz, context);
-    out.vibratoDelay(VibratoDelayPerformanceEvent{
-        .delayTicks = delay,
-        .tempoRelative = true,
-        .updateMode =
-            program.globalLfo ? LfoDelayUpdateMode::FutureNotesOnly : LfoDelayUpdateMode::CurrentAndFutureNotes,
-    });
+    out.vibratoDelay(*context.delay);
   }
 
   void vibratoOff() {
@@ -456,12 +451,7 @@ struct Playback : SequencePlayback<TrackState> {
     out.tremoloLinearGainDepth((rawDepth & 0x3f) / 128.0, context);
     context.restartMode = LfoRestartMode::None;
     out.tremoloRate(*context.frequencyHz, context);
-    out.tremoloDelay(TremoloDelayPerformanceEvent{
-        .delayTicks = delay,
-        .tempoRelative = true,
-        .updateMode =
-            program.globalLfo ? LfoDelayUpdateMode::FutureNotesOnly : LfoDelayUpdateMode::CurrentAndFutureNotes,
-    });
+    out.tremoloDelay(*context.delay);
   }
 
   void tremoloOff() {

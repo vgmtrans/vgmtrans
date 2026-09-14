@@ -738,9 +738,8 @@ struct Playback : SequencePlayback<TrackState> {
   [[nodiscard]] LfoPerformanceContext lfoContext(u8 delay) const {
     const u32 delayUpdates = delay;
     return LfoPerformanceContext{
-        .delayTicks =
-            delayUpdates == 0 ? std::optional<u32>{0} : std::optional<u32>{timelineTicks(delayUpdates, program.tempo)},
-        .delayMilliseconds = delayUpdates * program.timer * kTimerQuantumSeconds * 1000.0,
+        .delay = LfoDelay{.ticks = delayUpdates == 0 ? 0 : timelineTicks(delayUpdates, program.tempo),
+                          .milliseconds = delayUpdates * program.timer * kTimerQuantumSeconds * 1000.0},
         .shape = LfoShape{.waveform = LfoWaveform::Triangle},
         .initialPhaseCycles = 0.0,
         .sampleImmediatelyOnNote = false,

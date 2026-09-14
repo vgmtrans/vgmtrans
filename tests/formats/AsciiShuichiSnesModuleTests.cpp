@@ -137,7 +137,7 @@ void laterCommandsKeepAuditedOperandLengthsAndEffects() {
              std::abs(*envelopes.front()->update.values->releaseSeconds - expectedRelease) < 0.000001 &&
              modulation.size() >= 2 && modulation.front()->context.cyclesPerTick &&
              std::abs(*modulation.front()->context.cyclesPerTick - 1.0 / 32.0) < 0.000001 &&
-             modulation.front()->context.delayTicks == 3,
+             modulation.front()->context.delay && modulation.front()->context.delay->ticks == 3,
          "release GAIN and the driver triangle vibrato should emit physical performance state");
   expect(reverb.size() == 5, "initial echo state and all four echo commands should emit reverb state");
   expect(reverb.back()->filterIndex == 0 && reverb.back()->voiceMask == 1,

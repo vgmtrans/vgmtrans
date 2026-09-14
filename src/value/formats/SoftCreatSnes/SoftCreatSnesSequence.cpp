@@ -136,8 +136,7 @@ struct VibratoState {
   }
   return {
       .cyclesPerTick = 1.0 / (2.0 * halfCycle),
-      .delayTicks = vibrato.delay,
-      .delayIsTempoRelative = true,
+      .delay = LfoDelay{.ticks = vibrato.delay, .tempoRelative = true},
       .shape = LfoShape{.waveform = LfoWaveform::Triangle, .samples = std::move(samples)},
       .polarity = LfoPolarity::Bipolar,
       .initialPhaseCycles = 0.0,

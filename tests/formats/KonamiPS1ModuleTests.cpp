@@ -187,9 +187,9 @@ void sequenceModelsDriverLfosAdsrReverbAndTempo() {
   const auto tremoloRate = std::ranges::find_if(
       modulation, [](const auto* event) { return event->target == ModulationPerformanceTarget::TremoloRate; });
   expect(vibratoRate != modulation.end() && (*vibratoRate)->context.frequencyHz &&
-             std::abs(*(*vibratoRate)->context.frequencyHz - 6.5651052) < 0.000001 &&
-             (*vibratoRate)->context.delayMilliseconds &&
-             std::abs(*(*vibratoRate)->context.delayMilliseconds - 190.4006522) < 0.001,
+             std::abs(*(*vibratoRate)->context.frequencyHz - 6.5651052) < 0.000001 && (*vibratoRate)->context.delay &&
+             (*vibratoRate)->context.delay->milliseconds &&
+             std::abs(*(*vibratoRate)->context.delay->milliseconds - 190.4006522) < 0.001,
          "vibrato should retain the timer-divided phase accumulator and doubled delay counter");
   expect(tremoloRate != modulation.end() && (*tremoloRate)->context.frequencyHz &&
              std::abs(*(*tremoloRate)->context.frequencyHz - 3.2825526) < 0.000001,
