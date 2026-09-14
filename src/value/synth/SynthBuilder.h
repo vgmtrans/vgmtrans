@@ -25,6 +25,32 @@ void annotateSynthValue(AnnotationBuilder annotation, const Sample& sample);
 void annotateSynthValue(AnnotationBuilder annotation, const Instrument& instrument);
 void annotateSynthValue(AnnotationBuilder annotation, const Region& region);
 
+namespace detail {
+
+// Shared source ownership, range inference, and diagnostics for synth builders.
+class SynthBuilderSources {
+public:
+  // Asset-level structures receive the builder's owner automatically.
+  AnnotationBuilder source(SourceRole role, std::string_view label, SourceRange range, std::string_view kind = {});
+  AnnotationBuilder source(SourceRole role, std::string_view label, const SourceRecord& record,
+                           std::string_view kind = {});
+  [[nodiscard]] SourceRange range() const noexcept;
+  void warning(std::string message, SourceRange range = {});
+  void error(std::string message, SourceRange range = {});
+
+protected:
+  SynthBuilderSources(AssetId asset, SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics);
+  void report(Severity severity, std::string code, std::string message, SourceRange range);
+
+  AssetId asset_;
+  SourceMapBuilder* sourceMap_ = nullptr;
+  std::vector<Diagnostic>* diagnostics_ = nullptr;
+  SourceRange includedRange_;
+  SourceRange observedRange_;
+};
+
+}  // namespace detail
+
 struct BuiltSamplePool {
   SamplePool value;
   SourceRange range;
@@ -32,7 +58,7 @@ struct BuiltSamplePool {
 
 // Builds one sample pool while keeping sparse source keys, dense model
 // indexes, and source annotations synchronized.
-class SamplePoolBuilder {
+class SamplePoolBuilder : public detail::SynthBuilderSources {
 public:
   class Entry;
 
@@ -47,19 +73,9 @@ public:
   Entry add(u64 sourceKey, Sample sample);
   [[nodiscard]] std::optional<SampleRef> find(u64 sourceKey) const;
 
-  // Asset-level source structures, such as a sample directory table, use this
-  // escape hatch while still receiving the correct asset owner automatically.
-  AnnotationBuilder source(SourceRole role, std::string_view label, SourceRange range, std::string_view kind = {});
-  AnnotationBuilder source(SourceRole role, std::string_view label, const SourceRecord& record,
-                           std::string_view kind = {});
-
   SamplePoolBuilder& include(SourceRange range);
-  [[nodiscard]] SourceRange range() const noexcept;
   [[nodiscard]] bool empty() const noexcept { return samples_.empty(); }
   [[nodiscard]] size_t size() const noexcept { return samples_.size(); }
-
-  void warning(std::string message, SourceRange range = {});
-  void error(std::string message, SourceRange range = {});
 
   [[nodiscard]] BuiltSamplePool finish() &&;
 
@@ -89,16 +105,10 @@ private:
   [[nodiscard]] bool validIndex(u32 index) const noexcept;
   AnnotationBuilder addEntrySource(u32 index, std::string_view label, SourceRange range, std::string_view kind);
   void finishSources();
-  void report(Severity severity, std::string code, std::string message, SourceRange range);
 
-  AssetId asset_;
-  SourceMapBuilder* sourceMap_ = nullptr;
-  std::vector<Diagnostic>* diagnostics_ = nullptr;
   std::vector<Sample> samples_;
   std::vector<std::vector<SourceAnnotationId>> sources_;
   std::unordered_map<u64, u32> indexes_;
-  SourceRange includedRange_;
-  SourceRange observedRange_;
   bool finished_ = false;
 };
 
@@ -109,7 +119,7 @@ struct BuiltInstrumentSet {
 
 // Builds one bank's instruments while assigning durable dense identities to
 // instruments and regions and projecting their sample relationships.
-class InstrumentSetBuilder {
+class InstrumentSetBuilder : public detail::SynthBuilderSources {
 public:
   class Entry;
   class RegionEntry;
@@ -126,17 +136,9 @@ public:
   Entry add(u64 groupingKey, Instrument instrument);
   Entry getOrAdd(u64 groupingKey, Instrument initialValue);
 
-  AnnotationBuilder source(SourceRole role, std::string_view label, SourceRange range, std::string_view kind = {});
-  AnnotationBuilder source(SourceRole role, std::string_view label, const SourceRecord& record,
-                           std::string_view kind = {});
-
   InstrumentSetBuilder& include(SourceRange range);
-  [[nodiscard]] SourceRange range() const noexcept;
   [[nodiscard]] bool empty() const noexcept { return instruments_.empty(); }
   [[nodiscard]] size_t size() const noexcept { return instruments_.size(); }
-
-  void warning(std::string message, SourceRange range = {});
-  void error(std::string message, SourceRange range = {});
 
   [[nodiscard]] BuiltInstrumentSet finish() &&;
 
@@ -209,16 +211,10 @@ private:
   void linkSample(SourceAnnotationId annotation, SampleRef sample, std::string_view label);
   void recordInstrumentRange(u32 index, SourceRange range);
   void recordRegionRange(u32 instrumentIndex, u32 regionIndex, SourceRange range);
-  void report(Severity severity, std::string code, std::string message, SourceRange range);
 
-  AssetId asset_;
-  SourceMapBuilder* sourceMap_ = nullptr;
-  std::vector<Diagnostic>* diagnostics_ = nullptr;
   std::vector<Instrument> instruments_;
   std::vector<InstrumentState> states_;
   std::unordered_map<u64, u32> indexes_;
-  SourceRange includedRange_;
-  SourceRange observedRange_;
   bool finished_ = false;
 };
 
