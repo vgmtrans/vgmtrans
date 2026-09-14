@@ -37,6 +37,7 @@
 #include "value/formats/PrismSnes/PrismSnes.h"
 #include "value/formats/RareSnes/RareSnes.h"
 #include "value/formats/NDS/Nds.h"
+#include "value/formats/SculptSoftSnes/SculptSoftSnes.h"
 #include "value/formats/SegSat/SegSat.h"
 #include "value/formats/SonyPS1/SonyPS1.h"
 #include "value/formats/SonyPS2/SonyPS2.h"
@@ -134,6 +135,7 @@ void registerValueFormats(core::Session& session, const ValueFormatOptions& opti
   session.registerFormat(pandora_box_snes::module());
   session.registerFormat(prism_snes::module());
   session.registerFormat(rare_snes::module());
+  session.registerFormat(sculpt_soft_snes::module());
   session.registerFormat(segsat::segSatModule());
   session.registerFormat(sony_ps1::sonyPs1Module());
   session.registerFormat(sony_ps2::module());
