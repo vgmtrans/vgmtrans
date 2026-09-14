@@ -48,6 +48,7 @@ void runAsciiShuichiSnesModuleTests();
 void runPrismSnesModuleTests();
 void runHudsonSnesModuleTests();
 void runItikitiSnesModuleTests();
+void runSculptSoftSnesModuleTests();
 void runMoriSnesModuleTests();
 void runSoftCreatSnesModuleTests();
 void runCompileSnesModuleTests();
@@ -237,6 +238,7 @@ int main() {
     runAsciiShuichiSnesModuleTests();
     runHudsonSnesModuleTests();
     runItikitiSnesModuleTests();
+    runSculptSoftSnesModuleTests();
     runMoriSnesModuleTests();
     runSoftCreatSnesModuleTests();
     runNeverlandSnesModuleTests();

@@ -21,6 +21,7 @@ target_sources(vgmtrans-value-core-tests
     formats/HeartBeatSnesModuleTests.cpp
     formats/HudsonSnesModuleTests.cpp
     formats/ItikitiSnesModuleTests.cpp
+    formats/SculptSoftSnesModuleTests.cpp
     formats/MoriSnesModuleTests.cpp
     formats/CpsModuleTests.cpp
     formats/KonamiArcadeModuleTests.cpp
@@ -314,3 +315,10 @@ foreach(segsat_file IN LISTS VGMTRANS_PARITY_SEGSAT_FILES)
     "vgmtrans-parity-segsat-${segsat_parity_index}-synth"
     PROPERTIES RUN_SERIAL TRUE)
 endforeach()
+
+add_executable(vgmtrans-sculpt-soft-snes-tests
+  formats/SculptSoftSnesModuleTests.cpp
+  formats/SculptSoftSnesTestMain.cpp)
+target_link_libraries(vgmtrans-sculpt-soft-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore ZLIB::ZLIB)
+target_compile_features(vgmtrans-sculpt-soft-snes-tests PRIVATE cxx_std_20)
+add_test(NAME vgmtrans-sculpt-soft-snes-tests COMMAND vgmtrans-sculpt-soft-snes-tests)
