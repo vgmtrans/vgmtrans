@@ -2619,6 +2619,58 @@ void performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes() {
          "sequence-event vibrato simulation should restart the delay and phase for each new note");
 }
 
+void performanceMidiRendererClearsVibratoOutputWhenEventsRestartItsDelay() {
+  for (const auto target : {ModulationPerformanceTarget::VibratoRate, ModulationPerformanceTarget::VibratoDepth}) {
+    for (const bool milliseconds : {false, true}) {
+      PerformanceTrack track{.id = TrackId{0}, .sourceTrackNumber = 0, .endTick = 8};
+      u64 nextSequence = 0;
+      u32 nextNote = 0;
+      u32 nextAutomation = 0;
+      PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence, nextNote,
+                             nextAutomation};
+      out.tempo(1'000'000);
+      out.note(60, 1.0, 8);
+      out.pitchBend(0.25);
+      const LfoPerformanceContext context{
+          .cyclesPerTick = 0.125,
+          .delay = milliseconds ? LfoDelay{.milliseconds = 20.0} : LfoDelay{.ticks = 2, .tempoRelative = true},
+          .shape = LfoShape{.samples = {-1.0, -1.0, 1.0, 1.0}},
+          .sampleImmediatelyOnNote = true,
+          .restartMode = LfoRestartMode::PhaseAndDelay,
+      };
+      out.modulation(ModulationPerformanceEvent{
+          .target = ModulationPerformanceTarget::VibratoDepth,
+          .pitchDepthSemitones = 1.0,
+          .context = context,
+      });
+      // Restart an already sounding oscillator without a note attack. Both
+      // rate and depth events can restart the delay independently.
+      out.at(4).modulation(ModulationPerformanceEvent{
+          .target = target,
+          .pitchDepthSemitones = 1.0,
+          .context = context,
+      });
+      const MidiSequence midi = renderMidiSequence(
+          PerformanceSequence{.timebase = Timebase{.ppqn = 100}, .tracks = {track}}, {},
+          ModulationConversionPolicy::SequenceEventSimulation);
+      const auto bendAt = [&](u64 tick) {
+        s32 value = 0;
+        for (const auto& event : midi.tracks.front().events) {
+          if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+              bend != nullptr && event.tick <= tick) {
+            value = bend->value;
+          }
+        }
+        return value;
+      };
+      expect(bendAt(3) == -3072, "the oscillator must produce a nonzero offset before its explicit restart");
+      expect(bendAt(4) == 1024 && bendAt(5) == 1024,
+             "restarting vibrato's delay must clear its old output while preserving the source pitch bend");
+      expect(bendAt(6) == -3072, "the restarted oscillator must resume when its tick or physical delay expires");
+    }
+  }
+}
+
 void performanceMidiRendererReplacesSavedNoteDelay() {
   const LfoShape shape{.waveform = LfoWaveform::Sine, .samples = {0.0, 1.0, 0.0, -1.0}};
   std::vector<PerformanceEvent> events{
@@ -3560,6 +3612,7 @@ void runValueMidiTests() {
   performanceMidiRendererReplacesSampledLfoWithNamedWaveform();
   performanceMidiRendererDoesNotDoubleDelayVibrato();
   performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes();
+  performanceMidiRendererClearsVibratoOutputWhenEventsRestartItsDelay();
   performanceMidiRendererReplacesSavedNoteDelay();
   performanceMidiRendererSimulatesTremoloUsingGlobalTempo();
   performanceMidiRendererUsesGlobalTempoOrderAtTrackBoundaries();

@@ -6,6 +6,7 @@
 
 #include "value/formats/SoftCreatSnes/SoftCreatSnes.h"
 
+#include "../MidiTestSupport.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
@@ -512,6 +513,55 @@ void pitchEffectsRetainPhysicalTiming() {
          "trill should begin with the low-phase duration and then reach its high pitch");
 }
 
+void legatoSlidesClearVibratoDuringEachNotesDelay() {
+  // A sustained G has time to vibrate; the following C and E are shorter
+  // than the vibrato delay. This reproduces the held-voice pattern in Beach
+  // without relying on an external SPC or its instrument/pitch tables.
+  const PerformanceSequence performance = render({
+      0x30, 1,             // C establishes the MIDI voice's base key.
+      0x90, 64, 0x9f,      // Portamento and no envelope retrigger.
+      0x8e, 32, 1, 9,      // Vibrato with a 32-tick delay.
+      0x2b, 80,            // G, ticks 1-80.
+      0x30, 30,            // C, ticks 81-110.
+      0x28, 30,            // E, ticks 111-140.
+      0x2b, 70, 0x80,      // G, ticks 141-210, then end.
+  });
+  expect(performance.diagnostics.empty(), "the synthetic legato passage should render without diagnostics");
+  const MidiSequence plain = renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators);
+  const MidiSequence simulated =
+      renderMidiSequence(performance, {}, ModulationConversionPolicy::SequenceEventSimulation);
+  const auto notes = midiNotes(simulated.tracks.front().events);
+  expect(notes.size() == 1 && notes.front().duration == 211,
+         "vibrato restarts must preserve one held MIDI voice through every legato slide");
+
+  const auto centsAt = [](const MidiSequence& midi, u64 tick) {
+    const auto& events = midi.tracks.front().events;
+    u16 range = 200;
+    for (const auto& [at, cents] : midiPitchBendRanges(events)) {
+      if (at <= tick) {
+        range = cents;
+      }
+    }
+    s32 value = 0;
+    for (const auto& event : events) {
+      if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+          bend != nullptr && event.tick <= tick) {
+        value = bend->value;
+      }
+    }
+    return value * range / 8192.0;
+  };
+  expect(std::abs(centsAt(simulated, 80) - centsAt(plain, 80)) > 1.0,
+         "the preceding long note must have an active vibrato offset before the short notes");
+  for (u64 tick = 81; tick < 173; ++tick) {
+    expect(std::abs(centsAt(simulated, tick) - centsAt(plain, tick)) < 0.15,
+           "each restarted vibrato delay must leave portamento and its destination at their unmodulated pitch");
+  }
+  expect(centsAt(simulated, 100) == 0.0, "the C slide must reach the held voice's exact center pitch");
+  expect(std::abs(centsAt(simulated, 173) - centsAt(plain, 173)) > 0.15,
+         "vibrato must resume on the later long note when its delay expires");
+}
+
 }  // namespace
 
 void runSoftCreatSnesModuleTests() {
@@ -528,4 +578,5 @@ void runSoftCreatSnesModuleTests() {
   finiteRepeatsAreNotSongLoops();
   perNoteVolumePrecedesLiteralDuration();
   pitchEffectsRetainPhysicalTiming();
+  legatoSlidesClearVibratoDuringEachNotesDelay();
 }
