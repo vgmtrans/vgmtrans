@@ -577,9 +577,173 @@ void legatoAttackPreservesSamplePanEchoAndCurrentGain() {
          "legato must retain the sample and current DSP envelope instead of resetting either");
 }
 
+std::vector<u8> earlyFixture() {
+  auto data = fixture();
+  bytes(data, 0xb00, {0x3f, 0x87, 0xb,  0x8d, 0x16, 0x3f, 0,    8,    0xf8, 0x5e, 0xd4, 0x7b,
+                      0xdd, 0xd4, 0x7c, 0xf8, 0x5d, 0xe8, 0x0a, 0xd4, 0x61, 0x5f, 0,    0xc});
+  bytes(data, 0xb80, {0x3f, 0x87, 0xb, 0x5d, 0x1f, 0, 0xd});
+  word(data, 0xd08, 0xb00);
+  bytes(data, 0xc00, {0x3f, 7, 0xc, 0x5d, 0x1f, 0x40, 0xd});
+  word(data, 0xd42, 0xc40);
+  bytes(data, 0xc40, {0x8d, 0x10, 0x3f, 0x80, 0xc, 0xe8, 6, 0xd4, 0x61, 0x5f, 0, 0xe});
+  bytes(data, 0xc60, {0xf8, 0x5d, 0xe8, 0xa, 0xd4, 0x61, 0x5f, 0, 0xc});
+  word(data, 0x940, 0xc60);
+  word(data, 0x2280, 0x4100);
+  word(data, 0x2260, 0x4200);
+  word(data, 0x2200, 0x4300);
+  bytes(data, 0x4100, {0x0a, 0, 4, 1, 8, 0, 0});
+  bytes(data, 0x4200, {8, 0, 2, 0, 0});
+  bytes(data, 0x4300, {0xc0, 3, 0xf2, 100, 0x21, 4, 0xf0});
+  return data;
+}
+
+void earlyDetectionRequiresLayeredCommandTables() {
+  auto data = earlyFixture();
+  const auto layout = findLayout(ByteReader(SourceId{70}, data));
+  expect(layout && layout->revision == Revision::Early, "early detection must validate the three-layer interpreter");
+  const auto notes = events<NotePerformanceEvent>(render(data).tracks.front());
+  expect(notes.size() == 1 && notes.front().durationTicks == 4 && notes.front().key == 72,
+         "early song headers must index track table +18, then list +16 and pattern +10");
+  word(data, 0xd42, 0xc60);
+  expect(!findLayout(ByteReader(SourceId{70}, data)), "an incompatible early pattern command table must be rejected");
+}
+
+void earlyPatternsRetainStateAndUseBothInstruments() {
+  auto data = earlyFixture();
+  word(data, 0x2122, 0x5010);
+  bytes(data, 0x5010, {0, 127, 2, 0, 50, 0});
+  word(data, 0x3008, 0x6003);
+  word(data, 0x300a, 0x6003);
+  bytes(data, 0x4100, {0x0a, 0, 4, 2, 6, 20, 0, 8, 0, 8, 0, 0});
+  bytes(data, 0x4200, {6, 40, 0, 8, 0, 0x0a, 1, 0x12, 20, 2, 0, 0});
+  bytes(data, 0x4300, {0xc0, 3, 0xf1, 30, 0x21, 2, 0x61, 2, 0xf0});
+  const ByteReader reader(SourceId{70}, data);
+  const auto layout = *findLayout(reader);
+  std::set<u8> programs;
+  const auto sequence =
+      decodeSequence(reader, layout, readDriverData(reader, layout), AssetId{0}, nullptr, nullptr, &programs);
+  expect(programs == std::set<u8>({0, 1}), "both early patch selections must contribute to sound-bank discovery");
+  std::ranges::fill(data, 0xff);
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence);
+  expect(performance.diagnostics.empty(), "early playback must own all decoded data after the source is overwritten");
+  const auto& track = performance.tracks.front();
+  const auto notes = events<NotePerformanceEvent>(track);
+  const auto instruments = events<InstrumentPerformanceEvent>(track);
+  const auto balance = events<StereoBalancePerformanceEvent>(track);
+  expect(notes.size() == 4 && notes[0].durationTicks == 4 && notes[2].header.tick == 8 && notes[3].header.tick == 12,
+         "pattern returns must resume the list and track, with waits multiplied by the local divisor");
+  expect(std::ranges::all_of(notes, [](const auto& note) { return note.key == 75; }),
+         "track and pattern transpose must combine without accumulating on repeated calls");
+  expect(instruments.size() == 4 && std::get<InstrumentIdentity>(instruments[0].instrument).key == 1 &&
+             std::get<InstrumentIdentity>(instruments[1].instrument).key == 2,
+         "bit 6 selects the secondary patch independently of bit 5's attack flag");
+  expect(balance.size() == 2 && balance[0].leftGain == 25.0 / 128 && balance[1].leftGain == 40.0 / 128,
+         "note volume is additive with list volume and persists through pattern calls");
+}
+
+void earlyFinePitchFixedPitchAndRests() {
+  auto data = earlyFixture();
+  word(data, 0x2262, 0x4240);
+  bytes(data, 0x4100, {0x0a, 0, 4, 1, 6, 20, 0, 8, 0, 8, 1, 0});
+  bytes(data, 0x4200, {8, 0, 6, 20, 0, 2, 0, 0});
+  bytes(data, 0x4240, {0x0e, 0, 0, 2, 0, 0x0c, 2, 0, 0});
+  bytes(data, 0x4300, {0xc0, 3, 0xf2, 100, 0x20, 0, 0x21, 2, 0x88, 2, 0xf4, 2, 0xf3, 1, 0xf0});
+  const auto performance = render(data);
+  const auto& track = performance.tracks.front();
+  const auto notes = events<NotePerformanceEvent>(track);
+  const auto bends = events<PitchBendPerformanceEvent>(track);
+  expect(notes.size() == 3 && notes[0].key == 75 && notes[1].key == 72 && notes[2].key == 75 &&
+             notes[0].durationTicks == 6 && notes[1].header.tick == 7 && notes[2].header.tick == 14,
+         "zero notes update pitch without attacking; fixed mode suppresses deltas and both transposes; rests silence "
+         "ties");
+  expect(std::ranges::any_of(
+             bends, [](const auto& bend) { return bend.header.tick == 2 && std::abs(bend.semitones - 0.1) < 1e-9; }) &&
+             std::ranges::none_of(bends, [](const auto& bend) { return bend.header.tick == 9; }),
+         "fine pitch bends the existing note in pitched mode and has no effect in fixed mode");
+}
+
+void earlyDivisorsAndLoopPolicy() {
+  auto data = earlyFixture();
+  bytes(data, 0x4000, {2, 0, 1});
+  word(data, 0x2282, 0x4140);
+  bytes(data, 0x4100, {0x0a, 0, 4, 2, 8, 0, 0});
+  bytes(data, 0x4140, {0x0a, 1, 4, 3, 8, 0, 0});
+  bytes(data, 0x4300, {0xc0, 3, 0xf1, 10, 0x21, 2, 0xf0});
+  const auto once = render(data);
+  for (const auto& track : once.tracks) {
+    const auto notes = events<NotePerformanceEvent>(track);
+    expect(notes.size() == 1 && notes.front().durationTicks == (track.sourceTrackNumber == 0 ? 4 : 6),
+           "each early track has its own clock divisor");
+  }
+  data[0x4000] = 1;
+  data[0x4106] = 2;
+  const auto looped = render(data, {.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = 1});
+  const auto track = std::ranges::find(looped.tracks, 0u, &PerformanceTrack::sourceTrackNumber);
+  const auto notes = events<NotePerformanceEvent>(*track);
+  const auto balance = events<StereoBalancePerformanceEvent>(*track);
+  expect(notes.size() == 2 && notes[1].header.tick == 4 && balance.back().leftGain == 10.0 / 128,
+         "early restart respects loop policy and preserves musical state, including note volume");
+  data = earlyFixture();
+  bytes(data, 0x4100, {4, 2, 8, 0, 0});
+  bytes(data, 0x4300, {0xc0, 3, 0xf4, 0, 0x21, 1, 0xf0});
+  expect(events<NotePerformanceEvent>(render(data).tracks.front()).front().header.tick == 512,
+         "zero wait duration wraps before multiplying by the local divisor");
+}
+
+void earlyEnvelopesKeepPhysicalTimeAndEncodedStride() {
+  auto data = earlyFixture();
+  bytes(data, 0x4100, {4, 3, 8, 0, 0});
+  bytes(data, 0x5000, {0x0c, 127, 1, 0, 0, 0});
+  word(data, 0x2160, 0x5100);
+  bytes(data, 0x5100, {0, 255, 0, 1, 0, 2, 2, 0, 0xb0, 4, 0xc4, 4});
+  word(data, 0x2180, 0x5140);
+  // Some early pan curves use a stride larger than their two-byte value.
+  bytes(data, 0x5140, {0, 255, 0, 1, 0, 2, 5, 0, 20, 0, 99, 99, 99, 80, 0});
+  const auto performance = render(data);
+  const auto& track = performance.tracks.front();
+  const auto bends = events<PitchBendPerformanceEvent>(track);
+  const auto balance = events<StereoBalancePerformanceEvent>(track);
+  expect(events<NotePerformanceEvent>(track).front().durationTicks == 12 &&
+             std::ranges::any_of(bends, [](const auto& bend) { return bend.header.tick == 1 && bend.semitones == 1; }),
+         "early envelopes advance every physical frame while the note counter runs at its local divisor");
+  expect(balance.size() == 2 && balance[0].leftGain == 20.0 / 128 && balance[1].leftGain == 80.0 / 128 &&
+             balance[1].header.tick == 1,
+         "curve values use the encoded stride and the same physical frame clock");
+}
+
+void earlyUnsupportedAllocationAndInvalidPointersAreDiagnosed() {
+  auto data = earlyFixture();
+  bytes(data, 0x4100, {0x0a, 255, 0xf8, 4, 1, 8, 0, 0});
+  ByteReader reader(SourceId{70}, data);
+  const auto layout = *findLayout(reader);
+  const auto result = SequenceVm().render(decodeSequence(reader, layout, readDriverData(reader, layout), AssetId{0}));
+  expect(result.diagnostics.size() == 1 && result.diagnostics[0].message.find("voice allocation") != std::string::npos,
+         "unsupported voice allocation must not silently flatten overlapping voices");
+  auto shared = earlyFixture();
+  bytes(shared, 0x4000, {2, 0, 0});
+  const ByteReader sharedReader(SourceId{70}, shared);
+  const auto sharedLayout = *findLayout(sharedReader);
+  const auto sharedResult = SequenceVm().render(
+      decodeSequence(sharedReader, sharedLayout, readDriverData(sharedReader, sharedLayout), AssetId{0}));
+  expect(
+      sharedResult.diagnostics.size() == 1 && sharedResult.diagnostics[0].message.find("Sharing") != std::string::npos,
+      "two logical tracks must not silently claim independent playback on the same DSP voice");
+  word(data, 0x2200, 0xffff);
+  std::vector<Diagnostic> diagnostics;
+  std::set<u8> programs;
+  (void)decodeSequence(reader, layout, readDriverData(reader, layout), AssetId{0}, nullptr, &diagnostics, &programs);
+  expect(!diagnostics.empty(), "unloaded early pattern pointers must stop decoding with a diagnostic");
+}
+
 }  // namespace
 
 void runSculptSoftSnesModuleTests() {
+  earlyDetectionRequiresLayeredCommandTables();
+  earlyPatternsRetainStateAndUseBothInstruments();
+  earlyFinePitchFixedPitchAndRests();
+  earlyDivisorsAndLoopPolicy();
+  earlyEnvelopesKeepPhysicalTimeAndEncodedStride();
+  earlyUnsupportedAllocationAndInvalidPointersAreDiagnosed();
   detectsTablesAndBuildsBank();
   noteTieRestAndZeroDurations();
   tempoUpdatesPendingWaitsInPhysicalTime();

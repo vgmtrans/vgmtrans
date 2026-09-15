@@ -5,14 +5,14 @@
  */
 
 #include "value/formats/SculptSoftSnes/SculptSoftSnes.h"
+#include "value/formats/SculptSoftSnes/SculptSoftSnesEarly.h"
+#include "value/formats/SculptSoftSnes/SculptSoftSnesVoice.h"
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompilerCursor.h"
-#include "value/synth/SnesDsp.h"
 
 #include <fmt/format.h>
 
 #include <algorithm>
-#include <cmath>
 #include <map>
 #include <memory>
 #include <utility>
@@ -22,8 +22,6 @@ namespace vgmtrans::formats::sculpt_soft_snes {
 using namespace core;
 
 namespace {
-
-constexpr std::array<u8, 4> kCurveFlags{1, 4, 8, 2};  // Gain, pitch, pan, sample.
 
 struct Phrase {
   Address start;
@@ -41,20 +39,13 @@ struct PhraseFrame {
   u8 savedVolume = 0;
 };
 
-struct RuntimeConfig {
-  std::shared_ptr<const DriverData> data;
-  u32 frameMicroseconds;
-  Revision revision;
-};
-
 struct ProgramState {
   u8 tempo = 0;
   u8 phase = 0xff;
   u16 gateScale = 0x100;
   u64 frame = 0;
   bool sequenceTick = true;
-  u8 echoMask = 0;
-  std::optional<std::array<u8, 12>> echo;
+  EchoState echo;
   std::optional<u16> nextGate;
   bool legato = false;
 
@@ -69,40 +60,16 @@ struct ProgramState {
   }
 };
 
-struct TrackState {
-  TrackState(TrackStateContext context, const RuntimeConfig& config)
-      : data(config.data), frameSeconds(config.frameMicroseconds / 1000000.0), revision(config.revision),
-        number(context.sourceTrackNumber) {}
+struct TrackState : VoiceState {
+  using VoiceState::VoiceState;
 
-  std::shared_ptr<const DriverData> data;
-  double frameSeconds;
-  Revision revision;
-  u32 number;
   u16 pitch = 0x21c;
   u16 finePitch = 0;
   u16 transpose = 0;
   u8 volume = 0;
   u8 program = 0;
-  u8 sample = 0;
-  u8 voiceVolume = 0;
-  u8 fixedPan = 50;
-  u8 fixedSample = 0;
-  Patch patch;
-  std::array<CurvePlayer, 4> curves;
-  bool alternatePan = false;
   std::vector<PhraseFrame> phrases;
   u16 remaining = 0;
-  std::optional<PerformanceNoteId> note;
-  double noteKey = 0;
-  u16 voicePitch = 0;
-  s16 envelope = 0;
-  u8 gainRegister = 0;
-  bool sounding = false;
-  bool warnedPitchModulation = false;
-  std::optional<u8> emittedSample;
-  std::optional<std::array<s8, 2>> emittedBalance;
-  std::optional<double> emittedExpression;
-  std::optional<double> emittedPitch;
 };
 
 [[nodiscard]] u8 scaledVolume(u8 volume, u16 scale) {
@@ -114,211 +81,19 @@ struct Playback : SequencePlayback<TrackState> {
 
   void beforeCommand() { program.advance(vm.tick()); }
 
-  void warning(std::string message) {
-    vm.diagnostic(Diagnostic{.severity = Severity::Warning, .message = std::move(message), .range = vm.sourceRange()});
-  }
+  [[nodiscard]] Voice voice() { return Voice{track, program.echo, out, vm}; }
 
-  [[nodiscard]] double key() const {
-    if ((track.data->sampleFlags[track.sample] & 0x80) != 0) {
-      return 72.0;
-    }
-    u16 pitch = track.voicePitch;
-    if ((track.patch.flags & 4) != 0) {
-      pitch = static_cast<u16>(pitch + track.curves[1].value - 0x4b0);
-    }
-    pitch = static_cast<u16>(pitch + track.data->sampleTuning[track.sample]);
-    if ((track.patch.flags & 0x40) != 0) {
-      return 72.0 + 12.0 * std::log2(std::max(1u, unsigned(pitch & 0x3fff)) / 4096.0);
-    }
-    const unsigned topOctave = track.revision == Revision::Extended ? 10 : 4;
-    if (track.revision == Revision::Extended) {
-      pitch = static_cast<u16>(pitch + 0x5a0);
-    }
-    // Clamp high octaves; negative words take the wrapped low-octave path.
-    unsigned octave = topOctave;
-    if (pitch < (topOctave + 1) * 240) {
-      octave = pitch / 240;
-    } else if (pitch >= 0x8000) {
-      pitch = static_cast<u16>(pitch + 0xdf20);
-      octave = 0;
-    }
-    // Preserve the driver's musical units without its integer table/shift rounding.
-    return track.data->pitchBaseKey - 12.0 * (topOctave - octave) + (pitch % 240) / 20.0;
-  }
-
-  void selectSample(u8 sample) {
-    track.sample = sample;
-    if (track.emittedSample != sample) {
-      out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = sample});
-      track.emittedSample = sample;
-    }
-  }
-
-  void emitEcho() {
-    const u8 bit = static_cast<u8>(1u << track.number);
-    program.echoMask &= static_cast<u8>(~bit);
-    if ((track.patch.flags & 0x10) != 0) {
-      if (const auto& preset = track.data->echoes[track.patch.echo]) {
-        program.echo = preset;
-        program.echoMask |= bit;
-      } else {
-        warning("Invalid SculptSoftSnes echo preset");
-      }
-    }
-    if (!program.echo) {
-      out.reverb(ReverbPerformanceEvent{.voiceMask = program.echoMask, .send = 0.0});
-      return;
-    }
-    const auto& echo = program.echo;
-    const auto gain = [](u8 value) { return std::min<u8>(value, 75) / 128.0; };
-    const double left = gain((*echo)[1]);
-    const double right = gain((*echo)[2]);
-    out.reverb(ReverbPerformanceEvent{.voiceMask = program.echoMask,
-                                      .send = std::max(std::abs(left), std::abs(right)),
-                                      .leftGain = left,
-                                      .rightGain = right,
-                                      .delayMilliseconds = ((*echo)[0] & 15) * 16.0,
-                                      .feedback = static_cast<s8>((*echo)[3]) / 128.0});
-  }
-
-  void emitVoice() {
-    const u8 pan = static_cast<u8>((track.patch.flags & 8) ? track.curves[2].value : track.fixedPan);
-    const u8 left = static_cast<u8>((track.voiceVolume * pan) / 100);
-    const u8 right = static_cast<u8>(track.voiceVolume - left);
-    std::array<s8, 2> balance{static_cast<s8>(left), static_cast<s8>(right)};
-    if (track.alternatePan) {
-      std::swap(balance[0], balance[1]);
-    }
-    if (track.emittedBalance != balance) {
-      out.stereoBalance(balance[0] / 128.0, balance[1] / 128.0);
-      track.emittedBalance = balance;
-    }
-    const double expression = track.envelope / 2047.0;
-    if (track.emittedExpression != expression) {
-      out.expression(expression);
-      track.emittedExpression = expression;
-    }
-    const double bend = key() - track.noteKey;
-    if (track.emittedPitch != bend) {
-      out.pitchBend(bend);
-      track.emittedPitch = bend;
-    }
+  void tick() {
+    program.advance(vm.tick());
+    voice().tick();
   }
 
   void attack(u16 duration, bool legato) {
-    if (!track.data->patches[track.program]) {
-      warning(fmt::format("Invalid SculptSoftSnes instrument {}", track.program));
-      return;
-    }
-    track.patch = *track.data->patches[track.program];
-    track.voiceVolume = std::min<u8>(track.volume, 127);
-    const std::array<u8, 4> indices{track.patch.gain, track.patch.pitch, track.patch.pan, track.patch.sample};
     const auto scaledByte = [&](u8 value) { return (u32(value) * program.gateScale + 128) >> 8; };
     // The extended driver scales and rounds the two duration bytes separately.
     const u16 gate = static_cast<u16>(scaledByte(static_cast<u8>(duration)) +
                                       (track.revision == Revision::Extended ? scaledByte(duration >> 8) << 8 : 0));
-    for (u8 lane = 0; lane < (legato ? 2 : 4); ++lane) {
-      if ((track.patch.flags & kCurveFlags[lane]) == 0) {
-        continue;
-      }
-      const auto& curve = track.data->curves[lane][indices[lane]];
-      if (!curve) {
-        warning(fmt::format("Invalid SculptSoftSnes envelope: patch {}, lane {}, index {}", track.program, lane,
-                            indices[lane]));
-        track.patch.flags &= static_cast<u8>(~kCurveFlags[lane]);
-      } else {
-        track.curves[lane].start(*curve, gate);
-        // $0856 runs sequence commands before the frame's envelope updates.
-        track.curves[lane].tick();
-      }
-    }
-    if (!legato) {
-      track.alternatePan = (track.patch.flags & 8) != 0 && track.curves[2].curve->alternate && !track.alternatePan;
-      if ((track.patch.flags & 8) == 0) {
-        track.fixedPan = track.patch.pan;
-      }
-      if ((track.patch.flags & 2) == 0) {
-        track.fixedSample = track.patch.sample;
-      }
-    }
-    const u8 sample = static_cast<u8>((track.patch.flags & 2) ? track.curves[3].value : track.fixedSample);
-    const bool retrigger =
-        !legato && (!track.sounding || track.sample != sample || (track.data->sampleFlags[sample] & 0x40) != 0);
-    if (retrigger && track.note) {
-      out.setNoteEnd(*track.note, vm.tick());
-    }
-    if (!legato) {
-      selectSample(sample);
-    }
-    if ((track.patch.flags & 0x20) != 0 && !track.warnedPitchModulation) {
-      track.warnedPitchModulation = true;
-      warning("SculptSoftSnes DSP pitch modulation is not representable by the current performance model");
-    }
-    if (retrigger) {
-      // Keep sample tuning and fractional pitch in the bend when choosing an
-      // integral MIDI key for the new voice.
-      track.noteKey = std::clamp(std::round(key()), 0.0, 127.0);
-    }
-    if (legato) {
-      updateGainRegister();
-    } else {
-      track.gainRegister = static_cast<u8>((track.patch.flags & 1) ? track.curves[0].value : track.patch.gain);
-      track.envelope = snesDspGainEnvelopeValue(track.gainRegister, 0, 0.0);
-      emitEcho();
-    }
-    emitVoice();
-    if (retrigger) {
-      track.note = out.note(track.noteKey, 1.0, 1);
-    }
-    track.sounding = track.sounding || retrigger;
-  }
-
-  void tick() {
-    program.advance(vm.tick());
-    if (!track.sounding) {
-      return;
-    }
-    // DSP rate counters continue across the 20 ms software updates. Restarting
-    // a rate on every frame would freeze slow release rates indefinitely.
-    constexpr std::array<u32, 32> periods{30720, 2048, 1536, 1280, 1024, 768, 640, 512, 384, 320, 256,
-                                          192,   160,  128,  96,   80,   64,  48,  40,  32,  24,  20,
-                                          16,    12,   10,   8,    6,    5,   4,   3,   2,   1};
-    const u32 period = periods[track.gainRegister & 31];
-    const auto samplesPerFrame = static_cast<u64>(std::llround(track.frameSeconds * kSnesDspSampleRate));
-    const u64 clocks = (vm.tick() * samplesPerFrame) / period - ((vm.tick() - 1) * samplesPerFrame) / period;
-    track.envelope =
-        snesDspGainEnvelopeValue(track.gainRegister, track.envelope, (clocks * period + 0.001) / kSnesDspSampleRate);
-    for (u8 lane = 0; lane < track.curves.size(); ++lane) {
-      if ((track.patch.flags & kCurveFlags[lane]) != 0) {
-        track.curves[lane].tick();
-      }
-    }
-    if ((track.patch.flags & 2) != 0 && track.curves[3].value != track.sample) {
-      out.setNoteEnd(*track.note, vm.tick());
-      selectSample(static_cast<u8>(track.curves[3].value));
-      track.noteKey = std::clamp(std::round(key()), 0.0, 127.0);
-      track.note = out.note(track.noteKey, 1.0, 1);
-    }
-    updateGainRegister();
-    emitVoice();
-    out.setNoteEnd(*track.note, vm.tick() + 1);
-  }
-
-  void updateGainRegister() {
-    // Choose a linear GAIN rate from the distance to the next target.
-    constexpr std::array<u8, 22> distances{255, 214, 160, 128, 107, 80, 64, 54, 40, 32, 27,
-                                           20,  16,  14,  11,  8,   6,  5,  4,  3,  2,  1};
-    constexpr std::array<u8, 22> rates{29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19,
-                                       18, 17, 16, 15, 14, 13, 12, 10, 9,  6,  0};
-    const int target = static_cast<u8>((track.patch.flags & 1) ? track.curves[0].value : track.patch.gain);
-    const int difference = target - (track.envelope >> 4);
-    const unsigned distance = std::abs(difference) / 2;
-    unsigned rateIndex = 21;
-    while (rateIndex > 0 && distance >= distances[rateIndex]) {
-      --rateIndex;
-    }
-    track.gainRegister =
-        distance == 0 && target == 0 ? 0x82 : static_cast<u8>((difference < 0 ? 0x80 : 0xc0) | rates[rateIndex]);
+    voice().attack(track.program, track.volume, gate, legato);
   }
 
   [[nodiscard]] Effects waitFrame() {
@@ -347,11 +122,7 @@ struct Playback : SequencePlayback<TrackState> {
       track.finePitch = 0;
     }
     if (opcode == 0xf3) {
-      if (track.note) {
-        out.setNoteEnd(*track.note, vm.tick());
-      }
-      track.note.reset();
-      track.sounding = false;
+      voice().silence();
     } else if (opcode != 0xf4 && duration != 0) {
       const u16 gate = program.nextGate.value_or(duration);
       program.nextGate.reset();
@@ -361,7 +132,7 @@ struct Playback : SequencePlayback<TrackState> {
       if (retrigger) {
         attack(gate, legato);
       } else if (track.sounding) {
-        emitVoice();
+        voice().emitVoice();
       }
     }
     if (duration == 0 && opcode != 0xf3 && opcode != 0xf4) {
@@ -395,7 +166,7 @@ struct Playback : SequencePlayback<TrackState> {
 
   [[nodiscard]] Effects call(Phrase phrase) {
     if (track.phrases.size() == 5) {
-      warning("SculptSoftSnes phrase stack exceeds five entries");
+      voice().warning("SculptSoftSnes phrase stack exceeds five entries");
       return vm.end();
     }
     const u8 savedVolume = track.volume;
@@ -431,9 +202,7 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   [[nodiscard]] Effects end() {
-    if (track.note) {
-      out.setNoteEnd(*track.note, vm.tick());
-    }
+    voice().silence();
     return vm.end();
   }
 };
@@ -625,17 +394,22 @@ SequenceProgram decodeSequence(ByteReader reader, const Layout& layout, const Dr
   if (referencedPrograms) {
     referencedPrograms->insert(0);
   }
-  const u16 tracks = reader.le16(layout.tables + 0x10);
+  const u16 tracks = reader.le16(layout.tables + (layout.revision == Revision::Early ? 0x18 : 0x10));
   for (u32 i = layout.tracks; i-- > 0;) {
     const u32 pointer = tracks + reader.u8At(layout.song + 1 + i) * 2u;
     const u16 start = reader.le16(pointer);
     sequence.trackPointer(i, reader.range(pointer, 2), start);
-    sequence.addTrack(decodeTrack(sequence.trackScope(), i, start, layout.revision, diagnostics, referencedPrograms));
+    sequence.addTrack(
+        layout.revision == Revision::Early
+            ? decodeEarlyTrack(sequence.trackScope(), layout, i, start, diagnostics, referencedPrograms)
+            : decodeTrack(sequence.trackScope(), i, start, layout.revision, diagnostics, referencedPrograms));
   }
-  return sequence.finish(
-      makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{.data = std::make_shared<const DriverData>(data),
-                                                                .frameMicroseconds = layout.frameMicroseconds,
-                                                                .revision = layout.revision}));
+  RuntimeConfig runtime{.data = std::make_shared<const DriverData>(data),
+                        .frameMicroseconds = layout.frameMicroseconds,
+                        .revision = layout.revision};
+  return sequence.finish(layout.revision == Revision::Early
+                             ? makeEarlyRuntime(std::move(runtime))
+                             : makeCompiledRuntime<Playback, ProgramState>(std::move(runtime)));
 }
 
 }  // namespace vgmtrans::formats::sculpt_soft_snes

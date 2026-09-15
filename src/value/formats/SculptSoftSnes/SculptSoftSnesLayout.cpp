@@ -23,6 +23,14 @@ constexpr auto kSong =
 constexpr auto kPhrase =
     makeMaskedBytePattern("\xf8\x62\xf4\x7f\x80\xa8\x05\xd4\x7f\x60\x94\x87\xfd\xcb\x00\xf8\x63", "x?x?xxxx?xx?xx?x?");
 constexpr auto kDispatch = makeMaskedBytePattern("\xdd\x28\x0f\x1c\x5d\x1f\x00\x00", "xxxxxx??");
+// Early tracks call pattern lists, which in turn call note patterns.
+constexpr auto kEarlyList = makeMaskedBytePattern(
+    "\x3f\x00\x00\x8d\x16\x3f\x00\x00\xf8\x5e\xd4\x7b\xdd\xd4\x7c\xf8\x5d\xe8\x0a\xd4\x61\x5f\x00\x00",
+    "x??xxx??x?x?xx?x?xxx?x??");
+constexpr auto kEarlyDispatch = makeMaskedBytePattern("\x3f\x00\x00\x5d\x1f\x00\x00", "x??xx??");
+constexpr auto kEarlyPattern =
+    makeMaskedBytePattern("\x8d\x10\x3f\x00\x00\xe8\x06\xd4\x61\x5f\x00\x00", "xxx??xxx?x??");
+constexpr auto kEarlyPatternEnd = makeMaskedBytePattern("\xf8\x5d\xe8\x0a\xd4\x61\x5f\x00\x00", "x?xxx?x??");
 constexpr auto kPitch = makeMaskedBytePattern("\xf6\x00\x00\xc4\x2c\xf6\x00\x00\xc4\x2d\xe8\x04\x80", "x??x?x??x?xxx");
 // NHL Stanley Cup and Rocko add six octaves before the lookup and shift over
 // ten octaves. Their FB/FC commands extend the envelope gate and suppress key-on.
@@ -48,9 +56,10 @@ std::optional<Layout> findLayout(ByteReader reader) {
   const auto lookup = findBytePattern(reader, kLookup);
   const auto songCode = findBytePattern(reader, kSong);
   const auto phrase = findBytePattern(reader, kPhrase);
+  const auto earlyList = findBytePattern(reader, kEarlyList);
   const auto dispatch = findBytePattern(reader, kDispatch);
   auto pitch = findBytePattern(reader, kPitch);
-  Revision revision = Revision::Standard;
+  Revision revision = earlyList ? Revision::Early : Revision::Standard;
   if (!pitch) {
     pitch = findBytePattern(reader, kExtendedPitch);
     revision = Revision::Extended;
@@ -59,7 +68,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
   const auto directory = findBytePattern(reader, kDirectory);
   const auto timer = findBytePattern(reader, kTimer);
   const auto frame = findBytePattern(reader, kFrame);
-  if (!lookup || !songCode || !phrase || !dispatch || !pitch || !delta || !directory || !timer || !frame ||
+  if (!lookup || !songCode || !dispatch || !pitch || !delta || !directory || !timer || !frame ||
       reader.le16(*songCode + 3) != *lookup || reader.u8At(*frame + 8) == 0 ||
       reader.u8At(*frame + 8) != reader.u8At(*frame + 12)) {
     return std::nullopt;
@@ -68,16 +77,35 @@ std::optional<Layout> findLayout(ByteReader reader) {
   const u16 tables = reader.le16(*lookup + 8);
   const u16 pitchTable = reader.le16(*pitch + 1);
   const u16 deltaTable = reader.le16(*delta + 1);
+  if (revision == Revision::Early) {
+    const u16 fetch = reader.le16(*earlyList + 1);
+    const u16 lists = reader.le16(*earlyList + 22);
+    if (fetch < 7 || !matchesBytePattern(reader, fetch - 7, kEarlyDispatch) ||
+        !matchesBytePattern(reader, lists, kEarlyDispatch) || reader.le16(*earlyList + 6) != *lookup) {
+      return std::nullopt;
+    }
+    const u16 trackCommands = reader.le16(fetch - 2);
+    const u16 listCommands = reader.le16(lists + 5);
+    if (!reader.has(trackCommands, 12) || !reader.has(listCommands, 24) || !reader.has(commands, 10) ||
+        reader.le16(trackCommands + 8) != *earlyList ||
+        !matchesBytePattern(reader, reader.le16(listCommands + 2), kEarlyPattern) ||
+        !matchesBytePattern(reader, reader.le16(commands), kEarlyPatternEnd) ||
+        reader.le16(reader.le16(commands) + 7) != lists) {
+      return std::nullopt;
+    }
+  } else if (!phrase || !reader.has(commands, 22) || reader.le16(commands + 12) != *phrase ||
+             reader.le16(commands + 14) != reader.le16(commands + 16)) {
+    return std::nullopt;
+  }
   if (revision == Revision::Extended &&
       (*pitch < 57 || !matchesBytePattern(reader, *pitch - 57, kPitchBias) || !reader.has(commands, 26) ||
        !matchesBytePattern(reader, reader.le16(commands + 22), kLongGate) ||
        !matchesBytePattern(reader, reader.le16(commands + 24), kLegato))) {
     return std::nullopt;
   }
-  if (!reader.has(commands, 22) || reader.le16(commands + 12) != *phrase ||
-      reader.le16(commands + 14) != reader.le16(commands + 16) || !reader.has(tables, 32) ||
-      reader.le16(*lookup + 15) != tables + 1 || reader.le16(*pitch + 6) != pitchTable + 240 ||
-      reader.le16(*delta + 8) != deltaTable + 32 || !reader.has(pitchTable, 480) || !reader.has(deltaTable, 64)) {
+  if (!reader.has(tables, 32) || reader.le16(*lookup + 15) != tables + 1 ||
+      reader.le16(*pitch + 6) != pitchTable + 240 || reader.le16(*delta + 8) != deltaTable + 32 ||
+      !reader.has(pitchTable, 480) || !reader.has(deltaTable, 64)) {
     return std::nullopt;
   }
   const u16 song = reader.le16(reader.u8At(*songCode + 6));
@@ -88,7 +116,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
   if (tracks == 0 || tracks > 8 || !reader.has(song, 1u + tracks)) {
     return std::nullopt;
   }
-  const u16 trackTable = reader.le16(tables + 0x10);
+  const u16 trackTable = reader.le16(tables + (revision == Revision::Early ? 0x18 : 0x10));
   for (u32 track = 0; track < tracks; ++track) {
     const u32 entry = trackTable + reader.u8At(song + 1 + track) * 2u;
     if (!reader.has(entry, 2) || reader.le16(entry) < 0x200 || reader.le16(entry) == 0xffff) {

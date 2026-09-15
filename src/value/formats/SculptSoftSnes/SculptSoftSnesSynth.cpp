@@ -18,12 +18,13 @@ namespace vgmtrans::formats::sculpt_soft_snes {
 
 using namespace core;
 
-namespace {
-
-[[nodiscard]] std::optional<u16> tableEntry(ByteReader reader, const Layout& layout, u8 table, u8 index) {
+std::optional<u16> readTablePointer(ByteReader reader, const Layout& layout, u8 table, u8 index) {
   const u16 base = reader.le16(layout.tables + table);
   u32 end = kAramSize;
-  for (u8 offset : {2, 4, 6, 8, 10, 12, 14, 16, 26}) {
+  for (u8 offset = 2; offset <= 26; offset += 2) {
+    if (layout.revision != Revision::Early && offset > 16 && offset < 26) {
+      continue;
+    }
     const u16 next = reader.le16(layout.tables + offset);
     if (next > base) {
       end = std::min(end, u32(next));
@@ -37,17 +38,23 @@ namespace {
   return address >= 0x200 && address != 0xffff ? std::optional{address} : std::nullopt;
 }
 
-[[nodiscard]] std::optional<Curve> readCurve(ByteReader reader, u16 address, u8 width) {
-  if (!reader.has(address, 8) || reader.u8At(address + 6) != width) {
+namespace {
+
+[[nodiscard]] std::optional<Curve> readCurve(ByteReader reader, u16 address) {
+  if (!reader.has(address, 8)) {
     return std::nullopt;
   }
   const u8 count = reader.u8At(address + 5);
   const u8 loopStart = reader.u8At(address);
   const u8 loopEnd = reader.u8At(address + 1);
+  // The header specifies a byte stride, not a lane type. The interpreter reads
+  // one byte for stride 1 and a word otherwise, including nonstandard strides.
+  const u8 stride = reader.u8At(address + 6);
+  const u8 width = stride == 1 ? 1 : 2;
   // Some authored curves put release/loop points beyond the nominal end.
   // The SPC follows those indexes literally, so retain the reachable tail.
   const u32 storedCount = loopEnd == 0xff ? count : std::max({u32(count), u32(loopStart) + 1, u32(loopEnd) + 1});
-  const u32 size = 8u + storedCount * width;
+  const u32 size = 8u + (std::max(1u, storedCount) - 1) * stride + width;
   if (count == 0 || !reader.has(address, size)) {
     return std::nullopt;
   }
@@ -62,7 +69,7 @@ namespace {
       .pointCount = count,
   };
   for (u32 i = 0; i < storedCount; ++i) {
-    const u32 at = address + 8 + i * width;
+    const u32 at = address + 8 + i * stride;
     curve.points.push_back(width == 1 ? reader.u8At(at) : reader.le16(at));
   }
   return curve;
@@ -80,18 +87,19 @@ DriverData readDriverData(ByteReader reader, const Layout& layout) {
   }
   for (u32 i = 0; i < 256; ++i) {
     for (u8 lane = 0; lane < 4; ++lane) {
-      if (const auto address = tableEntry(reader, layout, 4 + lane * 2, static_cast<u8>(i))) {
-        data.curves[lane][i] = readCurve(reader, *address, lane == 1 ? 2 : 1);
+      if (const auto address = readTablePointer(reader, layout, 4 + lane * 2, static_cast<u8>(i))) {
+        data.curves[lane][i] = readCurve(reader, *address);
       }
     }
-    if (const auto address = tableEntry(reader, layout, 12, static_cast<u8>(i)); address && reader.has(*address, 12)) {
+    if (const auto address = readTablePointer(reader, layout, 12, static_cast<u8>(i));
+        address && reader.has(*address, 12)) {
       std::array<u8, 12> echo{};
       for (u32 byte = 0; byte < echo.size(); ++byte) {
         echo[byte] = reader.u8At(*address + byte);
       }
       data.echoes[i] = echo;
     }
-    const auto address = tableEntry(reader, layout, 2, static_cast<u8>(i));
+    const auto address = readTablePointer(reader, layout, 2, static_cast<u8>(i));
     if (!address || !reader.has(*address, 6)) {
       continue;
     }
@@ -219,7 +227,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
       }
     }
     if ((patch->flags & 0x10) != 0 && data.echoes[patch->echo]) {
-      if (const auto address = tableEntry(reader, layout, 12, patch->echo)) {
+      if (const auto address = readTablePointer(reader, layout, 12, patch->echo)) {
         bank.instruments()
             .source(SourceRole::TableEntry, "Echo / FIR", reader.range(*address, 12), "sculpt-soft-snes-echo")
             .parent(root.id());

@@ -23,7 +23,7 @@ inline constexpr u32 kAramSize = 0x10000;
 inline constexpr u32 kCommandLimit = 131072;
 inline constexpr std::string_view kInstrumentDomain = "sculpt-soft-snes.sample";
 
-enum class Revision { Standard, Extended };
+enum class Revision { Early, Standard, Extended };
 
 struct Layout {
   Revision revision = Revision::Standard;
@@ -86,6 +86,7 @@ struct DriverData {
 };
 
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);
+[[nodiscard]] std::optional<u16> readTablePointer(core::ByteReader reader, const Layout& layout, u8 table, u8 index);
 [[nodiscard]] DriverData readDriverData(core::ByteReader reader, const Layout& layout);
 [[nodiscard]] core::SequenceProgram decodeSequence(core::ByteReader reader, const Layout& layout,
                                                    const DriverData& data, core::AssetId id,
