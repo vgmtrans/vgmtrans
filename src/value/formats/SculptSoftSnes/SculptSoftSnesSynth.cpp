@@ -11,6 +11,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 
 namespace vgmtrans::formats::sculpt_soft_snes {
@@ -71,10 +72,8 @@ namespace {
 
 DriverData readDriverData(ByteReader reader, const Layout& layout) {
   DriverData data;
-  for (u32 i = 0; i < 240; ++i) {
-    data.pitches[i] =
-        static_cast<u16>(reader.u8At(layout.pitchTable + i) | (reader.u8At(layout.pitchTable + 240 + i) << 8));
-  }
+  const u16 basePitch = reader.u8At(layout.pitchTable) | (reader.u8At(layout.pitchTable + 240) << 8);
+  data.pitchBaseKey = 72.0 + 12.0 * std::log2(std::max(1u, unsigned(basePitch)) / 4096.0);
   for (u32 i = 0; i < 32; ++i) {
     data.deltas[i] =
         static_cast<s16>(reader.u8At(layout.deltaTable + i) | (reader.u8At(layout.deltaTable + 32 + i) << 8));

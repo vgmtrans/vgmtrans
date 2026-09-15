@@ -166,11 +166,91 @@ void midiPreservesSampleTuningAndFinePitch() {
         bend = message->value / 8192.0;
       }
     }
-    const u16 pitch = static_cast<u16>(data[0x2400 + index] | (data[0x24f0 + index] << 8));
-    const double expected = 72 + 12 * std::log2(pitch / 4096.0);
+    const double expected = 72 + index / 20.0;
     const double actual = notes.front().key + bend * ranges.front().second / 100.0;
-    expect(std::abs(actual - expected) < 0.005,
-           "MIDI note plus bend must preserve the DSP frequency, including fractional sample tuning");
+    expect(std::abs(actual - expected) < ranges.front().second / (8192.0 * 100),
+           "MIDI note plus bend must preserve musical pitch and sample tuning within one wheel step");
+  }
+}
+
+void semitoneAttacksKeepOneTuningBend() {
+  for (const auto revision : {Revision::Standard, Revision::Extended}) {
+    for (const u16 basePitch : {4096, 8192}) {
+      for (const s16 tuning : {-7, 0, 7, 10}) {
+        auto data = fixture(revision);
+        for (u32 i = 0; i < 240; ++i) {
+          const u16 pitch = static_cast<u16>(basePitch * std::exp2(i / 240.0));
+          data[0x2400 + i] = static_cast<u8>(pitch);
+          data[0x24f0 + i] = static_cast<u8>(pitch >> 8);
+        }
+        word(data, 0x6000, static_cast<u16>(tuning));
+        bytes(data, 0x4100, {0xf2, 100});
+        for (u16 i = 0; i < 36; ++i) {
+          const u16 pitch = 480 + 20 * i;
+          bytes(data, 0x4102 + 4 * i, {0xf7, static_cast<u8>(pitch), static_cast<u8>(pitch >> 8), 1});
+        }
+        data[0x4192] = 0xf0;
+        const auto midi = renderMidiSequence(render(data));
+        const auto& track = midi.tracks.front();
+        const auto notes = midiNotes(track.events);
+        expect(notes.size() == 36, "semitone runs must preserve every attack");
+        const auto isBend = [](const auto& event) {
+          return isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+        };
+        expect(std::ranges::count_if(track.events, isBend) == 1,
+               "semitone changes must retain one tuning bend across octave boundaries in both revisions");
+        const auto bend = std::ranges::find_if(track.events, isBend);
+        const double cents = midiPitchBendRanges(track.events).front().second;
+        const double offset = midiChannelMessage(*bend, MidiChannelMessageKind::PitchBend)->value * cents / 819200.0;
+        for (size_t i = 0; i < notes.size(); ++i) {
+          const double expected = (basePitch == 8192 ? 60 : 48) + i + tuning / 20.0;
+          expect(notes[i].tick == i && std::abs(notes[i].key + offset - expected) < cents / 819200.0,
+                 "table calibration and fractional sample tuning must survive semitone and octave changes");
+        }
+      }
+    }
+  }
+}
+
+void pitchCurvesPreserveFiveCentStepsAndAttackResets() {
+  auto data = fixture();
+  bytes(data, 0x5000, {4, 127, 1, 0, 50, 0});
+  word(data, 0x2160, 0x5100);
+  bytes(data, 0x5100, {0, 255, 0, 1, 0, 3, 2, 0, 0xb0, 4, 0xb1, 4, 0xb2, 4});
+  bytes(data, 0x4100, {0xf2, 100, 0xf7, 0xc0, 3, 3, 0xf7, 0xd4, 3, 3, 0xf0});
+  const auto performance = render(data);
+  const auto bends = events<PitchBendPerformanceEvent>(performance.tracks.front());
+  expect(bends.size() == 6, "each authored pitch-curve step and its attack reset must survive");
+  for (size_t i = 0; i < bends.size(); ++i) {
+    expect(bends[i].header.tick == i && std::abs(bends[i].semitones - (i % 3) / 20.0) < 1e-12,
+           "five-cent pitch steps must remain exact and reset when the next note restarts the curve");
+  }
+}
+
+void rawPitchRetainsDspResolution() {
+  auto data = fixture(Revision::Extended);
+  data[0x5000] = 0x40;
+  bytes(data, 0x4100, {0xf2, 100, 0xf7, 0, 0x10, 2, 0xf8, 1, 0x10, 2, 0xf8, 1, 0x50, 2, 0xf0});
+  const auto performance = render(data);
+  const auto bends = events<PitchBendPerformanceEvent>(performance.tracks.front());
+  expect(bends.size() == 2 && bends.back().header.tick == 2 &&
+             std::abs(bends.back().semitones - 12 * std::log2(4097.0 / 4096)) < 1e-12,
+         "raw pitch must retain sub-five-cent DSP changes and mask unused register bits");
+}
+
+void musicalPitchPreservesOctaveLimitsAndWrapping() {
+  for (const auto revision : {Revision::Standard, Revision::Extended}) {
+    for (const auto [pitch, key] : {std::pair{u16{1199}, 83.95}, std::pair{u16{1200}, 72.0},
+                                    std::pair{u16{0xffff}, revision == Revision::Extended ? 23.95 : 35.95}}) {
+      auto data = fixture(revision);
+      bytes(data, 0x4100, {0xf2, 100, 0xf7, static_cast<u8>(pitch), static_cast<u8>(pitch >> 8), 1, 0xf0});
+      const auto performance = render(data);
+      const auto& track = performance.tracks.front();
+      const double actual =
+          events<NotePerformanceEvent>(track).front().key + events<PitchBendPerformanceEvent>(track).front().semitones;
+      expect(std::abs(actual - key) < 1e-12,
+             "musical pitch must preserve high-octave limits, signed low pitches and the standard driver's wrap");
+    }
   }
 }
 
@@ -186,8 +266,8 @@ void phrasesRestoreVolumeAndTranspose() {
   expect(std::abs(notes[0].key - 73) < 0.01 && std::abs(notes[2].key - 72) < 0.01,
          "phrase transpose must be removed on return");
   const auto balance = events<StereoBalancePerformanceEvent>(performance.tracks.front());
-  expect(balance.size() == 3 && balance[0].leftGain == 25.0 / 128 && balance[1].leftGain == 25.0 / 128 &&
-             balance[2].leftGain == 50.0 / 128,
+  expect(balance.size() == 2 && balance[0].header.tick == 0 && balance[0].leftGain == 25.0 / 128 &&
+             balance[1].header.tick == 4 && balance[1].leftGain == 50.0 / 128,
          "phrase volume must be scaled once, preserved on repeat, and restored on return");
 }
 
@@ -238,11 +318,11 @@ void nestedPhrasesReplaceInstrumentsAndRespectLoopPolicy() {
   expect(notes.size() == 7 && notes.front().key == 74 && notes.back().key == 72,
          "nested phrase transpose must accumulate and unwind independently");
   const auto instruments = events<InstrumentPerformanceEvent>(track);
-  std::vector<u64> samples;
+  std::vector<std::pair<u64, u64>> samples;
   for (const auto& event : instruments) {
-    samples.push_back(std::get<InstrumentIdentity>(event.instrument).key);
+    samples.emplace_back(event.header.tick, std::get<InstrumentIdentity>(event.instrument).key);
   }
-  expect(samples == std::vector<u64>({2, 1, 2, 2, 1, 2, 2}),
+  expect(samples == std::vector<std::pair<u64, u64>>({{0, 2}, {1, 1}, {2, 2}, {4, 1}, {5, 2}}),
          "phrase replacement cursors must cycle across repeats; FF preserves the encoded patch");
 
   data[0x4107] = 0;  // The outer phrase loops forever.
@@ -256,6 +336,39 @@ void nestedPhrasesReplaceInstrumentsAndRespectLoopPolicy() {
              render(data, {.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = 2}).tracks.front())
                  .size() == 3,
          "F9 track restarts must honor the same loop policy");
+}
+
+void repeatedAttacksOnlyEmitChangedVoiceState() {
+  auto data = fixture();
+  word(data, 0x2122, 0x5010);
+  bytes(data, 0x5010, {0, 127, 2, 0, 25, 0});
+  word(data, 0x3008, 0x6003);
+  word(data, 0x300a, 0x6003);
+  bytes(data, 0x4100, {0xf2, 100,  0xf7, 0xc0, 3,    2, 0xf7, 0xc0, 3, 2, 0xf3, 2, 0xf7, 0xc0, 3, 2, 0xf2, 50,
+                       0xf7, 0xc0, 3,    2,    0xf5, 1, 0xf7, 0xc0, 3, 2, 0xf5, 0, 0xf7, 0xc0, 3, 2, 0xf0});
+  const auto performance = render(data);
+  const auto& track = performance.tracks.front();
+  expect(events<NotePerformanceEvent>(track).size() == 6, "unchanged voice state must still allow note retriggers");
+  const auto instruments = events<InstrumentPerformanceEvent>(track);
+  expect(instruments.size() == 3 && instruments[0].header.tick == 0 && instruments[1].header.tick == 10 &&
+             instruments[2].header.tick == 12,
+         "sample selections must persist across repeated attacks and rests, and emit changes in either direction");
+  const auto balance = events<StereoBalancePerformanceEvent>(track);
+  expect(balance.size() == 4 && balance[0].header.tick == 0 && balance[0].leftGain == 50.0 / 128 &&
+             balance[1].header.tick == 8 && balance[1].leftGain == 25.0 / 128 && balance[2].header.tick == 10 &&
+             balance[2].leftGain == 12.0 / 128 && balance[2].rightGain == 38.0 / 128 && balance[3].header.tick == 12 &&
+             balance[3].leftGain == 25.0 / 128,
+         "stereo output must suppress identical gains while retaining volume changes and integer pan rounding");
+
+  data = fixture();
+  bytes(data, 0x5000, {8, 127, 1, 0, 0, 0});
+  word(data, 0x2180, 0x5100);
+  bytes(data, 0x5100, {0, 255, 0, 1, 0, 1, 1, 1, 25});
+  bytes(data, 0x4100, {0xf2, 100, 0xf7, 0xc0, 3, 2, 0xf7, 0xc0, 3, 2, 0xf0});
+  const auto alternate = events<StereoBalancePerformanceEvent>(render(data).tracks.front());
+  expect(alternate.size() == 2 && alternate[0].leftGain == 75.0 / 128 && alternate[1].header.tick == 2 &&
+             alternate[1].leftGain == 25.0 / 128,
+         "alternating pan must still swap the output gains when the underlying curve value is unchanged");
 }
 
 void softwareEnvelopesStayOnTheHardwareClock() {
@@ -471,9 +584,14 @@ void runSculptSoftSnesModuleTests() {
   noteTieRestAndZeroDurations();
   tempoUpdatesPendingWaitsInPhysicalTime();
   midiPreservesSampleTuningAndFinePitch();
+  semitoneAttacksKeepOneTuningBend();
+  pitchCurvesPreserveFiveCentStepsAndAttackResets();
+  rawPitchRetainsDspResolution();
+  musicalPitchPreservesOctaveLimitsAndWrapping();
   phrasesRestoreVolumeAndTranspose();
   curvesFollowLoopReleaseAndInterpolation();
   nestedPhrasesReplaceInstrumentsAndRespectLoopPolicy();
+  repeatedAttacksOnlyEmitChangedVoiceState();
   softwareEnvelopesStayOnTheHardwareClock();
   slowGainReleaseEventuallyReachesSilence();
   sampleCurvesResolveTuningAndNoise();

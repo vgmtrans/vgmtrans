@@ -128,20 +128,27 @@ volume minus that integer quotient. Alternating pan switches sides on successive
 attacks. The sample's tuning is added before pitch conversion. $11b1 uses split
 240-byte pitch tables, octave shifts, and a special negative-word path.
 The Bugs Bunny table starts at 8192 and approaches 16384, rather than starting
-at the DSP's unity rate of 4096. Pitch conversion uses the driver's table and
-integer shifts, then converts the final 14-bit DSP register to a playback
-ratio. Bank regions use unity key 72 at 32000 Hz; sample-prefix tuning is
-already included in the sequence's ratio and must not be applied twice.
+at the DSP's unity rate of 4096. Entry `i` is `round(8192 × 2^(i/240))`, a rounded
+equal-tempered octave. Export uses that first entry to establish the
+pitch reference, then converts the sequence's twentieths of a semitone directly
+to musical pitch. It preserves sample tuning, pitch curves, and the driver's
+octave limits and wrapping, while omitting the table's integer rounding and
+discarded shift bits. Semitone changes therefore retain a constant tuning bend
+instead of introducing tiny per-note corrections. Bank regions use unity key 72
+at 32000 Hz; sample-prefix tuning is already included in the sequence's pitch
+and must not be applied twice.
 
 The extended revision adds $05a0 (six octaves) before the table lookup and
 shifts over ten octaves instead of four. This preserves the ordinary pitch
 range while accommodating lower signed pitches. Raw DSP pitch patches bypass
-both the bias and the table conversion.
+both the bias and the table conversion; export retains their exact 14-bit
+register-to-playback-rate calculation.
 
 MIDI export rounds note numbers, so each attack uses an integral anchor key
-and retains the fractional part in its pitch bend. This preserves the DSP
-frequency, including sample tuning and subsequent fine-pitch commands, without
-losing up to half a semitone to note-number rounding.
+and retains the fractional part in its pitch bend. This preserves sample tuning
+and subsequent fine-pitch commands without losing up to half a semitone to
+note-number rounding. No minimum bend size or change threshold is applied:
+authored five-cent steps and smaller raw DSP-pitch changes remain intact.
 
 Echo presets contain EDL, EVOL L/R, feedback, and eight FIR coefficients, in the
 DSP register order $080a. The global master starts at 75/128. Each patch attack

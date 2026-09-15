@@ -79,7 +79,8 @@ struct DriverData {
   std::array<std::optional<std::array<u8, 12>>, 256> echoes;
   std::array<s16, 256> sampleTuning{};
   std::array<u8, 256> sampleFlags{};
-  std::array<u16, 240> pitches{};
+  // MIDI key of the pitch table's first entry, before octave shifts.
+  double pitchBaseKey = 0;
   std::array<s16, 32> deltas{};
   std::set<u8> samples;
 };
