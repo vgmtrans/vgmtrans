@@ -23,12 +23,13 @@ namespace {
 double dsePitchLfoDepthCents(int32_t amplitude) {
   // [Pokemon Mystery Dungeon: Explorers of Sky]: The DSE driver shifts amplitude left by 10, then shifts waveform
   // output right by 8 before adding it to pitch in 1/256-semitone units.
-  return std::abs(static_cast<double>(amplitude)) * 25.0 / 16.0;
+  const int64_t magnitude = amplitude < 0 ? -static_cast<int64_t>(amplitude) : amplitude;
+  return static_cast<double>(magnitude) * 25.0 / 16.0;
 }
 
 double dseFullTriangleFrequencyHz(uint16_t periodMs) {
-  // Full-triangle direction changes once per period, so one cycle is two
-  // phase periods.
+  // [Pokemon Mystery Dungeon: Explorers of Sky]: The triangle generator reverses direction after each period, so a
+  // complete rising and falling cycle spans two periods.
   return periodMs == 0 ? 0.0 : 1000.0 / (2.0 * periodMs);
 }
 }  // namespace
@@ -632,10 +633,8 @@ bool PSDSEInstr::loadInstr() {
   addChild(offset() + 0x04, 1, "Program Volume");
 
   if (pInstrSet->m_header.version == 0x0402) {
-    // [Luminous Arc]: Version 0x0402 program records use this field layout.
-    // 0x00 ID (1)
-    // 0x01 nbsplits (1)
-    // 0xD0 SplitsTbl
+    // [Luminous Arc]: Version 0x0402 stores the split count at +0x01, four LFO records at +0x90, and the split table
+    // at +0xd0.
     nbsplits = readByte(offset() + 0x01);
     splitsOffset = offset() + 0xD0;
     lfoTableOffset = offset() + 0x90;
@@ -702,28 +701,30 @@ bool PSDSERgn::loadRgn() {
 
   const bool isV402 = pInstrSet->m_header.version == 0x0402;
   const uint32_t tuningOffset = offset() + (isV402 ? 0x12 : 0x14);
-  const uint32_t envelopeOffset = offset() + (isV402 ? 0x1e : 0x20);
+  const uint32_t envelopeOffset = offset() + 0x20;
 
   // [Luminous Arc]: Split key and velocity ranges occupy the same offsets as version 0x0415. Only the sample
   // ID width and the fields between the sample ID and envelope rates move in version 0x0402.
-  // [Fushigi no Dungeon: Fuurai no Shiren 5: Fortune Tower to Unmei no Dice]: The selector reads the primary
-  // ranges, leaving the mirrored ranges and split flag unused.
+  // [Luminous Arc]: The split selector reads only the primary key and velocity ranges; the adjacent matching values
+  // are retained authoring mirrors rather than a second runtime range.
+  // [Fushigi no Dungeon: Fuurai no Shiren 5: Fortune Tower to Unmei no Dice]: The version 0x0415 selector follows
+  // the same primary-range behavior and does not read the authoring split flag.
   addChild(offset(), 2, "ID");
   addChild(offset() + 0x02, 1, "Bend Sensitivity");
-  addChild(offset() + 0x03, 1, "Unused Split Flag");
+  addChild(offset() + 0x03, 1, "Authoring Split Flag");
   lowKey = readByte(offset() + 0x04);
   hiKey = readByte(offset() + 0x05);
   lowVel = readByte(offset() + 0x08);
   hiVel = readByte(offset() + 0x09);
   addChild(offset() + 0x04, 1, "Low Key");
   addChild(offset() + 0x05, 1, "High Key");
-  addChild(offset() + 0x06, 1, "Mirror Low Key (Unused)");
-  addChild(offset() + 0x07, 1, "Mirror High Key (Unused)");
+  addChild(offset() + 0x06, 1, "Authoring Low Key Mirror");
+  addChild(offset() + 0x07, 1, "Authoring High Key Mirror");
   addChild(offset() + 0x08, 1, "Low Velocity");
   addChild(offset() + 0x09, 1, "High Velocity");
-  addChild(offset() + 0x0a, 1, "Mirror Low Velocity (Unused)");
-  addChild(offset() + 0x0b, 1, "Mirror High Velocity (Unused)");
-  addChild(offset() + 0x0c, isV402 ? 5 : 6, "Padding");
+  addChild(offset() + 0x0a, 1, "Authoring Low Velocity Mirror");
+  addChild(offset() + 0x0b, 1, "Authoring High Velocity Mirror");
+  addChild(offset() + 0x0c, isV402 ? 5 : 6, "Authoring Split Metadata");
 
   if (isV402) {
     smplID = readByte(offset() + 0x11);
@@ -745,16 +746,15 @@ bool PSDSERgn::loadRgn() {
   addChild(tuningOffset + 4, 1, "Sample Volume");
   addChild(tuningOffset + 5, 1, "Sample Pan");
   addChild(tuningOffset + 6, 1, "Key Group ID");
-  addChild(tuningOffset + 7, 5, "Unused Sample Metadata");
+  addChild(tuningOffset + 7, envelopeOffset - (tuningOffset + 7), "Authoring Sample Metadata");
 
   envon = readByte(envelopeOffset);
   envmult = readByte(envelopeOffset + 1);
   addChild(envelopeOffset, 1, "Envelope On");
   addChild(envelopeOffset + 1, 1, "Envelope Multiplier");
-  // [Luminous Arc]: The envelope metadata is longer in version 0x0402, keeping AL through RR at +0x28..+0x2e.
-  // [Pokemon Mystery Dungeon: Explorers of Sky]: These rate offsets are unchanged in version 0x0415; the driver
-  // copies the envelope metadata but does not consume its constants or the trailing byte.
-  addChild(envelopeOffset + 2, offset() + 0x28 - (envelopeOffset + 2), "Unused Envelope Metadata");
+  // [Luminous Arc]: Version 0x0402 stores Envelope On and Envelope Multiplier at +0x20 and +0x21, followed by the
+  // same curve metadata and AL-through-RR rate fields used by version 0x0415.
+  addChild(envelopeOffset + 2, offset() + 0x28 - (envelopeOffset + 2), "Envelope Curve Metadata");
   attackBegin = readByte(offset() + 0x28);
   attack = readByte(offset() + 0x29);
   decay = readByte(offset() + 0x2a);
@@ -770,7 +770,7 @@ bool PSDSERgn::loadRgn() {
   addChild(offset() + 0x2c, 1, "Hold Time");
   addChild(offset() + 0x2d, 1, "Sustain Rate");
   addChild(offset() + 0x2e, 1, "Release Rate");
-  addChild(offset() + 0x2f, 1, "Unused Envelope Metadata");
+  addChild(offset() + 0x2f, 1, "Envelope Terminator");
 
   setLength(48);
   setRanges(lowKey, hiKey, lowVel, hiVel);
