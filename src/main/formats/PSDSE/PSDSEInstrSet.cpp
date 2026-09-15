@@ -1,5 +1,6 @@
 #include "PSDSEInstrSet.h"
 #include "PSDSEFormat.h"
+#include "PSGDSP.h"
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
 #include "VGMColl.h"
@@ -263,6 +264,23 @@ bool PSDSESampColl::parseSampleInfo() {
         loopLen = PSDSE::readU32(rawFile(), sampleInfoOffset + 0x2C, m_header.endianness);
       }
 
+      // [Pokemon Mystery Dungeon: Explorers of Darkness]: S_002_PSG_DUTY_ uses format 0x0300 with no PCMD data.
+      // [Pokemon Mystery Dungeon: Explorers of Sky]: DseVoice_PlayNote copies WAVI +0x10 to voice +0x1C;
+      // DseVoice_UpdateHardware dispatches format 3 to PSG and passes WAVI +0x19 as the hardware duty code.
+      if (m_header.endianness == Endianness::Little && m_header.version == 0x0415 && smplfmt == 0x0300) {
+        if (smplRate == 0) {
+          continue;
+        }
+        auto* samp = addSamp<PSDSESamp>(this, sampleInfoOffset, recordSize, 0, 0, 1, BPS::PCM16, smplRate,
+                                        PSDSESamp::PSG_PULSE, sampleName);
+        samp->configurePsgPulse(readByte(sampleInfoOffset + 0x19));
+        mapSampleSlot(i, sampleCount() - 1);
+        samp->unityKey = rootKey;
+        samp->pan = pan;
+        samp->setVolume(volume / 127.0);
+        continue;
+      }
+
       // Calculate absolute data offset
       uint32_t dataOffset = 0;
       if (m_header.pcmdOffset != 0) {
@@ -316,6 +334,9 @@ bool PSDSESampColl::parseSampleInfo() {
         dspInitialHistory1 = static_cast<int16_t>(rawFile()->readShortBE(dataOffset - dspHeaderSize + 0x40));
         dspInitialHistory2 = static_cast<int16_t>(rawFile()->readShortBE(dataOffset - dspHeaderSize + 0x42));
       } else if (smplfmt == 0x0200) {
+        if (dataLength < 4) {
+          continue;
+        }
         waveType = PSDSESamp::IMA_ADPCM;
         dataOffset += 4;
         dataLength -= 4;  // Subtract header size from total length
@@ -323,6 +344,9 @@ bool PSDSESampColl::parseSampleInfo() {
         // PCM8
         waveType = PSDSESamp::PCM8;
         bps = BPS::PCM8;
+      } else if (smplfmt != 0x0100) {
+        L_WARN("PSDSE: Unsupported sample format {:#x} for '{}'", smplfmt, sampleName);
+        continue;
       }
 
       const uint32_t bankEnd = m_header.offset + m_header.fileLength;
@@ -334,6 +358,9 @@ bool PSDSESampColl::parseSampleInfo() {
           continue;
         }
         dataLength = bankEnd - dataOffset;
+      }
+      if (dataLength == 0 || smplRate == 0) {
+        continue;
       }
 
       PSDSESamp* samp = addSamp<PSDSESamp>(this, sampleInfoOffset, 64, dataOffset, dataLength, 1, bps, smplRate,
@@ -419,6 +446,10 @@ double PSDSESamp::compressionRatio() const {
 }
 
 std::vector<uint8_t> PSDSESamp::decodeToNativePcm() {
+  if (waveType == PSG_PULSE) {
+    const double duty = m_psgDuty == 7 ? 0.0 : (m_psgDuty + 1) / 8.0;
+    return psg::synthesizeBandLimitedPulsePCM16(duty, rate, loopLength(), rate / 128.0);
+  }
   if (waveType == IMA_ADPCM) {
     return decodeImaAdpcm();
   }
@@ -426,6 +457,18 @@ std::vector<uint8_t> PSDSESamp::decodeToNativePcm() {
     return decodeDspAdpcm();
   }
   return VGMSamp::decodeToNativePcm();
+}
+
+void PSDSESamp::configurePsgPulse(uint8_t duty) {
+  // [Pokemon Mystery Dungeon: Explorers of Sky]: DseVoice_UpdateParameters divides the PCM playback frequency
+  // by 16 for PSG. The hardware has eight duty phases, so one pulse period spans 128 PCM-rate samples.
+  m_psgDuty = duty & 7;
+  setLoopStatus(1);
+  setLoopStartMeasure(LM_SAMPLES);
+  setLoopLengthMeasure(LM_SAMPLES);
+  setLoopOffset(0);
+  setLoopLength(128);
+  ulUncompressedSize = 128 * sizeof(int16_t);
 }
 
 void PSDSESamp::configureDspAdpcm(std::array<int16_t, 16> coefficients, uint32_t sampleCount, int16_t initialHistory1,

@@ -6,6 +6,7 @@
 #include "PSDSEPS2InstrSet.h"
 #include "PSDSEPS2Seq.h"
 #include "PSDSESeq.h"
+#include "PSDSEStream.h"
 #include "ScannerManager.h"
 #include "VGMColl.h"
 
@@ -134,13 +135,13 @@ PSDSEInstrSet* findInstrSetForSequence(const PSDSESeq* seq) {
     return *rawFileMatch;
   }
 
-  const std::string key = collectionKey(seq->name());
+  const std::string key = collectionKey(seq->bankMatchName());
   std::vector<PSDSEInstrSet*> matches;
   std::copy_if(PSDSEScanner::g_loadedInstrSets.begin(), PSDSEScanner::g_loadedInstrSets.end(),
                std::back_inserter(matches),
                [&key](const PSDSEInstrSet* instrSet) { return collectionKey(instrSet->name()) == key; });
   if (matches.empty()) {
-    const std::string compactKey = compactCollectionKey(seq->name());
+    const std::string compactKey = compactCollectionKey(seq->bankMatchName());
     std::copy_if(
         PSDSEScanner::g_loadedInstrSets.begin(), PSDSEScanner::g_loadedInstrSets.end(), std::back_inserter(matches),
         [&compactKey](const PSDSEInstrSet* instrSet) { return compactCollectionKey(instrSet->name()) == compactKey; });
@@ -419,6 +420,15 @@ void PSDSEScanner::scan(RawFile* file, void* offset) {
     const uint32_t word = (static_cast<uint32_t>(fileData[i]) << 24) | (static_cast<uint32_t>(fileData[i + 1]) << 16) |
                           (static_cast<uint32_t>(fileData[i + 2]) << 8) | fileData[i + 3];
 
+    if (word == 0x73616462) {
+      PSDSESADBHeader header;
+      if (header.read(file, i)) {
+        pRoot->loadVGMFileWithMatcher<PSDSESADBSampColl>(false, file, header);
+        i += header.fileLength - 1;
+        continue;
+      }
+    }
+
     if (word == PSDSEPS2::kSedsMagic) {
       PSDSEPS2::EffectSetHeader header;
       if (header.read(file, i)) {
@@ -501,6 +511,26 @@ void PSDSEScanner::scan(RawFile* file, void* offset) {
       }
       const uint32_t seqLength = PSDSE::readU32(file, i + 0x08, magic.endianness);
       if (seqLength < 0x40 || seqLength > nFileLength - i) {
+        continue;
+      }
+      const uint32_t foldedMagic = word | 0x20202020;
+      const bool effectSet = foldedMagic == 0x7365646c || foldedMagic == 0x73656462;
+      const uint32_t firstChunk = seqLength >= 0x44 ? file->readWordBE(i + 0x40) : 0;
+      if (effectSet && firstChunk != 0x74726b20 && firstChunk != 0x736f6e67) {
+        PSDSE::EffectSetHeader header;
+        if (header.read(file, i)) {
+          for (const auto& effect : header.effects) {
+            if (auto* seq = pRoot->loadVGMFileWithMatcher<PSDSESeq>(false, file, effect)) {
+              sequences.push_back(seq);
+            } else {
+              L_WARN("PSDSE: Could not load effect {} in '{}' at {:#x}", effect.number, effect.sourceName,
+                     effect.offset);
+            }
+          }
+        } else {
+          L_WARN("PSDSE: Invalid or unsupported SED effect table at {:#x} in '{}'", i, file->name());
+        }
+        i += seqLength - 1;
         continue;
       }
       PSDSESeq* seq = pRoot->loadVGMFileWithMatcher<PSDSESeq>(false, file, i);

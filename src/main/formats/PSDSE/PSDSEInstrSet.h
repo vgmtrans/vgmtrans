@@ -63,12 +63,13 @@ public:
   std::vector<uint8_t> decodeImaAdpcm();
   void configureDspAdpcm(std::array<int16_t, 16> coefficients, uint32_t sampleCount, int16_t initialHistory1,
                          int16_t initialHistory2);
+  void configurePsgPulse(uint8_t duty);
 
   static inline void clamp_step_index(int& stepIndex);
   static inline void clamp_sample(int& decompSample);
   static inline void process_nibble(unsigned char code, int& stepIndex, int& decompSample);
 
-  enum { PCM8, PCM16, IMA_ADPCM, DSP_ADPCM };
+  enum { PCM8, PCM16, IMA_ADPCM, DSP_ADPCM, PSG_PULSE };
   uint8_t waveType;
 
 private:
@@ -79,6 +80,7 @@ private:
   uint32_t m_dspSampleCount = 0;
   int16_t m_dspInitialHistory1 = 0;
   int16_t m_dspInitialHistory2 = 0;
+  uint8_t m_psgDuty = 0;
 };
 
 class PSDSERgn : public VGMRgn {
