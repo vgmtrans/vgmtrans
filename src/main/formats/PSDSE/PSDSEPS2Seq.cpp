@@ -14,8 +14,9 @@
 
 namespace {
 
-// [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqFuncTrap, its matching handlers, and the
-// shipped SsdSeqFuncLength table define the version 0x0301 names and operand widths.
+// [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqFuncTrap and its matching handlers define
+// the version 0x0301 names and operand widths. The handler return pointers take precedence where the shipped
+// SsdSeqFuncLength table disagrees with Position and Master Fader.
 // [Bakusou Dekotora Densetsu: Otoko Hanamichi Yume Roman]: The driver establishes the version 0x0300 width changes.
 // [Tokimeki Memorial: Girl's Side]: The unstripped version 0x0250 driver establishes the handlers added after
 // version 0x0201 and retains the three-operand All Reset command.
@@ -23,9 +24,9 @@ namespace {
 constexpr std::array<uint8_t, 128> kOperandCounts = {
     0, 0, 1, 1, 1, 2, 3, 4, 2, 2, 2, 0, 3, 2, 3, 0,  // 80-8f
     0, 0, 2, 3, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 2, 2,  // 90-9f
-    2, 3, 1, 1, 1, 1, 3, 0, 1, 1, 1, 3, 1, 1, 3, 0,  // a0-af
+    2, 2, 1, 1, 1, 1, 2, 0, 1, 1, 1, 3, 1, 1, 3, 0,  // a0-af
     0, 3, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1,  // b0-bf
-    0, 0, 0, 0, 1, 1, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0,  // c0-cf
+    0, 0, 0, 0, 1, 1, 0, 0, 3, 2, 0, 0, 3, 0, 0, 0,  // c0-cf
     1, 1, 1, 2, 2, 3, 2, 1, 3, 3, 0, 0, 0, 0, 0, 1,  // d0-df
     1, 1, 3, 1, 3, 3, 0, 0, 1, 1, 3, 1, 3, 3, 0, 0,  // e0-ef
     3, 3, 2, 0, 0, 0, 1, 1, 0, 1, 3, 2, 2, 5, 1, 0,  // f0-ff
@@ -65,6 +66,9 @@ uint8_t operandCount(uint8_t status, uint16_t version) {
       case 0xcb:
       case 0xd6:
         return 1;
+      case 0xa1:
+        // [Tokimeki Memorial: Girl's Side 2nd Kiss]: Position adds a third byte for the tick within the beat.
+        return 3;
       case 0xa8:
       case 0xaf:
         return 2;
@@ -77,6 +81,23 @@ uint8_t operandCount(uint8_t status, uint16_t version) {
     }
   }
   return kOperandCounts[status - 0x80];
+}
+
+uint16_t sequencePpqn(uint16_t version) {
+  if (PSDSEPS2::isV2(version)) {
+    // [Shadow Hearts]: SsdInitSequence initializes 48 ticks per quarter, while SsdSeqMeasure divides 192 whole-note
+    // ticks by the encoded denominator.
+    return 48;
+  }
+  if (PSDSEPS2::isV25(version)) {
+    // [Tokimeki Memorial: Girl's Side]: SsdInitSequence initializes 120 ticks per quarter, while SsdSeqMeasure
+    // divides 480 whole-note ticks by the encoded denominator.
+    return 120;
+  }
+  // [Bakusou Dekotora Densetsu: Otoko Hanamichi Yume Roman]: SsdInitSequence initializes 96 ticks per quarter, while
+  // SsdSeqMeasure divides 384 whole-note ticks by the encoded denominator.
+  // [Tokimeki Memorial: Girl's Side 2nd Kiss]: Version 0x0320 retains the 384-tick whole-note calculation.
+  return 96;
 }
 
 std::string eventName(uint8_t status, uint16_t version) {
@@ -307,7 +328,7 @@ PSDSEPS2Seq::PSDSEPS2Seq(RawFile* file, const PSDSEPS2::SequenceHeader& header)
     : VGMSeq(PSDSEFormat::name, file, header.offset, header.fileLength, header.internalName), m_header(header) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
-  setPPQN(48);
+  setPPQN(sequencePpqn(header.version));
   setAlwaysWriteInitialTempo(120);
   setInitialVolume(127);
   // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: Jump events routinely implement backward
@@ -355,7 +376,7 @@ bool PSDSEPS2Seq::parseHeader() {
       // [Tokimeki Memorial: Girl's Side 2nd Kiss]: SsdPlayEffectParamData transfers +1 as flags and splits +2 into
       // low-nibble priority and high-nibble output group. SsdSaechSeqFreeTrack compares priority when stealing
       // voices, SsdPlaySeqEffectNormal applies the output group through its table, and the driver never reads +0.
-      header->addChild(offset(), 1, "Effect Record Type (Driver Unused)");
+      header->addChild(offset(), 1, "Authoring Effect Type (Driver Unused)");
       header->addChild(offset() + 1, 1, "Effect Flags");
       header->addChild(offset() + 2, 1, "Output Group And Priority");
     } else {
@@ -375,14 +396,14 @@ bool PSDSEPS2Seq::parseHeader() {
       // Offset +8 mirrors the set-level bank ID, while the driver resolves the set-level field.
       header->addChild(offset() + 4, 2, "Effect Voice Range Start");
       header->addChild(offset() + 6, 2, "Effect Voice Range End");
-      header->addChild(offset() + 8, 2, "Bank ID Mirror (Driver Unused)");
-      header->addChild(offset() + 0x0a, 2, "Unused Effect Record Data");
+      header->addChild(offset() + 8, 2, "Authoring Bank ID Mirror (Driver Unused)");
+      header->addChild(offset() + 0x0a, 2, "Authoring Effect Metadata (Driver Unused)");
       header->addChild(offset() + 0x0c, 1, "Initial Voice Velocity");
       // [Tokimeki Memorial: Girl's Side 2nd Kiss]: Every audited record uses 0x40 and either 0x2a or 0x2d here, and
       // the shipped version 0x0320 runtime never reads these authoring defaults.
       header->addChild(offset() + 0x0d, 1, "Authoring Default 1 (Driver Unused)");
       header->addChild(offset() + 0x0e, 1, "Authoring Default 2 (Driver Unused)");
-      header->addChild(offset() + 0x0f, 1, "Unused Effect Record Data");
+      header->addChild(offset() + 0x0f, 1, "Authoring Effect Metadata (Driver Unused)");
     } else {
       // [Shadow Hearts]: The unstripped version 2 driver does not read +4.
       // [Xenosaga Episode I: Der Wille zur Macht]: Version 0x0250 also leaves +4 unread, all 10,837 nonempty audited
@@ -393,7 +414,8 @@ bool PSDSEPS2Seq::parseHeader() {
       // +4 through +5; all 13,206 audited records store zero there, and +6 stores the record extent.
       const bool hasZeroPadding = PSDSEPS2::isV25(m_header.version) || m_header.version == 0x0300 ||
                                   m_header.version == 0x0301;
-      header->addChild(offset() + 4, 2, hasZeroPadding ? "Zero Padding" : "Unused Effect Record Data");
+      header->addChild(offset() + 4, 2,
+                       hasZeroPadding ? "Zero Padding" : "Authoring Effect Metadata (Driver Unused)");
       header->addChild(offset() + 6, 2, "Effect Record Size");
     }
     header->addChild(offset() + m_header.effectHeaderSize, pointerBytes, "Track Offsets");
@@ -904,12 +926,61 @@ bool PSDSEPS2Track::readEvent() {
       addTempoBPM(beginOffset, curOffset - beginOffset, bpm, eventName(status, m_version));
       break;
     }
-    case 0xa6: {
-      const uint16_t duration = readEventU16LE();
-      const uint8_t target = readByte(curOffset++);
+    case 0xa0: {
+      const uint8_t denominator = readByte(curOffset++);
+      const uint8_t numerator = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqMeasure stores operand one as the
+      // denominator, operand two as the numerator, and derives ticks per beat from a whole note divided by operand
+      // one. Shipped data also uses denominators 3 and 6, which MIDI time-signature metadata cannot represent.
+      const bool midiDenominator = denominator != 0 && (denominator & (denominator - 1)) == 0;
+      if (midiDenominator) {
+        addTimeSig(beginOffset, curOffset - beginOffset, numerator, denominator,
+                   static_cast<uint8_t>(parentSeq->ppqn()), eventName(status, m_version));
+      } else {
+        addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                        fmt::format("Numerator: {}, denominator: {}; MIDI export omitted because its denominator "
+                                    "must be a nonzero power of two",
+                                    numerator, denominator),
+                        VGMItem::Type::TimeSignature);
+      }
+      break;
+    }
+    case 0xa1: {
+      const uint8_t measure = readByte(curOffset++);
+      const uint8_t beat = readByte(curOffset++);
+      const uint8_t tick = m_version == 0x0320 ? readByte(curOffset++) : 0;
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqPosition updates the one-based measure
+      // and beat counters and resets the tick counter without changing sequence playback position.
+      // [Tokimeki Memorial: Girl's Side 2nd Kiss]: Version 0x0320 supplies the tick counter as a third operand.
       addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
-                      fmt::format("Target: {}, duration: {}; master-output automation stub", target, duration),
-                      VGMItem::Type::Unknown);
+                      fmt::format("Measure: {}, beat: {}, tick: {}", measure, beat, tick), VGMItem::Type::Marker);
+      break;
+    }
+    case 0xa4: {
+      const uint8_t cuePoint = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqCuePoint stores the one-byte cue ID
+      // in channel +0x28 and invokes the channel callback without changing playback timing.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Cue point ID: {}; callback stub", cuePoint), VGMItem::Type::Marker);
+      break;
+    }
+    case 0xa6: {
+      if (PSDSEPS2::isV2(m_version)) {
+        const std::string operands = readOperands(count);
+        addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                        rawValueDetail(status, operands), VGMItem::Type::Unknown);
+        break;
+      }
+      const uint8_t target = readByte(curOffset++);
+      const uint8_t duration = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqMasterFader stores operand one as the
+      // target master level and converts operand two to 500 mixer-update steps per unit. This global output ramp has
+      // no channel-local MIDI equivalent.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Target: {}, duration units: {}, mixer-update steps: {}; master-output automation "
+                                  "stub",
+                                  target, duration, static_cast<uint32_t>(duration) * 500),
+                      VGMItem::Type::MasterVolumeSlide);
       break;
     }
     case 0xa7: {
@@ -992,23 +1063,111 @@ bool PSDSEPS2Track::readEvent() {
                       VGMItem::Type::Unknown);
       break;
     }
-    case 0xb0:
-      addGenericEvent(beginOffset, 1, eventName(status, m_version),
-                      "Clears runtime SPU2 envelope overrides; SF2/DLS automation stub", VGMItem::Type::Unknown);
+    case 0xae: {
+      if (PSDSEPS2::isV2(m_version)) {
+        addGenericEvent(beginOffset, 1, eventName(status, m_version), rawValueDetail(status, ""),
+                        VGMItem::Type::Unknown);
+        break;
+      }
+      const uint8_t randomMode = readByte(curOffset++);
+      const uint8_t lowerBound = readByte(curOffset++);
+      const uint8_t upperBound = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqRandomNote enables random-note mode
+      // and stores the lower and upper note bounds in channel +0x12 and +0x13.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Mode: {}, lower bound: {}, upper bound: {}; random-note conversion stub", randomMode,
+                                  lowerBound, upperBound),
+                      VGMItem::Type::Unknown);
       break;
-    case 0xb1:
-    case 0xb2:
-    case 0xb3:
-    case 0xb4:
-    case 0xb5:
-    case 0xb6:
-    case 0xb7:
+    }
+    case 0xb0:
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqADSRReset is a zero-operand reset
+      // callback; the driver clears its channel envelope state, which SF2 and DLS exports cannot represent.
+      addGenericEvent(beginOffset, 1, eventName(status, m_version), "ADSR reset command; SF2/DLS automation stub",
+                      VGMItem::Type::Unknown);
+      break;
+    case 0xb1: {
+      const std::string operands = readOperands(count);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqADSRMode consumes three bytes and the
+      // version 0x0301 callback is empty; later drivers may use these authoring mode parameters. SF2 and DLS exports
+      // preserve the command as a documented automation stub.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      "ADSR mode parameters: " + operands + "; SPU2 envelope mode automation stub",
+                      VGMItem::Type::Unknown);
+      break;
+    }
+    case 0xb2: {
+      const uint8_t value = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqAR shifts the unsigned attack operand
+      // left by eight before writing the SPU2 attack register.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Attack operand: {}; SPU2 attack register: {}; envelope automation stub", value,
+                                  static_cast<uint16_t>(value) << 8),
+                      VGMItem::Type::Unknown);
+      break;
+    }
+    case 0xb3: {
+      const uint8_t value = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqDR shifts the unsigned decay operand
+      // left by four before writing the SPU2 decay register.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Decay operand: {}; SPU2 decay register: {}; envelope automation stub", value,
+                                  static_cast<uint16_t>(value) << 4),
+                      VGMItem::Type::Unknown);
+      break;
+    }
+    case 0xb4: {
+      const uint8_t value = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqSL keeps the low nibble of the sustain
+      // operand before writing the SPU2 sustain-level register.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Sustain operand: {}; SPU2 sustain level: {}; envelope automation stub", value,
+                                  value & 0x0f),
+                      VGMItem::Type::Unknown);
+      break;
+    }
+    case 0xb5: {
+      const uint8_t value = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqSR shifts the unsigned sustain-rate
+      // operand left by six before writing the SPU2 sustain-rate register.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Sustain-rate operand: {}; SPU2 sustain-rate register: {}; envelope automation "
+                                  "stub",
+                                  value, static_cast<uint16_t>(value) << 6),
+                      VGMItem::Type::Unknown);
+      break;
+    }
+    case 0xb6: {
+      const uint8_t value = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqRR keeps the low five bits of the
+      // release-rate operand before writing the SPU2 release-rate register.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Release operand: {}; SPU2 release rate: {}; envelope automation stub", value,
+                                  value & 0x1f),
+                      VGMItem::Type::Unknown);
+      break;
+    }
+    case 0xb7: {
+      const uint8_t decay = readByte(curOffset++);
+      const uint8_t sustain = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqDRSL packs the first operand into the
+      // high bits and combines the second operand before writing the SPU2 decay and sustain-level fields.
+      const uint16_t packed = static_cast<uint16_t>(decay) << 4 | sustain;
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Decay operand: {}, sustain operand: {}; packed SPU2 DRSL value: {}; envelope "
+                                  "automation stub",
+                                  decay, sustain, packed),
+                      VGMItem::Type::Unknown);
+      break;
+    }
     case 0xb8:
     case 0xb9:
     case 0xba: {
-      const std::string operands = readOperands(count);
+      const uint8_t envelopeMode = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqAMode, SsdSeqSMode, and SsdSeqRMode
+      // consume one mode byte and update SPU2 envelope mode bits; SF2 and DLS exports cannot automate those bits.
       addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
-                      "Operands: " + operands + "; runtime SPU2 envelope override, SF2/DLS automation stub",
+                      fmt::format("Envelope mode: {}; SPU2 mode automation stub", envelopeMode),
                       VGMItem::Type::Unknown);
       break;
     }
@@ -1023,6 +1182,30 @@ bool PSDSEPS2Track::readEvent() {
                       detail, VGMItem::Type::DurationChange);
       break;
     }
+    case 0xbb: {
+      if (PSDSEPS2::isV2(m_version)) {
+        addGenericEvent(beginOffset, 1, eventName(status, m_version), rawValueDetail(status, ""),
+                        VGMItem::Type::Unknown);
+        break;
+      }
+      const uint8_t priority = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqPriority masks the operand to its low
+      // nibble before storing it in the effect voice-stealing priority field.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Priority: {} (low nibble {})", priority, priority & 0x0f), VGMItem::Type::Unknown);
+      break;
+    }
+    case 0xbd: {
+      const std::string operands = readOperands(count);
+      const bool isRuntimeNoOp = !PSDSEPS2::isV2(m_version) && !PSDSEPS2::isV25(m_version) && m_version != 0x0300;
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqSetpRel only advances past its
+      // one-byte authoring operand and performs no runtime action.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      isRuntimeNoOp ? fmt::format("Authoring step-relative value: {}; runtime no-op", operands)
+                                    : rawValueDetail(status, operands),
+                      isRuntimeNoOp ? VGMItem::Type::Nop : VGMItem::Type::Unknown);
+      break;
+    }
     case 0xbf: {
       if (PSDSEPS2::isV2(m_version)) {
         addGenericEvent(beginOffset, 1, eventName(status, m_version), rawValueDetail(status, ""),
@@ -1030,21 +1213,66 @@ bool PSDSEPS2Track::readEvent() {
         break;
       }
       const uint8_t value = readByte(curOffset++);
-      addSustainEvent(beginOffset, curOffset - beginOffset, value >= 0x40 ? 127 : 0, "Sustain");
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqSustaion reads one byte only to
+      // advance the event pointer, then emits a channel keyoff event; the operand is not used in the decision.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Operand: {}; driver sends channel keyoff; MIDI sustain approximation omitted",
+                                  value),
+                      VGMItem::Type::Unknown);
       break;
     }
     case 0xbe: {
       const int8_t level = static_cast<int8_t>(readByte(curOffset));
       const std::string operands = readOperands(count);
       const bool isDummy = PSDSEPS2::isV2(m_version) || PSDSEPS2::isV25(m_version) || m_version == 0x0300;
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqModulation passes the signed operand
+      // to SsdSetChannelVoiceModulation; this is channel voice modulation, not an LFO envelope.
       const std::string detail = isDummy ? rawValueDetail(status, operands)
-                                         : fmt::format("Signed level: {}; updates active constant-envelope LFOs; "
-                                                       "synthesis automation stub",
+                                         : fmt::format("Signed modulation value: {}; SPU2 voice modulation "
+                                                       "automation stub",
                                                        level);
       addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version), detail,
                       isDummy ? VGMItem::Type::Unknown : VGMItem::Type::Lfo);
       break;
     }
+    case 0xc0:
+    case 0xc1:
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqSulrOn and SsdSeqSulrOff set or clear
+      // SPU2 channel hardware-effect mask 0x0800 without consuming operands.
+      addGenericEvent(beginOffset, 1, eventName(status, m_version),
+                      status == 0xc0 ? "SPU2 hardware-effect mask 0x0800 enabled"
+                                     : "SPU2 hardware-effect mask 0x0800 disabled",
+                      VGMItem::Type::Unknown);
+      break;
+    case 0xc2:
+    case 0xc3:
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqPMOn and SsdSeqPMOff toggle the SPU2
+      // phase-modulation hardware effect and carry no operands.
+      addGenericEvent(beginOffset, 1, eventName(status, m_version),
+                      status == 0xc2 ? "SPU2 phase modulation enabled; MIDI modulation stub"
+                                     : "SPU2 phase modulation disabled; MIDI modulation stub",
+                      VGMItem::Type::Unknown);
+      break;
+    case 0xc4:
+    case 0xc5: {
+      const int value = status == 0xc4 ? readByte(curOffset++) : static_cast<int8_t>(readByte(curOffset++));
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqNoiseAbsolute writes an unsigned noise
+      // value, while SsdSeqNoiseRelative adds a signed delta and keeps the low six bits before enabling noise.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      status == 0xc4 ? fmt::format("Noise value: {}; SPU2 noise automation stub", value)
+                                     : fmt::format("Signed noise delta: {}; SPU2 noise automation stub", value),
+                      VGMItem::Type::Lfo);
+      break;
+    }
+    case 0xc6:
+    case 0xc7:
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqNoiseOn and SsdSeqNoiseOff route the
+      // current channel noise state to the SPU2 hardware effect without consuming operands.
+      addGenericEvent(beginOffset, 1, eventName(status, m_version),
+                      status == 0xc6 ? "SPU2 noise enabled; noise automation stub"
+                                     : "SPU2 noise disabled; noise automation stub",
+                      VGMItem::Type::Lfo);
+      break;
     case 0xca:
     case 0xcb: {
       if (m_version == 0x0320) {
@@ -1064,6 +1292,30 @@ bool PSDSEPS2Track::readEvent() {
                       VGMItem::Type::Unknown);
       break;
     }
+    case 0xc8: {
+      const uint8_t parameter = readByte(curOffset++);
+      const int8_t value = static_cast<int8_t>(readByte(curOffset++));
+      const int8_t amount = static_cast<int8_t>(readByte(curOffset++));
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqReverbParameter forwards a three-byte
+      // tuple to SsdSetReverbParameter. The first byte is unsigned; the following two are read as signed values by
+      // the driver before it updates the SPU2 reverb state.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Parameter: {}, signed value: {}, signed amount: {}; SPU2 reverb automation stub",
+                                  parameter, value, amount),
+                      VGMItem::Type::Reverb);
+      break;
+    }
+    case 0xc9: {
+      const bool spuEffectEnabled = readByte(curOffset++) != 0;
+      const bool reverbEnabled = readByte(curOffset++) != 0;
+      // [Shadow Hearts]: SsdSeqReverbSet consumes two booleans that control SPU2 attribute masks 0x8000 and 0x4000.
+      // [Tokimeki Memorial: Girl's Side 2nd Kiss]: Version 0x0320 retains the same operands and routing behavior.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("SPU2 effect: {}; reverb routing: {}; MIDI routing stub",
+                                  spuEffectEnabled ? "enabled" : "disabled", reverbEnabled ? "enabled" : "disabled"),
+                      VGMItem::Type::Reverb);
+      break;
+    }
     case 0xd0: {
       const int value = static_cast<int8_t>(readByte(curOffset++));
       addTranspose(beginOffset, curOffset - beginOffset, static_cast<int8_t>(value), eventName(status, m_version));
@@ -1074,12 +1326,33 @@ bool PSDSEPS2Track::readEvent() {
       addTranspose(beginOffset, curOffset - beginOffset, static_cast<int8_t>(value), eventName(status, m_version));
       break;
     }
+    case 0xd2: {
+      const int8_t delta = static_cast<int8_t>(readByte(curOffset++));
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqTune sign-extends its byte and shifts
+      // it left by three before adding it to the channel's 8.8-semitone pitch event, giving 1/32-semitone units.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Signed tuning delta: {} / 32 semitone; SPU2 pitch automation stub", delta),
+                      VGMItem::Type::FineTune);
+      break;
+    }
     case 0xd3:
     case 0xd4: {
       const int16_t value = static_cast<int16_t>(readEventU16LE());
       addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
-                      fmt::format("Signed 16-bit value: {}; exact SPU2 pitch automation stub", value),
+                      fmt::format("Signed 16-bit SPU2 pitch value: {}; exact automation stub", value),
                       VGMItem::Type::FineTune);
+      break;
+    }
+    case 0xd5: {
+      const uint16_t duration = readEventU16LE();
+      const int8_t delta = static_cast<int8_t>(readByte(curOffset++));
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqSweep reads a little-endian duration,
+      // combines the signed third byte with the current pitch event, and interpolates the result in the SPU2 voice
+      // state. MIDI has no equivalent for this driver-side sweep state.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Duration ticks: {}, signed target delta: {}; SPU2 pitch sweep automation stub",
+                                  duration, delta),
+                      VGMItem::Type::PitchBendSlide);
       break;
     }
     case 0xd6: {
@@ -1095,6 +1368,30 @@ bool PSDSEPS2Track::readEvent() {
       // in the pitch-control group between Sweep and Vibrate Fade.
       addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
                       fmt::format("Write-only channel value: {}", value), VGMItem::Type::FineTune);
+      break;
+    }
+    case 0xd7: {
+      const uint8_t fade = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqVibrateFade stores 0x400 for a zero
+      // operand and otherwise stores 0x100 divided by the operand as its runtime vibrato period.
+      const uint32_t period = fade == 0 ? 0x400 : 0x100 / fade;
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Fade divisor: {}, runtime period units: {}; SPU2 vibrato automation stub", fade,
+                                  period),
+                      VGMItem::Type::Lfo);
+      break;
+    }
+    case 0xd8:
+    case 0xd9: {
+      const uint8_t amplitude = readByte(curOffset++);
+      const int8_t rate = static_cast<int8_t>(readByte(curOffset++));
+      const uint8_t slot = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqVibrate1 and SsdSeqVibrate2 consume
+      // amplitude, signed rate, and LFO slot bytes, build an SPU2 LFO record, and enable the matching channel flag.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Amplitude: {}, signed rate: {}, LFO slot: {}; SPU2 vibrato automation stub",
+                                  amplitude, rate, slot & 0x0f),
+                      VGMItem::Type::Lfo);
       break;
     }
     case 0xdd:
@@ -1123,6 +1420,44 @@ bool PSDSEPS2Track::readEvent() {
       vol = target;
       break;
     }
+    case 0xe3:
+    case 0xeb: {
+      const uint8_t divisor = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqTremoloFade and SsdSeqShakeFade use
+      // the same period formula, preserving 0x400 for zero and otherwise dividing 0x400 by four times the operand.
+      const uint32_t period = divisor == 0 ? 0x400 : 0x400 / (static_cast<uint32_t>(divisor) * 4);
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Fade divisor: {}, runtime period units: {}; SPU2 modulation automation stub",
+                                  divisor, period),
+                      VGMItem::Type::Lfo);
+      break;
+    }
+    case 0xe4:
+    case 0xe5:
+    case 0xec:
+    case 0xed: {
+      const uint8_t amplitude = readByte(curOffset++);
+      const int8_t rate = static_cast<int8_t>(readByte(curOffset++));
+      const uint8_t slot = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: Tremolo and shake handlers consume an
+      // unsigned amplitude, signed rate, and slot byte, then build an SPU2 LFO record for their effect group.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Amplitude: {}, signed rate: {}, LFO slot: {}; SPU2 modulation automation stub",
+                                  amplitude, rate, slot & 0x0f),
+                      VGMItem::Type::Lfo);
+      break;
+    }
+    case 0xe6:
+    case 0xe7:
+    case 0xee:
+    case 0xef:
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: Tremolo and shake on/off handlers only
+      // toggle their existing SPU2 LFO records and consume no operands.
+      addGenericEvent(beginOffset, 1, eventName(status, m_version),
+                      status == 0xe6 || status == 0xee ? "SPU2 modulation enabled; automation stub"
+                                                       : "SPU2 modulation disabled; automation stub",
+                      VGMItem::Type::Lfo);
+      break;
     case 0xe8:
       addPan(beginOffset, 2, readByte(curOffset++));
       break;
@@ -1146,6 +1481,57 @@ bool PSDSEPS2Track::readEvent() {
       const std::string operands = readOperands(count);
       addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
                       "Operands: " + operands + "; runtime SPU2 LFO routing/automation stub", VGMItem::Type::Lfo);
+      break;
+    }
+    case 0xf9: {
+      if (PSDSEPS2::isV2(m_version)) {
+        addGenericEvent(beginOffset, 1, eventName(status, m_version), rawValueDetail(status, ""),
+                        VGMItem::Type::Nop);
+        break;
+      }
+      const uint8_t label = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqLabel advances past the label ID but
+      // performs no runtime action.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Label ID: {}; runtime no-op", label), VGMItem::Type::Marker);
+      break;
+    }
+    case 0xfa: {
+      const uint8_t hours = readByte(curOffset++);
+      const uint8_t minutes = readByte(curOffset++);
+      const uint8_t seconds = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqSMPTETime advances past these authoring
+      // time fields without updating runtime state.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Hours: {}, minutes: {}, seconds: {}; runtime no-op", hours, minutes, seconds),
+                      VGMItem::Type::Marker);
+      break;
+    }
+    case 0xfb: {
+      const uint8_t frame = readByte(curOffset++);
+      const uint8_t subframe = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqSMPTEFrame advances past these authoring
+      // frame fields without updating runtime state.
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Frame: {}, subframe: {}; runtime no-op", frame, subframe), VGMItem::Type::Marker);
+      break;
+    }
+    case 0xfd: {
+      const uint8_t hours = readByte(curOffset++);
+      const uint8_t minutes = readByte(curOffset++);
+      const uint8_t seconds = readByte(curOffset++);
+      const uint8_t frame = readByte(curOffset++);
+      const uint8_t subframe = readByte(curOffset++);
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqSMPTEOffset stores the first four
+      // operands as an internal 500-unit-per-second offset at 30 frames per second. The shipped runtime advances past
+      // the fifth subframe byte without reading it.
+      const uint64_t units = static_cast<uint64_t>(hours) * 1800000 + static_cast<uint64_t>(minutes) * 30000 +
+                             static_cast<uint64_t>(seconds) * 500 + static_cast<uint64_t>(frame) * 500 / 30;
+      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
+                      fmt::format("Hours: {}, minutes: {}, seconds: {}, frame: {}, subframe: {} (driver unused), "
+                                  "internal offset units: {}",
+                                  hours, minutes, seconds, frame, subframe, units),
+                      VGMItem::Type::Marker);
       break;
     }
     default: {
