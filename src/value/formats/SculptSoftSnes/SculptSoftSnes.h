@@ -23,7 +23,7 @@ inline constexpr u32 kAramSize = 0x10000;
 inline constexpr u32 kCommandLimit = 131072;
 inline constexpr std::string_view kInstrumentDomain = "sculpt-soft-snes.sample";
 
-enum class Revision { Early, Standard, Extended };
+enum class Revision { Early, Standard, Extended, Late };
 
 struct Layout {
   Revision revision = Revision::Standard;
@@ -34,9 +34,12 @@ struct Layout {
   u16 deltaTable = 0;
   u32 frameMicroseconds = 20000;
   u8 tracks = 0;
+  bool resetCommand = false;
+  bool inlineTrackPointers = false;
+  bool sharedTranspose = false;
 };
 
-// All four automation lanes use the same eight-byte header and interpreter.
+// All four automation lanes share this eight-byte header.
 struct Curve {
   core::SourceRange range;
   u8 loopStart = 0;
@@ -60,6 +63,26 @@ struct CurvePlayer {
 
   void start(const Curve& data, u16 duration);
   void tick();
+};
+
+// Later music curves sustain until key-off and interpolate byte lanes in 10.6
+// fixed point. Each lane also has an independent fractional clock.
+struct LateCurvePlayer {
+  const Curve* curve = nullptr;
+  u16 value = 0;
+  u16 accumulator = 0;
+  s16 increment = 0;
+  u8 index = 0;
+  u8 interval = 0;
+  u8 countdown = 0;
+  u8 phase = 0xff;
+  u8 step = 0xff;
+  u8 precision = 1;
+  bool active = false;
+  bool held = true;
+
+  void start(const Curve& data, u8 scale, bool pitch);
+  void tick(bool released);
 };
 
 struct Patch {

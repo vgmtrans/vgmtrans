@@ -47,6 +47,159 @@ constexpr auto kTimer = makeMaskedBytePattern("\x8f\x20\xfa\x8f\x81\xf1", "x?xxx
 constexpr auto kFrame =
     makeMaskedBytePattern("\xe4\xfd\x60\x84\x19\xc4\x19\x68\x05\x90\x00\xa8\x05\xc4\x19", "xxxx?x?x?x?x?x?");
 
+constexpr auto kLateDispatch =
+    makeMaskedBytePattern("\xdd\x28\x1f\x1c\xfd\xf6\x00\x00\xc5\x00\x00\xf6\x00\x00\xc5\x00\x00", "xxxxxx??x??x??x??");
+constexpr auto kLateTimers = makeMaskedBytePattern(
+    "\x8f\xa0\xfa\x8f\xa0\xfb\x8f\x20\xfc\x8f\x87\xf1\x3f\x00\x00\x8f\x00\x25\x8f\x1f\x26", "x?xx?xx?xxxxx??x??x??");
+constexpr auto kLateAbsolute = makeMaskedBytePattern("\x3f\x00\x00\xfd\x3f\x00\x00\x2d\xe8\x00", "x??xx??xxx");
+constexpr auto kLateInlineTracks =
+    makeMaskedBytePattern("\xe4\x88\x5d\x1c\xbc\xfd\xf7\x8a\xd4\x8c\xfc\xf7\x8a\xd4\xa0", "x?xxxxx?x?xx?x?");
+constexpr auto kLateIndexedTracks =
+    makeMaskedBytePattern("\xeb\x87\xfc\xf7\x89\x8d\x10\x3f\x00\x00\xf8\x87\xd4\x8b\xdd\xd4\x9f", "x?xx?xxx??x?x?xx?");
+
+constexpr auto kLatePhraseTranspose =
+    makeMaskedBytePattern("\xdd\x60\x95\x00\x00\xd5\x00\x00\xae\x95\x00\x00\xd5\x00\x00", "xxx??x??xx??x??");
+constexpr auto kLateTrackTranspose =
+    makeMaskedBytePattern("\x3f\x00\x00\xd5\x00\x00\x3f\x00\x00\xd5\x00\x00\x2f", "x??x??x??x??x");
+
+// Host commands use parallel rings for the command and its two arguments.
+// Some revisions also mirror the dequeued command into the communication ports.
+constexpr auto kHostQueue =
+    makeMaskedBytePattern("\xe4\xe8\xf0\x2f\x9c\xc4\xe8\xf8\xea\xf5\x50\x10\x28\xfe\xc4\x31", "x?x?xx?x?x??xxx?");
+constexpr auto kQueueArguments = makeMaskedBytePattern("\xf5\x60\x10\xc4\x32\xf5\x70\x10\xc4\x33", "x??x?x??x?");
+constexpr auto kQueuePortArguments =
+    makeMaskedBytePattern("\xc4\xf7\xf5\x04\xfd\xc4\x31\xc4\xf4\xf5\x1c\xfd\xc4\xf5\xc4\x32", "xxx??x?xxx??xxx?");
+constexpr auto kQueueDispatch = makeMaskedBytePattern(
+    "\x3d\xc8\x10\xd0\x02\xcd\x00\xd8\xea\xe4\x31\x5d\x28\xfe\xc8\x49\xb0\x07\xe4\x32\xeb\x33\x3f\x96\x0b",
+    "xx?xxxxx?x?xxxx?x?x?x?x??");
+constexpr auto kStartSong = makeMaskedBytePattern("\x2d\x3f\x00\x00\xae\x92\x07", "xx??xx?");
+
+std::optional<u8> queuedSongIndex(ByteReader reader, u32 songCode) {
+  const auto queue = findBytePattern(reader, kHostQueue);
+  if (!queue || songCode < 7 || !matchesBytePattern(reader, songCode - 7, kStartSong)) {
+    return std::nullopt;
+  }
+  const u32 arguments = *queue + 16;
+  const bool portMirror = matchesBytePattern(reader, arguments, kQueuePortArguments);
+  if (!portMirror && !matchesBytePattern(reader, arguments, kQueueArguments)) {
+    return std::nullopt;
+  }
+  const u32 dispatch = arguments + (portMirror ? 16 : 10);
+  if (!matchesBytePattern(reader, dispatch, kQueueDispatch) || reader.u8At(*queue + 1) != reader.u8At(*queue + 6) ||
+      reader.u8At(*queue + 8) != reader.u8At(dispatch + 8) || reader.u8At(*queue + 15) != reader.u8At(dispatch + 10)) {
+    return std::nullopt;
+  }
+  const u16 jump = reader.le16(dispatch + 23);
+  if (!reader.has(jump, 3) || reader.u8At(jump) != 0x1f) {
+    return std::nullopt;
+  }
+  const u16 commands = reader.le16(jump + 1);
+  if (!reader.has(commands, 8)) {
+    return std::nullopt;
+  }
+  const u16 startSong = reader.le16(commands + 6);
+  if (!reader.has(startSong, 3) || reader.u8At(startSong) != 0x3f || reader.le16(startSong + 1) != songCode - 7) {
+    return std::nullopt;
+  }
+  const u8 capacity = reader.u8At(dispatch + 2);
+  const u8 count = reader.u8At(reader.u8At(*queue + 1));
+  const u8 head = reader.u8At(reader.u8At(*queue + 8));
+  const u16 commandRing = reader.le16(*queue + 10);
+  const u16 argumentRing = reader.le16(arguments + (portMirror ? 3 : 1));
+  if (capacity == 0 || count > capacity || head >= capacity || !reader.has(commandRing, capacity) ||
+      !reader.has(argumentRing, capacity)) {
+    return std::nullopt;
+  }
+  std::optional<u8> song;
+  for (u32 i = 0; i < count; ++i) {
+    const u32 slot = (head + i) % capacity;
+    if ((reader.u8At(commandRing + slot) & 0xfe) == 6) {
+      song = reader.u8At(argumentRing + slot);
+    }
+  }
+  return song;
+}
+
+std::optional<Layout> findLateLayout(ByteReader reader, u32 lookup, u32 songCode, u32 pitch) {
+  const auto dispatch = findBytePattern(reader, kLateDispatch);
+  const auto timers = findBytePattern(reader, kLateTimers);
+  if (!dispatch || !timers || !reader.has(songCode, 22) || lookup < 3 || reader.le16(songCode + 3) != lookup - 3 ||
+      pitch < 57 || !matchesBytePattern(reader, pitch - 57, kPitchBias)) {
+    return std::nullopt;
+  }
+  const u16 commands = reader.le16(*dispatch + 6);
+  const u16 tables = reader.le16(lookup + 8);
+  const u16 pitchTable = reader.le16(pitch + 1);
+  if (!reader.has(commands, 64) || !reader.has(tables, 28) || !reader.has(pitchTable, 480) ||
+      reader.le16(lookup + 15) != tables + 1 || reader.le16(pitch + 6) != pitchTable + 240 ||
+      reader.le16(*dispatch + 12) != commands + 1 ||
+      !matchesBytePattern(reader, reader.le16(commands + 30), kLateAbsolute)) {
+    return std::nullopt;
+  }
+  for (const auto& [opcode, duration] :
+       std::array<std::pair<u8, u8>, 4>{{{0xf8, 32}, {0xfd, 64}, {0xfe, 128}, {0xff, 0}}}) {
+    const u16 handler = reader.le16(commands + 2 * (opcode - 0xe0));
+    if (!reader.has(handler, 4) || reader.u8At(handler) != 0xe8 || reader.u8At(handler + 1) != duration ||
+        reader.u8At(handler + 2) != 0x2f) {
+      return std::nullopt;
+    }
+  }
+  const u16 phrase = reader.le16(commands + 44);
+  const u16 transpose = reader.le16(commands + 46);
+  if (!matchesBytePattern(reader, phrase + 0x32u, kLatePhraseTranspose) ||
+      !matchesBytePattern(reader, transpose, kLateTrackTranspose)) {
+    return std::nullopt;
+  }
+  u16 song = reader.le16(reader.u8At(songCode + 6));
+  if (const auto index = queuedSongIndex(reader, songCode)) {
+    const u16 songs = reader.le16(tables + 0x1a);
+    if (songs < 0x200) {
+      return std::nullopt;
+    }
+    const u32 slot = songs + 2u * *index;
+    song = reader.has(slot, 2) ? reader.le16(slot) : 0;
+  }
+  if (song < 0x200 || !reader.has(song, 1)) {
+    return std::nullopt;
+  }
+  const u8 tracks = reader.u8At(song);
+  const u16 trackInit = reader.le16(songCode + 20);
+  const bool inlinePointers = matchesBytePattern(reader, trackInit, kLateInlineTracks);
+  if (!inlinePointers &&
+      (!matchesBytePattern(reader, trackInit, kLateIndexedTracks) || reader.le16(trackInit + 8) != lookup - 3)) {
+    return std::nullopt;
+  }
+  if (tracks == 0 || tracks > 20 || !reader.has(song, 1u + (inlinePointers ? 2u : 1u) * tracks)) {
+    return std::nullopt;
+  }
+  for (u32 i = 0; i < tracks; ++i) {
+    const u32 slot = inlinePointers ? song + 1 + 2 * i : reader.le16(tables + 16) + 2u * reader.u8At(song + 1 + i);
+    if (!reader.has(slot, 2)) {
+      return std::nullopt;
+    }
+    const u16 start = reader.le16(slot);
+    if (start < 0x200 || start == 0xffff) {
+      return std::nullopt;
+    }
+  }
+  // The two clocks must agree for the current frame-based scheduler.
+  if (reader.u8At(*timers + 1) != reader.u8At(*timers + 4) || reader.u8At(0xfb) != reader.u8At(*timers + 4)) {
+    return std::nullopt;
+  }
+  return Layout{
+      .revision = Revision::Late,
+      .tables = tables,
+      .directory = static_cast<u16>(reader.u8At(*timers + 16) | (reader.u8At(*timers + 19) << 8)),
+      .song = song,
+      .pitchTable = pitchTable,
+      .frameMicroseconds = 125u * (reader.u8At(*timers + 1) == 0 ? 256u : reader.u8At(*timers + 1)),
+      .tracks = tracks,
+      .resetCommand = reader.u8At(reader.le16(commands + 14)) == 0x3f,
+      .inlineTrackPointers = inlinePointers,
+      .sharedTranspose = reader.le16(phrase + 0x38) == reader.le16(transpose + 4),
+  };
+}
+
 }  // namespace
 
 std::optional<Layout> findLayout(ByteReader reader) {
@@ -63,6 +216,9 @@ std::optional<Layout> findLayout(ByteReader reader) {
   if (!pitch) {
     pitch = findBytePattern(reader, kExtendedPitch);
     revision = Revision::Extended;
+  }
+  if (lookup && songCode && pitch && findBytePattern(reader, kLateDispatch)) {
+    return findLateLayout(reader, *lookup, *songCode, *pitch);
   }
   const auto delta = findBytePattern(reader, kDelta);
   const auto directory = findBytePattern(reader, kDirectory);

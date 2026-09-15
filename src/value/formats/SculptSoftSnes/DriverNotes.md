@@ -2,7 +2,8 @@
 
 This format supports the early revision used by **Super Star Wars**, the standard
 revision used by **Bugs Bunny Rabbit Rampage**, and the extended revision used by
-**NHL Stanley Cup** and **Rocko's Modern Life**.
+**NHL Stanley Cup** and **Rocko's Modern Life**, and the later family used by
+**Mortal Kombat II**, **Return of the Jedi**, and **Secret of Evermore**.
 Addresses below refer to the standard revision unless stated otherwise; related
 revisions may relocate code and tables.
 
@@ -24,8 +25,10 @@ revisions may relocate code and tables.
   Direct-page and absolute table addresses may move.
 * Early detection also verifies the track, pattern-list, and note dispatch
   tables against their linked handlers. Its song entries index table +$18.
-* The live song-header pointer identifies the current sequence. Sound-effect
-  cues without an active song header are not treated as music sequences.
+* The live song-header pointer identifies the current sequence. In the later
+  revision, a pending host song request takes precedence: the pointer can still
+  be zero or refer to the previous song. Sound-effect requests do not select
+  music sequences.
 
 ## Sequence and clock
 
@@ -161,6 +164,114 @@ so the selected path is not determined by the sequence bytes alone. Other
 tracks continue. These limitations affect several logo/special cues and some ordinary music;
 the compatibility table below distinguishes them.
 
+## Later sequence revision
+
+Addresses in this section refer to Mortal Kombat II. The pointer directory is
+$1ee0 and the BRR directory is $1f00. The six-byte patches, sample prefixes, and
+four envelope tables retain the earlier organization.
+
+Song headers contain a count of up to twenty logical tracks. One variant stores
+little-endian track pointers immediately after the count; another stores byte
+indexes into table +$10. The track initializer distinguishes these layouts.
+The command table at $1c6b contains thirty-two entries for $e0–$ff. Detection
+checks the linked note, wait, phrase, and transposition handlers as well as the
+header initializer and pitch table.
+
+Host command $06 starts a song indexed through table +$1a. Commands wait in a
+ring before the music header is initialized. In Mortal Kombat II, DP $e9 holds
+the pending count, DP $eb the read index, and $1065/$1075/$1085 hold parallel
+arrays for commands and their two arguments. The first argument is the song
+index; bit zero of the command is ignored. Related revisions have 16, 20, 24,
+or 32 slots, and some mirror dequeued commands into the communication ports.
+Detection derives the queue addresses and capacity from its consumer and
+verifies that the song command calls the recognized music initializer. The
+latest pending song request supersedes the live header; consumed ring entries
+are ignored. Song and track pointers must still pass the usual validation.
+
+Timer 0 advances envelopes every 20 ms; timer 1 supplies music pulses at the
+same base interval. Tempo is an eight-bit accumulator increment: zero admits
+every pulse, and other values admit carries. Envelopes continue during skipped
+music pulses. Timer 2 services DSP register fades. The performance timebase
+remains 50 PPQN with one tick per envelope frame. Snapshots with independently
+retimed music clocks are excluded.
+
+| Opcode | Operands | Meaning |
+| --- | --- | --- |
+| $00–$7f | — | Add `(opcode >> 3) - 8` semitones; duration `(opcode & 7) + 1` |
+| $80–$bf | duration | Absolute note `opcode - $60` |
+| $c0–$df | — | Key off, then rest `opcode - $bf` pulses |
+| $e0 | word | Add a raw DSP pitch offset after pitch conversion |
+| $e1/$e2/$e3/$e4 | byte | GAIN/pan/sample/pitch envelope speed multiplier |
+| $e5 | mode, voice, mask | Set voice allocation parameters |
+| $e6 | — | Restore the logical track's default fixed voice |
+| $e7 | — | Reset track parameters; a no-op in Mortal Kombat II |
+| $e8/$ee | — | Unimplemented dispatch entries; unsupported |
+| $e9 | mask | Restrict sound-effect voice allocation; no music event |
+| $ea | — | Key off without waiting |
+| $eb/$ec | fine stream | Enter fine-pitch mode; $ec first keys off |
+| $ed | byte | Attack volume multiplier, divided by 256 |
+| $ef | note, duration | Absolute note |
+| $f0 | — | End track |
+| $f1 | word | Scale stored volume by an 8.8 multiplier |
+| $f2 | byte | Set stored volume |
+| $f3 | byte | Set allocation priority |
+| $f4 | — | Suppress the next note's patch attack |
+| $f5 | byte | Select patch, including phrase substitutions |
+| $f6 | descriptor | Bounded phrase call, using the earlier descriptor layout |
+| $f7 | word | Set track pitch offset; see revision distinction below |
+| $f8/$fd/$fe/$ff | — | Wait 32/64/128/256 pulses without key-off |
+| $f9 | — | Restart track and reset its parameters |
+| $fa | byte | Set global tempo accumulator increment |
+| $fb | signed byte | Pan offset, latched on the next attack |
+| $fc | — | Legato patch attack on the previously allocated voice |
+
+Explicit zero note durations mean 256 pulses. Packed notes clear the fine-pitch
+accumulator. Fine mode interprets a nonzero high nibble as a signed delta of
+`high nibble - 8`, in twentieths of a semitone; its low nibble supplies the wait.
+A zero wait applies the delta immediately. Within that stream, $00 returns to
+normal notes, $01 reads a wait byte, $02 keys off, and $03–$0f read a signed delta
+byte while reusing the current wait counter. Phrase boundaries are checked by
+the normal interpreter, not while consuming the fine stream.
+
+Pitch starts at `20 * note - 900`, then adds fine pitch and phrase transposition.
+The extended ten-octave converter, patch pitch curve, and sample tuning retain
+five-cent musical units. The $e0 offset is applied afterward in DSP register
+units, so it can produce a pitch-dependent detune. In most later variants, $f7
+writes a separate offset whose low result is discarded: attacks ignore it and
+ties retain only its effect on the high byte. The Jungle Book and Super Copa
+instead write the phrase-transposition field and apply its full value. Detection
+uses the handlers' storage addresses to distinguish those behaviors.
+
+The later envelope player ignores header byte 6: pitch points are words, and
+GAIN, pan, and sample points are bytes. Byte values interpolate internally with
+six fractional bits before truncation. A lane's speed override multiplies the
+header interval and divides by 32; the integer interval is clamped to 1–255 and
+the remainder adjusts an eight-bit phase accumulator. Zero selects the header
+interval. Even the default phase step is $ff rather than $100. Music curves
+sustain their loop until key-off, then enter the release tail at the next point
+boundary; they do not derive their hold time from the next note's duration.
+A track end keys off and plays any finite GAIN release tail before closing its
+last note. These curves cover vibrato, tremolo, pan motion, and sample switching. The DSP
+continues to use GAIN rather than hardware ADSR.
+
+Tracks start with note zero, volume 127, multiplier 255, priority 64, and fixed
+voice equal to their logical index. Attacks latch pan and volume settings. Pan
+is clamped to 0–100 after applying its signed offset. The initial master level
+is 127/128; the two default GAIN multipliers each use 255/256. Echo presets retain
+the shared global state, while DSP register fades are represented by their
+target settings.
+
+The hardware orders tracks by priority and allocates eight voices. Allocation
+mode bit 3 selects a fixed voice, bit 4 disables allocation, bit 1 requires an
+idle voice, and bit 0 requires a strictly lower priority when stealing. Masked
+searches can rotate and leave several voices sounding for one logical track.
+Fixed assignments and single-voice masks are supported, including handoffs
+between logical tracks. Retired notes close at the handoff frame. Rotating
+allocation and changes that would overlap voices on one logical track emit
+explicit diagnostics. Physical sample-phase continuity across a track handoff,
+ENDX-based priority changes, and priority-dependent ordering of simultaneous
+global commands are not reproduced.
+
 ## Instruments and physical envelopes
 
 $0d2b loads a six-byte patch: flags, gain, sample, pitch curve, pan, echo preset.
@@ -236,7 +347,7 @@ note-number rounding. No minimum bend size or change threshold is applied:
 authored five-cent steps and smaller raw DSP-pitch changes remain intact.
 
 Echo presets contain EDL, EVOL L/R, feedback, and eight FIR coefficients, in the
-DSP register order $080a. The global master starts at 75/128. Each patch attack
+DSP register order $080a. The standard and extended global master starts at 75/128. Each patch attack
 updates its EON bit and may replace the global echo preset.
 
 ## Scope and export limits
@@ -315,7 +426,7 @@ Early revision archive coverage:
 | WWF Super Wrestlemania | 11 / 11 | 3 clean; 3 allocation and 5 pitch-modulation warnings |
 
 The early revision adds 367 recognized sequences from 28 games, all with sound
-banks. Across all three revisions this is 589 recognized sequences from 46
+banks. The first three revisions account for 589 recognized sequences from 46
 games. Recognition counts include partial sequences with the explicit
 limitations above; they do not imply complete support for every cue.
 
@@ -324,8 +435,42 @@ ten sharing a DSP voice between tracks, five using DSP pitch modulation, and
 two using randomized patterns. Six other
 sequences preserve signed pan changes in the performance model but warn that
 MIDI/SF2 stereo instrument variants only apply those changes at future attacks.
-The later Mortal Kombat II / Return of the Jedi family still needs its own
-interpreter audit and is deliberately excluded by detection.
 
 All 28 early-driver pitch tables match the same rounded equal-tempered octave,
 and their DSP GAIN distance/rate tables match the shared voice implementation.
+
+Later revision coverage:
+
+| Game | Recognized music snapshots / SPCs | Result |
+| --- | ---: | --- |
+| Air Cavalry | 4 / 4 | Pass |
+| Boogerman | 16 / 16 | 6 clean; 10 cues require rotating or overlapping voices |
+| Carrier Aces | 11 / 11 | Pass |
+| Dirt Trax FX | 12 / 12 | 4 clean; 8 cues require rotating or overlapping voices |
+| DOOM | 19 / 19 | 12 clean; 7 cues require rotating or overlapping voices |
+| King Arthur and the Knights of Justice | 15 / 15 | Pass |
+| Looney Tunes Basketball | 13 / 13 | 4 clean; 9 cues require rotating or overlapping voices |
+| Mortal Kombat II | 36 / 37 | 34 clean; 2 cues require rotating or overlapping voices |
+| Mortal Kombat 3 | 38 / 38 | 32 clean; 6 cues require rotating or overlapping voices |
+| Pitfall The Mayan Adventure | 72 / 83 | Recognized sequences pass |
+| Ren and Stimpy Time Warp | 17 / 18 | 13 clean; 4 cues require rotating or overlapping voices |
+| SeaQuest DSV | 12 / 13 | 6 clean; 6 cues require rotating or overlapping voices |
+| Secret of Evermore | 72 / 72 | Pass |
+| Super Copa | 7 / 7 | 5 clean; 2 cues require rotating or overlapping voices |
+| Super Star Wars: Return of the Jedi | 18 / 19 | 10 clean; 8 cues require rotating or overlapping voices |
+| Tecmo Super Baseball | 20 / 20 | 13 clean; 7 cues require rotating or overlapping voices |
+| The Jungle Book | 11 / 11 | Pass |
+| Untitled NFL Football Game | 1 / 1 | Pass |
+| Virtual Bart | 20 / 20 | 13 clean; 7 cues require rotating or overlapping voices |
+| WWF Raw | 21 / 21 | Pass |
+| WWF Wrestlemania The Arcade Game | 9 / 9 | 7 clean; 2 cues require rotating or overlapping voices |
+| War 2410 | 10 / 10 | Pass |
+| War 3010 | 9 / 9 | Pass |
+
+The later revision adds 463 recognized music snapshots from 23 games, with
+sound banks for all of them. Of these, 385 export without playback diagnostics;
+78 retain explicit voice-allocation limitations. The four revisions together
+recognize 1,052 music snapshots from 69 games. Counts include partial sequences
+and do not imply full support for an entire soundtrack. Return of the Jedi's
+“JVC Presents…” cue uses the sound-effect player without a music sequence.
+Sound effects layered over active music are also omitted from sequence exports.
