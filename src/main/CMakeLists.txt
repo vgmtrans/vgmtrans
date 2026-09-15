@@ -244,6 +244,8 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/SculptSoftSnes/SculptSoftSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SculptSoftSnes/SculptSoftSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SculptSoftSnes/SculptSoftSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SculptSoftSnes/SculptSoftSnesEarly.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SculptSoftSnes/SculptSoftSnesVoice.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SculptSoftSnes/SculptSoftSnesEnvelope.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SculptSoftSnes/SculptSoftSnesSynth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoInstrumentSet.cpp
