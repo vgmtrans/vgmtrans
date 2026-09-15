@@ -19,6 +19,15 @@ namespace {
 constexpr std::array<u8, 4> kCurveFlags{1, 4, 8, 2};  // Gain, pitch, pan, sample.
 }
 
+u16 Voice::curveValue(u8 lane) const {
+  return track.revision == Revision::Late ? track.lateCurves[lane].value : track.curves[lane].value;
+}
+
+u8 Voice::gainTarget() const {
+  const u8 gain = static_cast<u8>((track.patch.flags & 1) ? curveValue(0) : track.patch.gain);
+  return track.revision == Revision::Late ? ((gain * 255) >> 8) * 255 >> 8 : gain;
+}
+
 void Voice::warning(std::string message) {
   vm.diagnostic(Diagnostic{.severity = Severity::Warning, .message = std::move(message), .range = vm.sourceRange()});
 }
@@ -29,14 +38,14 @@ double Voice::key() const {
   }
   u16 pitch = track.voicePitch;
   if ((track.patch.flags & 4) != 0) {
-    pitch = static_cast<u16>(pitch + track.curves[1].value - 0x4b0);
+    pitch = static_cast<u16>(pitch + curveValue(1) - 0x4b0);
   }
   pitch = static_cast<u16>(pitch + track.data->sampleTuning[track.sample]);
   if ((track.patch.flags & 0x40) != 0) {
-    return 72.0 + 12.0 * std::log2(std::max(1u, unsigned(pitch & 0x3fff)) / 4096.0);
+    return 72.0 + 12.0 * std::log2(std::max(1u, unsigned((pitch + track.rawPitchOffset) & 0x3fff)) / 4096.0);
   }
-  const unsigned topOctave = track.revision == Revision::Extended ? 10 : 4;
-  if (track.revision == Revision::Extended) {
+  const unsigned topOctave = (track.revision == Revision::Extended || track.revision == Revision::Late) ? 10 : 4;
+  if (topOctave == 10) {
     pitch = static_cast<u16>(pitch + 0x5a0);
   }
   // Clamp high octaves; negative words take the wrapped low-octave path.
@@ -48,7 +57,13 @@ double Voice::key() const {
     octave = 0;
   }
   // Preserve the driver's musical units without its integer table/shift rounding.
-  return track.data->pitchBaseKey - 12.0 * (topOctave - octave) + (pitch % 240) / 20.0;
+  const double key = track.data->pitchBaseKey - 12.0 * (topOctave - octave) + (pitch % 240) / 20.0;
+  if (track.rawPitchOffset == 0) {
+    return key;
+  }
+  const double dspPitch = 4096.0 * std::exp2((key - 72.0) / 12.0);
+  const double shifted = std::fmod(dspPitch + track.rawPitchOffset, 16384.0);
+  return 72.0 + 12.0 * std::log2(std::max(1.0, shifted) / 4096.0);
 }
 
 void Voice::selectSample(u8 sample) {
@@ -60,7 +75,7 @@ void Voice::selectSample(u8 sample) {
 }
 
 void Voice::emitEcho() {
-  const u8 bit = static_cast<u8>(1u << track.number);
+  const u8 bit = static_cast<u8>(1u << track.dspVoice);
   echo.mask &= static_cast<u8>(~bit);
   if ((track.patch.flags & 0x10) != 0) {
     if (const auto& preset = track.data->echoes[track.patch.echo]) {
@@ -75,7 +90,7 @@ void Voice::emitEcho() {
     return;
   }
   const auto& preset = echo.preset;
-  const auto gain = [](u8 value) { return std::min<u8>(value, 75) / 128.0; };
+  const auto gain = [&](u8 value) { return std::min<u8>(value, track.revision == Revision::Late ? 127 : 75) / 128.0; };
   const double left = gain((*preset)[1]);
   const double right = gain((*preset)[2]);
   out.reverb(ReverbPerformanceEvent{.voiceMask = echo.mask,
@@ -87,7 +102,8 @@ void Voice::emitEcho() {
 }
 
 void Voice::emitVoice() {
-  const u8 pan = static_cast<u8>((track.patch.flags & 8) ? track.curves[2].value : track.fixedPan);
+  const int basePan = static_cast<u8>((track.patch.flags & 8) ? curveValue(2) : track.fixedPan);
+  const u8 pan = track.revision == Revision::Late ? std::clamp(basePan + track.panOffset, 0, 100) : basePan;
   const u8 left = static_cast<u8>((track.voiceVolume * pan) / 100);
   const u8 right = static_cast<u8>(track.voiceVolume - left);
   std::array<s8, 2> balance{static_cast<s8>(left), static_cast<s8>(right)};
@@ -128,13 +144,21 @@ void Voice::attack(u8 patchIndex, u8 volume, u16 gate, bool legato) {
           fmt::format("Invalid SculptSoftSnes envelope: patch {}, lane {}, index {}", patchIndex, lane, indices[lane]));
       track.patch.flags &= static_cast<u8>(~kCurveFlags[lane]);
     } else {
-      track.curves[lane].start(*curve, gate);
       // Sequence commands run before the frame's envelope updates.
-      track.curves[lane].tick();
+      if (track.revision == Revision::Late) {
+        track.lateCurves[lane].start(*curve, track.curveSpeeds[lane], lane == 1);
+        track.lateCurves[lane].tick(false);
+      } else {
+        track.curves[lane].start(*curve, gate);
+        track.curves[lane].tick();
+      }
     }
   }
   if (!legato) {
-    track.alternatePan = (track.patch.flags & 8) != 0 && track.curves[2].curve->alternate && !track.alternatePan;
+    track.alternatePan =
+        (track.patch.flags & 8) != 0 &&
+        (track.revision == Revision::Late ? track.lateCurves[2].curve : track.curves[2].curve)->alternate &&
+        !track.alternatePan;
     if ((track.patch.flags & 8) == 0) {
       track.fixedPan = track.patch.pan;
     }
@@ -142,7 +166,7 @@ void Voice::attack(u8 patchIndex, u8 volume, u16 gate, bool legato) {
       track.fixedSample = track.patch.sample;
     }
   }
-  const u8 sample = static_cast<u8>((track.patch.flags & 2) ? track.curves[3].value : track.fixedSample);
+  const u8 sample = static_cast<u8>((track.patch.flags & 2) ? curveValue(3) : track.fixedSample);
   const bool retrigger =
       !legato && (!track.sounding || track.sample != sample || (track.data->sampleFlags[sample] & 0x40) != 0);
   if (retrigger && track.note) {
@@ -160,10 +184,11 @@ void Voice::attack(u8 patchIndex, u8 volume, u16 gate, bool legato) {
     // integral MIDI key for the new voice.
     track.noteKey = std::clamp(std::round(key()), 0.0, 127.0);
   }
+  track.released = false;
   if (legato) {
     updateGainRegister();
   } else {
-    track.gainRegister = static_cast<u8>((track.patch.flags & 1) ? track.curves[0].value : track.patch.gain);
+    track.gainRegister = gainTarget();
     track.envelope = snesDspGainEnvelopeValue(track.gainRegister, 0, 0.0);
     emitEcho();
   }
@@ -190,10 +215,14 @@ void Voice::tick() {
       snesDspGainEnvelopeValue(track.gainRegister, track.envelope, (clocks * period + 0.001) / kSnesDspSampleRate);
   for (u8 lane = 0; lane < track.curves.size(); ++lane) {
     if ((track.patch.flags & kCurveFlags[lane]) != 0) {
-      track.curves[lane].tick();
+      if (track.revision == Revision::Late) {
+        track.lateCurves[lane].tick(track.released);
+      } else {
+        track.curves[lane].tick();
+      }
     }
   }
-  const u8 sample = static_cast<u8>(track.curves[3].value);
+  const u8 sample = static_cast<u8>(curveValue(3));
   if ((track.patch.flags & 2) != 0 && sample != track.sample) {
     out.setNoteEnd(*track.note, vm.tick());
     selectSample(sample);
@@ -211,7 +240,7 @@ void Voice::updateGainRegister() {
                                          20,  16,  14,  11,  8,   6,  5,  4,  3,  2,  1};
   constexpr std::array<u8, 22> rates{29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19,
                                      18, 17, 16, 15, 14, 13, 12, 10, 9,  6,  0};
-  const int target = static_cast<u8>((track.patch.flags & 1) ? track.curves[0].value : track.patch.gain);
+  const int target = gainTarget();
   const int difference = target - (track.envelope >> 4);
   const unsigned distance = std::abs(difference) / 2;
   unsigned rateIndex = 21;

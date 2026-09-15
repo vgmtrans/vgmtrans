@@ -735,9 +735,299 @@ void earlyUnsupportedAllocationAndInvalidPointersAreDiagnosed() {
   expect(!diagnostics.empty(), "unloaded early pattern pointers must stop decoding with a diagnostic");
 }
 
+std::vector<u8> lateFixture(bool indexed = false) {
+  auto data = fixture(Revision::Extended);
+  bytes(data, 0x700, {0x8f, 0xa0, 0xfa, 0x8f, 0xa0, 0xfb, 0x8f, 0x20, 0xfc, 0x8f, 0x87,
+                      0xf1, 0x3f, 0,    0xc,  0x8f, 0,    0x25, 0x8f, 0x30, 0x26});
+  data[0xfb] = 0xa0;
+  word(data, 0x843, 0x7fd);
+  word(data, 0x854, 0xc80);
+  bytes(data, 0x980, {0xdd, 0x28, 0x1f, 0x1c, 0xfd, 0xf6, 0, 0xb, 0xc5, 0, 0, 0xf6, 1, 0xb, 0xc5, 0, 0});
+  bytes(data, 0xc80, {0xe4, 0x88, 0x5d, 0x1c, 0xbc, 0xfd, 0xf7, 0x6d, 0xd4, 0x8c, 0xfc, 0xf7, 0x6d, 0xd4, 0xa0});
+  if (indexed) {
+    bytes(data, 0xc80,
+          {0xeb, 0x88, 0xfc, 0xf7, 0x6d, 0x8d, 0x10, 0x3f, 0xfd, 7, 0xf8, 0x88, 0xd4, 0x8c, 0xdd, 0xd4, 0xa0});
+  } else {
+    word(data, 0x4001, 0x4100);
+  }
+  word(data, 0xb2c, 0xe80);
+  word(data, 0xb2e, 0xf00);
+  bytes(data, 0xeb2, {0xdd, 0x60, 0x95, 0x26, 6, 0xd5, 0x26, 6, 0xae, 0x95, 0x3a, 6, 0xd5, 0x3a, 6});
+  bytes(data, 0xf00, {0x3f, 0, 0xe, 0xd5, 0x4e, 6, 0x3f, 0, 0xe, 0xd5, 0x62, 6, 0x2f});
+  word(data, 0xb1e, 0xd00);
+  bytes(data, 0xd00, {0x3f, 0, 0xe, 0xfd, 0x3f, 0, 0xe, 0x2d, 0xe8, 0});
+  for (const auto& [op, duration] :
+       std::array<std::pair<u8, u8>, 4>{{{0xf8, 32}, {0xfd, 64}, {0xfe, 128}, {0xff, 0}}}) {
+    const u16 handler = static_cast<u16>(0xd20 + 4 * (op - 0xf8));
+    word(data, 0xb00 + 2 * (op - 0xe0), handler);
+    bytes(data, handler, {0xe8, duration, 0x2f, 0});
+  }
+  for (u32 i = 0; i < 240; ++i) {
+    const u16 pitch = static_cast<u16>(8192 * std::exp2(i / 240.0));
+    data[0x2400 + i] = static_cast<u8>(pitch);
+    data[0x24f0 + i] = static_cast<u8>(pitch >> 8);
+  }
+  bytes(data, 0x4100, {0xf5, 0, 0xef, 69, 2, 0x49, 0xc1, 0xf0});
+  return data;
+}
+
+void lateHeadersAndPackedSemitones() {
+  for (const bool indexed : {false, true}) {
+    auto data = lateFixture(indexed);
+    const auto layout = findLayout(ByteReader(SourceId{70}, data));
+    expect(layout && layout->revision == Revision::Late && layout->inlineTrackPointers != indexed,
+           "late headers derive either direct pointers or table indexes from the track initializer");
+    const auto performance = render(data);
+    const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+    expect(notes.size() == 2 && notes[0].key == 60 && notes[1].key == 61 && notes[0].header.tick == 0 &&
+               notes[1].header.tick == 2,
+           "packed notes add signed semitone deltas and retain embedded durations");
+    expect(events<PitchBendPerformanceEvent>(performance.tracks.front()).size() == 1,
+           "ordinary late semitone notes must not emit per-note tuning corrections");
+    data[0xb30] = 0;
+    expect(!findLayout(ByteReader(SourceId{70}, data)), "an incompatible late command table must be rejected");
+  }
+}
+
+void addHostQueue(std::vector<u8>& data, u8 capacity, bool portMirror) {
+  bytes(data, 0x839, {0x2d, 0x3f, 0, 0x12, 0xae, 0x92, 7});
+  bytes(data, 0x1000, {0xe4, 0xe8, 0xf0, 0x2f, 0x9c, 0xc4, 0xe8, 0xf8, 0xea, 0xf5, 0, 0x18, 0x28, 0xfe, 0xc4, 0x31});
+  if (portMirror) {
+    bytes(data, 0x1010,
+          {0xc4, 0xf7, 0xf5, 0x40, 0x18, 0xc4, 0x32, 0xc4, 0xf4, 0xf5, 0x80, 0x18, 0xc4, 0xf5, 0xc4, 0x33});
+  } else {
+    bytes(data, 0x1010, {0xf5, 0x40, 0x18, 0xc4, 0x32, 0xf5, 0x80, 0x18, 0xc4, 0x33});
+  }
+  bytes(data, portMirror ? 0x1020 : 0x101a,
+        {0x3d, 0xc8, capacity, 0xd0, 2, 0xcd, 0,    0xd8, 0xea, 0xe4, 0x31, 0x5d, 0x28,
+         0xfe, 0xc8, 0x49,     0xb0, 7, 0xe4, 0x32, 0xeb, 0x33, 0x3f, 0,    0x11});
+  bytes(data, 0x1100, {0x1f, 0x40, 0x11});
+  word(data, 0x1146, 0x1180);
+  bytes(data, 0x1180, {0x3f, 0x39, 8});
+  word(data, 0x22a2, 0x4000);
+  word(data, 0x23a2, 0x4040);  // Song 129 exercises the nine-bit table offset.
+  bytes(data, 0x4040, {1, 1});
+  word(data, 0x2202, 0x4180);
+  bytes(data, 0x4180, {0xef, 71, 2, 0xf0});
+}
+
+void lateQueuedSongsOverrideStaleHeaders() {
+  for (const bool indexed : {false, true}) {
+    for (const bool portMirror : {false, true}) {
+      for (const u8 capacity : {16, 20, 24, 32}) {
+        auto data = lateFixture(indexed);
+        addHostQueue(data, capacity, portMirror);
+        if (!indexed) {
+          word(data, 0x4041, 0x4180);
+        }
+        word(data, 0x6d, 0);
+        expect(!findLayout(ByteReader(SourceId{70}, data)),
+               "resident songs alone must not select an arbitrary song from an idle driver");
+        // Two starts straddle the ring boundary. The newest request wins;
+        // stale entries outside the pending span and the second argument do not.
+        data[0xe8] = 2;
+        data[0xea] = capacity - 1;
+        data[0x1800 + capacity - 1] = 6;
+        data[0x1840 + capacity - 1] = 1;
+        bytes(data, 0x1800, {7, 6});
+        bytes(data, 0x1840, {129, 255});
+        data[0x1880] = 255;
+        const auto layout = findLayout(ByteReader(SourceId{70}, data));
+        expect(layout && layout->song == 0x4040,
+               "pending starts must recover the requested song before the live header is initialized");
+        word(data, 0x6d, 0x4000);
+        const auto notes = events<NotePerformanceEvent>(render(data).tracks.front());
+        expect(notes.size() == 1 && notes.front().key == 62,
+               "a queued song must replace the previous live song, including its tracks");
+        data[0xe8] = 0;
+        expect(findLayout(ByteReader(SourceId{70}, data))->song == 0x4000,
+               "an empty queue must leave the live song selected");
+        data[0xe8] = 1;
+        data[0xea] = 0;
+        data[0x1800] = 4;
+        expect(findLayout(ByteReader(SourceId{70}, data))->song == 0x4000,
+               "a queued sound effect must not be interpreted as a song request");
+      }
+    }
+  }
+}
+
+void lateInvalidQueuesAndUnloadedSongsAreRejected() {
+  auto data = lateFixture();
+  addHostQueue(data, 16, false);
+  word(data, 0x6d, 0);
+  data[0xe8] = 17;
+  data[0x1800] = 6;
+  data[0x1840] = 1;
+  expect(!findLayout(ByteReader(SourceId{70}, data)), "an overflowing queue count must not select a song");
+  data[0xe8] = 1;
+  data[0xea] = 16;
+  expect(!findLayout(ByteReader(SourceId{70}, data)), "an out-of-range queue head must not select a song");
+  data[0xea] = 0;
+  word(data, 0x100a, 0xfff8);
+  expect(!findLayout(ByteReader(SourceId{70}, data)), "queue storage must fit within ARAM");
+  word(data, 0x100a, 0x1800);
+  word(data, 0x1181, 0x1234);
+  expect(!findLayout(ByteReader(SourceId{70}, data)), "the host handler must call the detected song initializer");
+  word(data, 0x1181, 0x839);
+  word(data, 0x6d, 0x4000);
+  word(data, 0x22a2, 0xffff);
+  expect(!findLayout(ByteReader(SourceId{70}, data)),
+         "an unloaded queued song must not silently export the previous song");
+  word(data, 0x201a, 0);
+  word(data, 2, 0x4000);
+  expect(!findLayout(ByteReader(SourceId{70}, data)),
+         "an absent song table must not read direct-page state as headers");
+}
+
+void lateFinePitchAndTempo() {
+  auto data = lateFixture();
+  bytes(data, 0x4100, {0xfa, 128, 0xef, 69, 2, 0xeb, 0x92, 3, 19, 0, 0xf4, 0xef, 70, 2, 0xf0});
+  const auto performance = render(data);
+  const auto& track = performance.tracks.front();
+  const auto notes = events<NotePerformanceEvent>(track);
+  const auto bends = events<PitchBendPerformanceEvent>(track);
+  expect(notes.size() == 1 && notes.front().durationTicks == 11,
+         "fine pitch and explicit ties retain the note while the shared tempo counter controls waits");
+  expect(
+      std::ranges::any_of(
+          bends, [](const auto& bend) { return bend.header.tick == 3 && std::abs(bend.semitones - 0.05) < 1e-9; }) &&
+          std::ranges::any_of(
+              bends, [](const auto& bend) { return bend.header.tick == 7 && std::abs(bend.semitones - 1.0) < 1e-9; }),
+      "fine streams retain five-cent steps, signed explicit deltas, and zero-time commands");
+}
+
+void lateCurvesReleaseAndKeepFractionalInterpolation() {
+  Curve curve{.loopStart = 1, .loopEnd = 2, .speed = 2, .interpolate = true, .pointCount = 4, .points = {0, 3, 0, 0}};
+  LateCurvePlayer player;
+  player.start(curve, 0, false);
+  player.tick(false);
+  player.tick(false);
+  player.tick(false);
+  expect(player.accumulator == 96 && player.value == 1,
+         "late byte envelopes interpolate in 10.6 fixed point before truncation");
+  for (int i = 0; i < 20; ++i) {
+    player.tick(false);
+  }
+  expect(player.active && player.held, "music envelope loops sustain until key-off");
+  for (int i = 0; i < 20; ++i) {
+    player.tick(true);
+  }
+  expect(!player.active && !player.held && player.value == 0,
+         "key-off advances through the release tail and terminates the curve");
+  player.start(curve, 48, false);
+  expect(player.interval == 3 && player.step == 255, "lane speed uses a multiplier divided by 32");
+  player.start(curve, 17, false);
+  expect(player.interval == 1 && player.step == 253, "fractional lane speeds retain their phase step");
+}
+
+void lateVoiceHandoffsCloseThePreviousNote() {
+  auto data = lateFixture();
+  data[0x4000] = 2;
+  word(data, 0x4003, 0x4200);
+  bytes(data, 0x4100, {0xef, 69, 8, 0xf0});
+  bytes(data, 0x4200, {0xc1, 0xe5, 8, 0, 255, 0xef, 71, 2, 0xf0});
+  const auto performance = render(data);
+  const auto first = events<NotePerformanceEvent>(performance.tracks[0]);
+  const auto second = events<NotePerformanceEvent>(performance.tracks[1]);
+  expect(first.size() == 1 && first[0].durationTicks == 2 && second.size() == 1 && second[0].header.tick == 2 &&
+             second[0].key == 62,
+         "a fixed DSP voice handed to another logical track must close its previous note at the handoff");
+}
+
+void latePhrasesAndAttackParameters() {
+  auto data = lateFixture();
+  bytes(data, 0x4100, {0xf2, 100, 0xf6, 0, 0x43, 4, 0x43, 2, 20, 0, 128, 0, 1, 255, 0xef, 71, 1, 0xf0});
+  bytes(data, 0x4300, {0xef, 69, 2, 0x49});
+  const auto phrase = render(data);
+  const auto notes = events<NotePerformanceEvent>(phrase.tracks.front());
+  expect(notes.size() == 5 && notes[0].key == 61 && notes[1].key == 62 && notes[2].key == 61 && notes[4].key == 62 &&
+             notes[4].header.tick == 8,
+         "late bounded phrases repeat embedded durations and restore pitch offsets at their address boundary");
+  const auto balances = events<StereoBalancePerformanceEvent>(phrase.tracks.front());
+  expect(balances.size() == 2 && balances[0].leftGain == 24.0 / 128 && balances[1].leftGain == 49.0 / 128,
+         "phrase volume scaling is temporary and the attack multiplier keeps its byte truncation");
+
+  bytes(data, 0x4100, {0xfb, 231, 0xef, 69, 2, 0xfb, 25, 0xe0, 0, 8, 0xf8, 0xef, 69, 2, 0xf0});
+  const auto parameters = render(data);
+  const auto shifted = events<NotePerformanceEvent>(parameters.tracks.front());
+  const auto pans = events<StereoBalancePerformanceEvent>(parameters.tracks.front());
+  expect(shifted.size() == 2 && shifted[0].key == 60 && shifted[1].key == 72 && shifted[1].header.tick == 34,
+         "the raw DSP offset applies after musical pitch conversion and starts with the next note");
+  expect(
+      pans.size() == 2 && pans[0].leftGain == 31.0 / 128 && pans[1].leftGain == 94.0 / 128 && pans[1].header.tick == 34,
+      "signed pan offsets are clamped and latched on attack rather than retiming the sounding voice");
+}
+
+void lateTrackEndPlaysTheReleaseTail() {
+  auto data = lateFixture();
+  data[0x5000] = 1;
+  data[0x5001] = 0;
+  word(data, 0x2140, 0x5100);
+  bytes(data, 0x5100, {0, 1, 0, 1, 0, 3, 1, 0, 127, 127, 0});
+  bytes(data, 0x4100, {0xef, 69, 2, 0xf0});
+  const auto performance = render(data);
+  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto gain = events<ExpressionPerformanceEvent>(performance.tracks.front());
+  expect(notes.size() == 1 && notes[0].durationTicks > 2 && !gain.empty() && gain.back().linearGain == 0,
+         "track end keys off and lets a finite GAIN release settle before closing the note");
+}
+
+void lateAllocationLimitationsAreExplicit() {
+  auto data = lateFixture();
+  bytes(data, 0x4100, {0xe5, 0, 0, 3, 0xef, 69, 1, 0xf0});
+  const ByteReader reader(SourceId{70}, data);
+  const auto layout = *findLayout(reader);
+  const auto result = SequenceVm().render(decodeSequence(reader, layout, readDriverData(reader, layout), AssetId{0}));
+  expect(result.diagnostics.size() == 1 && result.diagnostics[0].message.find("voice allocation") != std::string::npos,
+         "rotating allocation must be diagnosed instead of flattening independent physical voices");
+  bytes(data, 0x4100, {0xe5, 16, 0, 255, 0xef, 69, 1, 0xe6, 0xef, 70, 1, 0xf0});
+  const auto muted = render(data);
+  const auto notes = events<NotePerformanceEvent>(muted.tracks.front());
+  expect(notes.size() == 1 && notes[0].header.tick == 1 && notes[0].key == 61,
+         "disabled allocation consumes note time and the default-voice command restores playback");
+}
+
+void lateTransposeVariantsAndCurveWidths() {
+  for (const bool shared : {false, true}) {
+    auto data = lateFixture();
+    if (shared) {
+      word(data, 0xf04, 0x626);
+      word(data, 0xf0a, 0x63a);
+    }
+    bytes(data, 0x4100, {0xf7, 20, 0, 0xef, 69, 2, 0xf0});
+    const auto layout = findLayout(ByteReader(SourceId{70}, data));
+    expect(layout && layout->sharedTranspose == shared,
+           "track pitch commands are distinguished by whether they address the phrase transposition field");
+    const auto performance = render(data);
+    expect(events<NotePerformanceEvent>(performance.tracks.front()).front().key == (shared ? 61 : 60),
+           "shared transposition affects attacks while the separate late offset retains its driver quirk");
+  }
+  auto data = lateFixture();
+  word(data, 0x2140, 0x5100);
+  word(data, 0x2160, 0x5120);
+  bytes(data, 0x5100, {0, 255, 0, 1, 0, 2, 17, 0, 127, 0});
+  bytes(data, 0x5120, {0, 255, 0, 1, 0, 2, 1, 0, 0xb0, 4, 0xc4, 4});
+  const ByteReader reader(SourceId{70}, data);
+  const auto driver = readDriverData(reader, *findLayout(reader));
+  expect(driver.curves[0][0]->points == std::vector<u16>({127, 0}) &&
+             driver.curves[1][0]->points == std::vector<u16>({1200, 1220}),
+         "late point widths come from the lane type and ignore header byte six");
+}
+
 }  // namespace
 
 void runSculptSoftSnesModuleTests() {
+  lateTrackEndPlaysTheReleaseTail();
+  lateTransposeVariantsAndCurveWidths();
+  latePhrasesAndAttackParameters();
+  lateAllocationLimitationsAreExplicit();
+  lateHeadersAndPackedSemitones();
+  lateQueuedSongsOverrideStaleHeaders();
+  lateInvalidQueuesAndUnloadedSongsAreRejected();
+  lateFinePitchAndTempo();
+  lateCurvesReleaseAndKeepFractionalInterpolation();
+  lateVoiceHandoffsCloseThePreviousNote();
   earlyDetectionRequiresLayeredCommandTables();
   earlyPatternsRetainStateAndUseBothInstruments();
   earlyFinePitchFixedPitchAndRests();

@@ -40,16 +40,16 @@ std::optional<u16> readTablePointer(ByteReader reader, const Layout& layout, u8 
 
 namespace {
 
-[[nodiscard]] std::optional<Curve> readCurve(ByteReader reader, u16 address) {
+[[nodiscard]] std::optional<Curve> readCurve(ByteReader reader, u16 address, std::optional<u8> lane = std::nullopt) {
   if (!reader.has(address, 8)) {
     return std::nullopt;
   }
   const u8 count = reader.u8At(address + 5);
   const u8 loopStart = reader.u8At(address);
   const u8 loopEnd = reader.u8At(address + 1);
-  // The header specifies a byte stride, not a lane type. The interpreter reads
-  // one byte for stride 1 and a word otherwise, including nonstandard strides.
-  const u8 stride = reader.u8At(address + 6);
+  // Earlier headers specify a byte stride: read a byte for stride 1 and a
+  // word otherwise. Later revisions derive the width from the lane instead.
+  const u8 stride = lane ? (*lane == 1 ? 2 : 1) : reader.u8At(address + 6);
   const u8 width = stride == 1 ? 1 : 2;
   // Some authored curves put release/loop points beyond the nominal end.
   // The SPC follows those indexes literally, so retain the reachable tail.
@@ -81,14 +81,15 @@ DriverData readDriverData(ByteReader reader, const Layout& layout) {
   DriverData data;
   const u16 basePitch = reader.u8At(layout.pitchTable) | (reader.u8At(layout.pitchTable + 240) << 8);
   data.pitchBaseKey = 72.0 + 12.0 * std::log2(std::max(1u, unsigned(basePitch)) / 4096.0);
-  for (u32 i = 0; i < 32; ++i) {
+  for (u32 i = 0; layout.revision != Revision::Late && i < 32; ++i) {
     data.deltas[i] =
         static_cast<s16>(reader.u8At(layout.deltaTable + i) | (reader.u8At(layout.deltaTable + 32 + i) << 8));
   }
   for (u32 i = 0; i < 256; ++i) {
     for (u8 lane = 0; lane < 4; ++lane) {
       if (const auto address = readTablePointer(reader, layout, 4 + lane * 2, static_cast<u8>(i))) {
-        data.curves[lane][i] = readCurve(reader, *address);
+        data.curves[lane][i] =
+            readCurve(reader, *address, layout.revision == Revision::Late ? std::optional{lane} : std::nullopt);
       }
     }
     if (const auto address = readTablePointer(reader, layout, 12, static_cast<u8>(i));
