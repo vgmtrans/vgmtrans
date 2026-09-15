@@ -99,9 +99,10 @@ struct TrackState {
   u8 gainRegister = 0;
   bool sounding = false;
   bool warnedPitchModulation = false;
+  std::optional<u8> emittedSample;
+  std::optional<std::array<s8, 2>> emittedBalance;
   std::optional<double> emittedExpression;
   std::optional<double> emittedPitch;
-  std::optional<u8> emittedPan;
 };
 
 [[nodiscard]] u8 scaledVolume(u8 volume, u16 scale) {
@@ -126,28 +127,31 @@ struct Playback : SequencePlayback<TrackState> {
       pitch = static_cast<u16>(pitch + track.curves[1].value - 0x4b0);
     }
     pitch = static_cast<u16>(pitch + track.data->sampleTuning[track.sample]);
-    u16 dspPitch = pitch;
-    if ((track.patch.flags & 0x40) == 0) {
-      const unsigned topOctave = track.revision == Revision::Extended ? 10 : 4;
-      if (track.revision == Revision::Extended) {
-        pitch = static_cast<u16>(pitch + 0x5a0);
-      }
-      // Clamp high octaves; negative words take the wrapped low-octave path.
-      unsigned octave = topOctave;
-      if (pitch < (topOctave + 1) * 240) {
-        octave = pitch / 240;
-      } else if (pitch >= 0x8000) {
-        pitch = static_cast<u16>(pitch + 0xdf20);
-        octave = 0;
-      }
-      dspPitch = track.data->pitches[pitch % 240] >> (topOctave - octave);
+    if ((track.patch.flags & 0x40) != 0) {
+      return 72.0 + 12.0 * std::log2(std::max(1u, unsigned(pitch & 0x3fff)) / 4096.0);
     }
-    return 72.0 + 12.0 * std::log2(std::max(1u, unsigned(dspPitch & 0x3fff)) / 4096.0);
+    const unsigned topOctave = track.revision == Revision::Extended ? 10 : 4;
+    if (track.revision == Revision::Extended) {
+      pitch = static_cast<u16>(pitch + 0x5a0);
+    }
+    // Clamp high octaves; negative words take the wrapped low-octave path.
+    unsigned octave = topOctave;
+    if (pitch < (topOctave + 1) * 240) {
+      octave = pitch / 240;
+    } else if (pitch >= 0x8000) {
+      pitch = static_cast<u16>(pitch + 0xdf20);
+      octave = 0;
+    }
+    // Preserve the driver's musical units without its integer table/shift rounding.
+    return track.data->pitchBaseKey - 12.0 * (topOctave - octave) + (pitch % 240) / 20.0;
   }
 
   void selectSample(u8 sample) {
     track.sample = sample;
-    out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = sample});
+    if (track.emittedSample != sample) {
+      out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = sample});
+      track.emittedSample = sample;
+    }
   }
 
   void emitEcho() {
@@ -179,13 +183,15 @@ struct Playback : SequencePlayback<TrackState> {
 
   void emitVoice() {
     const u8 pan = static_cast<u8>((track.patch.flags & 8) ? track.curves[2].value : track.fixedPan);
-    if (track.emittedPan != pan) {
-      const u8 left = static_cast<u8>((track.voiceVolume * pan) / 100);
-      const u8 right = static_cast<u8>(track.voiceVolume - left);
-      const double l = static_cast<s8>(left) / 128.0;
-      const double r = static_cast<s8>(right) / 128.0;
-      out.stereoBalance(track.alternatePan ? r : l, track.alternatePan ? l : r);
-      track.emittedPan = pan;
+    const u8 left = static_cast<u8>((track.voiceVolume * pan) / 100);
+    const u8 right = static_cast<u8>(track.voiceVolume - left);
+    std::array<s8, 2> balance{static_cast<s8>(left), static_cast<s8>(right)};
+    if (track.alternatePan) {
+      std::swap(balance[0], balance[1]);
+    }
+    if (track.emittedBalance != balance) {
+      out.stereoBalance(balance[0] / 128.0, balance[1] / 128.0);
+      track.emittedBalance = balance;
     }
     const double expression = track.envelope / 2047.0;
     if (track.emittedExpression != expression) {
@@ -249,8 +255,8 @@ struct Playback : SequencePlayback<TrackState> {
       warning("SculptSoftSnes DSP pitch modulation is not representable by the current performance model");
     }
     if (retrigger) {
-      // MIDI note numbers are integral. Keep all table rounding and sample
-      // tuning in the bend instead of losing them when a renderer rounds a key.
+      // Keep sample tuning and fractional pitch in the bend when choosing an
+      // integral MIDI key for the new voice.
       track.noteKey = std::clamp(std::round(key()), 0.0, 127.0);
     }
     if (legato) {
@@ -260,8 +266,6 @@ struct Playback : SequencePlayback<TrackState> {
       track.envelope = snesDspGainEnvelopeValue(track.gainRegister, 0, 0.0);
       emitEcho();
     }
-    track.emittedPan.reset();
-    track.emittedPitch.reset();
     emitVoice();
     if (retrigger) {
       track.note = out.note(track.noteKey, 1.0, 1);
