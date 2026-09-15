@@ -19,7 +19,7 @@ namespace {
 // SsdSeqFuncLength table disagrees with Position and Master Fader.
 // [Bakusou Dekotora Densetsu: Otoko Hanamichi Yume Roman]: The driver establishes the version 0x0300 width changes.
 // [Tokimeki Memorial: Girl's Side]: The unstripped version 0x0250 driver establishes the handlers added after
-// version 0x0201 and retains the three-operand All Reset command.
+// version 0x0201 and retains the zero-operand All Reset command.
 // [Tokimeki Memorial: Girl's Side 2nd Kiss]: The driver establishes the version 0x0320 width changes.
 constexpr std::array<uint8_t, 128> kOperandCounts = {
     0, 0, 1, 1, 1, 2, 3, 4, 2, 2, 2, 0, 3, 2, 3, 0,  // 80-8f
@@ -35,7 +35,7 @@ constexpr std::array<uint8_t, 128> kOperandCounts = {
 uint8_t operandCount(uint8_t status, uint16_t version) {
   if (PSDSEPS2::isV2(version)) {
     // [Shadow Hearts]: The named handlers define these older widths. Disabled Jump, If, Random Note, Priority,
-    // Sustain, and Label slots point to SsdSeqDummy; All Reset consumes three authoring parameters.
+    // Sustain, and Label slots point to SsdSeqDummy; All Reset returns after the opcode with no payload.
     switch (status) {
       case 0x88:
       case 0x89:
@@ -50,7 +50,7 @@ uint8_t operandCount(uint8_t status, uint16_t version) {
       case 0xdf:
         return 2;
       case 0xf8:
-        return 3;
+        return 0;
       default:
         break;
     }
@@ -654,15 +654,17 @@ bool PSDSEPS2Track::readEvent() {
   if (status < 0x80) {
     auto* sequence = static_cast<PSDSEPS2Seq*>(parentSeq);
     if (sequence->m_header.isEffect) {
-      if (curOffset + 2 > trackEnd) {
+      const uint32_t durationBytes = PSDSEPS2::isV2(m_version) ? 1 : 2;
+      if (curOffset + durationBytes > trackEnd) {
         return false;
       }
 
+      // [Shadow Hearts]: The version 2.0 and 2.0.1 effect handler consumes one duration byte after each note.
       // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: The named SsdEffectTrackSequence uses a SEDS
       // note layout where the opcode low nibble is added to the octave base and a little-endian 16-bit duration
       // follows. SsdPlaySeqEffectNormal initializes note velocity from effect record +1.
       // [Tokimeki Memorial: Girl's Side 2nd Kiss]: Version 0x0320 initializes note velocity from effect record +0xc.
-      const uint32_t duration = readEventU16LE();
+      const uint32_t duration = PSDSEPS2::isV2(m_version) ? readByte(curOffset++) : readEventU16LE();
       uint32_t gateDuration;
       // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdEffectTrackSequence interprets effect
       // gate values as sixteenths, with 15 shortening by two ticks and 16 preserving the full duration.
