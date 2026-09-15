@@ -25,8 +25,8 @@ inline MagicInfo magicInfo(uint32_t magic) {
   if (c0 == 's' && c1 == 'm' && c2 == 'd') {
     kind = FileKind::Sequence;
   } else if (c0 == 's' && c1 == 'e' && c2 == 'd') {
-    // [Mimi de Unou o Kitaeru: DS Chou-nouryoku]: Sound-effect event sequences use SEDL with the SMDL header, trk
-    // chunks, and event bytecode, but omit the song chunk.
+    // [Mimi de Unou o Kitaeru: DS Chou-nouryoku]: SEDL stores a table of independent effects. Each points to
+    // seqinfo followed by trk chunks using SMDL event bytecode, without an enclosing song chunk.
     kind = FileKind::Sequence;
   } else if (c0 == 's' && c1 == 'w' && c2 == 'd') {
     kind = FileKind::Bank;
