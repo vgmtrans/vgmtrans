@@ -145,8 +145,8 @@ bool PSDSESeq::parseHeader() {
   // fields. Shipped files consistently store 1, 1, -1, and -1 at these boundaries.
   header->addChild(curOffset + 0x30, 4, "Authoring Metadata 1");
   header->addChild(curOffset + 0x34, 4, "Authoring Metadata 2");
-  header->addChild(curOffset + 0x38, 4, "Unused Sentinel 1");
-  header->addChild(curOffset + 0x3C, 4, "Unused Sentinel 2");
+  header->addChild(curOffset + 0x38, 4, "Authoring Sentinel 1");
+  header->addChild(curOffset + 0x3C, 4, "Authoring Sentinel 2");
 
   // [Luminous Arc]: The song chunk contains 0x10 bytes of seqinfo, compared with 0x30 in
   // Pokemon Mystery Dungeon: Explorers of Sky. Both place TPQN at seqinfo +0x02.
@@ -198,7 +198,7 @@ bool PSDSESeq::parseSeqInfo(uint32_t curOffset) {
   if (version == 0x0415) {
     // [Pokemon Mystery Dungeon: Explorers of Sky]: DseSequence_LoadSong copies +0x04 into the sequence object,
     // but no subsequent driver routine reads it.
-    seqInfo->addChild(curOffset + 0x04, 1, "Unused Sequence Field");
+    seqInfo->addChild(curOffset + 0x04, 1, "Authoring Sequence Metadata");
     seqInfo->addChild(curOffset + 0x18, 1, "Loop Flag");
     seqInfo->addChild(curOffset + 0x19, 1, "Global Volume Index");
     // [Line Attack Heroes]: SsdPlayEffectParam uses +0x1A to group concurrent effects. A zero group counts

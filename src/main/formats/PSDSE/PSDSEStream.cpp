@@ -132,7 +132,10 @@ bool PSDSESADBSampColl::parseHeader() {
   header->addChild(offset() + 0x5c, 4, "Sample Rate");
   header->addChild(offset() + 0x60, 1, "Volume");
   header->addChild(offset() + 0x61, 1, "Pan");
-  header->addChild(offset() + 0x62, 1, "Playback Priority");
+  // [Disaster: Day of Crisis]: Header byte +0x62 is 8 for 1,852 streams, 2 for eight music streams, and 0 for one
+  // jingle, so its observed values do not establish a priority ordering.
+  // [Shiren the Wanderer]: Every audited stream stores 8 at +0x62, providing no independent semantic distinction.
+  header->addChild(offset() + 0x62, 1, "Playback Parameter");
   header->addChild(offset() + 0x63, 1, "Zero Padding");
   header->addChild(offset() + 0x64, 0x1c, "Authoring Playback Metadata");
 

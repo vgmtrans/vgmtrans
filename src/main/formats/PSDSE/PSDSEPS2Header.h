@@ -447,7 +447,7 @@ struct BankHeader {
         }
         if (type == 3) {
           const uint32_t descriptorBytes = static_cast<uint32_t>(waveCount) * 0x20;
-          if (recordSize < 0x10 || static_cast<uint32_t>(recordSize - 0x10) < descriptorBytes) {
+          if (recordSize < 0x10 || static_cast<uint32_t>(recordSize) - 0x10 < descriptorBytes) {
             return false;
           }
           for (uint32_t descriptor = cursor + 0x10; descriptor < cursor + 0x10 + descriptorBytes; descriptor += 0x20) {
@@ -455,7 +455,7 @@ struct BankHeader {
           }
         } else if (type == 4) {
           const uint32_t programBytes = static_cast<uint32_t>(programCount) * 0xd8;
-          if (programDataOffset != 0 || recordSize < 0x10 || static_cast<uint32_t>(recordSize - 0x10) < programBytes) {
+          if (programDataOffset != 0 || recordSize < 0x10 || static_cast<uint32_t>(recordSize) - 0x10 < programBytes) {
             return false;
           }
           programDataOffset = cursor + 0x10;
