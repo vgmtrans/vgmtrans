@@ -6,11 +6,13 @@
 #include "SeqTrack.h"
 #include "PSDSEFormat.h"
 #include "PSDSEHeader.h"
+#include "PSDSEEffectSet.h"
 #include "RawFile.h"
 
 class PSDSESeq : public VGMSeq {
 public:
   PSDSESeq(RawFile* file, uint32_t offset, uint32_t length = 0, std::string name = "PSDSE Sequence");
+  PSDSESeq(RawFile* file, const PSDSE::EffectSequence& effect);
   ~PSDSESeq() override = default;
 
   bool parseHeader() override;
@@ -21,8 +23,12 @@ public:
   void addPatchReference(uint16_t bank, uint8_t program);
   [[nodiscard]] bool referencesPatch(uint32_t bank, uint32_t program) const;
   [[nodiscard]] bool hasPatchReferences() const { return !m_referencedPatches.empty(); }
+  [[nodiscard]] const std::string& bankMatchName() const { return m_sourceName.empty() ? name() : m_sourceName; }
 
 private:
+  bool parseSeqInfo(uint32_t infoOffset);
+  bool m_isEffect = false;
+  std::string m_sourceName;
   Endianness m_endianness = Endianness::Little;
   std::set<uint32_t> m_referencedPatches;
 };

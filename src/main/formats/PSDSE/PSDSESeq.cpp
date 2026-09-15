@@ -67,6 +67,16 @@ void PSDSESeq::resetVars() {
   }
 }
 
+PSDSESeq::PSDSESeq(RawFile* file, const PSDSE::EffectSequence& effect)
+    : VGMSeq(PSDSEFormat::name, file, effect.offset, effect.length,
+             fmt::format("{} Effect {}", effect.sourceName, effect.number)),
+      version(effect.version), m_isEffect(true), m_sourceName(effect.sourceName), m_endianness(effect.endianness) {
+  bLoadTickByTick = true;
+  setAllowDiscontinuousTrackData(true);
+  setPPQN(48);
+  setInitialVolume(127);
+}
+
 void PSDSESeq::addPatchReference(uint16_t bank, uint8_t program) {
   m_referencedPatches.insert((static_cast<uint32_t>(bank) << 8) | program);
 }
@@ -79,6 +89,9 @@ bool PSDSESeq::referencesPatch(uint32_t bank, uint32_t program) const {
 }
 
 bool PSDSESeq::parseHeader() {
+  if (m_isEffect) {
+    return parseSeqInfo(offset());
+  }
   uint32_t curOffset = offset();
   if (curOffset > rawFile()->size() || rawFile()->size() - curOffset < 0x40) {
     return false;
@@ -125,6 +138,7 @@ bool PSDSESeq::parseHeader() {
   std::string intName = std::string(fname);
   if (!intName.empty()) {
     setName(intName);
+    m_sourceName = intName;
   }
   header->addChild(curOffset + 0x20, 16, "File Name");
   // [Pokemon Mystery Dungeon: Explorers of Sky]: DseFile_CheckHeader and the song loader skip these authoring
@@ -153,44 +167,60 @@ bool PSDSESeq::parseHeader() {
     songChunk->addChild(curOffset + 0x0A, 2, "Zero Padding");
     songChunk->addChild(curOffset + 0x0C, 4, "Chunk Length");
     curOffset += 0x10;
-    VGMHeader* seqInfo = addHeader(curOffset, seqInfoSize, "Seq Info");
-    // [Luminous Arc]: ARM9 0x020c06c4 selects a song by the signed halfword at seqinfo +0x00.
-    // [Pokemon Mystery Dungeon: Explorers of Sky]: ARM9 0x0206e514 compares the same field with the requested
-    // song ID. Line Attack Heroes' retail loader likewise selects song 1; this field is not a bank ID.
-    seqInfo->addChild(curOffset, 2, "Song ID");
-    const uint16_t ticksPerQuarter = PSDSE::readU16(rawFile(), curOffset + 0x02, m_endianness);
-    seqInfo->addChild(curOffset + 0x02, 2, "Ticks Per Quarter Note");
-    if (ticksPerQuarter != 0) {
-      setPPQN(ticksPerQuarter);
-    }
-    const uint32_t trackCountOffset = version == 0x0402 ? 4 : 6;
-    seqInfo->addChild(curOffset + trackCountOffset, 1, "Num Tracks");
-    seqInfo->addChild(curOffset + trackCountOffset + 1, 1, "Num Channels");
-
-    // [Pokemon Mystery Dungeon: Explorers of Sky]: DseSequence_LoadSong at ARM9 address 0x0206e554 establishes the
-    // following seqinfo field offsets. The structure length depends on the version.
-    if (version == 0x0415) {
-      // [Pokemon Mystery Dungeon: Explorers of Sky]: DseSequence_LoadSong copies +0x04 into the sequence object,
-      // but no subsequent driver routine reads it.
-      seqInfo->addChild(curOffset + 0x04, 1, "Unused Sequence Field");
-      seqInfo->addChild(curOffset + 0x18, 1, "Loop Flag");
-      seqInfo->addChild(curOffset + 0x19, 1, "Global Volume Index");
-      seqInfo->addChild(curOffset + 0x1A, 1, "Effect ID");
-      // [Pokemon Mystery Dungeon: Explorers of Sky]: DseSe_GetBestSeqAllocation compares this byte when choosing
-      // which sequence to evict.
-      seqInfo->addChild(curOffset + 0x1B, 1, "Sequence Priority");
-    }
+    return parseSeqInfo(curOffset);
   }
 
   return true;
 }
 
+bool PSDSESeq::parseSeqInfo(uint32_t curOffset) {
+  const uint32_t seqInfoSize = version == 0x0402 ? 0x10 : 0x30;
+  const uint64_t end = static_cast<uint64_t>(offset()) + length();
+  if (end > rawFile()->size() || curOffset > end || seqInfoSize > end - curOffset) {
+    return false;
+  }
+  VGMHeader* seqInfo = addHeader(curOffset, seqInfoSize, m_isEffect ? "Effect Seq Info" : "Seq Info");
+  // [Luminous Arc]: ARM9 0x020c06c4 selects a song by the signed halfword at seqinfo +0x00.
+  // [Pokemon Mystery Dungeon: Explorers of Sky]: ARM9 0x0206e514 compares the same field with the requested
+  // song ID. Line Attack Heroes' retail loader likewise selects song 1; this field is not a bank ID.
+  seqInfo->addChild(curOffset, 2, "Song ID");
+  const uint16_t ticksPerQuarter = PSDSE::readU16(rawFile(), curOffset + 0x02, m_endianness);
+  seqInfo->addChild(curOffset + 0x02, 2, "Ticks Per Quarter Note");
+  if (ticksPerQuarter != 0) {
+    setPPQN(ticksPerQuarter);
+  }
+  const uint32_t trackCountOffset = version == 0x0402 ? 4 : 6;
+  seqInfo->addChild(curOffset + trackCountOffset, 1, "Num Tracks");
+  seqInfo->addChild(curOffset + trackCountOffset + 1, 1, "Num Channels");
+
+  // [Pokemon Mystery Dungeon: Explorers of Sky]: DseSequence_LoadSong at ARM9 address 0x0206e554 establishes the
+  // following seqinfo field offsets. The structure length depends on the version.
+  if (version == 0x0415) {
+    // [Pokemon Mystery Dungeon: Explorers of Sky]: DseSequence_LoadSong copies +0x04 into the sequence object,
+    // but no subsequent driver routine reads it.
+    seqInfo->addChild(curOffset + 0x04, 1, "Unused Sequence Field");
+    seqInfo->addChild(curOffset + 0x18, 1, "Loop Flag");
+    seqInfo->addChild(curOffset + 0x19, 1, "Global Volume Index");
+    // [Line Attack Heroes]: SsdPlayEffectParam uses +0x1A to group concurrent effects. A zero group counts
+    // instances of the requested effect ID instead; +0x1C limits that count, with zero disabling the limit.
+    seqInfo->addChild(curOffset + 0x1A, 1, "Effect Group");
+    // [Pokemon Mystery Dungeon: Explorers of Sky]: DseSe_GetBestSeqAllocation compares this byte when choosing
+    // which sequence to evict.
+    seqInfo->addChild(curOffset + 0x1B, 1, "Sequence Priority");
+    seqInfo->addChild(curOffset + 0x1C, 1, "Concurrent Effect Limit");
+  }
+  return true;
+}
+
 bool PSDSESeq::parseTrackPointers() {
-  uint32_t curOffset = offset() + 0x40;  // Skip SMDL header
+  uint32_t curOffset = offset() + (m_isEffect ? (version == 0x0402 ? 0x10 : 0x30) : 0x40);
   uint32_t eof = offset() + length();
 
   while (curOffset <= eof && eof - curOffset >= 4) {
     uint32_t chunkType = readWordBE(curOffset);
+    if (m_isEffect && chunkType == 0x656f6320) {
+      break;
+    }
     if (chunkType == 0x74726B20) {  // "trk "
       if (eof - curOffset < 0x10) {
         return false;
@@ -205,12 +235,31 @@ bool PSDSESeq::parseTrackPointers() {
       //   [0x10] track ID, [0x11] channel ID, [0x12]/[0x13] zero padding.
       addTrack<PSDSETrack>(this, curOffset + 0x14, chunkLen - 4, readByte(curOffset + 0x11) & 0x0F);
 
-      // Skip to next chunk, aligned to 4 bytes
-      curOffset += 0x10 + chunkLen;
-      if ((chunkLen % 4) != 0) {
-        curOffset += (4 - (chunkLen % 4));
+      if (!m_isEffect) {
+        curOffset += 0x10 + chunkLen;
+        if ((chunkLen % 4) != 0) {
+          curOffset += (4 - (chunkLen % 4));
+        }
+        continue;
       }
-
+    }
+    if (m_isEffect) {
+      // [Line Attack Heroes]: SsdSetupSongSequence advances by each chunk's size and alignment until EOC;
+      // embedded bytes after a chunk header are not additional track headers.
+      if (eof - curOffset < 0x10) {
+        return false;
+      }
+      const uint32_t alignment = readByte(curOffset + 8);
+      const uint32_t size = PSDSE::readU32(rawFile(), curOffset + 0x0c, m_endianness);
+      if (alignment == 0 || (alignment & (alignment - 1)) != 0 || size > eof - curOffset - 0x10) {
+        return false;
+      }
+      const uint64_t step = (static_cast<uint64_t>(size) + 0x10 + alignment - 1) &
+                            ~static_cast<uint64_t>(alignment - 1);
+      if (step > eof - curOffset) {
+        return false;
+      }
+      curOffset += static_cast<uint32_t>(step);
     } else {
       curOffset += 4;
     }

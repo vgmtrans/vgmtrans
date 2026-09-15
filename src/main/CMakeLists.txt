@@ -250,6 +250,7 @@ target_sources(vgmtranscore
     formats/PSDSE/PSDSEPS2Seq.cpp
     formats/PSDSE/PSDSEScanner.cpp
     formats/PSDSE/PSDSESeq.cpp
+    formats/PSDSE/PSDSEStream.cpp
     formats/PandoraBoxSnes/PandoraBoxSnesInstr.cpp
     formats/PandoraBoxSnes/PandoraBoxSnesScanner.cpp
     formats/PandoraBoxSnes/PandoraBoxSnesSeq.cpp
@@ -286,6 +287,7 @@ target_sources(vgmtranscore
     formats/common/SNESDSP.cpp
     formats/common/YM2151InstrSet.cpp
     io/RawFile.cpp
+    loaders/At3Loader.cpp
     loaders/At7Loader.cpp
     loaders/CHDLoader.cpp
     loaders/CPS3Decrypt.cpp
@@ -448,6 +450,7 @@ target_sources(vgmtranscore
       formats/PSDSE/PSDSEEnvelopeCurve.h
       formats/PSDSE/PSDSEFormat.h
       formats/PSDSE/PSDSEHeader.h
+      formats/PSDSE/PSDSEEffectSet.h
       formats/PSDSE/PSDSEInstrSet.h
       formats/PSDSE/PSDSEMatcher.h
       formats/PSDSE/PSDSEPS2Header.h
@@ -455,6 +458,7 @@ target_sources(vgmtranscore
       formats/PSDSE/PSDSEPS2Seq.h
       formats/PSDSE/PSDSEScanner.h
       formats/PSDSE/PSDSESeq.h
+      formats/PSDSE/PSDSEStream.h
       formats/PandoraBoxSnes/PandoraBoxSnesFormat.h
       formats/PandoraBoxSnes/PandoraBoxSnesInstr.h
       formats/PandoraBoxSnes/PandoraBoxSnesScanner.h
@@ -572,6 +576,7 @@ target_sources(vgmtranscore
       conversion/VGMExport.h
     FILE_SET headers_loaders TYPE HEADERS BASE_DIRS loaders
     FILES
+      loaders/At3Loader.h
       loaders/At7Loader.h
       loaders/CHDLoader.h
       loaders/CPS3Decrypt.h
