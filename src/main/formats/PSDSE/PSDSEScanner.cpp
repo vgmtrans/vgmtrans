@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstring>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -405,16 +406,29 @@ void PSDSEScanner::onSampCollClose(PSDSEPS2SampColl* sampColl) {
 }
 
 void PSDSEScanner::scan(RawFile* file, void* offset) {
-  uint32_t nFileLength = file->size();
+  const size_t nFileLength = file->size();
   const auto* fileData = reinterpret_cast<const uint8_t*>(file->data());
   std::vector<PSDSESeq*> sequences;
   std::vector<PSDSEPS2Seq*> ps2Sequences;
 
-  for (uint32_t i = 0; i + 4 <= nFileLength; i++) {
-    // Every supported DSE/SSD object begins with ASCII S/s. Rejecting all
-    // other offsets before constructing the magic avoids four virtual reads
-    // per byte while scanning large ROM and archive payloads.
+  size_t scanOffset = 0;
+  while (scanOffset + 4 <= nFileLength) {
+    // [Professor Layton and the Diabolical Box]: Large retail images can exceed 4 GiB, and every supported DSE/SSD
+    // object begins with ASCII S/s. Keep the index wide and seek directly to the next candidate byte instead of
+    // reading four virtual bytes at every offset in an archive payload.
+    const auto* lower = static_cast<const uint8_t*>(std::memchr(fileData + scanOffset, 's', nFileLength - scanOffset));
+    const auto* upper = static_cast<const uint8_t*>(std::memchr(fileData + scanOffset, 'S', nFileLength - scanOffset));
+    if (lower == nullptr && upper == nullptr) {
+      break;
+    }
+    const auto* candidate = lower == nullptr || (upper != nullptr && upper < lower) ? upper : lower;
+    const size_t candidateOffset = static_cast<size_t>(candidate - fileData);
+    if (candidateOffset > std::numeric_limits<uint32_t>::max()) {
+      break;
+    }
+    const uint32_t i = static_cast<uint32_t>(candidateOffset);
     if ((fileData[i] | 0x20) != 's') {
+      scanOffset = candidateOffset + 1;
       continue;
     }
     const uint32_t word = (static_cast<uint32_t>(fileData[i]) << 24) | (static_cast<uint32_t>(fileData[i + 1]) << 16) |
@@ -424,7 +438,7 @@ void PSDSEScanner::scan(RawFile* file, void* offset) {
       PSDSESADBHeader header;
       if (header.read(file, i)) {
         pRoot->loadVGMFileWithMatcher<PSDSESADBSampColl>(false, file, header);
-        i += header.fileLength - 1;
+        scanOffset = candidateOffset + header.fileLength;
         continue;
       }
     }
@@ -437,7 +451,7 @@ void PSDSEScanner::scan(RawFile* file, void* offset) {
             ps2Sequences.push_back(seq);
           }
         }
-        i += header.fileLength - 1;
+        scanOffset = candidateOffset + header.fileLength;
         continue;
       }
     }
@@ -448,7 +462,7 @@ void PSDSEScanner::scan(RawFile* file, void* offset) {
         if (auto* seq = pRoot->loadVGMFileWithMatcher<PSDSEPS2Seq>(false, file, header)) {
           ps2Sequences.push_back(seq);
         }
-        i += header.fileLength - 1;
+        scanOffset = candidateOffset + header.fileLength;
         continue;
       }
     }
@@ -470,7 +484,7 @@ void PSDSEScanner::scan(RawFile* file, void* offset) {
             g_loadedPS2InstrSets.push_back(instrSet);
           }
         }
-        i += header.fileLength - 1;
+        scanOffset = candidateOffset + header.fileLength;
         continue;
       }
     }
@@ -503,14 +517,17 @@ void PSDSEScanner::scan(RawFile* file, void* offset) {
             g_loadedInstrSets.push_back(instrSet);
           }
         }
-        i += header.fileLength - 1;
+        scanOffset = candidateOffset + header.fileLength;
+        continue;
       }
     } else if (magic.kind == PSDSE::FileKind::Sequence) {
-      if (i + 0x40 > nFileLength) {
+      if (static_cast<size_t>(i) + 0x40 > nFileLength) {
+        scanOffset = candidateOffset + 1;
         continue;
       }
       const uint32_t seqLength = PSDSE::readU32(file, i + 0x08, magic.endianness);
-      if (seqLength < 0x40 || seqLength > nFileLength - i) {
+      if (seqLength < 0x40 || static_cast<size_t>(seqLength) > nFileLength - i) {
+        scanOffset = candidateOffset + 1;
         continue;
       }
       const uint32_t foldedMagic = word | 0x20202020;
@@ -530,15 +547,18 @@ void PSDSEScanner::scan(RawFile* file, void* offset) {
         } else {
           L_WARN("PSDSE: Invalid or unsupported SED effect table at {:#x} in '{}'", i, file->name());
         }
-        i += seqLength - 1;
+        scanOffset = candidateOffset + seqLength;
         continue;
       }
       PSDSESeq* seq = pRoot->loadVGMFileWithMatcher<PSDSESeq>(false, file, i);
       if (seq) {
         sequences.push_back(seq);
       }
-      i += seqLength - 1;
+      scanOffset = candidateOffset + seqLength;
+      continue;
     }
+
+    scanOffset = candidateOffset + 1;
   }
 
   for (PSDSEPS2Seq* seq : ps2Sequences) {
