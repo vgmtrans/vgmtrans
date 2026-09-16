@@ -307,6 +307,8 @@ using Cursor = CompilerCursor<Playback>;
 SequenceProgram decodeSequence(ByteReader reader, const Layout& layout, const DriverData& data, AssetId id,
                                SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics,
                                std::set<u8>* referencedPrograms) {
+  // One performance tick is one envelope frame. Music tempo changes the wait
+  // counters, not this timebase, so physical envelopes keep their original rate.
   const SequenceProgramConfig config{
       .commandKindPrefix = "sculpt-soft-snes",
       .timebase = {.ppqn = 50},
