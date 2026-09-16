@@ -65,6 +65,8 @@ struct Playback : SequencePlayback<TrackState> {
     target = relative ? static_cast<u8>(std::clamp(int(target) + static_cast<s8>(value), 0, 127)) : value;
   }
   [[nodiscard]] Effects assignVoice(u8 value, u8 mask) {
+    // TrackState holds one voice; changing assignments can leave independent
+    // envelopes sounding on multiple DSP voices, which this runtime cannot retain.
     if (value == 0xff && mask != 0 && (mask & (mask - 1)) == 0) {
       value = static_cast<u8>(std::countr_zero(unsigned(mask)));
     }
@@ -213,6 +215,8 @@ struct Decoder {
           return call(cursor, offset, 0x10, Layer::Pattern, "Note Pattern");
         case 0x04:
         case 0x14:
+          // The host polling loop advances the RNG independently of music ticks;
+          // sequence bytes alone do not determine which pattern to compile.
           return invalid(cursor, offset, "SculptSoftSnes randomized patterns are not supported");
         case 0x06: {
           auto event = cursor.command("Pattern Transpose", SequenceSemantic::Pitch);

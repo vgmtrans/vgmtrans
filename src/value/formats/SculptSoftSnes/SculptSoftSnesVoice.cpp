@@ -57,6 +57,7 @@ double Voice::key() const {
     octave = 0;
   }
   // Preserve the driver's musical units without its integer table/shift rounding.
+  // This removes rounding-induced bends while retaining authored fine pitch.
   const double key = track.data->pitchBaseKey - 12.0 * (topOctave - octave) + (pitch % 240) / 20.0;
   if (track.rawPitchOffset == 0) {
     return key;
@@ -75,6 +76,8 @@ void Voice::selectSample(u8 sample) {
 }
 
 void Voice::emitEcho() {
+  // The performance model retains echo parameters; custom FIR coefficients stay
+  // in the source preset because MIDI/SF2 cannot reproduce the DSP filter.
   const u8 bit = static_cast<u8>(1u << track.dspVoice);
   echo.mask &= static_cast<u8>(~bit);
   if ((track.patch.flags & 0x10) != 0) {
@@ -167,6 +170,7 @@ void Voice::attack(u8 patchIndex, u8 volume, u16 gate, bool legato) {
     }
   }
   const u8 sample = static_cast<u8>((track.patch.flags & 2) ? curveValue(3) : track.fixedSample);
+  // ENDX-dependent retriggers are not modeled; sample flag $40 remains explicit.
   const bool retrigger =
       !legato && (!track.sounding || track.sample != sample || (track.data->sampleFlags[sample] & 0x40) != 0);
   if (retrigger && track.note) {
@@ -205,6 +209,7 @@ void Voice::tick() {
   }
   // DSP rate counters continue across the 20 ms software updates. Restarting
   // a rate on every frame would freeze slow release rates indefinitely.
+  // Output is sampled once per software frame, not per DSP sample.
   constexpr std::array<u32, 32> periods{30720, 2048, 1536, 1280, 1024, 768, 640, 512, 384, 320, 256,
                                         192,   160,  128,  96,   80,   64,  48,  40,  32,  24,  20,
                                         16,    12,   10,   8,    6,    5,   4,   3,   2,   1};

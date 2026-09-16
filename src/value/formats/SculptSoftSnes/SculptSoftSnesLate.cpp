@@ -108,6 +108,9 @@ struct Playback : SequencePlayback<TrackState> {
   enum class Allocation { Ready, Muted, Unsupported };
 
   Allocation claimVoice(bool reuse) {
+    // Each logical track retains one voice. Handoffs close the old note without
+    // preserving sample phase; ENDX priority changes and hardware priority order
+    // for simultaneous track commands are not simulated.
     if (reuse && track.currentVoice) {
       auto& slot = program.voices[*track.currentVoice];
       slot.active = true;
