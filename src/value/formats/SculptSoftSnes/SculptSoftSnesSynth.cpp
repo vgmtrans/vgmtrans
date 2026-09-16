@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <map>
 
 namespace vgmtrans::formats::sculpt_soft_snes {
 
@@ -169,15 +170,27 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   if (catalog.empty() && !hasNoise) {
     return std::nullopt;
   }
-  auto bank = builder.soundBank(fmt::format("{} Instruments", name));
+  auto bank = builder.soundBank(fmt::format("{} Sound Bank", name));
+  std::map<std::string_view, std::pair<AnnotationBuilder, SourceRange>> tables;
+  const auto addEntry = [&](std::string_view tableName, std::string_view label, SourceRange range,
+                            std::string_view kind) {
+    auto& [table, tableRange] = tables[tableName];
+    if (!tableRange.valid()) {
+      table = bank.instruments().source(SourceRole::Section, tableName, range);
+    }
+    tableRange.include(range);
+    table.range(tableRange);
+    return bank.instruments().source(SourceRole::TableEntry, label, range, kind).parent(table.id());
+  };
   const auto samples = addSnesBrrSamples(bank.localSamples(), reader, catalog);
   for (const u8 srcn : srcns) {
+    const u16 start = reader.le16(layout.directory + srcn * 4u);
     auto sample = samples.findSrcn(srcn);
     if ((data.sampleFlags[srcn] & 0x80) != 0) {
       sample = bank.localSamples()
                    .add(0x100u + srcn, Sample{.name = fmt::format("Noise {}", data.sampleFlags[srcn] & 31),
                                               .codec = AudioCodec::SnesDspNoise,
-                                              .encodedData = reader.range(0, 0),
+                                              .encodedData = reader.range(start - 1, 1),
                                               .sampleRate = kSnesDspSampleRate,
                                               .loop = Loop{.enabled = true, .length = kSnesDspNoiseSampleCount},
                                               .codecParameter = u64(data.sampleFlags[srcn] & 31)})
@@ -186,17 +199,17 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     if (!sample) {
       continue;
     }
-    const u16 start = reader.le16(layout.directory + srcn * 4u);
     const auto range = reader.range(start - 3, 3);
+    addEntry("Sample parameters", fmt::format("Sample {}", srcn), range, "sculpt-soft-snes-sample")
+        .fieldsAsChildren()
+        .field("Pitch offset (1/20 semitone)", reader.range(start - 3, 2), data.sampleTuning[srcn])
+        .field("Flags / noise clock", reader.range(start - 1, 1), data.sampleFlags[srcn], SourceValueDisplay::Hex);
+    // These instruments are export adapters, not records stored in ARAM.
     auto instrument = bank.instruments().append(Instrument{
         .explicitAddress = InstrumentAddress{.bank = 0, .program = srcn},
         .identity = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = srcn},
         .name = fmt::format("Sample {}", srcn),
-        .range = range,
     });
-    instrument.source("Sample parameters", range, "sculpt-soft-snes-sample")
-        .description(fmt::format("Pitch offset {}/20 semitones; flags ${:02X}", data.sampleTuning[srcn],
-                                 data.sampleFlags[srcn]));
     // The sequence performs the sample tuning and software GAIN envelopes.
     instrument.region(*sample, Region{.unityKey = 72.0,
                                       .envelope = Envelope{.attackSeconds = 0.0,
@@ -204,34 +217,36 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
                                                            .releaseSeconds = 0.0,
                                                            .sustainAmplitude = 1.0}});
   }
-  constexpr std::array<std::string_view, 4> laneNames{"GAIN", "Pitch", "Pan", "Sample"};
+  constexpr std::array<std::string_view, 4> laneNames{"GAIN curves", "Pitch curves", "Pan curves", "Sample curves"};
   const std::array<u8, 4> flags{1, 4, 8, 2};
+  std::array<std::set<u8>, 4> annotatedCurves;
+  std::set<u8> annotatedEchoes;
   for (const u8 program : programs) {
     const auto& patch = data.patches[program];
     if (!patch) {
       continue;
     }
-    auto root = bank.instruments().source(SourceRole::TableEntry, fmt::format("Patch {}", program), patch->range,
-                                          "sculpt-soft-snes-patch");
-    root.description(fmt::format("Flags ${:02X}, gain {}, sample {}, pitch {}, pan {}, echo {}", patch->flags,
-                                 patch->gain, patch->sample, patch->pitch, patch->pan, patch->echo));
+    auto entry = addEntry("Patches", fmt::format("Patch {}", program), patch->range, "sculpt-soft-snes-patch");
+    entry.fieldsAsChildren();
+    constexpr std::array<std::string_view, 6> fields{"Flags", "GAIN", "Sample", "Pitch", "Pan", "Echo"};
+    for (u32 byte = 0; byte < fields.size(); ++byte) {
+      entry.field(fields[byte], reader.range(patch->range.offset + byte, 1), reader.u8At(patch->range.offset + byte),
+                  SourceValueDisplay::Hex);
+    }
     const std::array<u8, 4> indices{patch->gain, patch->pitch, patch->pan, patch->sample};
     for (u8 lane = 0; lane < 4; ++lane) {
       const auto& curve = data.curves[lane][indices[lane]];
-      if ((patch->flags & flags[lane]) != 0 && curve) {
-        bank.instruments()
-            .source(SourceRole::Table, laneNames[lane], curve->range, "sculpt-soft-snes-curve")
-            .parent(root.id())
+      if ((patch->flags & flags[lane]) != 0 && curve && annotatedCurves[lane].insert(indices[lane]).second) {
+        addEntry(laneNames[lane], fmt::format("Curve {}", indices[lane]), curve->range, "sculpt-soft-snes-curve")
             .description(fmt::format("{} points, interval {}, interpolation {}, loop {}–{}, release lead {}",
                                      curve->pointCount, curve->speed, curve->interpolate, curve->loopStart,
                                      curve->loopEnd, curve->releaseLead));
       }
     }
-    if ((patch->flags & 0x10) != 0 && data.echoes[patch->echo]) {
+    if ((patch->flags & 0x10) != 0 && data.echoes[patch->echo] && annotatedEchoes.insert(patch->echo).second) {
       if (const auto address = readTablePointer(reader, layout, 12, patch->echo)) {
-        bank.instruments()
-            .source(SourceRole::TableEntry, "Echo / FIR", reader.range(*address, 12), "sculpt-soft-snes-echo")
-            .parent(root.id());
+        addEntry("Echo presets", fmt::format("Echo {}", patch->echo), reader.range(*address, 12),
+                 "sculpt-soft-snes-echo");
       }
     }
   }
