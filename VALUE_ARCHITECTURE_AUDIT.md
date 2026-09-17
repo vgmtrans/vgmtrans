@@ -3114,6 +3114,17 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   parent-order, fallback-annotation, and explicit-range checks also pass.
 - Validation: warning-free Debug builds; all 21 CTest targets pass (10.78 s).
 
+## Read requested export kinds without a staging vector
+
+- Collection export now borrows the request's kind list, or a static MIDI
+  default, through a local span. Removed `requestedKinds` and the allocation/copy
+  it performed for every collection, including the default single-artifact path.
+  Request order and repeated entries retain their existing meaning.
+- Removed seven production lines. The paired-export regression now verifies
+  that an empty request produces the same MIDI as an explicit paired request
+  under both modulation-scaling policies; existing reversed-order checks pass.
+- Validation: warning-free Debug builds; all 21 CTest targets pass (10.78 s).
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual
