@@ -89,19 +89,21 @@ RiffChunk makeListChunk(std::string type, std::vector<RiffChunk> children) {
 }
 
 std::vector<u8> makeRiff(std::string type, std::vector<RiffChunk> children) {
-  std::vector<u8> payload;
-  writeAscii(payload, type);
-  for (const auto& child : children) {
-    appendChunk(payload, child);
-  }
-  if (payload.size() > std::numeric_limits<u32>::max()) {
-    throw std::overflow_error("RIFF payload is too large");
-  }
-
   std::vector<u8> bytes;
   writeAscii(bytes, "RIFF");
-  writeLe32(bytes, static_cast<u32>(payload.size()));
-  bytes.insert(bytes.end(), payload.begin(), payload.end());
+  writeLe32(bytes, 0);
+  writeAscii(bytes, type);
+  for (const auto& child : children) {
+    appendChunk(bytes, child);
+  }
+  const size_t payloadSize = bytes.size() - 8;
+  if (payloadSize > std::numeric_limits<u32>::max()) {
+    throw std::overflow_error("RIFF payload is too large");
+  }
+  // Fill the RIFF size after writing its children directly into the final buffer.
+  for (u32 byte = 0; byte < 4; ++byte) {
+    bytes[4 + byte] = static_cast<u8>(payloadSize >> (8 * byte));
+  }
   return bytes;
 }
 
