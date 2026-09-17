@@ -21,18 +21,22 @@
 #include <tuple>
 #include <vector>
 
-// Quest's N-SPC variant used by Tactics Ogre: Let Us Cling Together.
+// Quest's N-SPC variants used by Ogre Battle and Tactics Ogre.
 //
 // This driver shares N-SPC's section playlists and six-byte instruments, but
 // changes note gates, command layouts, and timing enough to need its own player.
 // The playlist parser, VM, instrument recipes, and sound-bank builder are shared.
 //
-// Track bytes (hex): 01-7D set length; 7E/7F mean 144/192 ticks; DE sets a
+// Tactics Ogre track bytes (hex): 01-7D set length; 7E/7F mean 144/192 ticks; DE sets a
 // 16-bit length. An optional nonzero byte below 80 packs a three-bit gate index
 // above a four-bit velocity index.
 // 80-C7 are notes, C8 a tie, C9 a rest, CA-D7 percussion, and D8-FF commands.
 // 00 ends a track or returns/repeats a pattern. Variable command operands are
 // documented in decodeCommand(); embedded zero bytes remain part of the command.
+// Ogre Battle doubles all short lengths, accepts a zero packed parameter, and
+// uses CA-DF for percussion. Its command differences are in decodeEarlierCommand.
+// It squares channel/master levels and uses tick-driven triangle modulation;
+// Tactics Ogre uses linear levels and an independently clocked sine vibrato.
 
 namespace vgmtrans::formats::nin_snes::quest {
 
@@ -53,6 +57,30 @@ const Pattern kGate("\xf5\xfb\x20\x68\x07\xf0\x2b\x60\x84\x58\xfd\xf6\x7b\x21", 
 const Pattern kVelocity("\x28\x0f\x04\x59\xfd\x80\xb6\x8b\x21\x48\xff\xfd\xcf\xdd", "xxxxxxx??xxxxx", 14);
 const Pattern kPan("\xfd\xf6\xe0\x1e\xc4\x05\xf6\xcb\x1e\xeb\x04\xcf\xdb\x93", "xx??xxx??xxxxx", 14);
 const Pattern kDspInit("\xf5\xd8\x19\x30\x0b\xc4\xf2\xf5\xd9\x19\xc4\xf3\x3d\x3d\x2f\xf0", "x??xxxxx??xxxxxx", 16);
+
+const Pattern kEarlierDispatch("\x68\xc8\x90\xa8\x68\xe0\xb0\x0a\x68\xca\xb0\xbe\x68\xc9\xf0\xd8"
+                               "\x2f\xe4\x1c\x80\xa8\xc0\x5d\xe8\x0b\x2d\xe8\xc2\x2d\x1f\x28\x0c",
+                               "xxx?xxx?xxx?xxx?x?xxxxxx?xx?xx??", 32);
+const Pattern kEarlierInstrument("\x8f\x00\x06\x8d\x06\x68\xfc\x90\x0e\x80\xa8\xfc\xcf\x60\x88\xf8"
+                                 "\xc4\x0c\x8f\x1d\x0d\x2f\x14\x8f\x1a\x0d\x8f\x00\x0c\xcf\x7a\x0c"
+                                 "\xf8\x59\xf0\x05\xfc\xfc\x8f\x40\x06\xda\x0c",
+                                 "xxxxxxxxxxxxxxx?xxx?xxxx?xx?xxxxxxxxxxxxxxx", 43);
+const Pattern kEarlierSong("\xf5\x00\x34\xc4\x4e\xfd\xf5\xff\x33\xc4\x4d\x2f\x16\xc4\xf4\x28"
+                           "\x7f\x1c\x5d\xe8\x80\xc5\x80\x01\xf5\x00\x1e\xc4\x4e\xfd\xf5\xff"
+                           "\x1d\xc4\x4d",
+                           "x??xxxx??xxx?xxxxxxxxxxxx??xxxx??xx", 35);
+const Pattern kEarlierSfx("\xf4\xcd\xd4\xf5\x68\x80\x90\x0e\x1c\x5d\xf5\x00\x1f\xc4\x0a\xf5"
+                          "\x01\x1f\xc4\x0b\x2f\x0d\x9c\x1c\x5d\xf5\x00\x1e\xc4\x0a\xf5\x01"
+                          "\x1e\xc4\x0b",
+                          "xxxxxxxxxxx??xxx??xxx?xxxx??xxx??xx", 35);
+const Pattern kEarlierGate("\x68\x07\xf0\x1b\xfd\xf6\x6f\x17\xc4\x04",
+                           "xxx?xx??xx", 10);
+const Pattern kEarlierVelocity("\x28\x0f\xfd\xf6\x77\x17\xd5\x4a\x02\xd5\x02\x03",
+                               "xxxx??xxxxxx", 12);
+const Pattern kEarlierPan("\x1c\x5d\xf5\x97\x17\x2d\xf5\x98\x17\xc4\x05",
+                          "xxx??xx??xx", 11);
+const Pattern kEarlierDir("\xe8\x18\xc4\x53\x8f\x5d\xf2\xc4\xf3",
+                          "x?xxxxxxx", 9);
 
 [[nodiscard]] std::vector<u8> table(ByteReader reader, u32 address, u32 count) {
   if (!reader.has(address, count)) {
@@ -78,15 +106,63 @@ const Pattern kDspInit("\xf5\xd8\x19\x30\x0b\xc4\xf2\xf5\xd9\x19\xc4\xf3\x3d\x3d
   return kPpqn * 125u * (divisor == 0 ? 256u : divisor);
 }
 
-// The 128 instrument rows each hold SRCN, ADSR1, ADSR2, GAIN, then a
-// big-endian pitch multiplier.
+// SRCN, ADSR1, ADSR2, GAIN, then a pitch multiplier normalized to big-endian.
 using InstrumentBytes = std::array<u8, 6>;
 
 struct Config {
+  bool earlier = false;
+  bool sfx = false;
   std::vector<u8> duration;
   std::vector<u8> pan;
-  std::array<InstrumentBytes, 128> instruments{};
+  std::array<InstrumentBytes, 256> instruments{};
+  std::array<SourceRange, 256> instrumentSources{};
+  std::array<u8, 2> conditions{};
   u8 condition = 0;
+};
+
+// Ogre Battle accumulates integer pitch steps (or 8.8 amplitude steps).
+// A triangle reverses at quarter-cycle boundaries; a slide simply runs out.
+// Note attacks reset the counters but retain the current step direction.
+struct EarlierMotion {
+  bool enabled = false;
+  bool triangle = false;
+  u8 delay = 0;
+  u8 period = 0;
+  u8 waiting = 0;
+  u8 remaining = 0;
+  u8 phase = 0;
+  s16 step = 0;
+  u16 value = 0;
+
+  void restart(u16 initial) {
+    waiting = delay;
+    remaining = period;
+    phase = 0;
+    value = initial;
+  }
+
+  bool tick() {
+    if (!enabled) {
+      return false;
+    }
+    if (waiting != 0) {
+      --waiting;
+      return false;
+    }
+    if (triangle && remaining == 0) {
+      remaining = period;
+      if (++phase & 1) {
+        step = static_cast<s16>(-step);
+      }
+    } else if (!triangle && remaining == 0) {
+      return false;
+    }
+    if (triangle || remaining != 0xff) {
+      --remaining;
+    }
+    value = static_cast<u16>(value + step);
+    return true;
+  }
 };
 
 struct CallFrame {
@@ -100,12 +176,17 @@ struct TrackState {
     calls.clear();
     percussionNote = 0;
     legato = false;
+    tieEligible = false;
   }
 
   u32 number = 0;
   u16 length = 1;
   u8 gate = 0;
   u8 velocity = 0;
+  std::optional<u8> pendingVelocity;
+  u16 tiedLength = 0;
+  bool tieEligible = false;
+  u64 noteStartTick = 0;
   u8 logicalProgram = 0;
   u32 activeProgram = 0;
   u8 percussionNote = 0;
@@ -148,12 +229,18 @@ struct TrackState {
   u32 pitchRemaining = 0;
   s16 pitchDelta = 0;
   bool pitchIsDelta = false;
+  EarlierMotion earlierPitch;
+  EarlierMotion earlierTremolo;
 };
 
 struct ProgramState {
   explicit ProgramState(const Config& config) : config(config), instruments(config.instruments) {
     for (u32 i = 0; i < programs.size(); ++i) {
       programs[i] = i;
+    }
+    if (config.sfx) {
+      master.reset(0xe6);
+      tempo.reset(0x43);
     }
   }
 
@@ -166,7 +253,7 @@ struct ProgramState {
     if (const auto it = versions.find(key); it != versions.end()) {
       return it->second;
     }
-    const u32 id = 0x80 + static_cast<u32>(versions.size());
+    const u32 id = config.earlier ? logical : 0x80 + static_cast<u32>(versions.size());
     versions.emplace(key, id);
     recipes.overrides.push_back(InstrumentOverride{.program = id,
                                                    .tuningProgram = logical,
@@ -182,8 +269,8 @@ struct ProgramState {
   }
 
   Config config;
-  std::array<InstrumentBytes, 128> instruments;
-  std::array<u32, 128> programs{};
+  std::array<InstrumentBytes, 256> instruments;
+  std::array<u32, 256> programs{};
   std::map<std::tuple<u8, InstrumentBytes, bool>, u32> versions;
   SequenceRecipes recipes;
   s8 transpose = 0;
@@ -211,8 +298,7 @@ struct Playback : SequencePlayback<TrackState> {
   void beforeCommand() {
     if (!track.initialized) {
       track.initialized = true;
-      track.volume.reset(0);
-      out.level(0);
+      volume(program.config.earlier ? (program.config.sfx ? 0xdc : 0xff) : 0);
       pan(10);
     }
   }
@@ -221,22 +307,30 @@ struct Playback : SequencePlayback<TrackState> {
     track.length = length;
     if (packed) {
       track.gate = (*packed >> 4) & 7;
-      track.velocity = velocity;
+      if (program.config.earlier) {
+        track.pendingVelocity = velocity;
+      } else {
+        track.velocity = velocity;
+      }
     }
   }
 
-  // Gating applies to the combined note/tie length. Gate 7 subtracts one tick.
-  // Other gates use floor(floor(length / divisor) * rate / 256) * divisor,
-  // with divisor = highByte + 1. Preserve both truncations for long notes.
+  // Gating applies to the combined note/tie length. Tactics Ogre gate 7
+  // subtracts one tick (Ogre Battle subtracts two). Other Tactics Ogre gates use
+  // floor(floor(length / divisor) * rate / 256) * divisor, with divisor =
+  // highByte + 1. Preserve both truncations for long notes.
   [[nodiscard]] u32 duration(u16 length) const {
     const u32 fullLength = length == 0 ? 0x10000u : length;
     if (track.legato) {
       return fullLength;
     }
     if (track.gate == 7) {
-      return static_cast<u16>(length - 1);
+      return static_cast<u16>(length - (program.config.earlier ? 2 : 1));
     }
     const u8 rate = program.config.duration[track.gate];
+    if (program.config.earlier) {
+      return (length * rate) >> 8;
+    }
     const u8 divisor = static_cast<u8>((length >> 8) + 1);
     if (divisor == 0) {
       return fullLength;
@@ -247,17 +341,20 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   void loadProgram(u8 logical) {
-    logical &= 0x7f;
     track.logicalProgram = logical;
     track.instrument = program.instruments[logical];
-    track.activeProgram = program.programs[logical];
+    const u8 srcn = track.instrument[0];
+    track.activeProgram = program.config.earlier
+        ? program.instrumentVersion(logical, track.instrument, program.config.instrumentSources[logical],
+                                    srcn >= 0x80 && srcn < 0xc0)
+        : program.programs[logical & 0x7f];
     out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = track.activeProgram});
     out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
 
   void instrument(u8 encoded) {
     track.percussionNote = 0xff;
-    loadProgram(encoded & 0x7f);
+    loadProgram(program.config.earlier && encoded >= 0xfc ? encoded : encoded & 0x7f);
   }
 
   void noise(u8 clock, SourceRange source) {
@@ -313,6 +410,9 @@ struct Playback : SequencePlayback<TrackState> {
     constexpr std::array<u8, 12> steps{0x7f, 0x87, 0x8f, 0x98, 0xa0, 0xaa, 0xb5, 0xbf, 0xca, 0xd6, 0xe3, 0xf1};
     const u32 pitch = pitches[note % 12] + ((steps[note % 12] * track.tuning) >> 8);
     const u16 scale = (track.instrument[4] << 8) | track.instrument[5];
+    if (program.config.earlier) {
+      return note < 72 ? static_cast<u16>((pitch * scale) >> 8) >> (5 - note / 12) : 0;
+    }
     const u32 tuned = ((pitch * scale) >> 8) & ~0x0fu;
     return std::max(1.0, std::ldexp(static_cast<double>(tuned), static_cast<int>(note / 12) - 5));
   }
@@ -331,6 +431,10 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   void pitchEnvelope(u8 delay, u8 length, s16 delta) {
+    if (program.config.earlier) {
+      track.earlierPitch = {.enabled = true, .delay = delay, .period = length, .step = delta};
+      return;
+    }
     track.pitchEnvelope = true;
     track.envelopeDelay = delay;
     track.envelopeLength = length;
@@ -339,11 +443,16 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   void pitchOff() {
+    track.earlierPitch.enabled = false;
     track.pitchEnvelope = false;
     track.pitchRemaining = 0;
   }
 
   void vibrato(u8 delay, u8 rate, u8 depth) {
+    if (program.config.earlier) {
+      earlierModulation(track.earlierPitch, delay, rate, depth, false);
+      return;
+    }
     track.vibratoDelay = delay;
     track.vibratoRate = rate;
     track.vibratoDepth = depth;
@@ -359,6 +468,9 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   void emitVibrato() {
+    if (program.config.earlier) {
+      return;
+    }
     // Quest's sine LFO runs on the independent 10 ms timer-0 clock. Its
     // phase increment is rate*64 in a 16-bit cycle; depth scales DSP pitch.
     const LfoPerformanceContext context{.shape = LfoShape{.waveform = LfoWaveform::Sine}};
@@ -372,7 +484,42 @@ struct Playback : SequencePlayback<TrackState> {
     track.vibratoGrowth = depth;
   }
 
+  void earlierModulation(EarlierMotion& motion, u8 delay, u8 rate, u8 depth, bool tremolo) {
+    const u8 period = static_cast<u8>(-rate);
+    const s16 step = period == 0 ? 0xff : (tremolo ? depth * 256 : depth) / period;
+    motion = {.enabled = !tremolo || period != 0, .triangle = true, .delay = delay, .period = period, .step = step};
+  }
+
+  void emitEarlierPitch() {
+    const u32 pitch = static_cast<u32>(track.pitchScale) & 0x3fff;
+    const u32 origin = static_cast<u32>(track.pitchOrigin) & 0x3fff;
+    out.pitchBend(12.0 * std::log2(std::max(1u, pitch) / static_cast<double>(std::max(1u, origin))));
+  }
+
   [[nodiscard]] Effects note(u8 opcode, const std::vector<TieSegment>& ties, std::optional<Slide> slide) {
+    if (program.config.earlier) {
+      // This revision follows calls and returns during tie lookahead. Extending
+      // the original event as ties execute preserves that behavior across patterns.
+      if (opcode == 0xc8 && track.tieEligible) {
+        track.tiedLength = static_cast<u16>(track.tiedLength + track.length);
+        if (track.lastNote.valid()) {
+          out.setNoteEnd(track.lastNote, track.noteStartTick + duration(track.tiedLength));
+        }
+      }
+      if ((opcode != 0xc8 || !track.tieEligible) && track.pendingVelocity) {
+        track.velocity = *track.pendingVelocity;
+      }
+      track.pendingVelocity.reset();
+      if (opcode == 0xc8) {
+        return track.tieEligible ? Effects::wait(track.length) : Effects{};
+      }
+      track.tieEligible = true;
+      track.tiedLength = track.length;
+      track.noteStartTick = vm.tick();
+      if (opcode == 0xc9) {
+        track.lastNote = {};
+      }
+    }
     // Lookahead carries the last tie's length and gate into subsequent notes,
     // while leaving velocity alone. The combined wait wraps as a 16-bit value.
     u16 total = track.length;
@@ -388,17 +535,23 @@ struct Playback : SequencePlayback<TrackState> {
       return Effects::wait(wait);
     }
     const bool drum = opcode >= 0xca;
+    const bool repeatedDrum = drum && track.percussionNote == opcode;
     // Repeated percussion retains its active instrument, even after a table
     // write. E0 and section changes invalidate this cache. A following melodic
     // note also keeps the percussion instrument until another program is loaded.
     if (drum && track.percussionNote != opcode) {
       track.percussionNote = opcode;
-      loadProgram(static_cast<u8>(opcode - 0xca + program.percussionBase));
+      const u8 patch = static_cast<u8>(opcode - 0xca + program.percussionBase + (program.config.sfx ? 0x30 : 0));
+      loadProgram(program.config.earlier ? patch : patch & 0x7f);
     }
     // Melodic notes carry overflow from global transpose into the channel
     // addition. Percussion clears carry and applies only channel transpose.
     const u16 globalSum = (opcode & 0x7f) + static_cast<u8>(program.transpose);
-    const u8 raw = static_cast<u8>((drum ? 0x24 : globalSum + (globalSum > 0xff)) + static_cast<u8>(track.transpose));
+    u8 raw = static_cast<u8>((drum ? 0x24 : globalSum + (globalSum > 0xff)) + static_cast<u8>(track.transpose));
+    if (program.config.earlier) {
+      raw = repeatedDrum && track.lastKey ? static_cast<u8>(*track.lastKey - 24)
+                                         : drum ? raw : std::min<u8>(raw, 0x47);
+    }
     const double key = 24.0 + raw;
     program.recipes.usedNotes.emplace(track.activeProgram, static_cast<u8>(std::min(24u + raw, 127u)));
     if (track.releaseApplied) {
@@ -408,10 +561,19 @@ struct Playback : SequencePlayback<TrackState> {
       track.releaseApplied = false;
     }
     track.releaseGainActive = false;
-    track.pitchScale = pitchRegister(raw);
-    track.pitchOrigin = track.pitchScale;
+    track.pitchOrigin = pitchRegister(raw);
+    if (!program.config.earlier || !repeatedDrum) {
+      track.pitchScale = track.pitchOrigin;
+    }
+    track.earlierPitch.restart(static_cast<u16>(track.pitchScale));
+    track.earlierTremolo.restart(0x8000);
+    if (program.config.earlier) {
+      out.expression(1.0);
+      emitEarlierPitch();
+    } else {
+      out.pitchBend(0);
+    }
     track.pitchRemaining = 0;
-    out.pitchBend(0);
     out.tuning(track.tuning * (100.0 / 256.0));
     emitVibrato();
     track.vibratoElapsedUs = 0;
@@ -435,11 +597,13 @@ struct Playback : SequencePlayback<TrackState> {
       sounding = std::min(sounding, releaseDelay > 1 ? releaseDelay - 1 : 1u);
     }
     const NotePerformanceEvent event{.key = key,
-                                     .linearVelocity = track.velocity / 255.0,
+                                     .linearVelocity = level(track.velocity),
                                      .durationTicks = std::max(1u, sounding),
                                      .restartsLfoPhase = !held};
     track.lastNote = held ? out.continueVoice(track.lastNote, event) : out.note(event);
     track.lastKey = key;
+    track.tiedLength = total;
+    track.noteStartTick = vm.tick();
     if (slide) {
       startSlide(*slide);
     } else if (track.pitchEnvelope) {
@@ -465,18 +629,23 @@ struct Playback : SequencePlayback<TrackState> {
     }
   }
 
-  // EF patterns nest four deep. Repeat slot 0 belongs to the independent
-  // EB/EC loop; slots 1-4 follow the pattern stack. The VM owns return addresses.
+  // Ogre Battle has one pattern frame; Tactics Ogre has four. Repeat slot 0
+  // belongs to the later EB/EC loop; other slots follow the pattern stack.
+  // The VM owns return addresses.
   [[nodiscard]] Effects call(u8 count, Address destination) {
-    if (count == 0xff) {
+    const bool earlier = program.config.earlier;
+    if (earlier ? count == 0 : count == 0xff) {
+      if (earlier) {
+        track.calls.clear();
+      }
       return vm.jump(destination);
     }
-    if (track.calls.size() == 4) {
+    if (track.calls.size() == (earlier ? 1 : 4)) {
       vm.diagnostic(Diagnostic{.severity = Severity::Warning, .message = "Quest subroutine stack overflow"});
       return vm.end();
     }
-    // 00 and 80-FE repeat forever; FF is a jump without a return frame.
-    const bool infinite = count == 0 || count >= 0x80;
+    // Tactics Ogre repeats 00 and 80-FE forever; Ogre Battle repeats only FF.
+    const bool infinite = earlier ? count == 0xff : count == 0 || count >= 0x80;
     if (!infinite) {
       vm.repeatCounter(static_cast<u8>(track.calls.size() + 1)).start(count);
     }
@@ -519,18 +688,26 @@ struct Playback : SequencePlayback<TrackState> {
     return program.config.condition == 0 ? vm.jump(destination) : Effects{};
   }
 
-  // E1 selects one of 21 positions from each pan table. Bits 7/6 invert the
-  // left/right phase, respectively; the gains also determine channel loudness.
+  // E1 selects one of 21 positions. Tactics Ogre adds left/right phase inversion
+  // in bits 7/6; the gains also determine channel loudness.
   void pan(u8 value) {
+    if (program.config.earlier) {
+      value = std::min<u8>(value, 20);
+    }
     const u8 index = std::min<u8>(value & 0x3f, 20);
     const auto& panTable = program.config.pan;
     out.stereoBalance((panTable[index] / 128.0) * ((value & 0x80) ? -1 : 1),
                       (panTable[21 + index] / 128.0) * ((value & 0x40) ? -1 : 1));
   }
 
+  [[nodiscard]] double level(double value) const {
+    const double gain = value / 255.0;
+    return program.config.earlier ? gain * gain : gain;
+  }
+
   void volume(u8 value) {
     track.volume.reset(value);
-    out.level(value / 255.0);
+    out.level(level(value));
   }
 
   void volumeFade(u8 length, u8 target) {
@@ -541,7 +718,7 @@ struct Playback : SequencePlayback<TrackState> {
 
   void master(u8 value) {
     program.master.reset(value);
-    out.masterLevel(value / 255.0);
+    out.masterLevel(level(value));
   }
 
   void masterFade(u8 length, u8 target) {
@@ -551,8 +728,16 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   void tempo(u8 value) {
-    program.tempo.reset(tempoDivisor(value));
-    out.tempo(tempoUs(tempoDivisor(value)));
+    if (program.config.sfx) {
+      return;
+    }
+    // Ogre Battle divides 0x082a without the later revision's overflow clamp.
+    const u8 divisor = program.config.earlier
+        ? (value >= 5 ? static_cast<u8>(0x082a / value)
+                      : static_cast<u8>(255 - (0x082a - value * 512) / (256 - value)))
+        : tempoDivisor(value);
+    program.tempo.reset(divisor);
+    out.tempo(tempoUs(divisor));
   }
 
   void tempoFade(u8 length, u8 target) {
@@ -604,6 +789,15 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   void tick() {
+    if (program.config.earlier) {
+      if (track.earlierPitch.tick()) {
+        track.pitchScale = track.earlierPitch.value;
+        emitEarlierPitch();
+      }
+      if (track.earlierTremolo.tick()) {
+        out.expression((track.earlierTremolo.value >> 8) / 128.0);
+      }
+    }
     if (track.vibratoDepth != 0 && track.vibratoGrowthTicks != 0) {
       const u32 divisor = static_cast<u8>(program.tempo.currentRaw());
       track.vibratoElapsedUs += (divisor == 0 ? 256 : divisor) * 125;
@@ -620,14 +814,14 @@ struct Playback : SequencePlayback<TrackState> {
     if (program.lastTick != vm.tick()) {
       program.lastTick = vm.tick();
       if (program.master.tick().shouldApply()) {
-        out.masterLevel(program.master.currentRaw() / 255.0);
+        out.masterLevel(level(program.master.currentRaw()));
       }
       if (program.tempo.tick().shouldApply()) {
         out.tempo(tempoUs(static_cast<u8>(program.tempo.currentRaw())));
       }
     }
     if (track.volume.tick().shouldApply()) {
-      out.level(track.volume.currentRaw() / 255.0);
+      out.level(level(track.volume.currentRaw()));
     }
     if (track.pitchRemaining != 0) {
       if (track.pitchDelay != 0) {
@@ -681,10 +875,10 @@ using Cursor = CompilerCursor<Playback>;
   return value == 0x7e ? 0x90 : value == 0x7f ? 0xc0 : value;
 }
 
-[[nodiscard]] std::optional<u8> packedParameter(Cursor::Event& event) {
+[[nodiscard]] std::optional<u8> packedParameter(Cursor::Event& event, bool earlier = false) {
   const auto next = event.peekU8();
-  // Unlike standard N-SPC, zero belongs to the end command.
-  if (next && *next != 0 && *next < 0x80) {
+  // Tactics Ogre reserves zero for the end command; Ogre Battle accepts it here.
+  if (next && (earlier || *next != 0) && *next < 0x80) {
     return event.u8("quantize_velocity", SourceValueDisplay::Hex);
   }
   return std::nullopt;
@@ -742,42 +936,143 @@ using Cursor = CompilerCursor<Playback>;
   return bytes;
 }
 
-[[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, const Layout& layout, u32 begin,
+// Only overrides of the later command set belong here. In particular, echo
+// placeholders consume fixed operands and CPU handshakes consume none.
+[[nodiscard]] std::optional<DecodedBytecodeCommand> decodeEarlierCommand(Cursor& cursor) {
+  const u8 opcode = cursor.opcode();
+  switch (opcode) {
+    case 0xe2:
+    case 0xe8:
+    case 0xf0:
+    case 0xf2:
+    case 0xf5:
+    case 0xf7:
+    case 0xf9: {
+      auto event = cursor.sourceOnly("Unused Command");
+      const u8 count = opcode == 0xf5 || opcode == 0xf7 ? 3 : opcode == 0xe2 || opcode == 0xe8 ? 2
+                                                                                          : opcode == 0xf0 ? 1 : 0;
+      for (u8 i = 0; i < count; ++i) {
+        event.u8(fmt::format("unused_{}", i), SourceValueDisplay::Hex);
+      }
+      return event;
+    }
+    case 0xe4:
+    case 0xf3:
+      return cursor.command("Pitch Modulation Off", SequenceSemantic::Modulation).invoke<&Playback::pitchOff>();
+    case 0xeb: {
+      auto event = cursor.command("Tremolo", SequenceSemantic::Modulation);
+      const u8 delay = event.u8("delay");
+      const u8 rate = event.u8("rate");
+      const u8 depth = event.u8("depth");
+      return event.invokeFlow([delay, rate, depth](Playback& p) {
+        p.earlierModulation(p.track.earlierTremolo, delay, rate, depth, true);
+        return Effects{};
+      });
+    }
+    case 0xec:
+      return cursor.command("Tremolo Off", SequenceSemantic::Modulation).invokeFlow([](Playback& p) {
+        p.track.earlierTremolo.enabled = false;
+        p.out.expression(1.0);
+        return Effects{};
+      });
+    case 0xf1: {
+      auto event = cursor.command("Pitch Envelope", SequenceSemantic::Pitch);
+      const u8 delay = event.u8("delay");
+      const u8 length = event.u8("length");
+      return event.invoke<&Playback::pitchEnvelope>(delay, length, static_cast<s16>(event.s8("pitch_step")));
+    }
+    case 0xf4:
+    case 0xfa: {
+      auto event = cursor.command("Percussion Base", SequenceSemantic::State);
+      return event.invoke<&Playback::percussionBase>(event.u8("base"));
+    }
+    case 0xf6:
+    case 0xf8:
+    case 0xfc:
+      return cursor.sourceOnly("CPU Handshake");
+    case 0xfb: {
+      auto event = cursor.command("Conditional Pan", SequenceSemantic::Pan);
+      const u8 first = event.u8("pan_if_set");
+      const u8 second = event.u8("pan_if_clear");
+      return event.invokeFlow([first, second](Playback& p) {
+        p.pan(p.program.config.conditions[p.track.number / 4] ? first : second);
+        return Effects{};
+      });
+    }
+    case 0xfd: {
+      auto event = cursor.command("Conditional Pattern", SequenceSemantic::Call);
+      const Address first{event.u16le("pattern_if_set", SourceValueDisplay::Address, SemanticOperandRole::CallTarget)};
+      const Address second{event.u16le("pattern_if_clear", SourceValueDisplay::Address, SemanticOperandRole::CallTarget)};
+      return event.invokeFlow([first, second](Playback& p) {
+        return p.call(1, p.program.config.conditions[p.track.number / 4] ? first : second);
+      }).call(first).discoverTarget(second);
+    }
+    case 0xfe: {
+      auto event = cursor.sourceOnly("Write Driver Byte");
+      const u8 address = event.u8("address", SourceValueDisplay::Address);
+      const u8 value = event.u8("value", SourceValueDisplay::Hex);
+      if (address == 0xa5 || address == 0xa6) {
+        return event.invokeFlow([address, value](Playback& p) {
+          p.program.config.conditions[address - 0xa5] = value;
+          return Effects{};
+        });
+      }
+      return event;
+    }
+    case 0xff:
+      return cursor.command("Mute Music", SequenceSemantic::Level).invokeFlow([](Playback& p) {
+        if (!p.program.config.sfx) {
+          p.master(0);
+        }
+        return Effects{};
+      });
+    default:
+      return std::nullopt;
+  }
+}
+
+[[nodiscard]] DecodedBytecodeCommand decodeCommandImpl(ByteReader reader, const Layout& layout, u32 begin,
                                                    std::vector<Diagnostic>* diagnostics, u8 forwardingDepth = 0) {
   Cursor cursor(reader, begin, "nin-snes-quest", diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
   }
   const u8 opcode = cursor.opcode();
-  if ((opcode > 0 && opcode < 0x80) || opcode == 0xde) {
+  const bool earlier = layout.profile == ProfileId::QuestEarlier;
+  if ((opcode > 0 && opcode < 0x80) || (!earlier && opcode == 0xde)) {
     auto event = cursor.command("Note Parameters", SequenceSemantic::State);
     const u16 length = opcode == 0xde
                            ? event.u16le("length", SourceValueDisplay::Decimal)
-                           : event.opcodeValue("length", shortLength(opcode));
-    const auto packed = packedParameter(event);
+                           : event.opcodeValue("length", earlier ? opcode * 2 : shortLength(opcode));
+    const auto packed = packedParameter(event, earlier);
     u8 velocity = 0;
     if (packed) {
       const u8 index = *packed & 15;
-      // The table includes the index, then the driver squares the
-      // adjusted byte. Master and channel volume are linear multipliers.
+      // Tactics Ogre includes the index, then squares the adjusted byte. Master and channel volume are linear multipliers.
       const u8 raw = static_cast<u8>(layout.volumeTable[index] - index - 1);
-      velocity = (raw * raw) >> 8;
+      velocity = earlier ? layout.volumeTable[index] : (raw * raw) >> 8;
       event.derived("velocity", velocity);
     }
     return event.invoke<&Playback::parameters>(length, packed, velocity);
   }
-  if (opcode >= 0x80 && opcode < 0xd8) {
+  if (opcode >= 0x80 && opcode < (earlier ? 0xe0 : 0xd8)) {
     auto event = cursor.command(opcode == 0xc9   ? "Rest"
                                 : opcode == 0xc8 ? "Tie"
                                                  : "Note",
                                 opcode == 0xc9 ? SequenceSemantic::Rest : SequenceSemantic::Note);
     std::optional<Slide> slide;
-    if (opcode != 0xc8 && opcode != 0xc9 && event.peekU8() == 0xf9) {
+    if (!earlier && opcode != 0xc8 && opcode != 0xc9 && event.peekU8() == 0xf9) {
       event.u8("pitch_slide", SourceValueDisplay::Hex);
       slide = readSlide(event);
     }
-    const auto ties = readTies(event, reader);
+    const auto ties = earlier ? std::vector<TieSegment>{} : readTies(event, reader);
     return event.invoke<&Playback::note>(opcode, ties, slide);
+  }
+
+  if (earlier) {
+    if (auto command = decodeEarlierCommand(cursor)) {
+      return std::move(*command);
+    }
   }
 
   switch (opcode) {
@@ -801,7 +1096,7 @@ using Cursor = CompilerCursor<Playback>;
       // A same-channel command can execute directly. Cross-channel commands
       // are SFX controls; keep their bytes and label in the source model.
       auto nested =
-          decodeCommand(reader, layout, static_cast<u32>(event.nextAddress().value), diagnostics, forwardingDepth + 1);
+          decodeCommandImpl(reader, layout, static_cast<u32>(event.nextAddress().value), diagnostics, forwardingDepth + 1);
       auto prefix = static_cast<DecodedBytecodeCommand>(event);
       nested.range = reader.range(begin, nested.range.endOffset() - begin);
       nested.opcode = opcode;
@@ -874,7 +1169,7 @@ using Cursor = CompilerCursor<Playback>;
     case 0xe0: {
       auto event = cursor.command("Program", SequenceSemantic::Program);
       const u8 patch = event.u8("program", SemanticOperandRole::Instrument);
-      if (patch == 0xff) {
+      if (!earlier && patch == 0xff) {
         const u8 clock = event.u8("noise_clock");
         return event.invoke<&Playback::noise>(clock, reader.range(begin, 3));
       }
@@ -945,7 +1240,7 @@ using Cursor = CompilerCursor<Playback>;
           event.u16le("destination", SourceValueDisplay::Address, SemanticOperandRole::CallTarget)};
       const u8 count = event.u8("count");
       event.invoke<&Playback::call>(count, destination);
-      return count == 0xff ? event.jump(destination) : event.call(destination);
+      return (earlier ? count == 0 : count == 0xff) ? event.jump(destination) : event.call(destination);
     }
     case 0xf0: {
       auto event = cursor.command("Vibrato Growth", SequenceSemantic::Modulation);
@@ -1078,11 +1373,98 @@ using Cursor = CompilerCursor<Playback>;
   }
 }
 
+[[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, const Layout& layout, u32 begin,
+                                                   std::vector<Diagnostic>* diagnostics) {
+  auto command = decodeCommandImpl(reader, layout, begin, diagnostics);
+  if (layout.profile == ProfileId::QuestEarlier && command.opcode >= 0xe0 && command.opcode != 0xef) {
+    const auto body = std::move(command.execution.body);
+    command.execution.body = [body](void* state) {
+      static_cast<Playback*>(state)->track.tieEligible = false;
+      return body ? body(state) : Effects{};
+    };
+  }
+  return command;
+}
+
+[[nodiscard]] std::optional<Layout> findEarlierLayout(ByteReader reader) {
+  if (!kEarlierDispatch.find(reader)) {
+    return std::nullopt;
+  }
+  const auto instrument = kEarlierInstrument.find(reader);
+  const auto song = kEarlierSong.find(reader);
+  const auto gate = kEarlierGate.find(reader);
+  const auto velocity = kEarlierVelocity.find(reader);
+  const auto pan = kEarlierPan.find(reader);
+  const auto dir = kEarlierDir.find(reader);
+  if (!instrument || !song || !gate || !velocity || !pan || !dir) {
+    return std::nullopt;
+  }
+  Layout layout{.signature = Signature::Quest,
+                .profile = ProfileId::QuestEarlier,
+                .songIndex = reader.u8At(0xcc),
+                .sectionPointerAddress = 0x4d,
+                .instrumentTableAddress = reader.u8At(*instrument + 27) | (reader.u8At(*instrument + 24) << 8),
+                .spcDirAddress = static_cast<u16>(reader.u8At(*dir + 1) << 8)};
+  layout.questBuiltinInstruments = reader.u8At(*instrument + 15) | (reader.u8At(*instrument + 19) << 8);
+  layout.durationRateTable = table(reader, reader.le16(*gate + 6), 8);
+  layout.volumeTable = table(reader, reader.le16(*velocity + 4), 16);
+  const auto pans = table(reader, reader.le16(*pan + 3), 42);
+  if (layout.durationRateTable.size() != 8 || layout.volumeTable.size() != 16 || pans.size() != 42 ||
+      reader.le16(*pan + 7) != reader.le16(*pan + 3) + 1) {
+    return std::nullopt;
+  }
+  for (u8 side = 0; side < 2; ++side) {
+    for (u8 i = 0; i < 21; ++i) {
+      layout.questPanTable.push_back(pans[i * 2 + side]);
+    }
+  }
+  // BGM requests are one-based and select one of two count-prefixed banks.
+  // Use the captured current song; scanning the wrong bank can read score data.
+  if (layout.songIndex != 0 && layout.songIndex != 0xff) {
+    layout.songListAddress = reader.le16(*song + (layout.songIndex < 0x80 ? 1 : 25)) + 1;
+    const u8 index = layout.songIndex & 0x7f;
+    const u32 entry = layout.songListAddress + (index - 1) * 2;
+    if (index != 0 && reader.has(entry, 2)) {
+      layout.playlistAddress = reader.le16(entry);
+      if (layout.playlistAddress >= 0x100 && isValidPlaylist(reader, layout)) {
+        return layout;
+      }
+    }
+    return std::nullopt;
+  }
+  // Short pieces such as Quest Logo run as SFX: a direct section, a separate
+  // instrument bank, and a fixed clock. Only inspect a group marked active.
+  const auto sfx = kEarlierSfx.find(reader);
+  if (sfx) {
+    for (u8 group = 0; group < 2; ++group) {
+      const u8 index = reader.u8At(0xcd + group);
+      if (reader.u8At(0x181 + group) != 0x80 || index == 0 || index == 0xff) {
+        continue;
+      }
+      layout.songListAddress = reader.le16(*sfx + (index < 0x80 ? 26 : 11));
+      const u32 entry = layout.songListAddress + (index < 0x80 ? index - 1 : index & 0x7f) * 2;
+      if (!reader.has(entry, 2)) {
+        continue;
+      }
+      layout.playlistAddress = reader.le16(entry);
+      if (layout.playlistAddress >= 0x100 && reader.has(layout.playlistAddress, 8) &&
+          reader.le16(layout.playlistAddress) >= 0x100) {
+        layout.songIndex = index;
+        layout.questSfx = group + 1;
+        layout.sectionTrackCount = 4;
+        *layout.instrumentTableAddress += 0x200;
+        return layout;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
 }  // namespace
 
 std::optional<Layout> findLayout(ByteReader reader) {
   if (!kDispatch.find(reader) || !kInstrument.find(reader)) {
-    return std::nullopt;
+    return findEarlierLayout(reader);
   }
   const auto song = kSongList.find(reader);
   const auto gate = kGate.find(reader);
@@ -1155,33 +1537,79 @@ std::optional<Layout> findLayout(ByteReader reader) {
 SequenceParse decodeSequence(ByteReader reader, const Layout& layout, SectionPlaylist playlist, AssetId sequenceId,
                              std::optional<SourceAnnotationId> parent, SourceMapBuilder* sourceMap,
                              std::vector<Diagnostic>* diagnostics) {
-  Config config{.duration = layout.durationRateTable, .pan = layout.questPanTable, .condition = reader.u8At(0xdf)};
+  Config config{.earlier = layout.profile == ProfileId::QuestEarlier,
+                .sfx = layout.questSfx != 0,
+                .duration = layout.durationRateTable, .pan = layout.questPanTable,
+                .conditions = {reader.u8At(layout.questSfx ? 0xa4 + layout.questSfx : 0xa5), reader.u8At(0xa6)},
+                .condition = reader.u8At(0xdf)};
   // A manually supplied layout can use the driver's documented defaults.
   if (config.duration.size() != 8) {
-    config.duration = {0x23, 0x46, 0x69, 0x8c, 0xaf, 0xd2, 0xf5, 0xff};
+    config.duration = config.earlier ? std::vector<u8>{0x32, 0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xff}
+                                    : std::vector<u8>{0x23, 0x46, 0x69, 0x8c, 0xaf, 0xd2, 0xf5, 0xff};
   }
   if (config.pan.size() != 42) {
-    config.pan = {0, 8, 17, 26, 35, 44, 55, 67, 80, 95, 104, 110, 114, 117, 119, 121, 123, 124, 125, 126, 127};
+    config.pan = config.earlier
+        ? std::vector<u8>{0, 2, 5, 11, 19, 30, 43, 60, 75, 94, 115, 117, 120, 121, 122, 123, 124, 125, 126, 127, 127}
+        : std::vector<u8>{0, 8, 17, 26, 35, 44, 55, 67, 80, 95, 104, 110, 114, 117, 119, 121, 123, 124, 125, 126, 127};
     const auto left = config.pan;
     config.pan.insert(config.pan.end(), left.rbegin(), left.rend());
   }
   Layout decodeLayout = layout;
   if (decodeLayout.volumeTable.size() != 16) {
-    decodeLayout.volumeTable = {0x19, 0x28, 0x37, 0x46, 0x55, 0x64, 0x73, 0x82,
-                                0x91, 0xa0, 0xaf, 0xbe, 0xcd, 0xdc, 0xeb, 0xff};
+    decodeLayout.volumeTable = config.earlier
+        ? std::vector<u8>{0x28, 0x3c, 0x4c, 0x65, 0x72, 0x7f, 0x8c, 0x98, 0xa5, 0xb2, 0xbf, 0xcb, 0xd8, 0xe5, 0xf2, 0xfc}
+        : std::vector<u8>{0x19, 0x28, 0x37, 0x46, 0x55, 0x64, 0x73, 0x82, 0x91, 0xa0, 0xaf, 0xbe, 0xcd, 0xdc, 0xeb, 0xff};
   }
   if (layout.instrumentTableAddress) {
-    for (u32 i = 0; i < config.instruments.size(); ++i) {
-      const u32 address = *layout.instrumentTableAddress + i * 6;
+    for (u32 i = 0; i < (config.earlier ? 256u : 128u); ++i) {
+      const bool builtin = config.earlier && i >= 0xfc;
+      // Built-in row selection wraps the low address byte without a carry.
+      const u32 address = builtin
+          ? (layout.questBuiltinInstruments & 0xff00) | static_cast<u8>(layout.questBuiltinInstruments + (i - 0xfc) * 6)
+          : *layout.instrumentTableAddress + i * 6;
       if (reader.has(address, 6)) {
-        std::ranges::copy(reader.slice(address, 6), config.instruments[i].begin());
+        auto& bytes = config.instruments[i];
+        std::ranges::copy(reader.slice(address, 6), bytes.begin());
+        config.instrumentSources[i] = reader.range(address, 6);
+        if (config.earlier) {
+          // Normalize little-endian pitch and banked SRCNs for shared recipes.
+          // 80-BF select noise; C0-FF address resident samples in reverse order.
+          std::swap(bytes[4], bytes[5]);
+          if (bytes[0] >= 0xc0) {
+            bytes[0] = (bytes[0] ^ 0xff) + 0x3c;
+          } else if (bytes[0] < 0x80) {
+            bytes[0] += config.sfx && !builtin ? 0x40 : 0;
+            if (bytes[0] >= 0x70) {
+              bytes[0] -= 0x70;
+            }
+          }
+        }
       }
     }
   }
   SequenceProgram program = sequenceConfig().makeProgram();
-  program.behavior.initialTempoMicrosecondsPerQuarter = tempoUs(0x80);
-  program.behavior.initialMasterLevel = 0;
+  program.behavior.initialTempoMicrosecondsPerQuarter = tempoUs(config.sfx ? 0x43 : 0x80);
+  program.behavior.initialMasterLevel = config.sfx ? (0xe6 / 255.0) * (0xe6 / 255.0) : 0;
   program.behavior.initialPitchBendRangeSemitones = 24;
+  if (config.sfx) {
+    const u32 start = layout.playlistAddress, end = start + layout.trackCount() * 2;
+    PlaylistCommand section{.address = Address{start}, .fallthrough = Address{end},
+                            .range = reader.range(start, end - start), .kind = PlaylistCommandKind::PlaySection,
+                            .target = Address{start}};
+    section.trackStarts.resize(layout.trackCount());
+    if (sourceMap) {
+      parent = sourceMap->header("SFX Section", section.range).owner(ObjectRefs::sequence(sequenceId)).id();
+    }
+    for (u8 track = 0; track < layout.trackCount(); ++track) {
+      const u16 address = reader.le16(start + track * 2);
+      if (address < 0x100) {
+        break;
+      }
+      section.trackStarts[track] = Address{address};
+    }
+    playlist.startAddress = Address{start};
+    playlist.commands = {std::move(section), PlaylistCommand{.address = Address{end}}};
+  }
   program.sectionPlaylist = std::move(playlist);
   // Playlists contain words: zero ends, 01-FE count additional plays, FF
   // repeats forever. A repeat's next word is its playlist destination; larger
@@ -1194,7 +1622,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, SectionPla
                                .sequenceAsset = sequenceId,
                                .parentAnnotation = parent,
                                .sourceMap = sourceMap};
-  for (u8 track = 0; track < kTrackCount; ++track) {
+  for (u8 track = 0; track < layout.trackCount(); ++track) {
     std::vector<Address> starts;
     for (const auto& section : program.sectionPlaylist->commands) {
       if (section.kind == PlaylistCommandKind::PlaySection && track < section.trackStarts.size() &&

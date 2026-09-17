@@ -63,6 +63,7 @@ enum class ProfileId : u8 {
   SunsoftEarlier,
   Sunsoft,
   SunsoftBenkei,
+  QuestEarlier,
   Quest,
 };
 
@@ -88,10 +89,12 @@ enum class PlaylistModel : u8 {
   Standard,
   Tose,
   Quest,
+  QuestEarlier,
 };
 
 [[nodiscard]] constexpr bool isInfinitePlaylistRepeat(PlaylistModel model, u16 value) {
   return value <= 0xff && (model == PlaylistModel::Tose ? value == 0 || value == 0xff
+                         : model == PlaylistModel::QuestEarlier ? value >= 0xfe
                          : model == PlaylistModel::Quest ? value == 0xff : value > 0x80);
 }
 
@@ -190,6 +193,9 @@ struct Layout {
   std::vector<u8> durationRateTable;
   // Quest stores separate left/right pan tables (21 entries each).
   std::vector<u8> questPanTable;
+  u16 questBuiltinInstruments = 0;
+  // Zero selects BGM; 1/2 select an earlier Quest SFX group (four tracks).
+  u8 questSfx = 0;
   std::vector<u8> intelliDurationRateTable;
   std::vector<u8> intelliVolumeTable;
   std::vector<u8> intelliTransposeTable;

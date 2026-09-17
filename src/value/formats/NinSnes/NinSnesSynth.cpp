@@ -132,7 +132,8 @@ struct InstrumentRegion {
 
 [[nodiscard]] std::vector<InstrumentInfo> collectBaseInstruments(ByteReader reader, const Layout& layout) {
   std::vector<InstrumentInfo> infos;
-  if (!layout.instrumentTableAddress || !layout.spcDirAddress) {
+  // Early Quest resolves banked SRCNs and built-in rows into instrument recipes.
+  if (!layout.instrumentTableAddress || !layout.spcDirAddress || layout.profile == ProfileId::QuestEarlier) {
     return infos;
   }
   const Profile& selected = profile(layout.profile);
@@ -226,7 +227,7 @@ struct InstrumentRegion {
   return infos;
 }
 
-[[nodiscard]] std::vector<InstrumentInfo> collectOverrides(const SequenceRecipes& recipes) {
+[[nodiscard]] std::vector<InstrumentInfo> collectOverrides(const SequenceRecipes& recipes, bool overwritten) {
   std::vector<InstrumentInfo> infos;
   infos.reserve(recipes.overrides.size());
   for (const auto& definition : recipes.overrides) {
@@ -240,7 +241,7 @@ struct InstrumentRegion {
         .pitchHigh = definition.pitchHigh,
         .pitchLow = definition.pitchLow,
         .source = SourceRecord{.range = definition.source},
-        .override = true,
+        .override = overwritten,
         .noise = definition.noise,
     });
   }
@@ -270,7 +271,7 @@ struct InstrumentRegion {
   return 96.0 - std::log2(pitchScale * (4286.0 / 4096.0) / 256.0) * 12.0;
 }
 
-void applyPitchWrap(Region& region, u16 pitchScale, int key) {
+void applyPitchWrap(Region& region, u16 pitchScale, int key, bool questEarlier = false) {
   if (pitchScale == 0 || key < 24) {
     return;
   }
@@ -280,7 +281,7 @@ void applyPitchWrap(Region& region, u16 pitchScale, int key) {
                                        0x0c8b, 0x0d4a, 0x0e14, 0x0eea, 0x0fcd, 0x10be};
   const int note = key - 24;
   // The driver slightly adjusts notes outside its middle register before interpolation.
-  const int correction = note >= 0x34 ? note - 0x34 : note < 0x13 ? (note - 0x13) * 2 : 0;
+  const int correction = questEarlier ? 0 : note >= 0x34 ? note - 0x34 : note < 0x13 ? (note - 0x13) * 2 : 0;
   const int pitchKey = note * 256 + correction;
   // Outside the driver's seven octaves its shift loop yields zero, not overflow.
   if (pitchKey < 0 || pitchKey >= 84 * 256) {
@@ -290,8 +291,11 @@ void applyPitchWrap(Region& region, u16 pitchScale, int key) {
   const int index = semitone % 12;
   const u32 interpolated = pitches[index] + ((pitches[index + 1] - pitches[index]) * (pitchKey & 0xff) >> 8);
   const u32 basePitch = (interpolated * 2) >> (6 - semitone / 12);
-  const u32 pitch = (basePitch * pitchScale) >> 8;
-  if (pitch <= 0x3fff) {
+  // Ogre Battle multiplies first, truncates to 16 bits, then shifts octaves.
+  const u32 pitch = questEarlier
+      ? (semitone < 72 ? static_cast<u16>((interpolated * pitchScale) >> 8) >> (5 - semitone / 12) : 0)
+      : (basePitch * pitchScale) >> 8;
+  if (!questEarlier && pitch <= 0x3fff) {
     return;
   }
   const u32 wrapped = pitch & 0x3fff;
@@ -386,7 +390,7 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
       for (int key = 0; key < 128; ++key) {
         Region tuned = region;
         if (recipes.usedNotes.contains({info.program, static_cast<u8>(key)})) {
-          applyPitchWrap(tuned, pitchScale, key);
+          applyPitchWrap(tuned, pitchScale, key, selected.id == ProfileId::QuestEarlier);
         }
         if (tuned.unityKey != zone.unityKey || tuned.attenuationDb != zone.attenuationDb) {
           addRegion(zone);
@@ -447,7 +451,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   }
   const ByteReader reader = builder.reader();
   std::vector<InstrumentInfo> instruments = collectBaseInstruments(reader, layout);
-  std::vector<InstrumentInfo> overrides = collectOverrides(recipes);
+  std::vector<InstrumentInfo> overrides = collectOverrides(recipes, layout.profile != ProfileId::QuestEarlier);
   instruments.insert(instruments.end(), overrides.begin(), overrides.end());
   std::vector<InstrumentInfo> percussion = collectEarlierPercussion(reader, layout, recipes);
   instruments.insert(instruments.end(), percussion.begin(), percussion.end());
