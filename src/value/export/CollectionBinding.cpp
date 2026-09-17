@@ -210,7 +210,7 @@ void CollectionWorkspace::render(const SequenceRenderOptions& options, DynamicEn
                      std::make_move_iterator(materialized.diagnostics.end()));
 }
 
-void CollectionWorkspace::prepareSynth(ModulationConversionPolicy conversion, ModulationScalingPolicy scaling) {
+void CollectionWorkspace::prepareModulation(ModulationConversionPolicy conversion, ModulationScalingPolicy scaling) {
   if (conversion != ModulationConversionPolicy::SynthModulators || !rendering.performance) {
     return;
   }

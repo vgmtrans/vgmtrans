@@ -2820,6 +2820,22 @@ now also checks that every instrument annotation gets the complete sample-link
 set and that a region annotated before its instrument retains its sample link.
 The full Debug build and all 21 CTest targets pass without compiler warnings.
 
+## Analyze modulation usage once for paired exports
+
+Collection export now prepares modulation before MIDI and synth serialization,
+and both consume the workspace's one observed controller range. The MIDI
+rendering helper no longer independently analyzes canonical performance or
+applies a second copy of the policy. The shared phase is named
+`prepareModulation`, reflecting its role for both outputs; stitching still
+combines per-song observations before scaling the complete result.
+
+This removes six production lines and one redundant performance traversal from
+paired observed-range exports. The synth fallback still depends on whether a
+companion MIDI performance is available. A regression checks MIDI-only,
+synth-only, and paired outputs under both scaling policies, including matched
+controller expansion and synth-depth reduction. All 21 CTest targets pass and
+the full Debug build is warning-free.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual

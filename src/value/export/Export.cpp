@@ -76,7 +76,6 @@ namespace {
                                                      std::span<const SoundBankAsset* const> soundBanks,
                                                      const MidiExportOptions& options,
                                                      ModulationConversionPolicy modulationConversion,
-                                                     ModulationScalingPolicy modulationScaling,
                                                      const PerformanceSequence* preparedPerformance = nullptr) {
   const auto* performance = preparedPerformance;
   if (performance == nullptr && rendering.performance) {
@@ -85,15 +84,7 @@ namespace {
   if (performance == nullptr) {
     return std::nullopt;
   }
-  auto midi = renderMidiSequence(*performance, options, modulationConversion, soundBanks, &rendering.modulation);
-  if (modulationConversion == ModulationConversionPolicy::SynthModulators &&
-      modulationScaling == ModulationScalingPolicy::ObservedSequenceRange && rendering.performance) {
-    // Scale once while preparing the MIDI so every artifact uses the same
-    // controller range as its companion synth modulators.
-    const auto usage = analyzePerformanceModulationUsage(*rendering.performance, &rendering.modulation);
-    applyMidiModulationScaling(midi, usage, modulationScaling);
-  }
-  return midi;
+  return renderMidiSequence(*performance, options, modulationConversion, soundBanks, &rendering.modulation);
 }
 
 [[nodiscard]] Artifact exportMidi(std::string_view baseName, const RenderedCollection& rendering,
@@ -187,8 +178,7 @@ Artifact exportStandaloneSequenceMidi(const SessionSnapshot& snapshot, AssetId s
   }
 
   const auto rendering = renderSequence(*sequence, request);
-  const auto midi = renderMidi(rendering, {}, request.midi, ModulationConversionPolicy::SequenceEventSimulation,
-                               ModulationScalingPolicy::FullFormatRange);
+  const auto midi = renderMidi(rendering, {}, request.midi, ModulationConversionPolicy::SequenceEventSimulation);
   return exportMidi(artifactBaseName(sequence->metadata, "sequence"), rendering, midi);
 }
 
@@ -357,9 +347,9 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
   workspace.render(request.sequence, request.dynamicEnvelopes, /*materializeSignedStereo=*/true);
   const auto instruments = workspace.soundBankView();
   auto midi = renderMidi(workspace.rendering, instruments, request.sequence.midi, request.modulationConversion,
-                         ModulationScalingPolicy::FullFormatRange, workspace.performance());
+                         workspace.performance());
   const auto synthConversion = midi ? request.modulationConversion : ModulationConversionPolicy::SynthModulators;
-  workspace.prepareSynth(synthConversion, ModulationScalingPolicy::FullFormatRange);
+  workspace.prepareModulation(synthConversion, ModulationScalingPolicy::FullFormatRange);
   auto soundFont = buildSoundFont2(SynthExportInput{
                                      .name = bound.baseName(),
                                      .soundBanks = instruments,
@@ -421,21 +411,24 @@ std::vector<Artifact> exportCollectionImpl(const SessionSnapshot& snapshot, cons
     std::erase_if(exportedBanks,
                   [&](const SoundBankAsset* bank) { return bank->metadata.id != *selectedSoundBank; });
   }
-  std::optional<MidiSequence> loweredMidi;
-  if (exportsMidi) {
-    loweredMidi = renderMidi(rendering, instruments, request.sequence.midi, request.modulationConversion,
-                             request.modulationScaling, preparedPerformance);
-  }
-
   ModulationConversionPolicy synthConversion = request.modulationConversion;
   // Sequence-event simulation replaces native synth modulation only when a
   // companion MIDI artifact was requested and could actually be rendered.
-  if (synthConversion == ModulationConversionPolicy::SequenceEventSimulation && (!exportsMidi || !loweredMidi)) {
+  if (synthConversion == ModulationConversionPolicy::SequenceEventSimulation && (!exportsMidi || !preparedPerformance)) {
     synthConversion = ModulationConversionPolicy::SynthModulators;
   }
 
-  if (exportsSynth) {
-    workspace.prepareSynth(synthConversion, request.modulationScaling);
+  if (exportsMidi || exportsSynth) {
+    workspace.prepareModulation(synthConversion, request.modulationScaling);
+  }
+
+  std::optional<MidiSequence> loweredMidi;
+  if (exportsMidi) {
+    loweredMidi = renderMidi(rendering, instruments, request.sequence.midi, request.modulationConversion,
+                             preparedPerformance);
+    if (loweredMidi) {
+      applyMidiModulationScaling(*loweredMidi, workspace.modulationUsage, request.modulationScaling);
+    }
   }
 
   const auto writeSynth = [&](SynthExportFormat format) {
