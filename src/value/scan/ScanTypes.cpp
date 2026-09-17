@@ -64,4 +64,17 @@ void ScanIdAllocator::reserveAfter(SourceAnnotationId id) noexcept {
   }
 }
 
+void normalizeScanResult(ScanResult& result, ScanIdAllocator& ids) {
+  // Formats may assign IDs when assets reference each other. If they leave an ID
+  // empty, assign one here before the asset leaves the scan result.
+  for (auto& asset : result.assets) {
+    auto& meta = metadata(asset);
+    if (meta.id.valid()) {
+      ids.reserveAfter(meta.id);
+    } else {
+      meta.id = ids.nextAssetId();
+    }
+  }
+}
+
 }  // namespace vgmtrans::core

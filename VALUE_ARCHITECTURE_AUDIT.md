@@ -2880,6 +2880,17 @@ This removes 16 production lines, the scan over active entries, and its separate
 out-of-range path. The full Debug rebuild and all 21 CTest targets pass without
 compiler warnings.
 
+## Keep scan normalization with its ID allocator
+
+`normalizeScanResult` now implements its asset-ID loop directly in
+`ScanTypes.cpp`, beside the allocator it uses. Its declaration was already in
+`ScanTypes.h`. Removed the one-use `assignMissingAssetIds` forwarding layer,
+`Scan.cpp`, and the corresponding build entry.
+
+This removes 21 C++ lines and one CMake entry without changing the public scan
+API or ID-assignment order. The regenerated full Debug build and all 21 CTest
+targets pass without compiler warnings.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual
