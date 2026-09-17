@@ -2530,6 +2530,31 @@ updates, linked notes, and signed stereo. Prepared regions and note instrument
 addresses match for both complete and used-only synth selection. Temporary
 probes and capture hooks are not committed. Real-file parity remains unverified.
 
+## Keep Prism decode state and flow beside their operands
+
+Prism's stateful discovery walker now follows the compiler's decoded control
+flow instead of maintaining a second opcode dispatch and rereading branch
+operands. Duration-mode and subtrack-mode changes update decode state in their
+existing command cases. The walker retains its breadth-first order, first
+reachable interpretation, single return-address behavior, and discovery of the
+encoded continuation after an infinite repeat. Its visit key uses structural
+comparison rather than repeating every decode-state member in a tuple.
+
+This removes **23 production lines** and, more importantly, removes a second
+place that had to know instruction layouts and version-specific branch aliases.
+The removed raw reads could throw after the compiler had already diagnosed a
+truncated jump, repeat, call, or subtrack-mode command. Such commands now stop
+through the compiler's existing unsupported/end transition.
+
+All 21 CTest targets pass. New regression cases cover state carried through
+calls, finite/infinite repeat discovery, and 46 truncated control/mode encodings
+across the three driver profiles. An ignored differential probe compiles both
+old and new Prism implementations with ASan/UBSan: 1,800 generated decoded
+programs and source maps match, as do 180 serialized MIDI outputs. The changed
+malformed-input behavior is covered separately by the regression cases. No
+real-file corpus is configured; these checks establish fixture/generated-input
+coverage only.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding
