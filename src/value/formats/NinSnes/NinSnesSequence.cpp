@@ -2337,8 +2337,9 @@ bool isValidPlaylist(ByteReader reader, const Layout& layout) {
 SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
                              std::vector<Diagnostic>* diagnostics) {
   const Profile& selected = profile(layout.profile);
-  PlaylistDecode playlist = decodePlaylist(reader, layout, sequenceId, sourceMap, diagnostics);
-  if (selected.id == ProfileId::Quest) {
+  PlaylistDecode playlist =
+      layout.questSfx ? PlaylistDecode{} : decodePlaylist(reader, layout, sequenceId, sourceMap, diagnostics);
+  if (selected.id == ProfileId::Quest || selected.id == ProfileId::QuestEarlier) {
     return quest::decodeSequence(reader, layout, std::move(playlist.playlist), sequenceId, playlist.annotation,
                                  sourceMap, diagnostics);
   }

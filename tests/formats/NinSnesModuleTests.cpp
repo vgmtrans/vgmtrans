@@ -2211,6 +2211,83 @@ void ninSnesQuestSupportsTacticsOgre() {
   }
 }
 
+void ninSnesQuestSupportsOgreBattle() {
+  auto layout = questLayout();
+  layout.profile = ProfileId::QuestEarlier;
+  layout.instrumentTableAddress = 0x4000;
+  {
+    const auto bytes = sequenceBytes({0xe2, 1, 2, 0xe8, 1, 2, 0xf0, 1, 0xf2, 0xf5, 1, 2, 3,
+                                     0xf6, 0xf7, 1, 2, 3, 0xf8, 0xf9, 0xfc, 0xe0, 0xff, 0x7f, 0, 0xde, 0});
+    const auto performance = render(bytes, layout);
+    const auto notes = questNotes(performance);
+    expect(notes.size() == 1 && notes[0].key == 60 && notes[0].durationTicks == 49 &&
+               std::abs(notes[0].linearVelocity - ninSnesLevelGain(0x28)) < 1e-9 &&
+               performance.tracks[0].endTick == 254,
+           "Ogre Battle doubles lengths, consumes zero parameters, and treats DE as percussion with early command widths");
+  }
+  {
+    auto bytes = sequenceBytes({10, 0x7f, 0x80, 0xef, 0, 4, 1, 0xc8, 0x81, 0xe4, 0xc8, 0x82, 0});
+    const std::array<u8, 4> pattern{5, 0x71, 0xc8, 0};
+    std::ranges::copy(pattern, bytes.begin() + 0x400);
+    const auto notes = questNotes(render(bytes, layout));
+    expect(notes.size() == 3 && notes[0].durationTicks == 38 && notes[1].header.tick == 40 &&
+               notes[1].durationTicks == 8 && notes[2].header.tick == 50 &&
+               notes[1].linearVelocity == notes[0].linearVelocity,
+           "early Quest ties cross pattern calls and returns, ignore tie velocity, and stop at other controls");
+    bytes = sequenceBytes({0xef, 0, 4, 0x80, 0});
+    const std::array<u8, 4> repeated{1, 0x7f, 0x80, 0};
+    std::ranges::copy(repeated, bytes.begin() + 0x400);
+    expect(questNotes(render(bytes, layout)).size() == 128 &&
+               isInfinitePlaylistRepeat(PlaylistModel::QuestEarlier, 0xfe),
+           "early Quest pattern counts 80-FE are finite, while playlist FE and FF repeat forever");
+  }
+  {
+    auto bytes = sequenceBytes({0xe0, 0, 0xe5, 0x80, 0xed, 0x40, 0xe7, 100, 0xe3, 1, 0xf6, 20,
+                               16, 0x7f, 0x80, 0xe4, 0xf1, 0, 2, 0xff, 0x81, 0});
+    bytes[0x4005] = 1;  // Little-endian pitch multiplier 0x0100.
+    const auto performance = render(bytes, layout);
+    bool tempo = false, volume = false, master = false, triangle = false, slide = false;
+    for (const auto& event : performance.tracks[0].events) {
+      if (const auto* e = std::get_if<TempoPerformanceEvent>(&event)) {
+        tempo |= e->microsecondsPerQuarter == 120000;
+      }
+      if (const auto* e = std::get_if<LevelPerformanceEvent>(&event)) {
+        volume |= e->linearGain == ninSnesLevelGain(0x40);
+      }
+      if (const auto* e = std::get_if<MasterLevelPerformanceEvent>(&event)) {
+        master |= e->linearGain == ninSnesLevelGain(0x80);
+      }
+      if (const auto* e = std::get_if<PitchBendPerformanceEvent>(&event)) {
+        triangle |= e->header.tick == 2 && std::abs(e->semitones - 12 * std::log2(68.0 / 66)) < 1e-9;
+        slide |= e->header.tick == 34 && std::abs(e->semitones - 12 * std::log2(68.0 / 70)) < 1e-9;
+      }
+    }
+    expect(tempo && volume && master && triangle && slide,
+           "early Quest squares levels and advances integer triangle vibrato and signed-byte pitch steps per tick");
+  }
+  {
+    layout.questSfx = 1;
+    layout.sectionTrackCount = 4;
+    layout.playlistAddress = 0x200;
+    layout.questBuiltinInstruments = 0x41f8;
+    auto bytes = sequenceBytes({0xe0, 0, 4, 0x7f, 0x80, 0xe0, 0xfc, 0x81, 0xe0, 0xfd, 0x82,
+                               0xe0, 0xfe, 0x83, 0xe0, 0xff, 0x84, 0});
+    for (const auto [address, srcn] : std::array<std::pair<u16, u8>, 5>{
+             {{0x4000, 0x30}, {0x41f8, 0xff}, {0x41fe, 0x9f}, {0x4104, 2}, {0x410a, 5}}}) {
+      bytes[address] = srcn;
+      bytes[address + 1] = 0x8f;
+      bytes[address + 5] = 1;
+    }
+    const auto parsed = decodeSequence(ByteReader(SourceId{1}, bytes), layout, AssetId{1});
+    const auto& rows = parsed.recipes.overrides;
+    expect(rows.size() == 5 && rows[0].srcn == 0 && rows[0].pitchHigh == 1 && rows[0].pitchLow == 0 &&
+               rows[1].srcn == 0x3c && rows[2].noise && rows[3].srcn == 2 && rows[4].srcn == 5 &&
+               parsed.program.behavior.initialTempoMicrosecondsPerQuarter == 402000 &&
+               questNotes(SequenceVm(LoopPolicy::PlayOnce).render(parsed.program)).size() == 5,
+           "Quest SFX uses a fixed clock, banked samples, and four special instruments with low-byte address wrapping");
+  }
+}
+
 }  // namespace
 
 void runNinSnesTests() {
@@ -2251,4 +2328,5 @@ void runNinSnesTests() {
   ninSnesSunsoftCommandsPreserveEchoAndEnvelopeState();
   ninSnesSunsoftFeAndGateFollowRevision();
   ninSnesQuestSupportsTacticsOgre();
+  ninSnesQuestSupportsOgreBattle();
 }
