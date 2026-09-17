@@ -3125,6 +3125,18 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   under both modulation-scaling policies; existing reversed-order checks pass.
 - Validation: warning-free Debug builds; all 21 CTest targets pass (10.78 s).
 
+## Check required draft payloads directly
+
+- Scanner finalization now directly checks the sequence and miscellaneous
+  alternatives for their required payloads. Removed a generic visitor,
+  compile-time type dispatch, and its nested conditions: eight fewer production
+  lines. The separate validation pass still runs before any draft is consumed.
+- Extended the incomplete-draft regression to fail once for a missing program
+  and again for a missing miscellaneous payload, then complete both. It verifies
+  preservation of an earlier instrument bank and the supplied sequence track,
+  and acceptance of an explicitly empty miscellaneous payload.
+- Validation: warning-free Debug builds; all 21 CTest targets pass (10.78 s).
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual

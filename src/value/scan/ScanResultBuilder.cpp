@@ -232,20 +232,12 @@ void ScanResultBuilder::error(std::string message, SourceRange range) {
 
 ScanResult ScanResultBuilder::finish() {
   for (const auto& slot : drafts_) {
-    std::visit(
-        [](const auto& pending) {
-          using Pending = std::decay_t<decltype(pending)>;
-          if constexpr (std::is_same_v<Pending, PendingSequence>) {
-            if (!pending.program) {
-              throw std::logic_error("ScanResultBuilder sequence draft was never given a program");
-            }
-          } else if constexpr (std::is_same_v<Pending, PendingMisc>) {
-            if (!pending.payload) {
-              throw std::logic_error("ScanResultBuilder misc draft was never given a payload");
-            }
-          }
-        },
-        slot->value);
+    if (const auto* sequence = std::get_if<PendingSequence>(&slot->value); sequence && !sequence->program) {
+      throw std::logic_error("ScanResultBuilder sequence draft was never given a program");
+    }
+    if (const auto* misc = std::get_if<PendingMisc>(&slot->value); misc && !misc->payload) {
+      throw std::logic_error("ScanResultBuilder misc draft was never given a payload");
+    }
   }
 
   result_.assets.reserve(result_.assets.size() + drafts_.size());
