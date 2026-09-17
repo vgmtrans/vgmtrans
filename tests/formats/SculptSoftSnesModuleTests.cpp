@@ -935,6 +935,36 @@ void lateVoiceHandoffsCloseThePreviousNote() {
          "a fixed DSP voice handed to another logical track must close its previous note at the handoff");
 }
 
+void phraseDiscoveryRetainsFineStreamInterpretations() {
+  for (const bool conflict : {false, true}) {
+    auto data = lateFixture();
+    bytes(data, 0x4100, {0xf6, 0, 0x43, 3, 0x43, 1, 0, 0, 0, 1, 0,
+                         0xf6, static_cast<u8>(conflict ? 1 : 0), 0x43, 4, 0x43, 1, 0, 0, 0, 1, 0, 0xf0});
+    bytes(data, 0x4300, {0xeb, 0x11, 0, 0xf0});
+    const ByteReader reader(SourceId{70}, data);
+    const auto layout = *findLayout(reader);
+    std::vector<Diagnostic> diagnostics;
+    const auto program = decodeSequence(reader, layout, readDriverData(reader, layout), AssetId{0}, nullptr,
+                                         &diagnostics);
+    const auto& commands = program.tracks.front().commands;
+    const auto at = [&](u32 address) -> const SourceCommand& {
+      const auto found = std::ranges::find_if(commands, [&](const auto& command) {
+        return command.address.value == address;
+      });
+      expect(found != commands.end(), "each bounded phrase should retain its discovered commands");
+      return *found;
+    };
+    expect(at(0x4301).semantic == (conflict ? SequenceSemantic::Note : SequenceSemantic::Pitch),
+           "revisited commands should retain their first fine-pitch interpretation");
+    expect(at(0x4303).semantic == SequenceSemantic::End && at(0x4303).range.size == 1 &&
+               at(0x4304).semantic == SequenceSemantic::Return && at(0x4304).range.size == 0,
+           "only a phrase end without a real command should receive a synthetic return");
+    expect(conflict ? diagnostics.size() == 1 && diagnostics.front().range.offset == 0x4301
+                    : diagnostics.empty(),
+           "compatible fine streams should reuse their decoded state; incompatible entry modes should be diagnosed");
+  }
+}
+
 void latePhrasesAndAttackParameters() {
   auto data = lateFixture();
   bytes(data, 0x4100, {0xf2, 100, 0xf6, 0, 0x43, 4, 0x43, 2, 20, 0, 128, 0, 1, 255, 0xef, 71, 1, 0xf0});
@@ -1020,6 +1050,7 @@ void lateTransposeVariantsAndCurveWidths() {
 void runSculptSoftSnesModuleTests() {
   lateTrackEndPlaysTheReleaseTail();
   lateTransposeVariantsAndCurveWidths();
+  phraseDiscoveryRetainsFineStreamInterpretations();
   latePhrasesAndAttackParameters();
   lateAllocationLimitationsAreExplicit();
   lateHeadersAndPackedSemitones();

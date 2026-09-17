@@ -11,7 +11,6 @@
 #include <fmt/format.h>
 #include <algorithm>
 #include <bit>
-#include <map>
 #include <utility>
 
 namespace vgmtrans::formats::sculpt_soft_snes {
@@ -473,103 +472,14 @@ DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 offset, Address star
   return cursor.unsupported(fmt::format("Invalid Opcode ${:02X}", opcode)).stop();
 }
 
-// Phrase returns are address comparisons, not opcodes. Discover each bounded
-// phrase separately, then add a return boundary only where no real command lives.
-[[nodiscard]] TrackProgram decodeLateTrackImpl(const TrackDecodeScope& scope, u32 number, u32 start,
-                                               const Layout& layout, std::vector<Diagnostic>* diagnostics,
-                                               std::set<u8>* referencedPrograms) {
-  std::map<u32, DecodedBytecodeCommand> commands;
-  std::map<u32, bool> interpretations;
-  std::vector<std::pair<u32, u32>> pending{{start, kAramSize}};
-  std::set<u32> ends;
-  std::set<std::pair<u32, u32>> visited;
-  while (!pending.empty() && commands.size() < kCommandLimit) {
-    const auto [begin, end] = pending.back();
-    pending.pop_back();
-    if (!visited.emplace(begin, end).second) {
-      continue;
-    }
-    bool fine = false;
-    for (u32 offset = begin; offset < end && commands.size() < kCommandLimit;) {
-      if (const auto existing = commands.find(offset); existing != commands.end()) {
-        if (interpretations.at(offset) != fine) {
-          if (diagnostics) {
-            diagnostics->push_back(Diagnostic{.severity = Severity::Warning,
-                                              .message = "Conflicting SculptSoftSnes fine-pitch stream interpretations",
-                                              .range = scope.reader.range(offset, 1)});
-          }
-          break;
-        }
-        const auto opcode = scope.reader.u8At(offset);
-        fine = fine ? opcode != 0 : opcode == 0xeb || opcode == 0xec;
-        const auto next = existing->second.flow.discoveryContinuation();
-        if (!next || next->value <= offset) {
-          break;
-        }
-        offset = next->value;
-        continue;
-      }
-      interpretations.emplace(offset, fine);
-      const bool boundary = !fine;
-      std::vector<Phrase> phrases;
-      auto command =
-          decodeCommand(scope.reader, offset, Address{start}, fine, layout, phrases, diagnostics, referencedPrograms);
-      for (const auto& phrase : phrases) {
-        pending.emplace_back(phrase.start.value, phrase.end.value);
-        ends.insert(phrase.end.value);
-      }
-      if (boundary) {
-        auto body = std::move(command.execution.body);
-        command.execution.body = [body = std::move(body)](void* state) {
-          auto& playback = *static_cast<Playback*>(state);
-          if (const auto effect = playback.phraseBoundary()) {
-            return *effect;
-          }
-          return body ? body(state) : playback.vm.end();
-        };
-      }
-      const auto next = command.flow.discoveryContinuation();
-      commands.emplace(offset, std::move(command));
-      if (!next || next->value <= offset) {
-        break;
-      }
-      offset = next->value;
-    }
-  }
-  for (const u32 end : ends) {
-    if (!commands.contains(end)) {
-      commands.emplace(end,
-                       DecodedBytecodeCommand{
-                           .range = scope.reader.range(end, 0),
-                           .flow = {.continuation = Address{end}, .defaultTransition = CommandTransition::return_()},
-                           .presentation = {.label = "Phrase End",
-                                            .kind = "sculpt-soft-snes-phrase-end",
-                                            .semantic = SequenceSemantic::Return,
-                                            .playback = CommandPlaybackStatus::AffectsControlFlow},
-                       });
-    }
-  }
-  auto session = scope.begin(number, start);
-  for (auto& [address, command] : commands) {
-    if (!command.execution.body) {
-      command.execution.body = [](void* state) {
-        auto& playback = *static_cast<Playback*>(state);
-        if (const auto boundary = playback.phraseBoundary()) {
-          return *boundary;
-        }
-        return playback.vm.end();
-      };
-    }
-    session.findOrAppend(std::move(command), address);
-  }
-  return session.finish();
-}
-
 }  // namespace
 
 TrackProgram decodeLateTrack(const TrackDecodeScope& scope, const Layout& layout, u32 number, u32 start,
                              std::vector<Diagnostic>* diagnostics, std::set<u8>* referencedPrograms) {
-  return decodeLateTrackImpl(scope, number, start, layout, diagnostics, referencedPrograms);
+  return decodePhraseTrack<Playback>(
+      scope, number, start, diagnostics, [&](u32 offset, bool& fine, std::vector<Phrase>& phrases) {
+        return decodeCommand(scope.reader, offset, Address{start}, fine, layout, phrases, diagnostics, referencedPrograms);
+      });
 }
 
 SequenceRuntime makeLateRuntime(RuntimeConfig config) {

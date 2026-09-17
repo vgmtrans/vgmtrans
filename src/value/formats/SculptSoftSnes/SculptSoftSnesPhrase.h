@@ -6,8 +6,10 @@
 #pragma once
 
 #include "value/formats/SculptSoftSnes/SculptSoftSnes.h"
+#include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/SequenceVm.h"
 #include <algorithm>
+#include <map>
 #include <utility>
 
 namespace vgmtrans::formats::sculpt_soft_snes {
@@ -91,6 +93,88 @@ public:
 private:
   std::vector<PhraseFrame> frames_;
 };
+
+// Phrase returns are address comparisons, not opcodes. Decode each bounded
+// phrase once per entry/end pair, retaining the first interpretation of each
+// command. Only the late decoder changes the fine-pitch stream state.
+template <class Playback, class DecodeCommand>
+[[nodiscard]] core::TrackProgram decodePhraseTrack(const core::TrackDecodeScope& scope, u32 number, u32 start,
+                                                   std::vector<core::Diagnostic>* diagnostics,
+                                                   DecodeCommand decodeCommand) {
+  using namespace core;
+  struct Decoded {
+    DecodedBytecodeCommand command;
+    bool fine = false;
+    bool nextFine = false;
+  };
+  std::map<u32, Decoded> commands;
+  std::vector<std::pair<u32, u32>> pending{{start, kAramSize}};
+  std::set<u32> ends;
+  std::set<std::pair<u32, u32>> visited;
+  while (!pending.empty() && commands.size() < kCommandLimit) {
+    const auto [begin, end] = pending.back();
+    pending.pop_back();
+    if (!visited.emplace(begin, end).second) {
+      continue;
+    }
+    bool fine = false;
+    for (u32 offset = begin; offset < end && commands.size() < kCommandLimit;) {
+      auto existing = commands.find(offset);
+      if (existing == commands.end()) {
+        const bool initialFine = fine;
+        std::vector<Phrase> phrases;
+        auto command = decodeCommand(offset, fine, phrases);
+        for (const auto& phrase : phrases) {
+          pending.emplace_back(phrase.start.value, phrase.end.value);
+          ends.insert(phrase.end.value);
+        }
+        existing = commands.emplace(offset, Decoded{std::move(command), initialFine, fine}).first;
+      } else if (existing->second.fine != fine) {
+        if (diagnostics) {
+          diagnostics->push_back(Diagnostic{.severity = Severity::Warning,
+                                            .message = "Conflicting SculptSoftSnes fine-pitch stream interpretations",
+                                            .range = scope.reader.range(offset, 1)});
+        }
+        break;
+      }
+      // Reuse the decoded state change; do not interpret the opcode a second time.
+      fine = existing->second.nextFine;
+      const auto next = existing->second.command.flow.discoveryContinuation();
+      if (!next || next->value <= offset) {
+        break;
+      }
+      offset = next->value;
+    }
+  }
+  for (const u32 end : ends) {
+    commands.try_emplace(end, Decoded{
+        .command = {.range = scope.reader.range(end, 0),
+                    .flow = {.continuation = Address{end}, .defaultTransition = CommandTransition::return_()},
+                    .presentation = {.label = "Phrase End",
+                                     .kind = "sculpt-soft-snes-phrase-end",
+                                     .semantic = SequenceSemantic::Return,
+                                     .playback = CommandPlaybackStatus::AffectsControlFlow}},
+    });
+  }
+  auto session = scope.begin(number, start);
+  for (auto& [address, decoded] : commands) {
+    auto& command = decoded.command;
+    // Fine-pitch bytes are inside a command stream; ordinary commands and
+    // synthetic phrase ends must check the exclusive boundary before executing.
+    if (!decoded.fine || !command.execution.body) {
+      auto body = std::move(command.execution.body);
+      command.execution.body = [body = std::move(body)](void* state) {
+        auto& playback = *static_cast<Playback*>(state);
+        if (const auto boundary = playback.phraseBoundary()) {
+          return *boundary;
+        }
+        return body ? body(state) : playback.vm.end();
+      };
+    }
+    session.findOrAppend(std::move(command), address);
+  }
+  return session.finish();
+}
 
 template <class Event>
 Phrase readPhrase(Event& event, std::set<u8>* referencedPrograms) {
