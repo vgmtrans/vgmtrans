@@ -9,6 +9,7 @@
 #include "value/sequence/BytecodeDecode.h"
 #include "value/model/SourceMap.h"
 
+#include <algorithm>
 #include <array>
 #include <limits>
 #include <map>
@@ -16,6 +17,7 @@
 #include <span>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace vgmtrans::core {
 
@@ -87,7 +89,35 @@ struct TrackDecodeScope {
     }
     auto session = begin(trackIndex, static_cast<u32>(startAddresses.front().value));
     const u32 end = std::min(static_cast<u32>(reader.size()), bytecodeEnd);
-    decodeBytecode(reader, end, startAddresses, maxCommands, session, std::move(decodeCommand));
+    std::vector<u32> pendingBlocks;
+    pendingBlocks.reserve(startAddresses.size());
+    for (const Address start : startAddresses) {
+      pendingBlocks.push_back(static_cast<u32>(start.value));
+    }
+    while (!pendingBlocks.empty() && session.commands_.size() < maxCommands) {
+      u32 offset = pendingBlocks.back();
+      pendingBlocks.pop_back();
+      while (offset < end && !session.hasCommand(offset) && session.commands_.size() < maxCommands) {
+        auto decoded = decodeCommand(offset);
+        // Jump and call targets start new blocks. The sequential continuation
+        // stays in this inner loop, preserving discovery order for stateful decoders.
+        if (const auto target = decoded.flow.defaultDestination();
+            target && target->value < end && !session.hasCommand(target->value)) {
+          pendingBlocks.push_back(target->value);
+        }
+        for (const Address target : decoded.discoveryTargets) {
+          if (target.value < end && !session.hasCommand(target.value)) {
+            pendingBlocks.push_back(target.value);
+          }
+        }
+        const auto next = decoded.flow.discoveryContinuation();
+        session.findOrAppend(std::move(decoded), offset);
+        if (!next) {
+          break;
+        }
+        offset = next->value;
+      }
+    }
     return session.finish();
   }
 };
