@@ -29,7 +29,6 @@ struct ActiveNoteState {
   bool sustain = false;
 };
 
-struct VmApiAccess;
 struct VmTrackRuntime;
 [[nodiscard]] std::any analyzeSequenceProgram(const SequenceVm& vm, const SequenceProgram& program,
                                               std::vector<Diagnostic>* diagnostics);
@@ -339,7 +338,7 @@ public:
   void diagnostic(Diagnostic diagnostic);
 
 private:
-  friend struct detail::VmApiAccess;
+  friend struct detail::VmTrackRuntime;
 
   VmApi(detail::VmTrackRuntime& runtime, PerformanceSequence& sequence, const SourceCommand& command);
 

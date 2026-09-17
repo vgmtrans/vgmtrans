@@ -31,12 +31,9 @@ struct VmTrackRuntime {
   // Remaining plays distinguish legitimate finite passes in loop detection.
   std::map<u8, u32> repeat;
   CommandId lastCommand;
-};
 
-struct VmApiAccess {
-  [[nodiscard]] static VmApi make(VmTrackRuntime& runtime, PerformanceSequence& sequence,
-                                  const SourceCommand& command) {
-    return VmApi(runtime, sequence, command);
+  [[nodiscard]] VmApi api(PerformanceSequence& sequence, const SourceCommand& command) {
+    return VmApi(*this, sequence, command);
   }
 };
 
@@ -488,7 +485,7 @@ private:
     }
     const SourceCommand& command = track_.commands.at(commandIndex);
     auto out = outputAt(runtime_.tick, CommandId{commandIndex}, command.annotation);
-    VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
+    VmApi vm = runtime_.api(targetSequence_, command);
     sequenceRuntime_.tick(command, programState_, trackState_, out, vm);
   }
 
@@ -503,7 +500,7 @@ private:
       return;
     }
     auto out = outputAt(runtime_.tick, CommandId{commandIndex}, command.annotation);
-    VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
+    VmApi vm = runtime_.api(targetSequence_, command);
     if (!sequenceRuntime_.readyDuringWait(command, programState_, trackState_, out, vm)) {
       return;
     }
@@ -536,7 +533,7 @@ private:
     const size_t firstEvent = performanceTrack_.events.size();
     const size_t firstAutomation = performanceTrack_.automations.size();
     auto out = outputAt(beginTick, commandId, command.annotation);
-    VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
+    VmApi vm = runtime_.api(targetSequence_, command);
     const Effects effects = sequenceRuntime_.execute(command, programState_, trackState_, out, vm);
     if (duringWait) {
       if (effects.advanceTicks != 0 || effects.flowOverride ||
@@ -1034,17 +1031,14 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
           .initialTempoMicrosecondsPerQuarter = behavior.initialTempoMicrosecondsPerQuarter,
       };
       renderSemanticPass(prepass);
-      if (analyzedProgramState != nullptr) {
-        sequence.diagnostics = std::move(prepass.diagnostics);
-      }
       if (runtime.finishPrepass != nullptr) {
         runtime.finishPrepass(programState);
       }
-    }
-    if (analyzedProgramState != nullptr) {
-      // Analysis already collected its result; only rendering needs an output pass.
-      *analyzedProgramState = std::move(programState);
-      return sequence;
+      if (analyzedProgramState != nullptr) {
+        // Analysis needs only this pass; its caller retains the state and diagnostics.
+        *analyzedProgramState = std::move(programState);
+        return prepass;
+      }
     }
     renderSemanticPass(sequence);
     if (runtime.finalizePerformance != nullptr) {
