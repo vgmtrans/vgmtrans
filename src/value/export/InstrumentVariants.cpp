@@ -41,28 +41,12 @@ struct InstrumentRef {
   friend bool operator==(const InstrumentRef&, const InstrumentRef&) noexcept = default;
 };
 
-using EnvelopeMember = std::optional<double> Envelope::*;
-
-struct EnvelopeField {
-  EnvelopeFields field;
-  EnvelopeMember member;
-};
-
-constexpr std::array envelopeFields{
-    EnvelopeField{EnvelopeFields::Attack, &Envelope::attackSeconds},
-    EnvelopeField{EnvelopeFields::Hold, &Envelope::holdSeconds},
-    EnvelopeField{EnvelopeFields::Decay, &Envelope::decaySeconds},
-    EnvelopeField{EnvelopeFields::SecondDecay, &Envelope::secondDecaySeconds},
-    EnvelopeField{EnvelopeFields::Release, &Envelope::releaseSeconds},
-    EnvelopeField{EnvelopeFields::Sustain, &Envelope::sustainAmplitude},
-};
-
 void applyEnvelopeUpdate(EnvelopeOverride& state, const EnvelopeUpdate& update) {
   if (!update.values) {
     state.fields = static_cast<EnvelopeFields>(static_cast<u8>(state.fields) & ~static_cast<u8>(update.fields));
     return;
   }
-  for (const auto [field, member] : envelopeFields) {
+  for (const auto& [field, member] : detail::envelopeFields) {
     if (hasEnvelopeField(update.fields, field)) {
       state.values.*member = (*update.values).*member;
     }
@@ -71,7 +55,7 @@ void applyEnvelopeUpdate(EnvelopeOverride& state, const EnvelopeUpdate& update) 
 }
 
 [[nodiscard]] Envelope applyEnvelopeOverride(Envelope envelope, const EnvelopeOverride& state) {
-  for (const auto [field, member] : envelopeFields) {
+  for (const auto& [field, member] : detail::envelopeFields) {
     if (hasEnvelopeField(state.fields, field)) {
       envelope.*member = state.values.*member;
     }
@@ -84,7 +68,7 @@ void applyEnvelopeUpdate(EnvelopeOverride& state, const EnvelopeUpdate& update) 
   if ((static_cast<u8>(update.fields) & ~knownFields) != 0 || !update.values) {
     return (static_cast<u8>(update.fields) & ~knownFields) == 0;
   }
-  for (const auto [field, member] : envelopeFields) {
+  for (const auto& [field, member] : detail::envelopeFields) {
     if (!hasEnvelopeField(update.fields, field)) {
       continue;
     }

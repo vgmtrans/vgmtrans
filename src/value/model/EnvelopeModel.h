@@ -8,6 +8,8 @@
 
 #include "value/base/CoreTypes.h"
 
+#include <algorithm>
+#include <array>
 #include <optional>
 #include <utility>
 
@@ -30,12 +32,6 @@ struct Envelope {
   friend bool operator==(const Envelope&, const Envelope&) noexcept = default;
 };
 
-[[nodiscard]] inline bool hasExplicitEnvelope(const Envelope& envelope) {
-  return envelope.attackSeconds.has_value() || envelope.holdSeconds.has_value() || envelope.decaySeconds.has_value() ||
-         envelope.secondDecaySeconds.has_value() || envelope.releaseSeconds.has_value() ||
-         envelope.sustainAmplitude.has_value();
-}
-
 // Fields are explicit because an absent optional can mean either "clear this
 // stage" or simply "this command did not touch this stage".
 enum class EnvelopeFields : u8 {
@@ -48,6 +44,24 @@ enum class EnvelopeFields : u8 {
   Sustain = 1 << 5,
   All = 0x3f,
 };
+
+namespace detail {
+
+inline constexpr std::array envelopeFields{
+    std::pair{EnvelopeFields::Attack, &Envelope::attackSeconds},
+    std::pair{EnvelopeFields::Hold, &Envelope::holdSeconds},
+    std::pair{EnvelopeFields::Decay, &Envelope::decaySeconds},
+    std::pair{EnvelopeFields::SecondDecay, &Envelope::secondDecaySeconds},
+    std::pair{EnvelopeFields::Release, &Envelope::releaseSeconds},
+    std::pair{EnvelopeFields::Sustain, &Envelope::sustainAmplitude},
+};
+
+}  // namespace detail
+
+[[nodiscard]] inline bool hasExplicitEnvelope(const Envelope& envelope) {
+  return std::ranges::any_of(detail::envelopeFields,
+                             [&](const auto& field) { return (envelope.*field.second).has_value(); });
+}
 
 [[nodiscard]] constexpr EnvelopeFields operator|(EnvelopeFields left, EnvelopeFields right) noexcept {
   return static_cast<EnvelopeFields>(static_cast<u8>(left) | static_cast<u8>(right));

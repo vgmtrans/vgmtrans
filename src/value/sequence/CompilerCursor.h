@@ -89,23 +89,10 @@ template <class Playback, class Callable, class... Arguments>
 
 template <class Playback, EnvelopeFields Field>
 void emitEnvelopeField(Playback& playback, double value, VoiceEnvelopeScope scope) {
-  static_assert(Field == EnvelopeFields::Attack || Field == EnvelopeFields::Hold || Field == EnvelopeFields::Decay ||
-                Field == EnvelopeFields::SecondDecay || Field == EnvelopeFields::Release ||
-                Field == EnvelopeFields::Sustain);
+  constexpr auto entry = std::ranges::find_if(envelopeFields, [](const auto& field) { return field.first == Field; });
+  static_assert(entry != envelopeFields.end(), "A compiled envelope field must name one stage");
   Envelope envelope;
-  if constexpr (Field == EnvelopeFields::Attack) {
-    envelope.attackSeconds = value;
-  } else if constexpr (Field == EnvelopeFields::Hold) {
-    envelope.holdSeconds = value;
-  } else if constexpr (Field == EnvelopeFields::Decay) {
-    envelope.decaySeconds = value;
-  } else if constexpr (Field == EnvelopeFields::SecondDecay) {
-    envelope.secondDecaySeconds = value;
-  } else if constexpr (Field == EnvelopeFields::Release) {
-    envelope.releaseSeconds = value;
-  } else {
-    envelope.sustainAmplitude = value;
-  }
+  envelope.*entry->second = value;
   playback.out.updateEnvelope(std::move(envelope), Field, scope);
 }
 
