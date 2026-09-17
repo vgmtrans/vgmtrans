@@ -26,7 +26,6 @@ namespace {
 
 struct PortamentoSegment {
   PerformanceEventHeader header;
-  u64 startTick = 0;
   u64 endTick = 0;
   double key = 0.0;
   // Pitch bend is channel-relative to the MIDI note that actually started the
@@ -160,7 +159,7 @@ struct PitchBendLayer {
 [[nodiscard]] double bendBaseKeyAt(const NoteSpan& note, u64 tick) {
   double key = note.bendBaseKey;
   for (const auto& segment : note.portamentoSegments) {
-    if (segment.startTick > tick) {
+    if (segment.header.tick > tick) {
       break;
     }
     key = segment.bendBaseKey;
@@ -419,8 +418,8 @@ void resolvePitchBends(std::span<const PitchBendWrite> writes, PitchBendLayerId 
       }
     }
     for (const PortamentoSegment& segment : note.portamentoSegments) {
-      if (segment.startTick >= startTick && segment.startTick <= endTick) {
-        sampleTicks.push_back(segment.startTick);
+      if (segment.header.tick >= startTick && segment.header.tick <= endTick) {
+        sampleTicks.push_back(segment.header.tick);
       }
     }
     std::ranges::sort(sampleTicks);
@@ -541,7 +540,6 @@ void beginPortamentoRewrite(NoteSpan& note) {
   }
   note.portamentoSegments.push_back(PortamentoSegment{
       .header = note.source.header,
-      .startTick = note.source.header.tick,
       .endTick = note.endTick,
       .key = note.source.key,
       .bendBaseKey = note.bendBaseKey,
@@ -564,7 +562,7 @@ void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
 
   const u64 clampedStart = std::min(startTick, note.endTick);
   std::erase_if(note.portamentoSegments, [=](const PortamentoSegment& segment) {
-    return segment.startTick >= clampedStart || segment.endTick <= segment.startTick;
+    return segment.header.tick >= clampedStart || segment.endTick <= segment.header.tick;
   });
   for (auto& segment : note.portamentoSegments) {
     if (segment.endTick > clampedStart) {
@@ -577,14 +575,14 @@ void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
     }
   }
   if (clampedStart < note.endTick) {
-    note.portamentoSegments.push_back(PortamentoSegment{
+    auto& segment = note.portamentoSegments.emplace_back(PortamentoSegment{
         .header = automation.header,
-        .startTick = clampedStart,
         .endTick = note.endTick,
         .key = transition.targetKey,
         .bendBaseKey = transition.targetKey,
         .restartsEnvelope = false,
     });
+    segment.header.tick = clampedStart;
   }
 }
 
@@ -704,16 +702,15 @@ void appendSourceEvents(std::vector<PerformanceEvent>& events, const Performance
 
   for (const auto& note : notes) {
     for (const auto& segment : note.portamentoSegments) {
-      if (segment.endTick <= segment.startTick) {
+      if (segment.endTick <= segment.header.tick) {
         continue;
       }
       auto event = note.source;
       event.header = segment.header;
-      event.header.tick = segment.startTick;
       event.header.sequence = nextSequence++;
       event.key = segment.key;
       event.durationTicks =
-          static_cast<u32>(std::min<u64>(segment.endTick - segment.startTick, std::numeric_limits<u32>::max()));
+          static_cast<u32>(std::min<u64>(segment.endTick - segment.header.tick, std::numeric_limits<u32>::max()));
       event.extendsPrevious = segment.extendsPrevious;
       event.restartsEnvelope = segment.restartsEnvelope;
       events.emplace_back(std::move(event));

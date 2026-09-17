@@ -2968,6 +2968,17 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   ordered admission, missing runtime errors, and source-backed diagnostics.
   Logs: `cmake-build-debug/value-audit/scan-admission-passes-{build,tests}.log`.
 
+## Keep one portamento segment start time
+
+- Removed the separate `PortamentoSegment::startTick`. Each segment's event
+  header now receives its actual start when the segment is created; bend
+  sampling, trimming, and output all read that same tick.
+- Removed three production lines and the deferred synchronization between two
+  time fields. Source attribution and event sequencing are unchanged.
+- Validation: warning-free Debug build; all 21 CTest targets pass (10.63 s),
+  including delayed/mixed pitch transitions, linked voices, and physical limits.
+  Logs: `cmake-build-debug/value-audit/portamento-segment-time-{build,tests}.log`.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual
