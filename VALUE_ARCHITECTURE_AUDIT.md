@@ -2779,6 +2779,22 @@ checks independent pan/envelopes, reset behavior, and active-voice diagnostics
 after an instrument change. The full Debug build and all 21 CTest targets pass
 without compiler warnings.
 
+## Remove export-only intermediates from playback and synth dispatch
+
+Deleted `SynthCollectionView`: synth dispatch now accepts the existing
+`SynthExportInput` directly. Each caller states its actual inputs and policies,
+without translating through another nearly identical view and a seven-argument
+adapter. Playback now uses its own request and consumes MIDI/SoundFont results
+directly, removing the temporary `ExportRequest` and two file-artifact wrappers
+whose filenames and media types were discarded.
+
+This removes nine production lines, one input representation, and three
+unnecessary playback intermediates. Canonical performance ownership, paired
+modulation policy, standalone-bank defaults, and failure diagnostics are
+preserved. The full Debug build and all 21 CTest targets pass without compiler
+warnings, including playback failure cases, used-instrument filtering, and
+collection export policy coverage.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual
