@@ -2570,6 +2570,22 @@ redundant command counter. An ignored ASan/UBSan differential probe compares
 bounds, and command caps. Callback order, emitted command order, entry points,
 and limit behavior match. All 21 CTest targets pass.
 
+## Use the same scan work loop for one worker
+
+The scanner previously special-cased a worker count of one by scanning index
+zero and returning. On a machine reporting one hardware thread, multiple
+applicable formats therefore silently lost every scan after the first.
+Removing this shortcut lets the existing task loop cover all worker counts;
+with one worker it runs serially and creates no asynchronous workers.
+
+This removes **5 production lines** and fixes the skipped-format behavior
+without adding a thread-count setting or another execution path. An ignored
+ASan/UBSan probe runs the existing session tests with
+`std::thread::hardware_concurrency()` replaced at link time to return one.
+The old implementation fails the assertion that an unknown-format source is
+offered to every processor; the simplified implementation passes all session
+tests. All 21 CTest targets also pass in the normal build.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding

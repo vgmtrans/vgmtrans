@@ -85,11 +85,6 @@ void runFormatScans(std::span<FormatScan> scans, const ScanInput& input) {
     }
   };
 
-  if (workerCount == 1) {
-    scanAt(0);
-    return;
-  }
-
   std::atomic_size_t nextTask{0};
   const auto work = [&] {
     while (true) {
