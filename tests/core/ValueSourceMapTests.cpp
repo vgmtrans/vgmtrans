@@ -164,6 +164,25 @@ void sourceMapRejectsDuplicateAnnotationIds() {
   expect(builderThrew, "source map builder should reject duplicate annotation ids from its allocator");
 }
 
+void annotationViewsOutliveJoinedSourceMaps() {
+  SharedSequence<SourceAnnotation> retained;
+  const SourceAnnotation* first = nullptr;
+  {
+    SessionState state;
+    for (u32 id : {1u, 2u}) {
+      state.appendScan(SourceId{id}, ScanResult{.sourceMap = SourceMap{{SourceAnnotation{
+          .id = SourceAnnotationId{id},
+          .range = SourceRange{.source = SourceId{id}, .size = 1},
+          .label = std::to_string(id),
+      }}}});
+    }
+    retained = state.sourceMap().annotations();
+    first = state.sourceMap().find(SourceAnnotationId{1});
+  }
+  expect(retained.size() == 2 && &retained.front() == first && retained[0].label == "1" && retained[1].label == "2",
+         "an annotation view must retain ordered chunk values after the session and source-map indexes are gone");
+}
+
 void sessionStateRejectsCrossScanAnnotationIdCollisions() {
   SessionState state;
   state.appendScan(SourceId{1}, ScanResult{
@@ -516,6 +535,7 @@ void runValueSourceMapTests() {
   sourceMapBuilderRecordsAnnotationsFieldsAndLinks();
   sourceAnnotationsCarryOutlinePolicyForTreeConsumers();
   sourceMapRejectsDuplicateAnnotationIds();
+  annotationViewsOutliveJoinedSourceMaps();
   sessionStateRejectsCrossScanAnnotationIdCollisions();
   sessionStatePreflightsSourceAnnotationIdCollisions();
   sessionStateReleasesAnnotationIdsWithRemovedSources();

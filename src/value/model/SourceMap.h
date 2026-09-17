@@ -254,9 +254,10 @@ public:
 private:
   friend class SessionState;
 
-  struct Index {
-    explicit Index(const std::vector<SourceAnnotation>& annotations);
+  struct Part {
+    explicit Part(std::vector<SourceAnnotation> annotations);
 
+    std::shared_ptr<const std::vector<SourceAnnotation>> annotations;
     std::unordered_map<u32, size_t> annotationsById;
     std::unordered_map<u32, std::vector<SourceAnnotationId>> annotationsBySource;
     std::unordered_map<u32, std::vector<SourceAnnotationId>> annotationsByParent;
@@ -264,15 +265,10 @@ private:
     std::unordered_map<u32, std::vector<SourceAnnotationId>> annotationsByAsset;
   };
 
-  struct Part {
-    std::shared_ptr<const std::vector<SourceAnnotation>> annotations;
-    std::shared_ptr<const Index> index;
-  };
-
   struct Storage {
-    explicit Storage(std::vector<Part> parts);
+    explicit Storage(std::vector<std::shared_ptr<const Part>> parts);
 
-    std::vector<Part> parts;
+    std::vector<std::shared_ptr<const Part>> parts;
     SharedSequence<SourceAnnotation> annotations;
   };
 

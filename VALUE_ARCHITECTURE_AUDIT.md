@@ -3045,6 +3045,22 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   (10.79 s). Logs: `cmake-build-debug/value-audit/shared-envelope-fields-*`,
   `envelope-and-source-storage-*`, and `shared-storage-final-*`.
 
+## Keep source-map indexes with their chunk
+
+- Removed `SourceMap::Index` as a separately shared object. Each immutable
+  `Part` constructs and owns its annotation indexes alongside the shared values;
+  joined maps retain one pointer per part instead of separately pairing values
+  and indexes. This removes one private representation and an ownership pairing
+  without adding allocations or rebuilding indexes during joins.
+- Annotation sequences still retain the underlying values independently.
+  Added a regression that destroys the session and joined map while retaining
+  an annotation view, checking order, contents, and pointer identity. Existing
+  snapshot/removal tests cover unaffected chunks and earlier revisions.
+- Removed three production lines. Validation: full Debug rebuild; all 21 CTest
+  targets pass (10.79 s after the final incremental build). Logs:
+  `cmake-build-debug/value-audit/envelope-and-source-storage-*` and
+  `shared-storage-final-*`.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual

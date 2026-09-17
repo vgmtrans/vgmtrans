@@ -73,32 +73,34 @@ ObjectRef ObjectRefs::misc(AssetId miscAsset) {
   return ObjectRef{.kind = ObjectKind::Misc, .asset = miscAsset};
 }
 
-SourceMap::Index::Index(const std::vector<SourceAnnotation>& annotations) {
-  annotationsById.reserve(annotations.size());
-  for (size_t i = 0; i < annotations.size(); ++i) {
-    const auto id = annotations[i].id;
+SourceMap::Part::Part(std::vector<SourceAnnotation> annotationValues)
+    : annotations(std::make_shared<const std::vector<SourceAnnotation>>(std::move(annotationValues))) {
+  const auto& values = *annotations;
+  annotationsById.reserve(values.size());
+  for (size_t i = 0; i < values.size(); ++i) {
+    const auto id = values[i].id;
     if (id.valid()) {
       const auto [_, inserted] = annotationsById.emplace(id.value, i);
       if (!inserted) {
         throw std::logic_error("Duplicate SourceAnnotationId in SourceMap");
       }
     }
-    if (annotations[i].range.source.valid()) {
-      annotationsBySource[annotations[i].range.source.value].push_back(id);
+    if (values[i].range.source.valid()) {
+      annotationsBySource[values[i].range.source.value].push_back(id);
     }
-    if (annotations[i].parent && annotations[i].parent->valid()) {
-      annotationsByParent[annotations[i].parent->value].push_back(id);
+    if (values[i].parent && values[i].parent->valid()) {
+      annotationsByParent[values[i].parent->value].push_back(id);
     }
   }
 
   // Ownership is inherited through parent annotations. Resolve each chain once
   // while building this immutable index; malformed cycles are reported by scan
   // validation before the map can enter session state.
-  assetOwnerByAnnotation.resize(annotations.size());
-  std::vector<bool> visited(annotations.size());
+  assetOwnerByAnnotation.resize(values.size());
+  std::vector<bool> visited(values.size());
   std::vector<size_t> path;
-  for (size_t root = 0; root < annotations.size(); ++root) {
-    if (!annotations[root].id.valid() || visited[root]) {
+  for (size_t root = 0; root < values.size(); ++root) {
+    if (!values[root].id.valid() || visited[root]) {
       continue;
     }
 
@@ -115,7 +117,7 @@ SourceMap::Index::Index(const std::vector<SourceAnnotation>& annotations) {
 
       visited[current] = true;
       path.push_back(current);
-      const auto& annotation = annotations[current];
+      const auto& annotation = values[current];
       if (annotation.owner && annotation.owner->asset.valid()) {
         owner = annotation.owner->asset;
         break;
@@ -135,18 +137,18 @@ SourceMap::Index::Index(const std::vector<SourceAnnotation>& annotations) {
     }
   }
 
-  for (size_t i = 0; i < annotations.size(); ++i) {
-    if (annotations[i].id.valid() && assetOwnerByAnnotation[i]) {
-      annotationsByAsset[assetOwnerByAnnotation[i]->value].push_back(annotations[i].id);
+  for (size_t i = 0; i < values.size(); ++i) {
+    if (values[i].id.valid() && assetOwnerByAnnotation[i]) {
+      annotationsByAsset[assetOwnerByAnnotation[i]->value].push_back(values[i].id);
     }
   }
 }
 
-SourceMap::Storage::Storage(std::vector<Part> partsValue) : parts(std::move(partsValue)) {
+SourceMap::Storage::Storage(std::vector<std::shared_ptr<const Part>> partsValue) : parts(std::move(partsValue)) {
   std::vector<std::shared_ptr<const std::vector<SourceAnnotation>>> chunks;
   chunks.reserve(parts.size());
   for (const auto& part : parts) {
-    chunks.push_back(part.annotations);
+    chunks.push_back(part->annotations);
   }
   annotations = detail::SharedSequenceAccess::fromChunks(std::move(chunks));
 }
@@ -159,9 +161,8 @@ SourceMap::SourceMap(std::vector<SourceAnnotation> annotations) {
     storage_ = emptyStorage();
     return;
   }
-  auto values = std::make_shared<const std::vector<SourceAnnotation>>(std::move(annotations));
-  auto index = std::make_shared<const Index>(*values);
-  storage_ = std::make_shared<const Storage>(std::vector<Part>{{std::move(values), std::move(index)}});
+  storage_ = std::make_shared<const Storage>(
+      std::vector<std::shared_ptr<const Part>>{std::make_shared<const Part>(std::move(annotations))});
 }
 
 SourceMap::SourceMap(std::shared_ptr<const Storage> storage) : storage_(std::move(storage)) {
@@ -177,9 +178,9 @@ const SharedSequence<SourceAnnotation>& SourceMap::annotations() const noexcept 
 
 const SourceAnnotation* SourceMap::find(SourceAnnotationId id) const {
   for (const auto& part : storage_->parts) {
-    const auto found = part.index->annotationsById.find(id.value);
-    if (found != part.index->annotationsById.end()) {
-      return &(*part.annotations)[found->second];
+    const auto found = part->annotationsById.find(id.value);
+    if (found != part->annotationsById.end()) {
+      return &(*part->annotations)[found->second];
     }
   }
   return nullptr;
@@ -196,8 +197,8 @@ const SourceAnnotation& SourceMap::get(SourceAnnotationId id) const {
 std::vector<SourceAnnotationId> SourceMap::annotationsForSource(SourceId source) const {
   std::vector<SourceAnnotationId> annotations;
   for (const auto& part : storage_->parts) {
-    const auto found = part.index->annotationsBySource.find(source.value);
-    if (found != part.index->annotationsBySource.end()) {
+    const auto found = part->annotationsBySource.find(source.value);
+    if (found != part->annotationsBySource.end()) {
       annotations.insert(annotations.end(), found->second.begin(), found->second.end());
     }
   }
@@ -231,9 +232,9 @@ std::optional<AssetId> SourceMap::assetOwner(SourceAnnotationId id) const {
     return std::nullopt;
   }
   for (const auto& part : storage_->parts) {
-    const auto found = part.index->annotationsById.find(id.value);
-    if (found != part.index->annotationsById.end()) {
-      return part.index->assetOwnerByAnnotation[found->second];
+    const auto found = part->annotationsById.find(id.value);
+    if (found != part->annotationsById.end()) {
+      return part->assetOwnerByAnnotation[found->second];
     }
   }
   return std::nullopt;
@@ -245,8 +246,8 @@ std::vector<SourceAnnotationId> SourceMap::annotationsForAsset(AssetId asset) co
     return annotations;
   }
   for (const auto& part : storage_->parts) {
-    const auto found = part.index->annotationsByAsset.find(asset.value);
-    if (found != part.index->annotationsByAsset.end()) {
+    const auto found = part->annotationsByAsset.find(asset.value);
+    if (found != part->annotationsByAsset.end()) {
       annotations.insert(annotations.end(), found->second.begin(), found->second.end());
     }
   }
@@ -256,8 +257,8 @@ std::vector<SourceAnnotationId> SourceMap::annotationsForAsset(AssetId asset) co
 std::vector<SourceAnnotationId> SourceMap::childrenOf(SourceAnnotationId parent) const {
   std::vector<SourceAnnotationId> children;
   for (const auto& part : storage_->parts) {
-    const auto found = part.index->annotationsByParent.find(parent.value);
-    if (found != part.index->annotationsByParent.end()) {
+    const auto found = part->annotationsByParent.find(parent.value);
+    if (found != part->annotationsByParent.end()) {
       children.insert(children.end(), found->second.begin(), found->second.end());
     }
   }
@@ -288,7 +289,7 @@ SourceMap SourceMap::join(std::span<const SourceMap> maps) {
     partCount += map.storage_->parts.size();
   }
 
-  std::vector<Part> parts;
+  std::vector<std::shared_ptr<const Part>> parts;
   parts.reserve(partCount);
   for (const auto& map : maps) {
     parts.insert(parts.end(), map.storage_->parts.begin(), map.storage_->parts.end());
@@ -300,7 +301,7 @@ SourceMap SourceMap::join(std::span<const SourceMap> maps) {
 }
 
 std::shared_ptr<const SourceMap::Storage> SourceMap::emptyStorage() {
-  static const auto empty = std::make_shared<const Storage>(std::vector<Part>{});
+  static const auto empty = std::make_shared<const Storage>(std::vector<std::shared_ptr<const Part>>{});
   return empty;
 }
 
