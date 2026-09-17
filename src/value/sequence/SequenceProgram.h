@@ -33,18 +33,6 @@ enum class PitchTransitionRenderingHint {
   PitchBend,
 };
 
-using CreateProgramState = std::function<std::any(const SequenceProgram&)>;
-using CreateTrackState = std::function<std::any(TrackStateContext)>;
-using ExecuteCommand = Effects (*)(const SourceCommand&, std::any& programState, std::any& trackState,
-                                   PerformanceEmitter& out, VmApi& vm);
-using CommandReadyDuringWait = bool (*)(const SourceCommand&, std::any& programState, std::any& trackState,
-                                        PerformanceEmitter& out, VmApi& vm);
-using TickTrackState = void (*)(const SourceCommand&, std::any& programState, std::any& trackState,
-                                PerformanceEmitter& out, VmApi& vm);
-using FinishPrepass = void (*)(std::any& programState);
-using BeginTrackSection = void (*)(std::any& trackState);
-using FinalizePerformance = void (*)(std::any& programState, PerformanceSequence& performance);
-
 // A parsed program owns the exact process-local runtime that executes it.
 // Only state creation is closure-backed so immutable typed format settings can
 // be captured without a generic configuration schema.
@@ -52,14 +40,17 @@ struct SequenceRuntime {
   // Runtimes created by the same typed adapter family share this token even
   // when their state factories capture different immutable settings.
   const void* family = nullptr;
-  CreateProgramState createProgramState;
-  CreateTrackState createTrackState;
-  ExecuteCommand execute = nullptr;
-  CommandReadyDuringWait readyDuringWait = nullptr;
-  TickTrackState tick = nullptr;
-  FinishPrepass finishPrepass = nullptr;
-  BeginTrackSection beginTrackSection = nullptr;
-  FinalizePerformance finalizePerformance = nullptr;
+  std::function<std::any(const SequenceProgram&)> createProgramState;
+  std::function<std::any(TrackStateContext)> createTrackState;
+  Effects (*execute)(const SourceCommand&, std::any& programState, std::any& trackState,
+                     PerformanceEmitter& out, VmApi& vm) = nullptr;
+  bool (*readyDuringWait)(const SourceCommand&, std::any& programState, std::any& trackState,
+                          PerformanceEmitter& out, VmApi& vm) = nullptr;
+  void (*tick)(const SourceCommand&, std::any& programState, std::any& trackState,
+                PerformanceEmitter& out, VmApi& vm) = nullptr;
+  void (*finishPrepass)(std::any& programState) = nullptr;
+  void (*beginTrackSection)(std::any& trackState) = nullptr;
+  void (*finalizePerformance)(std::any& programState, PerformanceSequence& performance) = nullptr;
 
   [[nodiscard]] bool valid() const noexcept { return execute != nullptr; }
 };

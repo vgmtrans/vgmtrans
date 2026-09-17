@@ -1622,7 +1622,7 @@ u32 synthOnlySequenceExecutions = 0;
 Effects countSynthOnlySequenceExecution(const SourceCommand& command, std::any& programState, std::any& trackState,
                                         PerformanceEmitter& out, VmApi& vm) {
   ++synthOnlySequenceExecutions;
-  static const ExecuteCommand execute = probeSequenceRuntime().execute;
+  static const auto execute = probeSequenceRuntime().execute;
   return execute(command, programState, trackState, out, vm);
 }
 
