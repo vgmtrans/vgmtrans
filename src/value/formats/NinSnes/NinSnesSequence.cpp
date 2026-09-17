@@ -4,14 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/NinSnes/NinSnes.h"
+#include "value/formats/NinSnes/NinSnesPlaylist.h"
 #include "value/formats/NinSnes/NinSnesQuest.h"
+#include "value/formats/NinSnes/NinSnesSequencePrivate.h"
 
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompilerCursor.h"
-#include "value/sequence/SequenceLfo.h"
-#include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
 
 #include <fmt/format.h>
@@ -19,12 +17,9 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <map>
 #include <optional>
-#include <set>
 #include <span>
 #include <string>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -32,36 +27,10 @@ namespace vgmtrans::formats::nin_snes {
 
 using namespace core;
 
-namespace {
+namespace sequence {
 
 constexpr u32 kMaxTrackCommands = 32768;
-constexpr u8 kMelodicKeyCorrection = 24;
-constexpr u8 kIntelliDrumSlots = 16;
-constexpr u8 kDefaultTempo = 0x20;
 constexpr u16 kNoPercussionSourceNote = 0x100;
-
-struct PercussionEntry {
-  u8 patch = 0;
-  u8 note = 0;
-  u8 pan = 0;
-};
-
-struct EnvelopeRegisters {
-  u8 adsr1 = 0;
-  u8 adsr2 = 0;
-  u8 gain = 0;
-};
-
-struct RuntimeConfig {
-  ProfileId profile = ProfileId::Standard;
-  u8 tempoTimerTarget = kStandardTimerTarget;
-  std::optional<u8> fixedPercussionBase;
-  u8 intelliConditionalMask = 0;
-  std::vector<u8> programMap;
-  std::vector<u8> intelliTransposeTable;
-  std::array<PercussionEntry, kIntelliDrumSlots> intelliPercussionTable{};
-  std::map<u32, EnvelopeRegisters> instrumentEnvelopes;
-};
 
 [[nodiscard]] constexpr u32 drumInstrumentKey(u8 program) {
   return (0x7fu << 7) | program;
@@ -77,27 +46,10 @@ constexpr std::array<u8, 16> kVolumeStandard{
     0x19, 0x33, 0x4c, 0x66, 0x72, 0x7f, 0x8c, 0x99, 0xa5, 0xb2, 0xbf, 0xcc, 0xd8, 0xe5, 0xf2, 0xfc,
 };
 constexpr std::array<u8, 8> kDurationStandard{0x33, 0x66, 0x7f, 0x99, 0xb2, 0xcc, 0xe5, 0xfc};
-constexpr std::array<u8, 16> kVolumeIntelli{
-    0x19, 0x32, 0x4c, 0x65, 0x72, 0x7f, 0x8c, 0x98, 0xa5, 0xb2, 0xbf, 0xcb, 0xd8, 0xe5, 0xf2, 0xfc,
-};
-constexpr std::array<u8, 8> kDurationIntelli{0x32, 0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xfc};
 constexpr std::array<u8, 21> kPan{
     0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29, 0x34, 0x42, 0x51,
     0x5e, 0x67, 0x6e, 0x73, 0x77, 0x7a, 0x7c, 0x7d, 0x7e, 0x7f,
 };
-constexpr std::array<u8, 64> kIntelliFe3{
-    0x00, 0x0c, 0x19, 0x26, 0x33, 0x3f, 0x4c, 0x59, 0x66, 0x72, 0x75, 0x77, 0x70, 0x7c, 0x7f, 0x82,
-    0x84, 0x87, 0x89, 0x8c, 0x8e, 0x91, 0x93, 0x96, 0x99, 0x9b, 0x9e, 0xa0, 0xa3, 0xa5, 0xa8, 0xaa,
-    0xad, 0xaf, 0xb2, 0xb5, 0xb7, 0xba, 0xbc, 0xbf, 0xc1, 0xc4, 0xc6, 0xc9, 0xcc, 0xce, 0xd1, 0xd3,
-    0xd6, 0xd8, 0xdb, 0xdd, 0xe0, 0xe2, 0xe5, 0xe8, 0xea, 0xed, 0xef, 0xf2, 0xf4, 0xf7, 0xf9, 0xfc,
-};
-constexpr std::array<u8, 64> kIntelliFe4{
-    0x19, 0x26, 0x33, 0x3f, 0x4c, 0x59, 0x66, 0x6d, 0x70, 0x72, 0x75, 0x77, 0x70, 0x7c, 0x7f, 0x82,
-    0x84, 0x87, 0x89, 0x8c, 0x8e, 0x91, 0x93, 0x96, 0x99, 0x9b, 0x9e, 0xa0, 0xa3, 0xa5, 0xa8, 0xaa,
-    0xad, 0xaf, 0xb2, 0xb5, 0xb7, 0xba, 0xbc, 0xbf, 0xc1, 0xc4, 0xc6, 0xc9, 0xcc, 0xce, 0xd1, 0xd3,
-    0xd6, 0xd8, 0xdb, 0xdd, 0xe0, 0xe2, 0xe5, 0xe8, 0xea, 0xed, 0xef, 0xf2, 0xf4, 0xf7, 0xf9, 0xfc,
-};
-
 [[nodiscard]] constexpr double vibratoDepthCents(u8 depth) {
   if (depth <= 0xf0) {
     return ((0xffu * depth) >> 8) * (100.0 / 256.0);
@@ -196,101 +148,6 @@ struct PanGains {
 
 }  // namespace math
 
-enum class EventType : u8 {
-  Unknown0,
-  Unknown1,
-  Unknown2,
-  Unknown3,
-  Unknown4,
-  Nop,
-  Nop1,
-  Nop2,
-  End,
-  NoteParameter,
-  LemmingsNoteParameter,
-  IntelliNoteParameter,
-  Note,
-  Tie,
-  Rest,
-  Percussion,
-  Program,
-  Call,
-  Pan,
-  PanFade,
-  VibratoOn,
-  VibratoOff,
-  MasterVolume,
-  MasterVolumeFade,
-  VolumeMultiplier,
-  Tempo,
-  TempoFade,
-  GlobalTranspose,
-  Transpose,
-  TremoloOn,
-  TremoloOff,
-  Volume,
-  VolumeFade,
-  VibratoFade,
-  PitchEnvelopeTo,
-  PitchEnvelopeFrom,
-  PitchEnvelopeOff,
-  Tuning,
-  EchoOn,
-  EchoOff,
-  EchoParameter,
-  EchoVolumeFade,
-  PitchSlide,
-  PercussionBase,
-  Rd2ProgramAndAdsr,
-  KonamiLoopStart,
-  KonamiLoopEnd,
-  KonamiAdsrGain,
-  QuintetTuning,
-  QuintetAdsr,
-  ChannelEchoOn,
-  ChannelEchoOff,
-  IntelliLegatoOn,
-  IntelliLegatoOff,
-  IntelliConditionalJump,
-  IntelliJump,
-  IntelliFe3F5,
-  IntelliWritePort,
-  IntelliFe3Percussion,
-  IntelliDefineVoice,
-  IntelliLoadVoice,
-  Adsr,
-  IntelliGainDurationRate,
-  IntelliGainDuration,
-  IntelliGain,
-  IntelliReleaseGainOff,
-  IntelliCustomPercussion,
-  IntelliTaSubevent,
-  IntelliFe4Subevent,
-};
-
-struct Status {
-  u8 noteMin = 0x80;
-  u8 noteMax = 0xc7;
-  u8 percussionMin = 0xca;
-  u8 percussionMax = 0xdf;
-};
-
-struct Definition {
-  Status status;
-  std::array<EventType, 256> events{};
-  std::vector<u8> volume;
-  std::vector<u8> duration;
-  std::vector<u8> intelliDuration;
-  std::vector<u8> intelliVolume;
-};
-
-template <size_t Size>
-void useDefault(std::vector<u8>& destination, const std::array<u8, Size>& source) {
-  if (destination.empty()) {
-    destination.assign(source.begin(), source.end());
-  }
-}
-
 void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
   constexpr std::array<EventType, 27> commands{
       EventType::Program,
@@ -339,8 +196,13 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
     definition.status = Status{.noteMin = 0x80, .noteMax = 0xc5, .percussionMin = 0xd0, .percussionMax = 0xd9};
   }
   definition.events[0] = EventType::End;
+  const EventType noteParameters = selected.noteParameters == NoteParameterModel::IntelliTable
+                                       ? EventType::IntelliNoteParameter
+                                   : selected.noteParameters == NoteParameterModel::Lemmings
+                                       ? EventType::LemmingsNoteParameter
+                                       : EventType::NoteParameter;
   for (u16 opcode = 1; opcode < definition.status.noteMin; ++opcode) {
-    definition.events[opcode] = EventType::NoteParameter;
+    definition.events[opcode] = noteParameters;
   }
   for (u16 opcode = definition.status.noteMin; opcode <= definition.status.noteMax; ++opcode) {
     definition.events[opcode] = EventType::Note;
@@ -384,54 +246,8 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
     }
     useDefault(definition.volume, math::kVolumeEarlier);
     useDefault(definition.duration, math::kDurationEarlier);
-  } else if (selected.intelli == IntelliMode::Fe3) {
-    for (u16 opcode = 1; opcode < definition.status.noteMin; ++opcode) {
-      definition.events[opcode] = EventType::IntelliNoteParameter;
-    }
-    loadStandardCommands(definition.events, 0xd6);
-    definition.events[0xf1] = EventType::ChannelEchoOn;
-    definition.events[0xf2] = EventType::ChannelEchoOff;
-    definition.events[0xf3] = EventType::IntelliLegatoOn;
-    definition.events[0xf4] = EventType::IntelliLegatoOff;
-    definition.events[0xf5] = EventType::IntelliFe3F5;
-    definition.events[0xf6] = EventType::IntelliWritePort;
-    definition.events[0xf7] = EventType::IntelliConditionalJump;
-    definition.events[0xf8] = EventType::IntelliJump;
-    definition.events[0xf9] = EventType::IntelliFe3Percussion;
-    definition.events[0xfa] = EventType::IntelliDefineVoice;
-    definition.events[0xfb] = EventType::IntelliLoadVoice;
-    definition.events[0xfc] = EventType::Adsr;
-    definition.events[0xfd] = EventType::IntelliGainDurationRate;
-    useDefault(definition.volume, math::kVolumeIntelli);
-    useDefault(definition.duration, math::kDurationIntelli);
-    useDefault(definition.intelliDuration, math::kIntelliFe3);
-    useDefault(definition.intelliVolume, math::kIntelliFe3);
-  } else if (selected.intelli == IntelliMode::Ta || selected.intelli == IntelliMode::Fe4) {
-    if (selected.intelli == IntelliMode::Fe4) {
-      for (u16 opcode = 1; opcode < definition.status.noteMin; ++opcode) {
-        definition.events[opcode] = EventType::IntelliNoteParameter;
-      }
-    }
-    loadStandardCommands(definition.events, 0xda);
-    definition.events[0xf5] = EventType::ChannelEchoOn;
-    definition.events[0xf6] = EventType::ChannelEchoOff;
-    definition.events[0xf7] = selected.intelli == IntelliMode::Ta ? EventType::Adsr : EventType::IntelliGain;
-    definition.events[0xf8] =
-        selected.intelli == IntelliMode::Ta ? EventType::IntelliGainDurationRate : EventType::IntelliGain;
-    definition.events[0xf9] =
-        selected.intelli == IntelliMode::Ta ? EventType::IntelliGainDuration : EventType::IntelliReleaseGainOff;
-    definition.events[0xfa] = EventType::IntelliDefineVoice;
-    definition.events[0xfb] = EventType::IntelliLoadVoice;
-    definition.events[0xfc] = EventType::IntelliCustomPercussion;
-    definition.events[0xfd] =
-        selected.intelli == IntelliMode::Ta ? EventType::IntelliTaSubevent : EventType::IntelliFe4Subevent;
-    if (selected.intelli == IntelliMode::Ta) {
-      useDefault(definition.volume, math::kVolumeIntelli);
-      useDefault(definition.duration, math::kDurationIntelli);
-    } else {
-      useDefault(definition.intelliDuration, math::kIntelliFe4);
-      useDefault(definition.intelliVolume, math::kIntelliFe4);
-    }
+  } else if (selected.intelli != IntelliMode::None) {
+    configureIntelligentCommands(definition, selected.intelli);
   } else {
     loadStandardCommands(definition.events, 0xe0);
     useDefault(definition.volume, math::kVolumeStandard);
@@ -473,9 +289,6 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
       definition.events[0xfe] = EventType::Nop;
       break;
     case ProfileId::Lemmings:
-      for (u16 opcode = 1; opcode < definition.status.noteMin; ++opcode) {
-        definition.events[opcode] = EventType::LemmingsNoteParameter;
-      }
       definition.events[0xe5] = EventType::Unknown1;
       definition.events[0xe6] = EventType::Unknown2;
       definition.events[0xfb] = EventType::Nop1;
@@ -494,22 +307,6 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
   return definition;
 }
 
-struct VoiceRecord {
-  u8 instrument = 0;
-  u8 volume = 0;
-  u8 pan = 0;
-  u8 tuningTranspose = 0;
-};
-
-struct VibratoConfig {
-  u8 delay = 0;
-  u8 rate = 0;
-  u8 depth = 0;
-  u8 fade = 0;
-
-  [[nodiscard]] bool active() const { return rate != 0 && depth != 0; }
-};
-
 [[nodiscard]] LfoPerformanceContext tremoloLfoContext() {
   return LfoPerformanceContext{
       .shape = LfoShape{.waveform = LfoWaveform::Triangle},
@@ -519,1064 +316,760 @@ struct VibratoConfig {
   };
 }
 
-struct EchoState {
-  void reset() {
-    event = ReverbPerformanceEvent{.voiceMask = 0};
-    setVolume(0, 0);
-  }
+void EchoState::reset() {
+  event = ReverbPerformanceEvent{.voiceMask = 0};
+  setVolume(0, 0);
+}
 
-  [[nodiscard]] ReverbPerformanceEvent current() const {
-    ReverbPerformanceEvent result = event;
-    const double left = gain(leftVolume.currentFixed());
-    const double right = gain(rightVolume.currentFixed());
-    result.send = std::max(std::abs(left), std::abs(right));
-    result.leftGain = left;
-    result.rightGain = right;
-    return result;
-  }
+ReverbPerformanceEvent EchoState::current() const {
+  ReverbPerformanceEvent result = event;
+  const double left = gain(leftVolume.currentFixed());
+  const double right = gain(rightVolume.currentFixed());
+  result.send = std::max(std::abs(left), std::abs(right));
+  result.leftGain = left;
+  result.rightGain = right;
+  return result;
+}
 
-  void set(u8 mask, u8 left, u8 right) {
-    event.voiceMask = mask;
+void EchoState::set(u8 mask, u8 left, u8 right) {
+  event.voiceMask = mask;
+  setVolume(left, right);
+}
+
+void EchoState::setVolume(u8 left, u8 right) {
+  leftVolume.reset(static_cast<s8>(left));
+  rightVolume.reset(static_cast<s8>(right));
+  lastAdvanceTick.reset();
+}
+
+void EchoState::disable() { event.voiceMask = 0; }
+
+void EchoState::channel(u8 bit, bool enabled) {
+  event.voiceMask = enabled ? (*event.voiceMask | bit) : (*event.voiceMask & static_cast<u8>(~bit));
+}
+
+void EchoState::setParameters(u8 delay, s8 feedback, u8 filter) {
+  event.delayMilliseconds = static_cast<double>(delay & 0x0f) * 16.0;
+  event.feedback = feedback / 128.0;
+  event.filterIndex = filter;
+}
+
+bool EchoState::beginFade(u8 length, u8 left, u8 right) {
+  if (length == 0) {
     setVolume(left, right);
+    return true;
   }
+  leftVolume.begin(leftVolume.toRawTarget(static_cast<s8>(left), length));
+  rightVolume.begin(rightVolume.toRawTarget(static_cast<s8>(right), length));
+  lastAdvanceTick.reset();
+  return false;
+}
 
-  void setVolume(u8 left, u8 right) {
-    leftVolume.reset(static_cast<s8>(left));
-    rightVolume.reset(static_cast<s8>(right));
-    lastAdvanceTick.reset();
-  }
-
-  void disable() { event.voiceMask = 0; }
-
-  void channel(u8 bit, bool enabled) {
-    event.voiceMask = enabled ? (*event.voiceMask | bit) : (*event.voiceMask & static_cast<u8>(~bit));
-  }
-
-  void setParameters(u8 delay, s8 feedback, u8 filter) {
-    event.delayMilliseconds = static_cast<double>(delay & 0x0f) * 16.0;
-    event.feedback = feedback / 128.0;
-    event.filterIndex = filter;
-  }
-
-  [[nodiscard]] bool beginFade(u8 length, u8 left, u8 right) {
-    if (length == 0) {
-      setVolume(left, right);
-      return true;
-    }
-    leftVolume.begin(leftVolume.toRawTarget(static_cast<s8>(left), length));
-    rightVolume.begin(rightVolume.toRawTarget(static_cast<s8>(right), length));
-    lastAdvanceTick.reset();
+bool EchoState::advanceFade(u64 tick) {
+  // Echo is global, but every active track calls this; advance its fade only once per sequence tick.
+  if (lastAdvanceTick == tick) {
     return false;
   }
+  lastAdvanceTick = tick;
+  const bool rightChanged = rightVolume.tick().shouldApply();
+  return leftVolume.tick().shouldApply() || rightChanged;
+}
 
-  [[nodiscard]] bool advanceFade(u64 tick) {
-    // Echo is global, but every active track calls this; advance its fade only once per sequence tick.
-    if (lastAdvanceTick == tick) {
-      return false;
-    }
-    lastAdvanceTick = tick;
-    const bool rightChanged = rightVolume.tick().shouldApply();
-    return leftVolume.tick().shouldApply() || rightChanged;
+double EchoState::gain(s32 fixedVolume) {
+  return std::clamp(static_cast<double>(fixedVolume) / (127.0 * 256.0), -1.0, 1.0);
+}
+
+ProgramState::ProgramState(const RuntimeConfig& config)
+    : selected(profile(config.profile)), tempoTimerTarget(config.tempoTimerTarget),
+      fixedPercussionBase(config.fixedPercussionBase), intelligent(config.intelligent),
+      baseEnvelopes(config.instrumentEnvelopes) {
+  for (u32 encoded = 0; encoded < basePrograms.size(); ++encoded) {
+    basePrograms[encoded] = encoded < config.programMap.size() ? config.programMap[encoded] : encoded;
   }
+  resetRuntime();
+}
 
-private:
-  [[nodiscard]] static double gain(s32 fixedVolume) {
-    return std::clamp(static_cast<double>(fixedVolume) / (127.0 * 256.0), -1.0, 1.0);
+void ProgramState::resetRuntime() {
+  tempo = kDefaultTempo;
+  globalTranspose = 0;
+  percussionBase = fixedPercussionBase.value_or(0);
+  intelligent.reset();
+  programs = basePrograms;
+  instrumentEnvelopes = baseEnvelopes;
+  tempoState.reset(kDefaultTempo);
+  tempoState.clearAutomation();
+  tempoAutomationTrack.reset();
+  masterVolume = selected.initialMasterVolume;
+  volumeMultiplier = 0xff;
+  masterVolumeState.reset(masterVolume);
+  masterVolumeState.clearAutomation();
+  masterVolumeAutomationTrack.reset();
+  echo.reset();
+}
+
+u32 ProgramState::resolveProgram(u8 encoded, u8 percussionMinimum, u8* logical) const {
+  u8 index = encoded;
+  if (selected.programs != ProgramResolver::Direct && encoded >= 0x80) {
+    index = static_cast<u8>((encoded - percussionMinimum) + percussionBase);
   }
-
-  ReverbPerformanceEvent event{.voiceMask = 0};
-  SequenceFixedPointAutomation<s32> leftVolume;
-  SequenceFixedPointAutomation<s32> rightVolume;
-  std::optional<u64> lastAdvanceTick;
-};
-
-struct ProgramState {
-  explicit ProgramState(const RuntimeConfig& config)
-      : selected(profile(config.profile)), tempoTimerTarget(config.tempoTimerTarget),
-        fixedPercussionBase(config.fixedPercussionBase), intelliConditionalMask(config.intelliConditionalMask),
-        intelliTransposeTable(config.intelliTransposeTable), initialPercussionTable(config.intelliPercussionTable),
-        baseEnvelopes(config.instrumentEnvelopes) {
-    for (u32 encoded = 0; encoded < basePrograms.size(); ++encoded) {
-      basePrograms[encoded] = encoded < config.programMap.size() ? config.programMap[encoded] : encoded;
-    }
-    resetRuntime();
+  if (logical != nullptr) {
+    // Quintet applies its base/lookup before exposing the logical instrument
+    // number. Keep that distinction from the encoded table index: percussion
+    // key assignment depends on the resolved logical number, while the
+    // program map still needs the encoded index.
+    *logical =
+        (selected.programs == ProgramResolver::QuintetActRBase || selected.programs == ProgramResolver::QuintetLookup)
+            ? static_cast<u8>(basePrograms[index])
+            : index;
   }
+  return programs[index];
+}
 
-  void resetRuntime() {
-    tempo = kDefaultTempo;
-    globalTranspose = 0;
-    percussionBase = fixedPercussionBase.value_or(0);
-    intelliFlags = 0;
-    voiceTable.clear();
-    percussionTable = initialPercussionTable;
-    programs = basePrograms;
-    overridePrograms.clear();
-    instrumentEnvelopes = baseEnvelopes;
-    tempoState.reset(kDefaultTempo);
-    tempoState.clearAutomation();
-    tempoAutomationTrack.reset();
-    masterVolume = selected.initialMasterVolume;
-    volumeMultiplier = 0xff;
-    masterVolumeState.reset(masterVolume);
-    masterVolumeState.clearAutomation();
-    masterVolumeAutomationTrack.reset();
-    echo.reset();
+u8 ProgramState::commandTempo(u8 encoded) const {
+  return static_cast<u8>(encoded * selected.tempoCommandMultiplier);
+}
+
+void ProgramState::rememberStandardDrum(u8 logicalProgram, u32 sourceProgram, u8 key, s8 transpose, u16 sourceNote) {
+  if (!collecting) {
+    return;
   }
+  const u8 resolvedSourceNote = sourceNote <= 0xff ? static_cast<u8>(sourceNote) : u8{0x24};
+  standardDrums[logicalProgram] = DrumSlot{
+      .key = key,
+      .sourceProgram = sourceProgram,
+      .sourceKey = static_cast<s16>((resolvedSourceNote & 0x7f) + kMelodicKeyCorrection + transpose),
+  };
+}
 
-  [[nodiscard]] u32 resolveProgram(u8 encoded, u8 percussionMinimum, u8* logical = nullptr) const {
-    u8 index = encoded;
-    if (selected.programs != ProgramResolver::Direct && encoded >= 0x80) {
-      index = static_cast<u8>((encoded - percussionMinimum) + percussionBase);
-    }
-    if (logical != nullptr) {
-      // Quintet applies its base/lookup before exposing the logical instrument
-      // number. Keep that distinction from the encoded table index: percussion
-      // key assignment depends on the resolved logical number, while the
-      // program map still needs the encoded index.
-      *logical =
-          (selected.programs == ProgramResolver::QuintetActRBase || selected.programs == ProgramResolver::QuintetLookup)
-              ? static_cast<u8>(basePrograms[index])
-              : index;
-    }
-    return programs[index];
-  }
-
-  [[nodiscard]] u8 commandTempo(u8 encoded) const {
-    return static_cast<u8>(encoded * selected.tempoCommandMultiplier);
-  }
-
-  void registerOverride(u8 logical, u8 srcn, u8 adsr1, u8 adsr2, u8 gain, u8 pitchHigh, u8 pitchLow,
-                        SourceRange source) {
-    const auto key = std::tuple{logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow};
-    const auto [entry, inserted] = overridePrograms.try_emplace(key, 0x80u + static_cast<u32>(overridePrograms.size()));
-    const u32 program = entry->second;
-    programs[logical] = program;
-    if (!inserted) {
-      return;
-    }
-    instrumentEnvelopes[program] = EnvelopeRegisters{adsr1, adsr2, gain};
-    if (collecting) {
-      recipes.overrides.push_back(InstrumentOverride{
-          .program = program,
-          .tuningProgram = logical,
-          .srcn = srcn,
-          .adsr1 = adsr1,
-          .adsr2 = adsr2,
-          .gain = gain,
-          .pitchHigh = pitchHigh,
-          .pitchLow = pitchLow,
-          .source = source,
-      });
-    }
-  }
-
-  void rememberStandardDrum(u8 logicalProgram, u32 sourceProgram, u8 key, s8 transpose, u16 sourceNote) {
-    if (!collecting) {
-      return;
-    }
-    const u8 resolvedSourceNote = sourceNote <= 0xff ? static_cast<u8>(sourceNote) : u8{0x24};
-    standardDrums[logicalProgram] = DrumSlot{
-        .key = key,
-        .sourceProgram = sourceProgram,
-        .sourceKey = static_cast<s16>((resolvedSourceNote & 0x7f) + kMelodicKeyCorrection + transpose),
+void ProgramState::finishPrepass() {
+  if (!standardDrums.empty()) {
+    DrumKit kit{
+        .program = 0,
     };
-  }
-
-  [[nodiscard]] bool usesCustomPercussion() const {
-    // FE4 always reads its percussion table; FE3 and TA can select the
-    // ordinary percussion-base path using their flags command.
-    return selected.intelli == IntelliMode::Fe3 ? (intelliFlags & 1) == 0
-           : selected.intelli == IntelliMode::Fe4 || (intelliFlags & 0x40) != 0;
-  }
-
-  [[nodiscard]] u32 intelliPercussionProgram(u8 slot, u8 percussionMinimum) const {
-    const u8 patch = usesCustomPercussion()
-                         ? percussionTable[slot].patch & (selected.intelli == IntelliMode::Fe4 ? 0x3f : 0xbf)
-                         : percussionMinimum + slot;
-    return resolveProgram(patch, percussionMinimum);
-  }
-
-  [[nodiscard]] u8 ensureIntelliDrumKit(u8 percussionMinimum, s16 transpose) {
-    DrumKit candidate;
-    const u8 slots = selected.intelli == IntelliMode::Fe3 ? 12 : kIntelliDrumSlots;
-    candidate.slots.reserve(slots);
-    for (u8 slot = 0; slot < slots; ++slot) {
-      const u8 note = usesCustomPercussion() ? percussionTable[slot].note : 0xa4;
-      candidate.slots.push_back(DrumSlot{
-          .key = static_cast<u8>(0x24 + slot),
-          .sourceProgram = intelliPercussionProgram(slot, percussionMinimum),
-          .sourceKey = static_cast<s16>((note & 0x7f) + kMelodicKeyCorrection + transpose),
-      });
+    for (const auto& [_, slot] : standardDrums) {
+      kit.slots.push_back(slot);
     }
-    const auto found =
-        std::ranges::find_if(recipes.drumKits, [&](const DrumKit& kit) { return kit.slots == candidate.slots; });
-    if (found != recipes.drumKits.end()) {
-      return found->program;
-    }
-    if (!collecting || recipes.drumKits.size() >= 0x80) {
-      return recipes.drumKits.empty() ? 0 : recipes.drumKits.back().program;
-    }
-    candidate.program = static_cast<u8>(recipes.drumKits.size());
-    recipes.drumKits.push_back(std::move(candidate));
-    return recipes.drumKits.back().program;
+    recipes.drumKits.push_back(std::move(kit));
   }
+  collecting = false;
+  resetRuntime();
+}
 
-  void finishPrepass() {
-    if (!standardDrums.empty()) {
-      DrumKit kit{
-          .program = 0,
-      };
-      for (const auto& [_, slot] : standardDrums) {
-        kit.slots.push_back(slot);
-      }
-      recipes.drumKits.push_back(std::move(kit));
-    }
-    collecting = false;
-    resetRuntime();
+TrackState::TrackState(TrackStateContext track, const RuntimeConfig& config) : trackNumber(track.sourceTrackNumber) {
+  if (const auto initial = config.instrumentEnvelopes.find(0); initial != config.instrumentEnvelopes.end()) {
+    envelope = initial->second;
   }
+}
 
-  const Profile& selected;
-  u8 tempoTimerTarget = kStandardTimerTarget;
-  std::array<u32, 256> basePrograms{};
-  std::array<u32, 256> programs{};
-  u8 tempo = kDefaultTempo;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> tempoState;
-  std::optional<u32> tempoAutomationTrack;
-  u8 masterVolume = 0xff;
-  u8 volumeMultiplier = 0xff;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> masterVolumeState;
-  std::optional<u32> masterVolumeAutomationTrack;
-  s8 globalTranspose = 0;
-  u8 percussionBase = 0;
-  std::optional<u8> fixedPercussionBase;
-  u8 intelliFlags = 0;
-  u8 intelliConditionalMask = 0;
-  std::vector<u8> intelliTransposeTable;
-  std::vector<VoiceRecord> voiceTable;
-  std::array<PercussionEntry, kIntelliDrumSlots> initialPercussionTable{};
-  std::array<PercussionEntry, kIntelliDrumSlots> percussionTable{};
-  std::map<std::tuple<u8, u8, u8, u8, u8, u8, u8>, u32> overridePrograms;
-  std::map<u32, EnvelopeRegisters> baseEnvelopes;
-  std::map<u32, EnvelopeRegisters> instrumentEnvelopes;
-  std::map<u8, DrumSlot> standardDrums;
-  EchoState echo;
-  SequenceRecipes recipes;
-  bool collecting = true;
-};
+void TrackState::beginSection() {
+  inPattern = false;
+  patternRemaining = 0;
+  // Instruments, legato, volume, pan, pitch, and modulation carry across
+  // section boundaries; the driver only clears its pattern/fade counters.
+}
 
-struct PitchEnvelope {
-  enum class Mode : u8 { None, To, From };
-  Mode mode = Mode::None;
-  u8 delay = 0;
-  u8 length = 0;
-  s8 semitones = 0;
-};
-
-struct PitchState {
-  static constexpr u16 kDefaultRangeCents = 200;
-
-  bool baseValid = false;
-  s32 base = 0;
-  SequenceLinearMotion<s32> motion;
-  PitchSlideBinding transition;
-  double transitionNoteKey = 0.0;
-  u16 rangeCents = kDefaultRangeCents;
-  std::optional<s16> bend = 0;
-};
-
-struct TrackState {
-  TrackState(TrackStateContext track, const RuntimeConfig& config) : trackNumber(track.sourceTrackNumber) {
-    if (const auto initial = config.instrumentEnvelopes.find(0); initial != config.instrumentEnvelopes.end()) {
-      envelope = initial->second;
-    }
+u8 Playback::soundingDuration() const {
+  if (track.legato || (program.selected.id == ProfileId::Konami && track.durationRate == 0)) {
+    return track.noteLength;
   }
+  const u8 scaled = static_cast<u8>(((track.noteLength * track.durationRate) >> 8) + program.selected.noteGateBias);
+  const u8 maximum = std::max<u8>(1, static_cast<u8>(track.noteLength - 2));
+  return std::min(std::max<u8>(scaled, 1), maximum);
+}
 
-  void beginSection() {
-    inPattern = false;
-    patternRemaining = 0;
-    // Instruments, legato, volume, pan, pitch, and modulation carry across
-    // section boundaries; the driver only clears its pattern/fade counters.
+void Playback::updateVoiceHold() {
+  const bool held = track.legato || (program.selected.id == ProfileId::Konami && track.durationRate == 0);
+  if (held != track.voiceHeld) {
+    out.legatoPedal(held);
   }
+  track.voiceHeld = held;
+}
 
-  u32 trackNumber = 0;
-  u8 noteLength = 1;
-  u8 durationRate = 0xfc;
-  u8 velocity = 0xfc;
-  s8 transpose = 0;
-  bool legato = false;
-  bool voiceHeld = false;
-  EnvelopeRegisters envelope;
-  bool inPattern = false;
-  u8 patternRemaining = 0;
-  Address patternStart;
-  Address konamiLoopStart;
-  u8 konamiLoopVolumeDelta = 0;
-  s16 konamiLoopPitchDelta = 0;
-  VibratoConfig vibrato;
-  PitchEnvelope pitchEnvelope;
-  PitchState pitch;
-  u32 melodicProgram = 0;
-  bool lastWasPercussion = false;
-  u8 percussionProgram = 0;
-  PerformanceNoteId lastNote;
-  std::optional<double> lastKey;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume{0xff};
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan{10};
-  SequenceLfoDepthFadeState vibratoDepth;
-};
+void Playback::legato(bool enabled) {
+  track.legato = enabled;
+  updateVoiceHold();
+}
 
-struct Playback : SequencePlayback<TrackState> {
-  ProgramState& program;
-
-  [[nodiscard]] u8 soundingDuration() const {
-    if (track.legato || (program.selected.id == ProfileId::Konami && track.durationRate == 0)) {
-      return track.noteLength;
-    }
-    const u8 scaled = static_cast<u8>(((track.noteLength * track.durationRate) >> 8) + program.selected.noteGateBias);
-    const u8 maximum = std::max<u8>(1, static_cast<u8>(track.noteLength - 2));
-    return std::min(std::max<u8>(scaled, 1), maximum);
+void Playback::emitVoiceNote(double key, u32 duration) {
+  const bool continuesPreviousVoice = track.voiceHeld && track.lastNote.valid() && track.lastKey.has_value();
+  const bool extendsPrevious = continuesPreviousVoice && std::abs(*track.lastKey - key) < 0.0001;
+  const PerformanceNoteId note = out.note(NotePerformanceEvent{
+      .key = key,
+      .linearVelocity = math::levelGain(track.velocity),
+      .durationTicks = duration,
+      .extendsPrevious = extendsPrevious,
+      .restartsLfoPhase = !continuesPreviousVoice,
+  });
+  if (continuesPreviousVoice && !extendsPrevious) {
+    out.pitchSlide(note, *track.lastKey, key, PitchSlideTiming::fromTicks(0))
+        .continueFrom(track.lastNote)
+        .preferPitchBend();
   }
+  track.lastNote = note;
+  track.lastKey = key;
+  updateVoiceHold();
+}
 
-  void updateVoiceHold() {
-    const bool held = track.legato || (program.selected.id == ProfileId::Konami && track.durationRate == 0);
-    if (held != track.voiceHeld) {
-      out.legatoPedal(held);
-    }
-    track.voiceHeld = held;
+void Playback::standardParameters(u8 duration, bool hasPacked, u8 durationValue, u8 velocityValue) {
+  track.noteLength = duration;
+  if (hasPacked) {
+    track.durationRate = durationValue;
+    track.velocity = program.selected.id == ProfileId::Konami
+                         ? static_cast<u8>(velocityValue + track.konamiLoop.volumeDelta)
+                         : velocityValue;
   }
+}
 
-  void legato(bool enabled) {
-    track.legato = enabled;
-    updateVoiceHold();
+void Playback::lemmingsParameters(u8 duration, bool hasDuration, u8 durationValue, bool hasVelocity, u8 velocityValue) {
+  track.noteLength = duration;
+  if (hasDuration) {
+    track.durationRate = durationValue;
   }
+  if (hasVelocity) {
+    track.velocity = velocityValue;
+  }
+}
 
-  void emitVoiceNote(double key, u32 duration) {
-    const bool continuesPreviousVoice = track.voiceHeld && track.lastNote.valid() && track.lastKey.has_value();
-    const bool extendsPrevious = continuesPreviousVoice && std::abs(*track.lastKey - key) < 0.0001;
-    const PerformanceNoteId note = out.note(NotePerformanceEvent{
-        .key = key,
-        .linearVelocity = math::levelGain(track.velocity),
-        .durationTicks = duration,
-        .extendsPrevious = extendsPrevious,
-        .restartsLfoPhase = !continuesPreviousVoice,
+void Playback::switchToMelodicProgram() {
+  if (track.lastWasPercussion) {
+    out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = track.melodicProgram});
+    track.lastWasPercussion = false;
+  }
+}
+
+void Playback::loadInstrumentEnvelope(u32 sourceProgram) {
+  if (const auto envelope = program.instrumentEnvelopes.find(sourceProgram);
+      envelope != program.instrumentEnvelopes.end()) {
+    track.envelope = envelope->second;
+  }
+}
+
+void Playback::melodicProgram(u8 encoded, u8 percussionMinimum) {
+  track.melodicProgram = program.resolveProgram(encoded, percussionMinimum);
+  loadInstrumentEnvelope(track.melodicProgram);
+  if (!track.lastWasPercussion) {
+    out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = track.melodicProgram});
+  }
+}
+
+void Playback::switchToDrumProgram(u8 drumProgram) {
+  if (!track.lastWasPercussion || track.percussionProgram != drumProgram) {
+    out.instrument(InstrumentIdentity{
+        .domain = std::string(kInstrumentDomain),
+        .key = drumInstrumentKey(drumProgram),
     });
-    if (continuesPreviousVoice && !extendsPrevious) {
-      out.pitchSlide(note, *track.lastKey, key, PitchSlideTiming::fromTicks(0))
-          .continueFrom(track.lastNote)
-          .preferPitchBend();
-    }
-    track.lastNote = note;
-    track.lastKey = key;
-    updateVoiceHold();
+    track.percussionProgram = drumProgram;
   }
+  track.lastWasPercussion = true;
+}
 
-  void standardParameters(u8 duration, bool hasPacked, u8 durationValue, u8 velocityValue) {
-    track.noteLength = duration;
-    if (hasPacked) {
-      track.durationRate = durationValue;
-      track.velocity = program.selected.id == ProfileId::Konami
-                           ? static_cast<u8>(velocityValue + track.konamiLoopVolumeDelta)
-                           : velocityValue;
-    }
+void Playback::emitPitchBend(s16 bend) {
+  if (track.pitch.bend && *track.pitch.bend == bend) {
+    return;
   }
+  track.pitch.bend = bend;
+  out.pitchBend((static_cast<double>(bend) / 8192.0) * (track.pitch.rangeCents / 100.0));
+}
 
-  void lemmingsParameters(u8 duration, bool hasDuration, u8 durationValue, bool hasVelocity, u8 velocityValue) {
-    track.noteLength = duration;
-    if (hasDuration) {
-      track.durationRate = durationValue;
-    }
-    if (hasVelocity) {
-      track.velocity = velocityValue;
-    }
+s16 Playback::currentPitchBend() const {
+  if (!track.pitch.baseValid) {
+    return 0;
   }
+  const double cents = (track.pitch.motion.current() - track.pitch.base) * (100.0 / 256.0);
+  return static_cast<s16>(
+      std::clamp<s32>(static_cast<s32>(std::lround((cents / track.pitch.rangeCents) * 8192.0)), -8192, 8191));
+}
 
-  void intelliParameter(u8 raw, u8 resolved) {
-    if (raw < 0x40) {
-      track.durationRate = resolved;
-    } else {
-      track.velocity = resolved;
-    }
+void Playback::applyCurrentPitchBend() { emitPitchBend(currentPitchBend()); }
+
+// Pitch values use 256 units per semitone. Apply their offset from the
+// original note to the emitted key, which already includes mapping and transpose.
+double Playback::pitchKey(s32 pitch, double noteKey) const {
+  return noteKey + static_cast<double>(pitch - track.pitch.base) / 256.0;
+}
+
+void Playback::setPitchBendRange(u16 cents) {
+  if (cents == 0 || cents == track.pitch.rangeCents) {
+    return;
   }
-
-  void fe3CustomParameter(u8 raw, u8 resolved) {
-    if ((program.intelliFlags & 0x80) != 0) {
-      intelliParameter(raw, resolved);
-    }
-  }
-
-  void fe3StandardParameter(bool present, u8 durationRate, u8 velocity) {
-    if (present && (program.intelliFlags & 0x80) == 0) {
-      track.durationRate = durationRate;
-      track.velocity = velocity;
-    }
-  }
-
-  [[nodiscard]] Effects fe3ParameterFlow(Address standardDestination, Address customDestination) {
-    return vm.jump((program.intelliFlags & 0x80) != 0 ? customDestination : standardDestination);
-  }
-
-  void switchToMelodicProgram() {
-    if (track.lastWasPercussion) {
-      out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = track.melodicProgram});
-      track.lastWasPercussion = false;
-    }
-  }
-
-  void loadInstrumentEnvelope(u32 sourceProgram) {
-    if (const auto envelope = program.instrumentEnvelopes.find(sourceProgram);
-        envelope != program.instrumentEnvelopes.end()) {
-      track.envelope = envelope->second;
-    }
-  }
-
-  void melodicProgram(u8 encoded, u8 percussionMinimum) {
-    track.melodicProgram = program.resolveProgram(encoded, percussionMinimum);
-    loadInstrumentEnvelope(track.melodicProgram);
-    if (!track.lastWasPercussion) {
-      out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = track.melodicProgram});
-    }
-  }
-
-  void switchToDrumProgram(u8 drumProgram) {
-    if (!track.lastWasPercussion || track.percussionProgram != drumProgram) {
-      out.instrument(InstrumentIdentity{
-          .domain = std::string(kInstrumentDomain),
-          .key = drumInstrumentKey(drumProgram),
-      });
-      track.percussionProgram = drumProgram;
-    }
-    track.lastWasPercussion = true;
-  }
-
-  void emitPitchBend(s16 bend) {
-    if (track.pitch.bend && *track.pitch.bend == bend) {
-      return;
-    }
-    track.pitch.bend = bend;
-    out.pitchBend((static_cast<double>(bend) / 8192.0) * (track.pitch.rangeCents / 100.0));
-  }
-
-  [[nodiscard]] s16 currentPitchBend() const {
-    if (!track.pitch.baseValid) {
-      return 0;
-    }
-    const double cents = (track.pitch.motion.current() - track.pitch.base) * (100.0 / 256.0);
-    return static_cast<s16>(
-        std::clamp<s32>(static_cast<s32>(std::lround((cents / track.pitch.rangeCents) * 8192.0)), -8192, 8191));
-  }
-
-  void applyCurrentPitchBend() { emitPitchBend(currentPitchBend()); }
-
-  // Pitch values use 256 units per semitone. Apply their offset from the
-  // original note to the emitted key, which already includes mapping and transpose.
-  [[nodiscard]] double pitchKey(s32 pitch, double noteKey) const {
-    return noteKey + static_cast<double>(pitch - track.pitch.base) / 256.0;
-  }
-
-  void setPitchBendRange(u16 cents) {
-    if (cents == 0 || cents == track.pitch.rangeCents) {
-      return;
-    }
-    track.pitch.rangeCents = cents;
-    out.pitchBendRange(PitchBendRangePerformanceEvent{.cents = cents});
-    if (track.pitch.baseValid) {
-      applyCurrentPitchBend();
-    }
-  }
-
-  void resetPitchForNote() {
-    track.pitch.transition.interrupt(out);
-    track.pitch.motion.clear();
-    track.pitch.baseValid = false;
-    if (track.pitch.rangeCents == PitchState::kDefaultRangeCents && track.pitch.bend == 0) {
-      return;
-    }
-    if (track.pitchEnvelope.mode != PitchEnvelope::Mode::None && track.pitchEnvelope.length != 0) {
-      emitPitchBend(0);
-      return;
-    }
-    setPitchBendRange(PitchState::kDefaultRangeCents);
-    emitPitchBend(0);
-  }
-
-  // Start a delayed pitch change for direct channel-pitch-bend output. It moves
-  // from the current pitch to the target over the requested length, expanding
-  // the bend range when necessary to avoid clipping.
-  void beginPitchBendMotion(u8 delay, u8 length, s32 target) {
-    track.pitch.motion.clear();
-    if (!track.pitch.baseValid || length == 0) {
-      setPitchBendRange(PitchState::kDefaultRangeCents);
-      return;
-    }
-
-    const s32 current = track.pitch.motion.current();
-    const double largestDeviation = std::max(std::abs(static_cast<double>(current - track.pitch.base)),
-                                             std::abs(static_cast<double>(target - track.pitch.base)));
-    const u16 range =
-        std::max<u16>(PitchState::kDefaultRangeCents, static_cast<u16>(std::ceil(largestDeviation * (100.0 / 256.0))));
-    setPitchBendRange(range);
-    track.pitch.motion.begin(SequenceMotionPlan<s32>::targetOverTicks(target, length, delay));
+  track.pitch.rangeCents = cents;
+  out.pitchBendRange(PitchBendRangePerformanceEvent{.cents = cents});
+  if (track.pitch.baseValid) {
     applyCurrentPitchBend();
   }
+}
 
-  void pitchSlide(u8 delay, u8 length, u8 targetNote) {
-    const s32 target = static_cast<s32>(targetNote & 0x7f) * 256;
+void Playback::resetPitchForNote() {
+  track.pitch.transition.interrupt(out);
+  track.pitch.motion.clear();
+  track.pitch.baseValid = false;
+  if (track.pitch.rangeCents == PitchState::kDefaultRangeCents && track.pitch.bend == 0) {
+    return;
+  }
+  if (track.pitchEnvelope.mode != PitchEnvelope::Mode::None && track.pitchEnvelope.length != 0) {
+    emitPitchBend(0);
+    return;
+  }
+  setPitchBendRange(PitchState::kDefaultRangeCents);
+  emitPitchBend(0);
+}
 
-    // A new F9 stops any F9 slide still in progress.
-    track.pitch.transition.interrupt(out);
-
-    // Portamento needs a nonzero length and a note to slide. Use pitch bends otherwise.
-    if (!track.pitch.baseValid || length == 0 || !track.lastNote.valid() || !track.lastKey) {
-      beginPitchBendMotion(delay, length, target);
-      return;
-    }
-
-    // Stop the previous calculation without resetting its current pitch, so
-    // the replacement starts from the value already reached.
-    track.pitch.motion.clear();
-    const s32 current = track.pitch.motion.current();
-    track.pitch.motion.begin(SequenceMotionPlan<s32>::targetOverTicks(target, length, delay));
-
-    // Calculate intermediate pitches with N-SPC integer math.
-    // advancePitchMotion() records each value on the slide created below.
-    track.pitch.transitionNoteKey = *track.lastKey;
-    track.pitch.transition =
-        out.at(vm.tick() + delay)
-            .pitchSlide(track.lastNote, pitchKey(current, *track.lastKey), pitchKey(target, *track.lastKey), length);
+// Start a delayed pitch change for direct channel-pitch-bend output. It moves
+// from the current pitch to the target over the requested length, expanding
+// the bend range when necessary to avoid clipping.
+void Playback::beginPitchBendMotion(u8 delay, u8 length, s32 target) {
+  track.pitch.motion.clear();
+  if (!track.pitch.baseValid || length == 0) {
+    setPitchBendRange(PitchState::kDefaultRangeCents);
+    return;
   }
 
-  void beginNotePitch(u8 rawNote) {
-    resetPitchForNote();
-    track.pitch.baseValid = true;
-    track.pitch.base = static_cast<s32>(rawNote & 0x7f) * 256;
-    track.pitch.motion.reset(track.pitch.base);
+  const s32 current = track.pitch.motion.current();
+  const double largestDeviation = std::max(std::abs(static_cast<double>(current - track.pitch.base)),
+                                           std::abs(static_cast<double>(target - track.pitch.base)));
+  const u16 range =
+      std::max<u16>(PitchState::kDefaultRangeCents, static_cast<u16>(std::ceil(largestDeviation * (100.0 / 256.0))));
+  setPitchBendRange(range);
+  track.pitch.motion.begin(SequenceMotionPlan<s32>::targetOverTicks(target, length, delay));
+  applyCurrentPitchBend();
+}
 
-    if (track.pitchEnvelope.mode != PitchEnvelope::Mode::None && track.pitchEnvelope.length != 0) {
-      const s32 offset = static_cast<s32>(track.pitchEnvelope.semitones) * 256;
-      s32 target = track.pitch.base;
-      if (track.pitchEnvelope.mode == PitchEnvelope::Mode::To) {
-        target += offset;
-      } else {
-        track.pitch.motion.reset(track.pitch.base - offset);
-      }
-      beginPitchBendMotion(track.pitchEnvelope.delay, track.pitchEnvelope.length, target);
-    }
-    beginNoteVibrato();
+void Playback::pitchSlide(u8 delay, u8 length, u8 targetNote) {
+  const s32 target = static_cast<s32>(targetNote & 0x7f) * 256;
+
+  // A new F9 stops any F9 slide still in progress.
+  track.pitch.transition.interrupt(out);
+
+  // Portamento needs a nonzero length and a note to slide. Use pitch bends otherwise.
+  if (!track.pitch.baseValid || length == 0 || !track.lastNote.valid() || !track.lastKey) {
+    beginPitchBendMotion(delay, length, target);
+    return;
   }
 
-  [[nodiscard]] bool pitchMotionIdle() const { return !track.pitch.motion.active(); }
+  // Stop the previous calculation without resetting its current pitch, so
+  // the replacement starts from the value already reached.
+  track.pitch.motion.clear();
+  const s32 current = track.pitch.motion.current();
+  track.pitch.motion.begin(SequenceMotionPlan<s32>::targetOverTicks(target, length, delay));
 
-  void advancePitchMotion() {
-    const auto tick = track.pitch.motion.tick();
-    if (tick.status == SequenceMotionStatus::Inactive || tick.status == SequenceMotionStatus::Delayed) {
-      return;
-    }
-    if (track.pitch.transition.valid()) {
-      track.pitch.transition.sample(out, pitchKey(tick.current, track.pitch.transitionNoteKey));
-      track.pitch.bend.reset();
-      if (tick.status == SequenceMotionStatus::Finished) {
-        track.pitch.transition.clear();
-      }
+  // Calculate intermediate pitches with N-SPC integer math.
+  // advancePitchMotion() records each value on the slide created below.
+  track.pitch.transitionNoteKey = *track.lastKey;
+  track.pitch.transition =
+      out.at(vm.tick() + delay)
+          .pitchSlide(track.lastNote, pitchKey(current, *track.lastKey), pitchKey(target, *track.lastKey), length);
+}
+
+void Playback::beginNotePitch(u8 rawNote) {
+  resetPitchForNote();
+  track.pitch.baseValid = true;
+  track.pitch.base = static_cast<s32>(rawNote & 0x7f) * 256;
+  track.pitch.motion.reset(track.pitch.base);
+
+  if (track.pitchEnvelope.mode != PitchEnvelope::Mode::None && track.pitchEnvelope.length != 0) {
+    const s32 offset = static_cast<s32>(track.pitchEnvelope.semitones) * 256;
+    s32 target = track.pitch.base;
+    if (track.pitchEnvelope.mode == PitchEnvelope::Mode::To) {
+      target += offset;
     } else {
-      applyCurrentPitchBend();
+      track.pitch.motion.reset(track.pitch.base - offset);
     }
+    beginPitchBendMotion(track.pitchEnvelope.delay, track.pitchEnvelope.length, target);
   }
+  beginNoteVibrato();
+}
 
-  [[nodiscard]] Effects note(u8 noteIndex) {
-    switchToMelodicProgram();
-    const double key =
-        kMelodicKeyCorrection + noteIndex + track.transpose + static_cast<double>(track.konamiLoopPitchDelta) / 256.0;
-    if (program.collecting) {
-      program.recipes.usedNotes.emplace(
-          track.melodicProgram, static_cast<u8>(std::clamp(std::lround(key + program.globalTranspose), 0l, 127l)));
+bool Playback::pitchMotionIdle() const { return !track.pitch.motion.active(); }
+
+void Playback::advancePitchMotion() {
+  const auto tick = track.pitch.motion.tick();
+  if (tick.status == SequenceMotionStatus::Inactive || tick.status == SequenceMotionStatus::Delayed) {
+    return;
+  }
+  if (track.pitch.transition.valid()) {
+    track.pitch.transition.sample(out, pitchKey(tick.current, track.pitch.transitionNoteKey));
+    track.pitch.bend.reset();
+    if (tick.status == SequenceMotionStatus::Finished) {
+      track.pitch.transition.clear();
     }
-    beginNotePitch(noteIndex);
-    emitVoiceNote(key, soundingDuration() + (track.legato ? 1u : 0u));
-    return Effects::wait(track.noteLength);
+  } else {
+    applyCurrentPitchBend();
   }
+}
 
-  [[nodiscard]] Effects percussion(u8 slot, u8 percussionMinimum, bool intelli, u16 sourceNote) {
-    const u8 duration = soundingDuration();
-    if (intelli) {
-      const bool custom = program.usesCustomPercussion();
-      const PercussionEntry entry = program.percussionTable[slot];
-      loadInstrumentEnvelope(program.intelliPercussionProgram(slot, percussionMinimum));
-      if (custom && entry.pan < 0x80) {
-        pan(entry.pan);
-      }
-      if (custom) {
-        channelEcho((entry.patch & 0x40) != 0);
-      }
-      const u8 kit = program.ensureIntelliDrumKit(percussionMinimum, track.transpose + program.globalTranspose);
-      switchToDrumProgram(kit);
-      const double key = 0x24 + slot - program.globalTranspose;
-      beginNotePitch(static_cast<u8>(0x24 + slot - program.globalTranspose));
-      emitVoiceNote(key, duration);
-    } else {
-      const bool earlier = program.selected.base == BaseProfile::Earlier;
-      u8 logical = earlier ? slot : 0;
-      const u32 sourceProgram =
-          earlier ? kEarlierPercussionProgramBase + slot
-                  : program.resolveProgram(static_cast<u8>(slot + program.percussionBase), percussionMinimum, &logical);
-      const u8 key = static_cast<u8>(0x24 + logical - program.percussionBase);
-      program.rememberStandardDrum(logical, sourceProgram, key, program.globalTranspose, sourceNote);
-      switchToDrumProgram(0);
-      if (isSunsoft(program.selected.id)) {
-        // Every percussion note runs the instrument loader, even when the
-        // exported drum-kit program stays the same. It replaces any FD ADSR
-        // override and supplies the GAIN register for a subsequent FD.
-        loadInstrumentEnvelope(sourceProgram);
-        out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
-      }
-      const double outputKey = key - program.globalTranspose + static_cast<double>(track.konamiLoopPitchDelta) / 256.0;
-      beginNotePitch(static_cast<u8>(key - program.globalTranspose));
-      emitVoiceNote(outputKey, duration);
-    }
-    return Effects::wait(track.noteLength);
+Effects Playback::note(u8 noteIndex) {
+  switchToMelodicProgram();
+  const double key =
+      kMelodicKeyCorrection + noteIndex + track.transpose + static_cast<double>(track.konamiLoop.pitchDelta) / 256.0;
+  if (program.collecting) {
+    program.recipes.usedNotes.emplace(
+        track.melodicProgram, static_cast<u8>(std::clamp(std::lround(key + program.globalTranspose), 0l, 127l)));
   }
+  beginNotePitch(noteIndex);
+  emitVoiceNote(key, soundingDuration() + (track.legato ? 1u : 0u));
+  return Effects::wait(track.noteLength);
+}
 
-  [[nodiscard]] Effects tie() {
-    if (track.lastKey) {
-      track.lastNote = out.note(*track.lastKey, math::levelGain(track.velocity), soundingDuration(), true);
-    }
-    updateVoiceHold();
-    return Effects::wait(track.noteLength);
+Effects Playback::percussion(u8 slot, u8 percussionMinimum, bool intelli, u16 sourceNote) {
+  if (intelli) {
+    return intelligentPercussion(slot, percussionMinimum);
   }
-
-  [[nodiscard]] Effects rest() {
-    if (track.voiceHeld && track.lastNote.valid()) {
-      out.setPreviousNoteEnd(vm.tick() + soundingDuration());
-    }
-    updateVoiceHold();
-    if (!track.voiceHeld) {
-      // A gated rest ends the preceding note chain; a later tie cannot reach
-      // back across that silence.
-      track.lastNote = {};
-      track.lastKey.reset();
-    }
-    return Effects::wait(track.noteLength);
+  const u8 duration = soundingDuration();
+  const bool earlier = program.selected.base == BaseProfile::Earlier;
+  u8 logical = earlier ? slot : 0;
+  const u32 sourceProgram =
+      earlier ? kEarlierPercussionProgramBase + slot
+              : program.resolveProgram(static_cast<u8>(slot + program.percussionBase), percussionMinimum, &logical);
+  const u8 key = static_cast<u8>(0x24 + logical - program.percussionBase);
+  program.rememberStandardDrum(logical, sourceProgram, key, program.globalTranspose, sourceNote);
+  switchToDrumProgram(0);
+  if (isSunsoft(program.selected.id)) {
+    // Every percussion note runs the instrument loader, even when the
+    // exported drum-kit program stays the same. It replaces any FD ADSR
+    // override and supplies the GAIN register for a subsequent FD.
+    loadInstrumentEnvelope(sourceProgram);
+    out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
+  const double outputKey = key - program.globalTranspose + static_cast<double>(track.konamiLoop.pitchDelta) / 256.0;
+  beginNotePitch(static_cast<u8>(key - program.globalTranspose));
+  emitVoiceNote(outputKey, duration);
+  return Effects::wait(track.noteLength);
+}
 
-  void beginPattern(u8 times, Address destination) {
-    track.inPattern = true;
-    track.patternRemaining = times;
-    track.patternStart = destination;
+Effects Playback::tie() {
+  if (track.lastKey) {
+    track.lastNote = out.note(*track.lastKey, math::levelGain(track.velocity), soundingDuration(), true);
   }
+  updateVoiceHold();
+  return Effects::wait(track.noteLength);
+}
 
-  [[nodiscard]] Effects endOrReturn() {
-    if (!track.inPattern) {
-      return vm.endSection();
-    }
-    if (track.patternRemaining > 1) {
-      --track.patternRemaining;
-      return vm.jump(track.patternStart);
-    }
-    track.inPattern = false;
-    track.patternRemaining = 0;
-    return vm.return_();
+Effects Playback::rest() {
+  if (track.voiceHeld && track.lastNote.valid()) {
+    out.setPreviousNoteEnd(vm.tick() + soundingDuration());
   }
-
-  void emitPan(PerformanceEmitter output, u8 value) const {
-    const auto gains = math::panGains(program.selected, panTable, value);
-    output.stereoBalance(gains.left, gains.right);
+  updateVoiceHold();
+  if (!track.voiceHeld) {
+    // A gated rest ends the preceding note chain; a later tie cannot reach
+    // back across that silence.
+    track.lastNote = {};
+    track.lastKey.reset();
   }
+  return Effects::wait(track.noteLength);
+}
 
-  void pan(u8 value) {
-    track.pan.setCurrentAt(vm.tick(), value);
-    emitPan(out, value);
+void Playback::beginPattern(u8 times, Address destination) {
+  track.inPattern = true;
+  track.patternRemaining = times;
+  track.patternStart = destination;
+}
+
+Effects Playback::endOrReturn() {
+  if (!track.inPattern) {
+    return vm.endSection();
   }
-
-  void panFade(u8 length, u8 value) {
-    if (length == 0) {
-      pan(value);
-      return;
-    }
-    // Interpolate the source pan index before applying its non-linear table.
-    const auto gains = math::panGains(program.selected, panTable, value);
-    track.pan.begin(out.fade(PerformanceAutomationTarget::Pan, math::stereoPosition(gains), length),
-                    track.pan.toRawTarget(value, length));
+  if (track.patternRemaining > 1) {
+    --track.patternRemaining;
+    return vm.jump(track.patternStart);
   }
+  track.inPattern = false;
+  track.patternRemaining = 0;
+  return vm.return_();
+}
 
-  void vibratoOn(u8 delay, u8 rate, u8 depth) {
-    track.vibrato = VibratoConfig{.delay = delay, .rate = rate, .depth = depth};
-    track.vibratoDepth.interruptFadeAutomationAt(vm.tick());
-    track.vibratoDepth.resetDepth(depth);
-    emitConfiguredVibrato();
+void Playback::emitPan(PerformanceEmitter output, u8 value) const {
+  const auto gains = math::panGains(program.selected, math::kPan, value);
+  output.stereoBalance(gains.left, gains.right);
+}
+
+void Playback::pan(u8 value) {
+  track.pan.setCurrentAt(vm.tick(), value);
+  emitPan(out, value);
+}
+
+void Playback::panFade(u8 length, u8 value) {
+  if (length == 0) {
+    pan(value);
+    return;
   }
+  // Interpolate the source pan index before applying its non-linear table.
+  const auto gains = math::panGains(program.selected, math::kPan, value);
+  track.pan.begin(out.fade(PerformanceAutomationTarget::Pan, math::stereoPosition(gains), length),
+                  track.pan.toRawTarget(value, length));
+}
 
-  void vibratoOff() {
-    track.vibrato = {};
-    track.vibratoDepth.interruptFadeAutomationAt(vm.tick());
-    track.vibratoDepth.resetDepth(0);
-    emitConfiguredVibrato();
+void Playback::vibratoOn(u8 delay, u8 rate, u8 depth) {
+  track.vibrato = VibratoConfig{.delay = delay, .rate = rate, .depth = depth};
+  track.vibratoDepth.interruptFadeAutomationAt(vm.tick());
+  track.vibratoDepth.resetDepth(depth);
+  emitConfiguredVibrato();
+}
+
+void Playback::vibratoOff() {
+  track.vibrato = {};
+  track.vibratoDepth.interruptFadeAutomationAt(vm.tick());
+  track.vibratoDepth.resetDepth(0);
+  emitConfiguredVibrato();
+}
+
+void Playback::konamiEnvelope(u8 adsr1, u8 adsr2, u8 gain) {
+  out.replaceEnvelope(snesDspEnvelope(adsr1, adsr2, gain), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+}
+
+void Playback::vibratoFade(u8 length) { track.vibrato.fade = length; }
+
+void Playback::emitVibratoDepth(u8 rawDepth, PerformanceEmitter output) {
+  const double depthSemitones = math::vibratoDepthCents(rawDepth) / 100.0;
+  track.vibratoDepth.emitPhysicalDepth(depthSemitones, [&](double value) { output.vibratoDepth(value); });
+}
+
+void Playback::emitVibratoRateAndDelay() {
+  const bool active = track.vibrato.active();
+  if (active) {
+    out.vibratoRateCyclesPerTick(static_cast<double>(track.vibrato.rate) / 256.0);
+    out.vibratoDelayTicks(track.vibrato.delay);
+  } else {
+    out.vibratoRate(0.0);
+    out.vibratoDelayTicks(0);
   }
+}
 
-  void konamiEnvelope(u8 adsr1, u8 adsr2, u8 gain) {
-    out.replaceEnvelope(snesDspEnvelope(adsr1, adsr2, gain), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+void Playback::emitConfiguredVibrato() {
+  emitVibratoDepth(track.vibrato.active() ? track.vibrato.depth : 0, out);
+  emitVibratoRateAndDelay();
+}
+
+void Playback::beginNoteVibrato() {
+  if (!track.vibrato.active() || track.vibrato.fade == 0) {
+    return;
   }
+  track.vibratoDepth.configureLinearFade(track.vibrato.fade);
+  static_cast<void>(track.vibratoDepth.restartFade(track.vibrato.delay));
+  track.vibratoDepth.bindFade(out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth,
+                                               math::vibratoDepthCents(track.vibrato.depth) / 100.0,
+                                               track.vibrato.fade, track.vibrato.delay));
+  emitVibratoDepth(0, track.vibratoDepth.fadeOutput(out));
+}
 
-  void vibratoFade(u8 length) { track.vibrato.fade = length; }
+void Playback::tremoloOn(u8 delay, u8 rate, u8 depth) {
+  const LfoPerformanceContext context = tremoloLfoContext();
+  out.tremoloDepth(math::tremoloDepthDecibels(program.selected.base, depth), context);
+  out.tremoloRateCyclesPerTick(static_cast<double>(rate) / 256.0, context);
+  out.tremoloDelayTicks(delay);
+}
 
-  void emitVibratoDepth(u8 rawDepth, PerformanceEmitter output) {
-    const double depthSemitones = math::vibratoDepthCents(rawDepth) / 100.0;
-    track.vibratoDepth.emitPhysicalDepth(depthSemitones, [&](double value) { output.vibratoDepth(value); });
+void Playback::tremoloOff() { out.tremoloDepth(0.0, tremoloLfoContext()); }
+
+void Playback::tempo(u8 value) {
+  const u8 driverTempo = program.commandTempo(value);
+  program.tempoState.setCurrentAt(vm.tick(), driverTempo);
+  program.tempoAutomationTrack.reset();
+  program.tempo = driverTempo;
+  out.tempo(math::tempoMicrosecondsPerQuarter(driverTempo, program.tempoTimerTarget));
+}
+
+void Playback::tempoFade(u8 length, u8 value) {
+  if (length == 0) {
+    tempo(value);
+    return;
   }
+  const u8 driverTempo = program.commandTempo(value);
+  program.tempoState.reset(program.tempo);
+  program.tempoState.begin(
+      out.fade(PerformanceAutomationTarget::Tempo,
+               static_cast<double>(math::tempoMicrosecondsPerQuarter(driverTempo, program.tempoTimerTarget)), length),
+      program.tempoState.toRawTarget(driverTempo, length));
+  program.tempoAutomationTrack = track.trackNumber;
+  advanceTempoFade();
+}
 
-  void emitVibratoRateAndDelay() {
-    const bool active = track.vibrato.active();
-    if (active) {
-      out.vibratoRateCyclesPerTick(static_cast<double>(track.vibrato.rate) / 256.0);
-      out.vibratoDelayTicks(track.vibrato.delay);
-    } else {
-      out.vibratoRate(0.0);
-      out.vibratoDelayTicks(0);
-    }
+void Playback::volume(u8 value) {
+  track.volume.setCurrentAt(vm.tick(), value);
+  out.level(math::levelGain(value), ValueQuantization{.levels = 256});
+}
+
+void Playback::volumeFade(u8 length, u8 value) {
+  if (length == 0) {
+    volume(value);
+    return;
   }
+  track.volume.begin(out.fade(PerformanceAutomationTarget::Level, math::levelGain(value), length),
+                     track.volume.toRawTarget(value, length));
+}
 
-  void emitConfiguredVibrato() {
-    emitVibratoDepth(track.vibrato.active() ? track.vibrato.depth : 0, out);
-    emitVibratoRateAndDelay();
+double Playback::masterGain(u8 value) const {
+  // Albert applies FE before squaring; multiplying the squared gains is equivalent.
+  return math::levelGain(value) * math::levelGain(program.volumeMultiplier);
+}
+
+void Playback::volumeMultiplier(u8 value) {
+  // The combined output changes immediately, but E6's source-domain fade
+  // keeps running. End its old output binding without clearing that motion.
+  program.masterVolumeState.interruptAutomationAt(vm.tick());
+  program.volumeMultiplier = value;
+  out.masterLevel(masterGain(program.masterVolume));
+}
+
+void Playback::masterVolume(u8 value) {
+  program.masterVolume = value;
+  program.masterVolumeState.setCurrentAt(vm.tick(), value);
+  program.masterVolumeAutomationTrack.reset();
+  out.masterLevel(masterGain(value));
+}
+
+void Playback::masterVolumeFade(u8 length, u8 value) {
+  if (length == 0) {
+    masterVolume(value);
+    return;
   }
+  program.masterVolumeState.reset(program.masterVolume);
+  program.masterVolumeState.begin(out.fade(PerformanceAutomationTarget::MasterLevel, masterGain(value), length),
+                                  program.masterVolumeState.toRawTarget(value, length));
+  program.masterVolumeAutomationTrack = track.trackNumber;
+}
 
-  void beginNoteVibrato() {
-    if (!track.vibrato.active() || track.vibrato.fade == 0) {
-      return;
-    }
-    track.vibratoDepth.configureLinearFade(track.vibrato.fade);
-    static_cast<void>(track.vibratoDepth.restartFade(track.vibrato.delay));
-    track.vibratoDepth.bindFade(out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth,
-                                                 math::vibratoDepthCents(track.vibrato.depth) / 100.0,
-                                                 track.vibrato.fade, track.vibrato.delay));
-    emitVibratoDepth(0, track.vibratoDepth.fadeOutput(out));
-  }
-
-  void tremoloOn(u8 delay, u8 rate, u8 depth) {
-    const LfoPerformanceContext context = tremoloLfoContext();
-    out.tremoloDepth(math::tremoloDepthDecibels(program.selected.base, depth), context);
-    out.tremoloRateCyclesPerTick(static_cast<double>(rate) / 256.0, context);
-    out.tremoloDelayTicks(delay);
-  }
-
-  void tremoloOff() { out.tremoloDepth(0.0, tremoloLfoContext()); }
-
-  void tempo(u8 value) {
-    const u8 driverTempo = program.commandTempo(value);
-    program.tempoState.setCurrentAt(vm.tick(), driverTempo);
+void Playback::advanceTempoFade() {
+  program.tempoState.tickRaw([&](s32 raw) {
+    const u8 value = static_cast<u8>(std::clamp<s32>(raw, 0, 0xff));
+    program.tempo = value;
+    program.tempoState.output(out).tempo(math::tempoMicrosecondsPerQuarter(value, program.tempoTimerTarget));
+  });
+  if (!program.tempoState.active()) {
     program.tempoAutomationTrack.reset();
-    program.tempo = driverTempo;
-    out.tempo(math::tempoMicrosecondsPerQuarter(driverTempo, program.tempoTimerTarget));
   }
+}
 
-  void tempoFade(u8 length, u8 value) {
-    if (length == 0) {
-      tempo(value);
-      return;
-    }
-    const u8 driverTempo = program.commandTempo(value);
-    program.tempoState.reset(program.tempo);
-    program.tempoState.begin(
-        out.fade(PerformanceAutomationTarget::Tempo,
-                 static_cast<double>(math::tempoMicrosecondsPerQuarter(driverTempo, program.tempoTimerTarget)), length),
-        program.tempoState.toRawTarget(driverTempo, length));
-    program.tempoAutomationTrack = track.trackNumber;
+void Playback::advanceVibratoFade() {
+  const auto tick = track.vibratoDepth.tickFade();
+  if (!tick.shouldApply()) {
+    return;
+  }
+  emitVibratoDepth(static_cast<u8>(track.vibratoDepth.currentDepth()), track.vibratoDepth.fadeOutput(out));
+}
+
+void Playback::advancePanFade() {
+  track.pan.tickRaw(
+      [&](s32 value) { emitPan(track.pan.output(out), static_cast<u8>(std::clamp<s32>(value, 0, 0xff))); });
+}
+
+void Playback::advanceVolumeFade() {
+  track.volume.tickRaw([&](s32 value) {
+    track.volume.output(out).level(math::levelGain(static_cast<u8>(std::clamp<s32>(value, 0, 0xff))),
+                                   ValueQuantization{.levels = 256});
+  });
+}
+
+void Playback::advanceMasterFade() {
+  program.masterVolumeState.tickRaw([&](s32 value) {
+    program.masterVolume = static_cast<u8>(std::clamp<s32>(value, 0, 0xff));
+    program.masterVolumeState.output(out).masterLevel(masterGain(program.masterVolume));
+  });
+  if (!program.masterVolumeState.active()) {
+    program.masterVolumeAutomationTrack.reset();
+  }
+}
+
+void Playback::tick() {
+  advanceVolumeFade();
+  advancePanFade();
+  advanceVibratoFade();
+  advancePitchMotion();
+  if (program.tempoAutomationTrack == track.trackNumber) {
     advanceTempoFade();
   }
-
-  void volume(u8 value) {
-    track.volume.setCurrentAt(vm.tick(), value);
-    out.level(math::levelGain(value), ValueQuantization{.levels = 256});
+  if (program.masterVolumeAutomationTrack == track.trackNumber) {
+    advanceMasterFade();
   }
-
-  void volumeFade(u8 length, u8 value) {
-    if (length == 0) {
-      volume(value);
-      return;
-    }
-    track.volume.begin(out.fade(PerformanceAutomationTarget::Level, math::levelGain(value), length),
-                       track.volume.toRawTarget(value, length));
-  }
-
-  [[nodiscard]] double masterGain(u8 value) const {
-    // Albert applies FE before squaring; multiplying the squared gains is equivalent.
-    return math::levelGain(value) * math::levelGain(program.volumeMultiplier);
-  }
-
-  void volumeMultiplier(u8 value) {
-    // The combined output changes immediately, but E6's source-domain fade
-    // keeps running. End its old output binding without clearing that motion.
-    program.masterVolumeState.interruptAutomationAt(vm.tick());
-    program.volumeMultiplier = value;
-    out.masterLevel(masterGain(program.masterVolume));
-  }
-
-  void masterVolume(u8 value) {
-    program.masterVolume = value;
-    program.masterVolumeState.setCurrentAt(vm.tick(), value);
-    program.masterVolumeAutomationTrack.reset();
-    out.masterLevel(masterGain(value));
-  }
-
-  void masterVolumeFade(u8 length, u8 value) {
-    if (length == 0) {
-      masterVolume(value);
-      return;
-    }
-    program.masterVolumeState.reset(program.masterVolume);
-    program.masterVolumeState.begin(out.fade(PerformanceAutomationTarget::MasterLevel, masterGain(value), length),
-                                    program.masterVolumeState.toRawTarget(value, length));
-    program.masterVolumeAutomationTrack = track.trackNumber;
-  }
-
-  void advanceTempoFade() {
-    program.tempoState.tickRaw([&](s32 raw) {
-      const u8 value = static_cast<u8>(std::clamp<s32>(raw, 0, 0xff));
-      program.tempo = value;
-      program.tempoState.output(out).tempo(math::tempoMicrosecondsPerQuarter(value, program.tempoTimerTarget));
-    });
-    if (!program.tempoState.active()) {
-      program.tempoAutomationTrack.reset();
-    }
-  }
-
-  void advanceVibratoFade() {
-    const auto tick = track.vibratoDepth.tickFade();
-    if (!tick.shouldApply()) {
-      return;
-    }
-    emitVibratoDepth(static_cast<u8>(track.vibratoDepth.currentDepth()), track.vibratoDepth.fadeOutput(out));
-  }
-
-  void advancePanFade() {
-    track.pan.tickRaw(
-        [&](s32 value) { emitPan(track.pan.output(out), static_cast<u8>(std::clamp<s32>(value, 0, 0xff))); });
-  }
-
-  void advanceVolumeFade() {
-    track.volume.tickRaw([&](s32 value) {
-      track.volume.output(out).level(math::levelGain(static_cast<u8>(std::clamp<s32>(value, 0, 0xff))),
-                                     ValueQuantization{.levels = 256});
-    });
-  }
-
-  void advanceMasterFade() {
-    program.masterVolumeState.tickRaw([&](s32 value) {
-      program.masterVolume = static_cast<u8>(std::clamp<s32>(value, 0, 0xff));
-      program.masterVolumeState.output(out).masterLevel(masterGain(program.masterVolume));
-    });
-    if (!program.masterVolumeState.active()) {
-      program.masterVolumeAutomationTrack.reset();
-    }
-  }
-
-  void tick() {
-    advanceVolumeFade();
-    advancePanFade();
-    advanceVibratoFade();
-    advancePitchMotion();
-    if (program.tempoAutomationTrack == track.trackNumber) {
-      advanceTempoFade();
-    }
-    if (program.masterVolumeAutomationTrack == track.trackNumber) {
-      advanceMasterFade();
-    }
-    if (program.echo.advanceFade(vm.tick())) {
-      out.reverb(program.echo.current());
-    }
-  }
-
-  void globalTranspose(s8 semitones) {
-    program.globalTranspose = semitones;
-    out.globalTranspose(semitones);
-  }
-
-  void echo(u8 channels, u8 volumeLeft, u8 volumeRight) {
-    program.echo.set(channels, volumeLeft, volumeRight);
+  if (program.echo.advanceFade(vm.tick())) {
     out.reverb(program.echo.current());
   }
+}
 
-  void channelEcho(bool enabled) {
-    program.echo.channel(static_cast<u8>(1u << track.trackNumber), enabled);
+void Playback::globalTranspose(s8 semitones) {
+  program.globalTranspose = semitones;
+  out.globalTranspose(semitones);
+}
+
+void Playback::echo(u8 channels, u8 volumeLeft, u8 volumeRight) {
+  program.echo.set(channels, volumeLeft, volumeRight);
+  out.reverb(program.echo.current());
+}
+
+void Playback::channelEcho(bool enabled) {
+  program.echo.channel(static_cast<u8>(1u << track.trackNumber), enabled);
+  out.reverb(program.echo.current());
+}
+
+void Playback::echoOff() {
+  if (isSunsoft(program.selected.id)) {
+    // Sunsoft F6 zeros EVOL but retains the channel mask.
+    program.echo.setVolume(0, 0);
+  } else {
+    program.echo.disable();
+  }
+  out.reverb(program.echo.current());
+}
+
+void Playback::echoParameters(u8 delay, s8 feedback, u8 filter) {
+  program.echo.setParameters(delay, feedback, filter);
+  out.reverb(program.echo.current());
+}
+
+void Playback::echoVolumeFade(u8 length, u8 volumeLeft, u8 volumeRight) {
+  if (program.echo.beginFade(length, volumeLeft, volumeRight)) {
     out.reverb(program.echo.current());
   }
+}
 
-  void echoOff() {
-    if (isSunsoft(program.selected.id)) {
-      // Sunsoft F6 zeros EVOL but retains the channel mask.
-      program.echo.setVolume(0, 0);
-    } else {
-      program.echo.disable();
-    }
-    out.reverb(program.echo.current());
+void Playback::percussionBase(u8 base) {
+  if (!program.fixedPercussionBase) {
+    program.percussionBase = base;
+  }
+  if (program.selected.intelli == IntelliMode::Ta) {
+    program.intelligent.flags &= static_cast<u8>(~0x40);
+  }
+}
+
+void Playback::pitchEnvelope(PitchEnvelope::Mode mode, u8 delay, u8 length, s8 semitones) {
+  track.pitchEnvelope = PitchEnvelope{mode, delay, length, semitones};
+}
+
+void Playback::beginKonamiLoop(Address start) { track.konamiLoop.start = start; }
+
+Effects Playback::konamiLoop(u8 times, s8 volumeDelta, s8 pitchDelta, Address destination) {
+  RepeatCounter counter = vm.repeatCounter(0);
+  if (counter.firstVisit()) {
+    counter.start(times == 0 ? 256 : times);
   }
 
-  void echoParameters(u8 delay, s8 feedback, u8 filter) {
-    program.echo.setParameters(delay, feedback, filter);
-    out.reverb(program.echo.current());
+  if (counter.consumeReplay()) {
+    // The driver accumulates these operands only for another pass. Volume is
+    // an eight-bit add applied when the packed note parameters are read;
+    // pitch uses signed 16-bit units with 1/256 semitone resolution.
+    track.konamiLoop.volumeDelta = static_cast<u8>(track.konamiLoop.volumeDelta + static_cast<u8>(volumeDelta));
+    const u16 pitchBits =
+        static_cast<u16>(track.konamiLoop.pitchDelta) + static_cast<u16>(static_cast<s16>(pitchDelta) * 16);
+    track.konamiLoop.pitchDelta =
+        pitchBits < 0x8000 ? static_cast<s16>(pitchBits) : static_cast<s16>(static_cast<s32>(pitchBits) - 0x10000);
+    return vm.jump(destination);
   }
 
-  void echoVolumeFade(u8 length, u8 volumeLeft, u8 volumeRight) {
-    if (program.echo.beginFade(length, volumeLeft, volumeRight)) {
-      out.reverb(program.echo.current());
-    }
+  counter.finish();
+  track.konamiLoop.volumeDelta = 0;
+  track.konamiLoop.pitchDelta = 0;
+  return Effects{};
+}
+
+void Playback::adsr(u8 adsr1, u8 adsr2) {
+  track.envelope.adsr1 = adsr1;
+  track.envelope.adsr2 = adsr2;
+  // Rate-based GAIN depends on the live ENVX value. Preserve the registers
+  // but emit only envelopes that the static model can describe faithfully.
+  if ((adsr1 & 0x80) != 0 || (track.envelope.gain & 0x80) == 0) {
+    out.replaceEnvelope(snesDspEnvelope(adsr1, adsr2, track.envelope.gain),
+                        VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
-
-  void percussionBase(u8 base) {
-    if (!program.fixedPercussionBase) {
-      program.percussionBase = base;
-    }
-    if (program.selected.intelli == IntelliMode::Ta) {
-      program.intelliFlags &= static_cast<u8>(~0x40);
-    }
-  }
-
-  void pitchEnvelope(PitchEnvelope::Mode mode, u8 delay, u8 length, s8 semitones) {
-    track.pitchEnvelope = PitchEnvelope{mode, delay, length, semitones};
-  }
-
-  [[nodiscard]] Effects konamiLoop(u8 times, s8 volumeDelta, s8 pitchDelta, Address destination) {
-    RepeatCounter counter = vm.repeatCounter(0);
-    if (counter.firstVisit()) {
-      counter.start(times == 0 ? 256 : times);
-    }
-
-    if (counter.consumeReplay()) {
-      // The driver accumulates these operands only for another pass. Volume is
-      // an eight-bit add applied when the packed note parameters are read;
-      // pitch uses signed 16-bit units with 1/256 semitone resolution.
-      track.konamiLoopVolumeDelta = static_cast<u8>(track.konamiLoopVolumeDelta + static_cast<u8>(volumeDelta));
-      const u16 pitchBits =
-          static_cast<u16>(track.konamiLoopPitchDelta) + static_cast<u16>(static_cast<s16>(pitchDelta) * 16);
-      track.konamiLoopPitchDelta =
-          pitchBits < 0x8000 ? static_cast<s16>(pitchBits) : static_cast<s16>(static_cast<s32>(pitchBits) - 0x10000);
-      return vm.jump(destination);
-    }
-
-    counter.finish();
-    track.konamiLoopVolumeDelta = 0;
-    track.konamiLoopPitchDelta = 0;
-    return Effects{};
-  }
-
-  void defineVoiceTable(u8 size) { program.voiceTable.assign(size, VoiceRecord{}); }
-
-  void defineVoice(u8 index, u8 instrument, u8 volume, u8 pan, u8 tuningTranspose) {
-    if (index < program.voiceTable.size()) {
-      program.voiceTable[index] = VoiceRecord{
-          .instrument = instrument,
-          .volume = volume,
-          .pan = pan,
-          .tuningTranspose = tuningTranspose,
-      };
-    }
-  }
-
-  void overwriteInstrument(u8 logical, u8 srcn, u8 adsr1, u8 adsr2, u8 gain, u8 pitchHigh, u8 pitchLow) {
-    // FA writes the shared RAM table. DSP registers change only when a
-    // channel next selects that instrument (D6/DA/FB or percussion).
-    program.registerOverride(logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow, vm.sourceRange());
-  }
-
-  void loadVoice(u8 index, u8 percussionMinimum, IntelliMode mode) {
-    // The declared table is the only typed data boundary; bytes belonging to
-    // following commands are not silently reinterpreted as voice records.
-    const u8 slot = index & 0x3f;  // The driver computes an eight-bit index * 4.
-    if (slot >= program.voiceTable.size()) {
-      return;
-    }
-    const VoiceRecord& record = program.voiceTable[slot];
-    volume(record.volume);
-    const u8 panValue = mode == IntelliMode::Fe3 ? record.pan : record.pan & 0x1f;
-    pan(panValue);
-
-    s8 transpose = track.transpose;
-    if (mode == IntelliMode::Fe3) {
-      constexpr std::array<s8, 7> transposes{-24, -12, -1, 0, 1, 12, 24};
-      const u8 tuning = record.tuningTranspose & 0x0f;
-      const u8 transposeIndex = (record.tuningTranspose >> 4) & 7;
-      if (tuning != 0) {
-        out.tuning(((tuning - 1) * 5 / 256.0) * 100.0);
-      }
-      if (transposeIndex != 0) {
-        transpose = program.intelliTransposeTable.size() == 7
-                        ? static_cast<s8>(program.intelliTransposeTable[transposeIndex - 1])
-                        : transposes[transposeIndex - 1];
-      }
-    } else {
-      const double tuningCents = (((record.pan >> 5) & 7) * 5 / 256.0) * 100.0;
-      transpose = static_cast<s8>(record.tuningTranspose);
-      out.tuning(tuningCents);
-      if ((index & 0x80) != 0) {
-        vibratoOff();
-      }
-      if (mode == IntelliMode::Fe4 && (index & 0x40) != 0) {
-        track.pitch.motion.clear();
-      }
-    }
-    track.transpose = transpose;
-    melodicProgram(record.instrument, percussionMinimum);
-  }
-
-  void adsr(u8 adsr1, u8 adsr2) {
-    track.envelope.adsr1 = adsr1;
-    track.envelope.adsr2 = adsr2;
-    // Rate-based GAIN depends on the live ENVX value. Preserve the registers
-    // but emit only envelopes that the static model can describe faithfully.
-    if ((adsr1 & 0x80) != 0 || (track.envelope.gain & 0x80) == 0) {
-      out.replaceEnvelope(snesDspEnvelope(adsr1, adsr2, track.envelope.gain),
-                          VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
-    }
-  }
-
-  void intelliGain(u8 gain) {
-    track.envelope.gain = gain;
-    if ((track.envelope.adsr1 & 0x80) == 0 && (gain & 0x80) == 0) {
-      out.replaceEnvelope(snesDspEnvelope(track.envelope.adsr1, track.envelope.adsr2, gain),
-                          VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
-    }
-  }
-
-  void percussionEntry(u8 slot, u8 patch, u8 note, u8 pan) {
-    if (slot < program.percussionTable.size()) {
-      program.percussionTable[slot] = PercussionEntry{patch, note, pan};
-    }
-  }
-
-  void enableCustomPercussion() { program.intelliFlags |= 0x40; }
-
-  void intelliFlags(u8 mask, bool enabled) {
-    if (enabled) {
-      program.intelliFlags |= mask;
-    } else {
-      program.intelliFlags &= static_cast<u8>(~mask);
-    }
-  }
-
-  void fe3Flags(u8 param) {
-    if (param < 0xf0) {
-      return;
-    }
-    intelliFlags(static_cast<u8>(1u << (param & 7)), (param & 8) == 0);
-  }
-
-  [[nodiscard]] Effects intelliConditionalJump(Address destination) {
-    const u8 channel = static_cast<u8>(1u << track.trackNumber);
-    return (program.intelliConditionalMask & channel) == 0 ? vm.jump(destination) : Effects{};
-  }
-
-  std::span<const u8> panTable = math::kPan;
-};
-
-using Cursor = CompilerCursor<Playback>;
-
-struct DecodeContext {
-  ByteReader reader;
-  const Layout& layout;
-  const Profile& selected;
-  const Definition& definition;
-  std::vector<Diagnostic>* diagnostics = nullptr;
-
-  [[nodiscard]] Address address(u16 raw) const { return Address{layout.resolveAddress(raw)}; }
-};
+}
 
 [[nodiscard]] DecodedBytecodeCommand unknownCommand(Cursor& cursor, u8 arguments) {
   auto event = cursor.sourceOnly("Unknown Event", "unknown");
@@ -1586,8 +1079,7 @@ struct DecodeContext {
   return event;
 }
 
-[[nodiscard]] DecodedBytecodeCommand decodeNoteParameters(Cursor& cursor, const DecodeContext& context, EventType type,
-                                                          u32 begin) {
+[[nodiscard]] DecodedBytecodeCommand decodeNoteParameters(Cursor& cursor, const DecodeContext& context, EventType type) {
   auto event = cursor.command("Note Parameters", SequenceSemantic::State);
   const u8 duration = event.opcodeValue("duration", cursor.opcode(), SourceValueDisplay::Decimal);
 
@@ -1610,61 +1102,18 @@ struct DecodeContext {
     return event.invoke<&Playback::lemmingsParameters>(duration, hasDuration, durationRate, hasVelocity, velocity);
   }
 
-  if (type == EventType::NoteParameter) {
-    bool present = false;
-    u8 durationRate = 0;
-    u8 velocity = 0;
-    if (event.peekU8() <= 0x7f) {
-      present = true;
-      const u8 packed = event.u8("quantize_velocity", SourceValueDisplay::Hex);
-      durationRate = context.definition.duration[(packed >> 4) & 7];
-      velocity = context.definition.volume[packed & 15];
-      event.derived("duration_rate", durationRate);
-      event.derived("velocity", velocity);
-    }
-    return event.invoke<&Playback::standardParameters>(duration, present, durationRate, velocity);
+  bool present = false;
+  u8 durationRate = 0;
+  u8 velocity = 0;
+  if (event.peekU8() <= 0x7f) {
+    present = true;
+    const u8 packed = event.u8("quantize_velocity", SourceValueDisplay::Hex);
+    durationRate = context.definition.duration[(packed >> 4) & 7];
+    velocity = context.definition.volume[packed & 15];
+    event.derived("duration_rate", durationRate);
+    event.derived("velocity", velocity);
   }
-
-  event.set<&TrackState::noteLength>(duration);
-  std::vector<std::pair<u8, u8>> parameters;
-  while (event.peekU8() <= 0x7f && parameters.size() < 0x80) {
-    const u8 raw = event.u8(fmt::format("parameter_{}", parameters.size() + 1), SourceValueDisplay::Hex);
-    const auto& table = raw < 0x40 ? context.definition.intelliDuration : context.definition.intelliVolume;
-    const u8 resolved = table[raw & 0x3f];
-    event.derived(fmt::format("resolved_{}", parameters.size() + 1), resolved);
-    parameters.emplace_back(raw, resolved);
-    // A velocity byte terminates the parameter list. Only duration bytes
-    // loop back to read another parameter in both FE3 and FE4.
-    if (raw >= 0x40) {
-      break;
-    }
-  }
-
-  if (context.selected.intelli != IntelliMode::Fe3) {
-    for (const auto& [raw, resolved] : parameters) {
-      event.invoke<&Playback::intelliParameter>(raw, resolved);
-    }
-    return event;
-  }
-
-  // FE3 can switch between the ordinary packed byte and its variable-length
-  // parameter stream at runtime. Decode both exits and let the semantic action
-  // choose one; this is the only overlapping command shape in the driver.
-  const bool hasPacked = !parameters.empty();
-  const u8 packed = hasPacked ? parameters.front().first : 0;
-  const u8 standardDuration = hasPacked ? context.definition.duration[(packed >> 4) & 7] : 0;
-  const u8 standardVelocity = hasPacked ? context.definition.volume[packed & 15] : 0;
-  event.invoke<&Playback::fe3StandardParameter>(hasPacked, standardDuration, standardVelocity);
-  for (const auto& [raw, resolved] : parameters) {
-    event.invoke<&Playback::fe3CustomParameter>(raw, resolved);
-  }
-  const Address standardDestination{begin + 1 + (hasPacked ? 1u : 0u)};
-  const Address customDestination = event.nextAddress();
-  event.derived("standard_destination", standardDestination, SourceValueDisplay::Address,
-                SemanticOperandRole::JumpTarget);
-  event.derived("custom_destination", customDestination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-  event.invoke<&Playback::fe3ParameterFlow>(standardDestination, customDestination);
-  return event.discoverTarget(standardDestination);
+  return event.invoke<&Playback::standardParameters>(duration, present, durationRate, velocity);
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(const DecodeContext& context, u32 begin) {
@@ -1675,9 +1124,16 @@ struct DecodeContext {
 
   const u8 opcode = cursor.opcode();
   const EventType type = context.definition.events[opcode];
-  if (type == EventType::NoteParameter || type == EventType::LemmingsNoteParameter ||
-      type == EventType::IntelliNoteParameter) {
-    return decodeNoteParameters(cursor, context, type, begin);
+  if (type == EventType::IntelliNoteParameter) {
+    return decodeIntelligentNoteParameters(cursor, context, begin);
+  }
+  if (type == EventType::NoteParameter || type == EventType::LemmingsNoteParameter) {
+    return decodeNoteParameters(cursor, context, type);
+  }
+  if (context.selected.intelli != IntelliMode::None) {
+    if (auto command = decodeIntelligentCommand(cursor, context, type)) {
+      return std::move(*command);
+    }
   }
 
   switch (type) {
@@ -1865,7 +1321,7 @@ struct DecodeContext {
     }
     case EventType::KonamiLoopStart: {
       auto event = cursor.command("Loop Start", SequenceSemantic::Loop);
-      return event.set<&TrackState::konamiLoopStart>(event.derived(
+      return event.invoke<&Playback::beginKonamiLoop>(event.derived(
           "destination", event.nextAddress(), SourceValueDisplay::Address, SemanticOperandRole::LoopTarget));
     }
     case EventType::KonamiLoopEnd: {
@@ -1874,7 +1330,7 @@ struct DecodeContext {
       const s8 volumeDelta = event.s8("volume_delta", SourceValueDisplay::SignedDecimal);
       const s8 pitchDelta = event.s8("pitch_delta", SourceValueDisplay::SignedDecimal);
       event.invokeFlow([times, volumeDelta, pitchDelta](Playback& playback) {
-        return playback.konamiLoop(times, volumeDelta, pitchDelta, playback.track.konamiLoopStart);
+        return playback.konamiLoop(times, volumeDelta, pitchDelta, playback.track.konamiLoop.start);
       });
       return event;
     }
@@ -1903,149 +1359,11 @@ struct DecodeContext {
       return cursor.command("Echo On", SequenceSemantic::State).invoke<&Playback::channelEcho>(true);
     case EventType::ChannelEchoOff:
       return cursor.command("Echo Off", SequenceSemantic::State).invoke<&Playback::channelEcho>(false);
-    case EventType::IntelliLegatoOn:
-      return cursor.command("Legato On", SequenceSemantic::State).invoke<&Playback::legato>(true);
-    case EventType::IntelliLegatoOff:
-      return cursor.command("Legato Off", SequenceSemantic::State).invoke<&Playback::legato>(false);
-    case EventType::IntelliConditionalJump: {
-      auto event = cursor.command("Conditional Short Jump", SequenceSemantic::Jump);
-      const u8 distance = event.u8("distance");
-      const Address destination{event.nextAddress().value + distance};
-      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-      return event.invoke<&Playback::intelliConditionalJump>(destination).discoverTarget(destination);
-    }
-    case EventType::IntelliJump: {
-      auto event = cursor.command("Short Jump", SequenceSemantic::Jump);
-      const u8 distance = event.u8("distance");
-      const Address destination{event.nextAddress().value + distance};
-      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-      return event.jump(destination);
-    }
-    case EventType::IntelliFe3F5: {
-      auto event = cursor.command("FE3 Flags / Port Wait", SequenceSemantic::State);
-      return event.invoke<&Playback::fe3Flags>(event.u8("parameter", SourceValueDisplay::Hex));
-    }
-    case EventType::IntelliWritePort: {
-      auto event = cursor.sourceOnly("Write APU Port");
-      event.u8("value");
-      return event;
-    }
-    case EventType::IntelliFe3Percussion: {
-      auto event = cursor.command("Custom Percussion Table", SequenceSemantic::State);
-      std::array<u8, 12> patches{};
-      std::array<u8, 12> notes{};
-      for (u8 slot = 0; slot < 12; ++slot) {
-        patches[slot] = event.u8(fmt::format("patch_{}", slot), SourceValueDisplay::Hex);
-      }
-      for (u8 slot = 0; slot < 12; ++slot) {
-        notes[slot] = event.u8(fmt::format("note_{}", slot), SourceValueDisplay::Hex);
-      }
-      for (u8 slot = 0; slot < 12; ++slot) {
-        const u8 pan = event.u8(fmt::format("pan_{}", slot), SourceValueDisplay::Hex);
-        event.invoke<&Playback::percussionEntry>(slot, patches[slot], notes[slot], pan);
-      }
-      return event;  // F5 selects the mode; F9 only copies the three arrays.
-    }
-    case EventType::IntelliDefineVoice: {
-      auto event = cursor.command("Voice Parameter Definition", SequenceSemantic::Program);
-      const s8 parameter = event.s8("count_or_instrument", SourceValueDisplay::SignedDecimal);
-      if (parameter >= 0 || !context.layout.intelliInstrumentOverwrite) {
-        const u8 count = static_cast<u8>(parameter) & 0x3f;
-        event.invoke<&Playback::defineVoiceTable>(count);
-        for (u8 index = 0; index < count; ++index) {
-          const u8 instrument = event.u8(fmt::format("instrument_{}", index), SemanticOperandRole::Instrument);
-          const u8 volume = event.u8(fmt::format("volume_{}", index));
-          const u8 pan = event.u8(fmt::format("pan_{}", index));
-          const u8 tuningTranspose = event.u8(fmt::format("tuning_transpose_{}", index));
-          event.invoke<&Playback::defineVoice>(index, instrument, volume, pan, tuningTranspose);
-        }
-        return event;
-      }
-      if (context.selected.intelli != IntelliMode::Fe3 && context.selected.intelli != IntelliMode::Ta) {
-        return event.ignore();
-      }
-      const u8 logical = static_cast<u8>(parameter) & 0x3f;
-      const u8 srcn = event.u8("srcn", SourceValueDisplay::Hex);
-      const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
-      const u8 adsr2 = event.u8("adsr2", SourceValueDisplay::Hex);
-      const u8 gain = event.u8("gain", SourceValueDisplay::Hex);
-      const u8 pitchHigh = event.u8("pitch_high", SourceValueDisplay::Hex);
-      const u8 pitchLow = event.u8("pitch_low", SourceValueDisplay::Hex);
-      return event.invoke<&Playback::overwriteInstrument>(logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow);
-    }
-    case EventType::IntelliLoadVoice: {
-      auto event = cursor.command("Load Voice Parameters", SequenceSemantic::Program);
-      const u8 index = event.u8("index");
-      return event.invoke<&Playback::loadVoice>(index, context.definition.status.percussionMin,
-                                                context.selected.intelli);
-    }
     case EventType::Adsr: {
       auto event = cursor.command("ADSR", SequenceSemantic::State);
       const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
       const u8 adsr2 = event.u8("adsr2", SourceValueDisplay::Hex);
       return event.invoke<&Playback::adsr>(adsr1, adsr2);
-    }
-    case EventType::IntelliGainDurationRate: {
-      auto event = cursor.command("GAIN Duration Rate", SequenceSemantic::State);
-      event.u8("duration_rate");
-      const u8 gain = event.u8("gain", SourceValueDisplay::Hex);
-      event.invoke<&Playback::intelliGain>(gain);
-      // This is the independent counter for switching ADSR to GAIN,
-      // not the note's key-off duration rate.
-      return event;
-    }
-    case EventType::IntelliGainDuration: {
-      auto event = cursor.command("GAIN Duration", SequenceSemantic::State);
-      event.u8("duration_rate");
-      return event.ignore();
-    }
-    case EventType::IntelliReleaseGainOff:
-      // FE4's zero-length F9 enters the release-GAIN store with A=0.
-      return cursor.sourceOnly("Clear Release GAIN");
-    case EventType::IntelliGain: {
-      auto event = cursor.command("GAIN", SequenceSemantic::State);
-      return event.invoke<&Playback::intelliGain>(event.u8("gain", SourceValueDisplay::Hex));
-    }
-    case EventType::IntelliCustomPercussion: {
-      auto event = cursor.command("Custom Percussion Table", SequenceSemantic::State);
-      const u8 packedCount = event.u8("packed_count", SourceValueDisplay::Hex);
-      const u8 count = static_cast<u8>((packedCount & 0x0f) + 1);
-      event.derived("count", count);
-      // MUL leaves the high byte as the first slot; shorter writes keep the rest.
-      const u8 firstSlot = static_cast<u8>((packedCount * 3) >> 8);
-      event.derived("first_slot", firstSlot);
-      for (u8 slot = 0; slot < count; ++slot) {
-        const u8 patch =
-            event.u8(fmt::format("patch_{}", slot), SourceValueDisplay::Hex, SemanticOperandRole::Instrument);
-        const u8 note = event.u8(fmt::format("note_{}", slot), SourceValueDisplay::MidiNote);
-        const u8 pan = event.u8(fmt::format("pan_{}", slot));
-        event.invoke<&Playback::percussionEntry>(static_cast<u8>(firstSlot + slot), patch, note, pan);
-      }
-      return event.invoke<&Playback::enableCustomPercussion>();
-    }
-    case EventType::IntelliTaSubevent:
-    case EventType::IntelliFe4Subevent: {
-      auto event = cursor.command("Intelligent Systems Subevent", SequenceSemantic::State);
-      const u8 subtype = event.u8("subtype", SourceValueDisplay::Hex);
-      if (type == EventType::IntelliTaSubevent && subtype == 0) {
-        event.u16le("request_value", SourceValueDisplay::Hex);
-        event.u8("request_type", SourceValueDisplay::Hex);
-        return event.ignore();
-      }
-      if (subtype == 1 || subtype == 2) {
-        const u8 mask = event.u8("mask", SourceValueDisplay::Hex);
-        return event.invoke<&Playback::intelliFlags>(mask, subtype == 1);
-      }
-      if (type == EventType::IntelliTaSubevent && subtype == 3) {
-        return event.invoke<&Playback::legato>(true);
-      }
-      if (type == EventType::IntelliTaSubevent && subtype == 4) {
-        return event.invoke<&Playback::legato>(false);
-      }
-      if (type == EventType::IntelliTaSubevent && subtype == 5) {
-        event.u8("global_byte", SourceValueDisplay::Hex);
-      }
-      return event.ignore();
     }
     case EventType::Nop:
       return cursor.sourceOnly("NOP");
@@ -2070,179 +1388,6 @@ struct DecodeContext {
     default:
       return unknownCommand(cursor, 0);
   }
-}
-
-struct PlaylistDecode {
-  SectionPlaylist playlist;
-  std::optional<SourceAnnotationId> annotation;
-};
-
-[[nodiscard]] PlaylistDecode decodePlaylist(ByteReader reader, const Layout& layout, AssetId sequenceId,
-                                            SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
-  const Profile& selected = profile(layout.profile);
-  const u8 trackCount = layout.trackCount();
-  std::map<u32, PlaylistCommand> commands;
-  using SectionTracks = std::vector<std::optional<Address>>;
-  std::map<u32, SectionTracks> sections;
-  std::vector<u32> pending{layout.playlistAddress};
-
-  const auto warn = [&](std::string message, SourceRange range) {
-    if (diagnostics != nullptr) {
-      diagnostics->push_back(Diagnostic{
-          .severity = Severity::Warning,
-          .message = std::move(message),
-          .range = range,
-      });
-    }
-  };
-  const auto queue = [&](u32 address) {
-    if (reader.has(address, 2) && !commands.contains(address) && std::ranges::find(pending, address) == pending.end()) {
-      pending.push_back(address);
-    }
-  };
-  const auto decodeSection = [&](u16 address) -> std::optional<SectionTracks> {
-    if (!reader.has(address, trackCount * 2)) {
-      warn(fmt::format("NinSnes section ${:04X} did not contain {} track pointers", address, trackCount),
-           reader.range(address, reader.has(address, 1) ? 1 : 0));
-      return std::nullopt;
-    }
-    SectionTracks trackStarts(trackCount);
-    bool active = false;
-    for (u8 track = 0; track < trackCount; ++track) {
-      const u16 raw = reader.le16(address + track * 2);
-      if ((raw & 0xff00) == 0) {
-        continue;
-      }
-      const u16 start = layout.resolveAddress(raw);
-      if (!reader.has(start, 1)) {
-        warn(fmt::format("NinSnes track pointer ${:04X} was outside ARAM", start),
-             reader.range(address + track * 2, 2));
-        continue;
-      }
-      trackStarts[track] = Address{start};
-      active = true;
-    }
-    return active ? std::optional<SectionTracks>{std::move(trackStarts)} : std::nullopt;
-  };
-
-  while (!pending.empty() && commands.size() < 4096) {
-    const u32 address = pending.back();
-    pending.pop_back();
-    if (commands.contains(address) || !reader.has(address, 2)) {
-      continue;
-    }
-    const u16 value = reader.le16(address);
-    PlaylistCommand command{
-        .address = Address{address},
-        .fallthrough = Address{address + 2},
-        .range = reader.range(address, 2),
-    };
-    if (value != 0 && value <= 0xff) {
-      if (!reader.has(address, 4)) {
-        warn("NinSnes playlist repeat was truncated", reader.range(address, 2));
-      } else {
-        const u16 storedDestination = reader.le16(address + 2);
-        const u16 destination = layout.resolveAddress(storedDestination);
-        const bool infinite = isInfinitePlaylistRepeat(selected.playlist, value);
-        command.fallthrough = Address{address + 4};
-        command.range = reader.range(address, 4);
-        command.kind = PlaylistCommandKind::Repeat;
-        command.target = Address{destination};
-        command.additionalPlays = infinite ? 0 : value;
-        queue(destination);
-        // Infinite repeats never reach their encoded fallthrough, which may be adjacent song data.
-        if (!infinite) {
-          queue(address + 4);
-        }
-      }
-    } else if (value > 0xff) {
-      const u16 sectionAddress = layout.resolveAddress(value);
-      command.kind = PlaylistCommandKind::PlaySection;
-      command.target = Address{sectionAddress};
-      auto section = sections.find(sectionAddress);
-      if (section == sections.end()) {
-        if (auto decodedSection = decodeSection(sectionAddress)) {
-          section = sections.emplace(sectionAddress, std::move(*decodedSection)).first;
-        }
-      }
-      if (section != sections.end()) {
-        command.trackStarts = section->second;
-      }
-      queue(address + 2);
-    }
-    commands.emplace(address, std::move(command));
-  }
-
-  PlaylistDecode decoded{
-      .playlist =
-          SectionPlaylist{
-              .startAddress = Address{layout.playlistAddress},
-          },
-  };
-  for (auto& [_, command] : commands) {
-    decoded.playlist.commands.push_back(std::move(command));
-  }
-
-  if (sourceMap == nullptr || decoded.playlist.commands.empty()) {
-    return decoded;
-  }
-  const u64 first = decoded.playlist.commands.front().range.offset;
-  u64 last = first;
-  for (const auto& command : decoded.playlist.commands) {
-    last = std::max(last, command.range.endOffset());
-  }
-  decoded.annotation = sourceMap
-                           ->header("Section Playlist",
-                                    SourceRange{
-                                        .source = reader.source(),
-                                        .offset = first,
-                                        .size = static_cast<u32>(last - first),
-                                    })
-                           .kind("nin-snes-playlist")
-                           .owner(ObjectRefs::sequence(sequenceId))
-                           .id();
-
-  for (auto& command : decoded.playlist.commands) {
-    const bool play = command.kind == PlaylistCommandKind::PlaySection;
-    const bool repeat = command.kind == PlaylistCommandKind::Repeat;
-    auto annotation = sourceMap
-                          ->command(play ? "Play Section" : (repeat ? "Repeat Playlist" : "Playlist End"),
-                                    command.range, repeat ? SequenceSemantic::Repeat : SequenceSemantic::Meta)
-                          .kind("nin-snes-playlist-command")
-                          .parent(*decoded.annotation)
-                          .field("value", reader.range(command.range.offset, 2), reader.le16(command.range.offset),
-                                 SourceValueDisplay::Hex);
-    if (play) {
-      annotation.derived("section", command.target.value, SourceValueDisplay::Address)
-          .link(SourceLinkRole::PointsTo, SourceTarget{reader.range(command.target.value, trackCount * 2)});
-    } else if (repeat) {
-      annotation
-          .field("destination", reader.range(command.range.offset + 2, 2), command.target.value,
-                 SourceValueDisplay::Address)
-          .derived("additional_plays", command.additionalPlays)
-          .derived("infinite", command.additionalPlays == 0)
-          .link(SourceLinkRole::RepeatTarget, SourceTarget{reader.range(command.target.value, 2)});
-    }
-  }
-
-  for (const auto& [address, trackStarts] : sections) {
-    auto annotation = sourceMap->header("Section", reader.range(address, trackCount * 2))
-                          .kind("nin-snes-section")
-                          .parent(*decoded.annotation)
-                          .owner(ObjectRefs::sequence(sequenceId));
-    for (u8 track = 0; track < trackStarts.size(); ++track) {
-      const SourceRange range = reader.range(address + track * 2, 2);
-      if (trackStarts[track]) {
-        annotation
-            .field(fmt::format("track_{}", track + 1), range, trackStarts[track]->value,
-                   SourceValueDisplay::Address)
-            .link(SourceLinkRole::PointsTo, SourceTarget{reader.range(trackStarts[track]->value, 1)});
-      } else {
-        annotation.field(fmt::format("track_{}", track + 1), range, 0, SourceValueDisplay::Address);
-      }
-    }
-  }
-  return decoded;
 }
 
 [[nodiscard]] TrackProgram decodeTrack(ByteReader reader, u32 trackNumber, const std::vector<Address>& starts,
@@ -2294,44 +1439,13 @@ struct PlaylistDecode {
   };
 }
 
-}  // namespace
+}  // namespace sequence
+
+using namespace sequence;
 
 const SequenceProgramConfig& sequenceConfig() {
   static const SequenceProgramConfig config = makeSequenceConfig();
   return config;
-}
-
-bool isValidPlaylist(ByteReader reader, const Layout& layout) {
-  const u8 trackCount = layout.trackCount();
-  const SectionPlaylist& playlist = decodePlaylist(reader, layout, AssetId{}, nullptr, nullptr).playlist;
-  if (playlist.commands.empty() ||
-      std::ranges::none_of(playlist.commands, [](const PlaylistCommand& command) {
-        return command.kind == PlaylistCommandKind::PlaySection && !command.trackStarts.empty();
-      })) {
-    return false;
-  }
-
-  std::set<u64> commandAddresses;
-  for (const PlaylistCommand& command : playlist.commands) {
-    commandAddresses.insert(command.address.value);
-  }
-  if (!commandAddresses.contains(playlist.startAddress.value)) {
-    return false;
-  }
-
-  for (const PlaylistCommand& command : playlist.commands) {
-    if (command.kind == PlaylistCommandKind::PlaySection) {
-      if (command.trackStarts.size() != trackCount || !commandAddresses.contains(command.fallthrough.value)) {
-        return false;
-      }
-    } else if (command.kind == PlaylistCommandKind::Repeat) {
-      if (!commandAddresses.contains(command.target.value) ||
-          (command.additionalPlays != 0 && !commandAddresses.contains(command.fallthrough.value))) {
-        return false;
-      }
-    }
-  }
-  return true;
 }
 
 SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
@@ -2351,11 +1465,8 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
       .tempoTimerTarget = layout.tempoTimerTarget,
       .fixedPercussionBase = layout.fixedPercussionBase,
   };
-  if (layout.profile == ProfileId::IntelliFe3 && reader.has(0xb9, 1)) {
-    runtime.intelliConditionalMask = reader.u8At(0xb9);
-  }
   runtime.programMap = buildProgramMap(reader, layout);
-  runtime.intelliTransposeTable = layout.intelliTransposeTable;
+  runtime.intelligent = readIntelligentConfig(reader, layout);
   if ((selected.intelli != IntelliMode::None || isSunsoft(selected.id)) && layout.instrumentTableAddress) {
     for (u32 index = 0; index < instrumentSlotCount(selected); ++index) {
       const u32 address = *layout.instrumentTableAddress + index * instrumentHeaderSize(selected);
@@ -2364,17 +1475,6 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
       }
       runtime.instrumentEnvelopes.emplace(index, EnvelopeRegisters{
           reader.u8At(address + 1), reader.u8At(address + 2), reader.u8At(address + 3)});
-    }
-  }
-  if (layout.intelliPercussionTableAddress) {
-    const u8 count = selected.intelli == IntelliMode::Fe3 ? 12 : kIntelliDrumSlots;
-    const u32 address = *layout.intelliPercussionTableAddress;
-    if (reader.has(address, count * 3)) {
-      for (u8 slot = 0; slot < count; ++slot) {
-        runtime.intelliPercussionTable[slot] = PercussionEntry{
-            reader.u8At(address + slot), reader.u8At(address + count + slot),
-            reader.u8At(address + count * 2 + slot)};
-      }
     }
   }
   program.behavior.initialTempoMicrosecondsPerQuarter =

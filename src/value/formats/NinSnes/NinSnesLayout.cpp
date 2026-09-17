@@ -467,7 +467,186 @@ void loadIntelligentTables(ByteReader reader, const VoiceCommandInfo& commands, 
       layout.intelliVolumeTable = layout.intelliDurationRateTable;
     }
   }
+}
 
+void loadVariantTables(ByteReader reader, const VoiceCommandInfo& commands, Layout& layout) {
+  const Profile& selected = profile(layout.profile);
+  loadIntelligentTables(reader, commands, layout);
+
+  // Hashire and Popun share command lengths but load six and eight music
+  // tracks respectively. Read the section size independently of the profile.
+  if (isSunsoft(selected.id)) {
+    if (const auto offset = Patterns::ptnSunsoftSectionTracks.find(reader)) {
+      const u8 lastByte = reader.u8At(*offset + 3);
+      if (lastByte == 0x0b || lastByte == 0x0f) {
+        layout.sectionTrackCount = (lastByte + 1) / 2;
+      }
+    }
+  }
+
+  if (selected.base == BaseProfile::Earlier) {
+    if (const auto offset = Patterns::ptnEarlierPercussionTable.find(reader)) {
+      const u16 address = reader.u8At(*offset + 6) | (reader.u8At(*offset + 9) << 8);
+      if (reader.has(address, 6)) {
+        layout.percussionTableAddress = address;
+      }
+    }
+  }
+
+  if (selected.id == ProfileId::Konami) {
+    layout.konamiPercussion = findKonamiPercussion(reader);
+    if (layout.konamiPercussion) {
+      layout.fixedPercussionBase = layout.konamiPercussion->programBase;
+    }
+    if (const auto target = detectKonamiTempoTimerTarget(reader)) {
+      layout.tempoTimerTarget = *target;
+    }
+  }
+  if (selected.instruments == InstrumentLayout::KonamiTuningTable) {
+    if (const auto offset = Patterns::ptnInstrVCmdGD3.find(reader)) {
+      const u16 low = reader.le16(*offset + 10);
+      const u16 high = reader.le16(*offset + 14);
+      if (high > low && high - low <= 0x7f) {
+        layout.konamiTuningTableAddress = low;
+        layout.konamiTuningTableSize = static_cast<u8>(high - low);
+      }
+    }
+  }
+}
+
+[[nodiscard]] std::optional<Layout> selectSong(ByteReader reader, Layout baseLayout,
+                                             std::optional<u16> falcomBaseAddress) {
+  const Profile& selected = profile(baseLayout.profile);
+  const auto sectionListPointer = [&](u32 songPointer) {
+    const u16 raw = reader.le16(songPointer);
+    return selected.addresses == AddressModel::KonamiBase ? baseLayout.resolveAddress(raw) : raw;
+  };
+  struct SongEntry {
+    u8 index = 0;
+    u16 playlistAddress = 0;
+    u16 falcomOffset = 0;
+  };
+  // Inspect the full addressable table: games such as Mario Paint leave
+  // unloaded holes, while Hyper Zone uses song slots beyond 31.
+  constexpr u8 kSongSlotCount = 0x80;
+  std::vector<SongEntry> entries;
+  entries.reserve(kSongSlotCount);
+  u32 songListEnd = kAramSize;
+  for (u8 song = 0; song < kSongSlotCount; ++song) {
+    const u32 pointer = baseLayout.songListAddress + song * 2;
+    if (!reader.has(pointer, 2) || pointer >= songListEnd) {
+      break;
+    }
+    const u16 playlistAddress = sectionListPointer(pointer);
+    if (playlistAddress < 0x100 || playlistAddress >= 0xfff0 || !reader.has(playlistAddress, 2)) {
+      continue;
+    }
+    if (playlistAddress >= pointer) {
+      songListEnd = std::min(songListEnd, static_cast<u32>(playlistAddress));
+    }
+    entries.push_back(SongEntry{
+        .index = song,
+        .playlistAddress = playlistAddress,
+        .falcomOffset = selected.addresses == AddressModel::FalcomBaseOffset && falcomBaseAddress
+                            ? static_cast<u16>(playlistAddress - *falcomBaseAddress)
+                            : u16{0},
+    });
+  }
+
+  const SongEntry* currentSong = nullptr;
+  if (reader.has(baseLayout.sectionPointerAddress, 2)) {
+    const u16 currentAddress = reader.le16(baseLayout.sectionPointerAddress);
+    if (currentAddress >= 0x100 && currentAddress < 0xfff0) {
+      for (const SongEntry& entry : entries) {
+        u16 address = entry.playlistAddress;
+        for (u8 command = 0; reader.has(address, 2) && command < 64; ++command) {
+          if (address == currentAddress) {
+            currentSong = &entry;
+            break;
+          }
+          const u16 value = reader.le16(address);
+          if (value == 0 || isInfinitePlaylistRepeat(selected.playlist, value)) {
+            break;
+          }
+          address = static_cast<u16>(address + (value <= 0xff ? 4 : 2));
+        }
+        if (currentSong) {
+          break;
+        }
+      }
+    }
+  }
+
+  std::vector<const SongEntry*> candidates;
+  const auto queueCandidate = [&](const SongEntry* entry) {
+    if (entry != nullptr && std::ranges::none_of(candidates, [entry](const SongEntry* queued) {
+          return queued->playlistAddress == entry->playlistAddress;
+        })) {
+      candidates.push_back(entry);
+    }
+  };
+
+  std::optional<u8> requestedSong;
+  if (selected.id == ProfileId::Koei) {
+    // The input port can be one driver tick newer than its direct-page mirror.
+    for (const u32 address : {0xf4u, 0u}) {
+      const u8 request = reader.u8At(address);
+      if (request != 0 && request != 0xff) {
+        requestedSong = request;
+        break;
+      }
+    }
+  } else if (isSunsoft(selected.id)) {
+    // BGM uses port 0 and seven-bit song indices. Benkei reserves F0/F1/FF
+    // before doubling the index; the other revisions strip the handshake bit
+    // and reserve 7D-7F. Other ports drive independent SFX players.
+    // Rips may contain a pending request before BGM or its port mirror initializes.
+    for (const u32 address : {0xf4u, 0u}) {
+      const u8 port = reader.u8At(address);
+      const u8 request = port & 0x7f;
+      const bool control = selected.id == ProfileId::SunsoftBenkei
+                               ? port == 0xf0 || port == 0xf1 || port == 0xff
+                               : request >= 0x7d;
+      if (request != 0 && !control) {
+        requestedSong = request;
+        break;
+      }
+    }
+  } else if (const auto requestRead = Patterns::ptnReadSongRequestPort.find(reader)) {
+    // Some rips are captured before the driver consumes the song request.
+    const u8 mirror = reader.u8At(*requestRead + 1);
+    if (mirror < 4) {
+      const u8 request = reader.u8At(0xf4 + mirror);
+      if (request != 0xff && (request & 0x1f) != 0) {
+        requestedSong = request & 0x1f;
+      }
+    }
+  }
+  if (requestedSong) {
+    const auto entry = std::ranges::find(entries, *requestedSong, &SongEntry::index);
+    if (entry != entries.end()) {
+      queueCandidate(&*entry);
+    }
+  }
+  queueCandidate(currentSong);
+  if (selected.id == ProfileId::Koei && candidates.empty()) {
+    return std::nullopt;
+  }
+  for (const SongEntry& entry : entries) {
+    queueCandidate(&entry);
+  }
+
+  for (const SongEntry* entry : candidates) {
+    Layout layout = baseLayout;
+    layout.songIndex = entry->index;
+    layout.playlistAddress = entry->playlistAddress;
+    layout.falcomBaseOffset = entry->falcomOffset;
+    if (!isValidPlaylist(reader, layout)) {
+      continue;
+    }
+    return layout;
+  }
+  return std::nullopt;
 }
 
 }  // namespace
@@ -575,37 +754,6 @@ std::optional<Layout> findLayout(ByteReader reader) {
     quintetLookup = reader.le16(operand);
   }
 
-  const auto resolveAddress = [&](u16 raw, u16 falcomOffset) {
-    switch (selected.addresses) {
-      case AddressModel::KonamiBase:
-        return static_cast<u16>(konamiBase.value_or(0) + raw);
-      case AddressModel::FalcomBaseOffset:
-        return static_cast<u16>(falcomOffset + raw);
-      case AddressModel::Direct:
-      default:
-        return raw;
-    }
-  };
-  const auto sectionListPointer = [&](u32 songPointer) {
-    u16 address = reader.le16(songPointer);
-    if (selected.addresses == AddressModel::KonamiBase) {
-      address = resolveAddress(address, 0);
-    }
-    return address;
-  };
-  std::optional<KonamiPercussionLayout> konamiPercussion;
-  std::optional<u8> fixedPercussionBase =
-      detectFixedPercussionBase(reader, selected.base == BaseProfile::Earlier ? u8{0xd0} : u8{0xca});
-  u8 tempoTimerTarget = kStandardTimerTarget;
-  if (selected.id == ProfileId::Konami) {
-    konamiPercussion = findKonamiPercussion(reader);
-    if (konamiPercussion) {
-      fixedPercussionBase = konamiPercussion->programBase;
-    }
-    if (const auto target = detectKonamiTempoTimerTarget(reader)) {
-      tempoTimerTarget = *target;
-    }
-  }
   Layout baseLayout{
       .signature = signature,
       .profile = profileId,
@@ -614,34 +762,13 @@ std::optional<Layout> findLayout(ByteReader reader) {
       .konamiBaseAddress = konamiBase.value_or(0),
       .quintetBgmInstrumentBase = quintetBase,
       .quintetInstrumentLookupAddress = quintetLookup,
-      .fixedPercussionBase = fixedPercussionBase,
-      .konamiPercussion = konamiPercussion,
-      .tempoTimerTarget = tempoTimerTarget,
+      .fixedPercussionBase =
+          detectFixedPercussionBase(reader, selected.base == BaseProfile::Earlier ? u8{0xd0} : u8{0xca}),
       .volumeTable = std::move(volumeTable),
       .durationRateTable = std::move(durationRateTable),
   };
 
-  loadIntelligentTables(reader, *commands, baseLayout);
-
-  // Hashire and Popun share command lengths but load six and eight music
-  // tracks respectively. Read the section size independently of the profile.
-  if (isSunsoft(selected.id)) {
-    if (const auto offset = Patterns::ptnSunsoftSectionTracks.find(reader)) {
-      const u8 lastByte = reader.u8At(*offset + 3);
-      if (lastByte == 0x0b || lastByte == 0x0f) {
-        baseLayout.sectionTrackCount = (lastByte + 1) / 2;
-      }
-    }
-  }
-
-  if (selected.base == BaseProfile::Earlier) {
-    if (const auto offset = Patterns::ptnEarlierPercussionTable.find(reader)) {
-      const u16 address = reader.u8At(*offset + 6) | (reader.u8At(*offset + 9) << 8);
-      if (reader.has(address, 6)) {
-        baseLayout.percussionTableAddress = address;
-      }
-    }
-  }
+  loadVariantTables(reader, *commands, baseLayout);
 
   if (const auto instruments = findInstrumentProbe(reader, selected)) {
     if (instruments->tableAddress != 0) {
@@ -652,143 +779,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
     }
   }
 
-  if (selected.instruments == InstrumentLayout::KonamiTuningTable) {
-    if (const auto offset = Patterns::ptnInstrVCmdGD3.find(reader)) {
-      const u16 low = reader.le16(*offset + 10);
-      const u16 high = reader.le16(*offset + 14);
-      if (high > low && high - low <= 0x7f) {
-        baseLayout.konamiTuningTableAddress = low;
-        baseLayout.konamiTuningTableSize = static_cast<u8>(high - low);
-      }
-    }
-  }
-
-  struct SongEntry {
-    u8 index = 0;
-    u16 playlistAddress = 0;
-    u16 falcomOffset = 0;
-  };
-  // Inspect the full addressable table: games such as Mario Paint leave
-  // unloaded holes, while Hyper Zone uses song slots beyond 31.
-  constexpr u8 kSongSlotCount = 0x80;
-  std::vector<SongEntry> entries;
-  entries.reserve(kSongSlotCount);
-  u32 songListEnd = kAramSize;
-  for (u8 song = 0; song < kSongSlotCount; ++song) {
-    const u32 pointer = songList->address + song * 2;
-    if (!reader.has(pointer, 2) || pointer >= songListEnd) {
-      break;
-    }
-    const u16 playlistAddress = sectionListPointer(pointer);
-    if (playlistAddress < 0x100 || playlistAddress >= 0xfff0 || !reader.has(playlistAddress, 2)) {
-      continue;
-    }
-    if (playlistAddress >= pointer) {
-      songListEnd = std::min(songListEnd, static_cast<u32>(playlistAddress));
-    }
-    entries.push_back(SongEntry{
-        .index = song,
-        .playlistAddress = playlistAddress,
-        .falcomOffset = selected.addresses == AddressModel::FalcomBaseOffset && falcomBaseAddress
-                            ? static_cast<u16>(playlistAddress - *falcomBaseAddress)
-                            : u16{0},
-    });
-  }
-
-  const SongEntry* currentSong = nullptr;
-  if (reader.has(sectionPointer, 2)) {
-    const u16 currentAddress = reader.le16(sectionPointer);
-    if (currentAddress >= 0x100 && currentAddress < 0xfff0) {
-      for (const SongEntry& entry : entries) {
-        u16 address = entry.playlistAddress;
-        for (u8 command = 0; reader.has(address, 2) && command < 64; ++command) {
-          if (address == currentAddress) {
-            currentSong = &entry;
-            break;
-          }
-          const u16 value = reader.le16(address);
-          if (value == 0 || isInfinitePlaylistRepeat(selected.playlist, value)) {
-            break;
-          }
-          address = static_cast<u16>(address + (value <= 0xff ? 4 : 2));
-        }
-        if (currentSong) {
-          break;
-        }
-      }
-    }
-  }
-
-  std::vector<const SongEntry*> candidates;
-  const auto queueCandidate = [&](const SongEntry* entry) {
-    if (entry != nullptr && std::ranges::none_of(candidates, [entry](const SongEntry* queued) {
-          return queued->playlistAddress == entry->playlistAddress;
-        })) {
-      candidates.push_back(entry);
-    }
-  };
-
-  std::optional<u8> requestedSong;
-  if (selected.id == ProfileId::Koei) {
-    // The input port can be one driver tick newer than its direct-page mirror.
-    for (const u32 address : {0xf4u, 0u}) {
-      const u8 request = reader.u8At(address);
-      if (request != 0 && request != 0xff) {
-        requestedSong = request;
-        break;
-      }
-    }
-  } else if (isSunsoft(selected.id)) {
-    // BGM uses port 0 and seven-bit song indices. Benkei reserves F0/F1/FF
-    // before doubling the index; the other revisions strip the handshake bit
-    // and reserve 7D-7F. Other ports drive independent SFX players.
-    // Rips may contain a pending request before BGM or its port mirror initializes.
-    for (const u32 address : {0xf4u, 0u}) {
-      const u8 port = reader.u8At(address);
-      const u8 request = port & 0x7f;
-      const bool control = selected.id == ProfileId::SunsoftBenkei
-                               ? port == 0xf0 || port == 0xf1 || port == 0xff
-                               : request >= 0x7d;
-      if (request != 0 && !control) {
-        requestedSong = request;
-        break;
-      }
-    }
-  } else if (const auto requestRead = Patterns::ptnReadSongRequestPort.find(reader)) {
-    // Some rips are captured before the driver consumes the song request.
-    const u8 mirror = reader.u8At(*requestRead + 1);
-    if (mirror < 4) {
-      const u8 request = reader.u8At(0xf4 + mirror);
-      if (request != 0xff && (request & 0x1f) != 0) {
-        requestedSong = request & 0x1f;
-      }
-    }
-  }
-  if (requestedSong) {
-    const auto entry = std::ranges::find(entries, *requestedSong, &SongEntry::index);
-    if (entry != entries.end()) {
-      queueCandidate(&*entry);
-    }
-  }
-  queueCandidate(currentSong);
-  if (selected.id == ProfileId::Koei && candidates.empty()) {
-    return std::nullopt;
-  }
-  for (const SongEntry& entry : entries) {
-    queueCandidate(&entry);
-  }
-
-  for (const SongEntry* entry : candidates) {
-    Layout layout = baseLayout;
-    layout.songIndex = entry->index;
-    layout.playlistAddress = entry->playlistAddress;
-    layout.falcomBaseOffset = entry->falcomOffset;
-    if (!isValidPlaylist(reader, layout)) {
-      continue;
-    }
-    return layout;
-  }
-  return std::nullopt;
+  return selectSong(reader, std::move(baseLayout), falcomBaseAddress);
 }
 
 }  // namespace vgmtrans::formats::nin_snes

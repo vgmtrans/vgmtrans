@@ -60,6 +60,10 @@ const Pattern kOgreBattleDir("\xe8\x18\xc4\x53\x8f\x5d\xf2\xc4\xf3",
   return {bytes.begin(), bytes.end()};
 }
 
+// Ogre Battle needs more than a song-table probe: the captured song index
+// selects between two BGM banks, and short pieces can use the SFX player.
+// An SFX group starts a section directly and selects a different instrument bank
+// and clock, so it must be identified before the sequence is decoded.
 [[nodiscard]] std::optional<Layout> findOgreBattleLayout(ByteReader reader) {
   if (!kOgreBattleDispatch.find(reader)) {
     return std::nullopt;
@@ -106,8 +110,7 @@ const Pattern kOgreBattleDir("\xe8\x18\xc4\x53\x8f\x5d\xf2\xc4\xf3",
     }
     return std::nullopt;
   }
-  // Short pieces such as Quest Logo run as SFX: a direct section, a separate
-  // instrument bank, and a fixed clock. Only inspect a group marked active.
+  // With no BGM selected, check for an active SFX group (e.g. Quest Logo).
   const auto sfx = kOgreBattleSfx.find(reader);
   if (sfx) {
     for (u8 group = 0; group < 2; ++group) {
@@ -134,6 +137,10 @@ const Pattern kOgreBattleDir("\xe8\x18\xc4\x53\x8f\x5d\xf2\xc4\xf3",
   return std::nullopt;
 }
 
+// Tactics Ogre's BGM loader supplies the song-list pointer indirectly; separate
+// routines locate the gate, velocity, pan, and sample-directory tables.
+// Captures can precede song initialization, so prefer a valid pending request
+// over the current song before falling back to other playlist candidates.
 [[nodiscard]] std::optional<Layout> findTacticsOgreLayout(ByteReader reader) {
   const auto song = kTacticsOgreSongList.find(reader);
   const auto gate = kTacticsOgreGate.find(reader);
@@ -178,8 +185,8 @@ const Pattern kOgreBattleDir("\xe8\x18\xc4\x53\x8f\x5d\xf2\xc4\xf3",
       !layout.spcDirAddress) {
     return std::nullopt;
   }
-  // Requests 1-15 select (song-1)*2. Try the pending request before the current
-  // song; raw input ports also contain the driver's handshake/control traffic.
+  // Requests 1-15 select (song-1)*2; raw input ports also contain the driver's
+  // handshake/control traffic.
   std::vector<u8> candidates;
   for (u8 index : {reader.u8At(0xb9), reader.u8At(0xbc), reader.u8At(0xf4)}) {
     if (index > 0 && index < 0x10) {
@@ -205,6 +212,11 @@ const Pattern kOgreBattleDir("\xe8\x18\xc4\x53\x8f\x5d\xf2\xc4\xf3",
 
 }  // namespace
 
+// Quest keeps N-SPC playlists but changes the dispatch and song-loader code
+// recognized by the shared detector. Each revision needs a complete layout
+// probe: driver recognition, playback tables, instruments, and song selection.
+// Other variants share most of these steps in NinSnesLayout.cpp; Quest still
+// uses the shared playlist validator for its BGM candidates.
 std::optional<Layout> findLayout(ByteReader reader) {
   if (!kTacticsOgreDispatch.find(reader) || !kTacticsOgreInstrument.find(reader)) {
     return findOgreBattleLayout(reader);
