@@ -337,9 +337,11 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/NeverlandSnes/NeverlandSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NeverlandSnes/NeverlandSnesSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NeverlandSnes/NeverlandSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesIntelligent.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesPatterns.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesPlaylist.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesProfile.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesQuest.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesQuestDetection.cpp
