@@ -143,7 +143,7 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
   endTick = std::max(endTick, tick);
 }
 
-[[nodiscard]] std::vector<u8> writeTrack(const MidiTrack& track, Timebase timebase) {
+void appendTrack(std::vector<u8>& bytes, const MidiTrack& track, Timebase timebase) {
   // Convert absolute event ticks to SMF delta times after sorting all generated messages.
   std::vector<MidiMessage> messages;
   u64 endTick = midiTick(timebase, track.endTick);
@@ -171,11 +171,9 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
     previousTick = message.tick;
   }
 
-  std::vector<u8> bytes;
   writeAscii(bytes, "MTrk");
   writeBe32(bytes, static_cast<u32>(trackData.size()));
   bytes.insert(bytes.end(), trackData.begin(), trackData.end());
-  return bytes;
 }
 
 }  // namespace
@@ -189,8 +187,7 @@ std::vector<u8> encodeMidiFile(const MidiSequence& sequence) {
   writeBe16(bytes, static_cast<u16>(sequence.timebase.midiDivision()));
 
   for (const auto& track : sequence.tracks) {
-    auto trackBytes = writeTrack(track, sequence.timebase);
-    bytes.insert(bytes.end(), trackBytes.begin(), trackBytes.end());
+    appendTrack(bytes, track, sequence.timebase);
   }
   return bytes;
 }

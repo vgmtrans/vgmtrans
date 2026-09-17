@@ -2900,6 +2900,21 @@ This removes 21 C++ lines and one CMake entry without changing the public scan
 API or ID-assignment order. The regenerated full Debug build and all 21 CTest
 targets pass without compiler warnings.
 
+## Write sequence output to its existing destination
+
+The VM's semantic pass now fills the supplied performance sequence completely,
+including its tracks. It no longer returns tracks separately from diagnostics
+and source spans, or takes a second reference to the song state already in its
+capture. Prepass, analysis, and final rendering still follow their existing
+execution order.
+
+MIDI track serialization now appends its header and encoded data directly to
+the file buffer. It retains the payload buffer needed to know the track length,
+but removes the complete-track buffer and the extra copy into the file.
+Together these changes remove five production lines and two intermediate
+output protocols. The full Debug build is warning-free and all 21 CTest targets
+pass, including VM scheduling, prepass, and MIDI serialization regressions.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual
