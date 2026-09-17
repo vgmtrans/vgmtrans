@@ -2760,6 +2760,19 @@ exceptions or expected failures were added. Exact commands, sources, results,
 and logs remain in ignored `cmake-build-debug/value-audit/corpus-parity` and
 `run-initial-parity.py`.
 
+## Update session chunk handles directly
+
+Source removal now updates the session's chunk handles directly and removes empty
+chunks in one pass, instead of staging a second chunk list and tracking whether
+each handle changed. The assets and source maps behind those handles remain
+immutable and shared. Collection reconciliation also constructs each replacement
+once, preserving an existing collection's ID when its key matches.
+
+This removes 25 production lines and the extra staging state. The source-map
+regression test now also checks that retained snapshots keep removed assets and
+their original links, and that surviving assets keep their addresses. The full
+Debug build and all 21 CTest targets pass without compiler warnings.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual
