@@ -57,7 +57,7 @@ struct Layout {
 [[nodiscard]] core::TrackProgram decodeSourceTrack(core::ByteReader reader, Version version, u32 trackNumber,
                                                    u32 startAddress,
                                                    std::vector<core::Diagnostic>* diagnostics = nullptr);
-[[nodiscard]] core::SequenceProgram decodeSequence(core::ByteReader reader, const Layout& layout,
+[[nodiscard]] core::SequenceProgram decodeSequence(core::RetainedSource source, const Layout& layout,
                                                    core::AssetId sequenceId,
                                                    core::SourceMapBuilder* sourceMap = nullptr,
                                                    std::vector<core::Diagnostic>* diagnostics = nullptr);

@@ -2611,6 +2611,67 @@ implementations fail the new ownership assertion, and both new implementations
 pass their complete format suites. All 21 CTest targets pass. These are generated
 fixtures, not real-file corpus validation.
 
+## Reuse retained sources and layouts in Prism and SoftCreat runtimes
+
+Prism now keeps one `RuntimeConfig` containing its retained source and parsed
+layout. Program/track state borrow that immutable configuration, whose lifetime
+is owned by `makeCompiledRuntime`. Child scores share it too. This removes the
+custom byte-by-byte ARAM capture, copied table addresses, `RuntimeData`, and a
+second per-track configuration vector. The small wrapping read methods remain:
+a 16-bit driver read at `$FFFF` still reads its high byte from `$0000`.
+Source-track numbers still index the layout's dense track order; logical channel
+aliases and physical channel flags retain their original meanings.
+
+SoftCreat's sequence entry point now accepts the retained source its runtime
+already needs, so Session scans share their immutable bytes instead of copying
+ARAM again inside sequence assembly. Together these changes remove **37
+production lines**. The ownership regression helper is shared by Mori,
+Neverland, Prism, and SoftCreat; direct SoftCreat fixtures also release their
+decode buffers before rendering. The warning-free full build and all 21 CTest
+targets pass.
+
+## Real-file regression baseline supplied during the audit
+
+The user supplied `/Volumes/emu/vgm/`. A local inventory found 1,547 RSN
+archives, 120 SPC files, and thousands of PSF/PSF2 files, including a
+`vgmtrans test suite` directory organized by format. Earlier sections' lack of
+corpus coverage describes verification at those earlier points; this new corpus
+is now available for subsequent changes.
+
+Ignored comparison runners compile the old/new runtime and scanner units with
+ASan/UBSan, using the existing core/export libraries. They scan whole archives,
+render every discovered sequence with PlayOnce, and export MIDI, SF2, and DLS.
+All **1,323 artifact files compare byte-for-byte**, with identical discovery,
+render, and export logs across **441 sequences in 14 archives**:
+
+| Format | Archives | Sequences | Matching artifacts |
+| --- | ---: | ---: | ---: |
+| Mori SNES | 4 | 132 | 396 |
+| Neverland SNES | 3 | 147 | 441 |
+| Prism SNES | 3 | 96 | 288 |
+| SoftCreat SNES | 4 | 66 | 198 |
+
+The archives cover Gokinjo, Combatribes, CB Chara Wars, Shien, Estpolis/Lufia I
+and II, Energy Breaker, Dual Orb I and II, Cosmo Gang the Video, Plok, Equinox,
+Maximum Carnage, and Ken Griffey Jr. Baseball. A separate runner compares Prism
+from before the discovery-walker change: all 288 exports from its three
+archives also match the current implementation, with identical logs.
+
+No standalone PlayOnce render produced diagnostics. Exports retain existing
+limitations: repeated mid-note envelope/stereo warnings, and a command-limit
+warning in Plok's "Flea Pit" MIDI export (`$2C59`, tick 34337, limit 32768).
+Both sides produce identical warnings; matching output does not resolve those
+limitations. Across the separate export artifacts, the logs contain 68,166
+mid-note envelope messages and 60 phase/pan messages. Warning origin and
+aggregation deserve a follow-up, preserving useful source attribution.
+
+These checks compare the value implementation before and after the changes;
+they do **not** establish legacy/value equivalence. The local runners, exact
+artifact files, logs, and JSON summaries remain under the ignored
+`cmake-build-debug/value-audit/retention-corpus-results` directory and adjacent
+`retention-corpus-*.json` / `prism-walker-corpus-results.json` files. Original
+music files are unchanged and are not added to the repository.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding
@@ -2634,8 +2695,16 @@ fixtures, not real-file corpus validation.
   immutable value captures. Preserve expansion before attack-time variants and
   owned prepared regions; avoid layering another generic response framework on
   top of the two shared synth-preparation helpers.
-- Real-file parity remains unverified. An optional corpus-path question is
-  pending; the absence of a corpus does not block further code investigation.
+- Use the supplied `/Volumes/emu/vgm/` corpus for subsequent regression checks.
+  Extend the current before/after value comparisons to additional formats and
+  run the existing legacy/value parity modes where applicable. Keep baseline
+  differences separate from regressions introduced by a simplification.
+- Inspect SoftCreat's redundant discovered-command staging and SculptSoft's
+  duplicated bounded-phrase walkers. Preserve interpretation conflicts,
+  discovery order, synthetic phrase boundaries, and diagnostic attribution.
+- Investigate the Plok "Flea Pit" MIDI command-limit warning and the volume of
+  existing envelope/stereo export warnings. Do not hide meaningful limitations
+  merely to make corpus runs appear clean.
 
 ## Design decisions retained after inspection
 

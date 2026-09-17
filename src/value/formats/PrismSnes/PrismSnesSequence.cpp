@@ -76,50 +76,19 @@ namespace math {
 
 }  // namespace math
 
-struct RuntimeData {
-  u16 adsr1Table;
-  u16 adsr2Table;
-  u16 alternatePanTable;
-  u16 defaultPanTable;
-  u8 echoDelay;
-  u8 echoFilter;
+struct RuntimeConfig {
+  RetainedSource source;
+  Layout layout;
 
-  [[nodiscard]] u8 u8At(u16 address) const { return (*aram)[address]; }
+  [[nodiscard]] u8 u8At(u16 address) const { return source.reader().u8At(address); }
 
   [[nodiscard]] u16 le16(u16 address) const {
     return static_cast<u16>(u8At(address) | (u8At(static_cast<u16>(address + 1)) << 8));
   }
 
-  [[nodiscard]] static RuntimeData capture(ByteReader reader, const Layout& layout) {
-    auto aram = std::make_shared<std::array<u8, kAramSize>>();
-    for (u32 address = 0; address < kAramSize; ++address) {
-      (*aram)[address] = reader.u8At(address);
-    }
-    return RuntimeData(std::move(aram), layout);
-  }
-
-private:
-  RuntimeData(std::shared_ptr<const std::array<u8, kAramSize>> capturedAram, const Layout& layout)
-      : adsr1Table(layout.adsr1TableAddress), adsr2Table(layout.adsr2TableAddress),
-        alternatePanTable(layout.alternatePanTableAddress), defaultPanTable(layout.defaultPanTableAddress),
-        echoDelay(layout.echoDelay), echoFilter(layout.echoFilter), aram(std::move(capturedAram)) {}
-
-  std::shared_ptr<const std::array<u8, kAramSize>> aram;
-};
-
-struct RuntimeTrackConfig {
-  u8 logicalChannel = 0;
-  u8 physicalChannelFlags = 0;
-};
-
-struct RuntimeConfig {
-  Version version = Version::Modern;
-  RuntimeData data;
-  std::vector<RuntimeTrackConfig> tracks;
-
-  [[nodiscard]] const RuntimeTrackConfig& track(TrackStateContext source) const {
-    // decodeSequence builds both vectors in dense source-track-number order.
-    return tracks.at(source.sourceTrackNumber);
+  [[nodiscard]] const TrackHeader& track(TrackStateContext context) const {
+    // Source tracks are decoded in layout order, including logical-channel aliases.
+    return layout.tracks.at(context.sourceTrackNumber);
   }
 };
 
@@ -194,13 +163,13 @@ struct MasterFade {
 };
 
 struct ProgramState {
-  ProgramState(const SequenceProgram&, const RuntimeConfig& config) : version(config.version), data(config.data) {
-    echo.delay = data.echoDelay;
-    echo.filter = data.echoFilter;
+  ProgramState(const SequenceProgram&, const RuntimeConfig& config) : version(config.layout.version), data(config) {
+    echo.delay = data.layout.echoDelay;
+    echo.filter = data.layout.echoFilter;
   }
 
   Version version = Version::Modern;
-  RuntimeData data;
+  const RuntimeConfig& data;
   bool condition = false;
   u8 masterVolume = 0xff;
   u8 masterDuck = 0;
@@ -216,22 +185,21 @@ struct RuntimeTrack;
 
 struct TrackState {
   TrackState(TrackStateContext source, const RuntimeConfig& config)
-      : TrackState(config.version, config.data, config.track(source).logicalChannel,
-                   config.track(source).physicalChannelFlags) {}
+      : TrackState(config, config.track(source).logicalChannel, config.track(source).physicalChannelFlags) {}
 
-  TrackState(Version newVersion, RuntimeData runtimeData, u8 newLogicalChannel, u8 newPhysicalChannelFlags)
-      : version(newVersion), data(runtimeData), logicalChannel(newLogicalChannel),
-        physicalChannelFlags(newPhysicalChannelFlags), panTable(data.defaultPanTable) {
+  TrackState(const RuntimeConfig& runtimeData, u8 newLogicalChannel, u8 newPhysicalChannelFlags)
+      : version(runtimeData.layout.version), data(runtimeData), logicalChannel(newLogicalChannel),
+        physicalChannelFlags(newPhysicalChannelFlags), panTable(data.layout.defaultPanTableAddress) {
     loadDefaultAdsr();
   }
 
   void loadDefaultAdsr() {
-    adsr1 = data.u8At(static_cast<u16>(data.adsr1Table + program));
-    adsr2 = data.u8At(static_cast<u16>(data.adsr2Table + program));
+    adsr1 = data.u8At(static_cast<u16>(data.layout.adsr1TableAddress + program));
+    adsr2 = data.u8At(static_cast<u16>(data.layout.adsr2TableAddress + program));
   }
 
   Version version = Version::Modern;
-  RuntimeData data;
+  const RuntimeConfig& data;
   u8 logicalChannel = 0;
   u8 physicalChannelFlags = 0;
   u8 program = 0;
@@ -280,8 +248,7 @@ struct TrackState {
 
 struct RuntimeTrack {
   RuntimeTrack(const TrackState& controller, u8 logicalChannel, u16 startAddress)
-      : state(controller.version, controller.data, logicalChannel,
-              static_cast<u8>(controller.physicalChannelFlags & 0x1f)),
+      : state(controller.data, logicalChannel, static_cast<u8>(controller.physicalChannelFlags & 0x1f)),
         cursor(startAddress) {
     state.volume = controller.volume;
     state.pan = controller.pan;
@@ -731,7 +698,9 @@ struct Playback : SequencePlayback<TrackState> {
     emitPan();
   }
 
-  void defaultPan(bool alternate) { panTable(alternate ? track.data.alternatePanTable : track.data.defaultPanTable); }
+  void defaultPan(bool alternate) {
+    panTable(alternate ? track.data.layout.alternatePanTableAddress : track.data.layout.defaultPanTableAddress);
+  }
 
   void vibratoDelay(u8 delay) {
     track.vibrato.delay = delay;
@@ -1567,22 +1536,14 @@ TrackProgram decodeSourceTrack(ByteReader reader, Version version, u32 trackNumb
   return decodeTrack(reader, version, trackNumber, startAddress, diagnostics, scope);
 }
 
-SequenceProgram decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
+SequenceProgram decodeSequence(RetainedSource source, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
                                std::vector<Diagnostic>* diagnostics) {
+  const ByteReader reader = source.reader();
   const u32 headerSize = static_cast<u32>(layout.tracks.size()) * 4 + 1;
   const SourceRange header = reader.range(layout.sequenceHeaderAddress, headerSize);
   SequenceDecodeSession sequence{reader, sequenceConfig(), sequenceId, header, sourceMap, kCommandLimit};
-  RuntimeConfig runtime{
-      .version = layout.version,
-      .data = RuntimeData::capture(reader, layout),
-  };
-  runtime.tracks.reserve(layout.tracks.size());
   for (u32 index = 0; index < layout.tracks.size(); ++index) {
     const TrackHeader& track = layout.tracks[index];
-    runtime.tracks.push_back(RuntimeTrackConfig{
-        .logicalChannel = track.logicalChannel,
-        .physicalChannelFlags = track.physicalChannelFlags,
-    });
     sequence.trackPointer(index, reader.range(track.range.offset + 2, 2), track.startAddress)
         .field("logical_channel", reader.range(track.range.offset, 1), track.logicalChannel)
         .field("physical_channel_flags", reader.range(track.range.offset + 1, 1), track.physicalChannelFlags,
@@ -1590,7 +1551,8 @@ SequenceProgram decodeSequence(ByteReader reader, const Layout& layout, AssetId 
     sequence.addTrack(
         decodeTrack(reader, layout.version, index, track.startAddress, diagnostics, sequence.trackScope()));
   }
-  return sequence.finish(makeCompiledRuntime<Playback, ProgramState>(std::move(runtime)));
+  return sequence.finish(
+      makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{.source = std::move(source), .layout = layout}));
 }
 
 }  // namespace vgmtrans::formats::prism_snes

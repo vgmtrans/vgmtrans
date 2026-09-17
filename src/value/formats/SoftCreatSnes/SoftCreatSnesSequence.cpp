@@ -1295,8 +1295,9 @@ TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, u32 trac
   return decodeTrack(scope, layout, trackNumber, startAddress, diagnostics, nullptr);
 }
 
-SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
+SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
                              std::vector<Diagnostic>* diagnostics) {
+  const ByteReader reader = source.reader();
   auto config = sequenceConfig();
   config.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(layout.initialTimer);
   std::set<u8> referencedInstruments{0};
@@ -1330,7 +1331,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     }
     sequence.addTrack(decodeTrack(tracks, layout, track, pointer.address, diagnostics, &referencedInstruments));
   }
-  return SequenceParse{.program = sequence.finish(sequenceRuntime(RetainedSource::copyOf(reader), layout)),
+  return SequenceParse{.program = sequence.finish(sequenceRuntime(std::move(source), layout)),
                        .referencedInstruments = std::move(referencedInstruments)};
 }
 
