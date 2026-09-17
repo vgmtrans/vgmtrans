@@ -3076,6 +3076,16 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   and release-tail automation. Warning-free Debug build; all 21 CTest targets
   pass (10.79 s).
 
+## Encode variable-length MIDI values in output order
+
+- Replaced the two-loop integer-packing scheme with one backward fill of a
+  fixed byte array, followed by appending its written suffix. Continuation bits
+  are assigned with each group; no packed intermediate integer or sentinel
+  loop is needed. The array accommodates all ten groups of the input `u64`.
+- Removed four production lines. Added exact output checks at every one-to-four
+  byte SMF delta boundary, including zero and the largest four-byte value.
+- Validation: warning-free Debug build; all 21 CTest targets pass (10.79 s).
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual

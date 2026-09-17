@@ -39,6 +39,22 @@ void midiExporterWritesStandardMidiFile() {
   expect(exported == expected, "MIDI exporter should write expected SMF bytes");
 }
 
+void midiExporterWritesVariableLengthBoundaries() {
+  const std::vector<std::pair<u64, std::vector<u8>>> cases{
+      {0, {0x00}}, {127, {0x7f}}, {128, {0x81, 0x00}}, {16383, {0xff, 0x7f}},
+      {16384, {0x81, 0x80, 0x00}}, {2097151, {0xff, 0xff, 0x7f}},
+      {2097152, {0x81, 0x80, 0x80, 0x00}}, {268435455, {0xff, 0xff, 0xff, 0x7f}},
+  };
+  for (const auto& [tick, delta] : cases) {
+    const MidiSequence sequence{.tracks = {MidiTrack{.events = {midi::programChange(tick, 0, 5)}}}};
+    const auto bytes = encodeMidiFile(sequence);
+    auto expected = delta;
+    expected.insert(expected.end(), {0xc0, 0x05, 0x00, 0xff, 0x2f, 0x00});
+    expect(std::vector<u8>(bytes.begin() + 22, bytes.end()) == expected,
+           "SMF delta times must keep byte order and continuation bits at every seven-bit boundary");
+  }
+}
+
 void midiExporterKeeps14BitControllerPairsAdjacent() {
   MidiSequence midiSequence{.timebase = Timebase{.ppqn = 48}};
   MidiTrack track;
@@ -3557,6 +3573,7 @@ void observedModulationScalingPreservesQuantizationBoundaries() {
 
 void runValueMidiTests() {
   midiExporterWritesStandardMidiFile();
+  midiExporterWritesVariableLengthBoundaries();
   midiExporterKeeps14BitControllerPairsAdjacent();
   midiExporterWritesAllSoundOffImmediatelyBeforeNoteOn();
   midiExporterPreservesLegacyPortamentoTimeByteOrder();
