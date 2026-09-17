@@ -90,18 +90,16 @@ const Pattern kEarlierDir("\xe8\x18\xc4\x53\x8f\x5d\xf2\xc4\xf3",
   return {bytes.begin(), bytes.end()};
 }
 
-// E7 divides 0x1036 by the tempo operand and writes the quotient to timer 1.
-// One BGM tick lasts 125 us per timer unit; a zero timer target means 256.
-// The 48-PPQN export timebase does not make the operand itself the exported BPM.
-[[nodiscard]] u8 tempoDivisor(u8 tempo, bool clampOverflow = true) {
-  if (clampOverflow && tempo < 0x11) {
-    return 0xff;
-  }
-  // E8 omits E7's overflow clamp, including SPC700 DIV's alternate result
-  // when the dividend high byte is at least twice the divisor.
-  return tempo >= 9 ? static_cast<u8>(0x1036 / tempo) : static_cast<u8>(255 - (0x1036 - tempo * 512) / (256 - tempo));
+// E7 divides a clock constant by the tempo operand: 0x082a in Ogre Battle,
+// 0x1036 in Tactics Ogre. Preserve SPC700 DIV's overflow result, including zero.
+[[nodiscard]] u8 tempoDivisor(u8 tempo, u16 dividend) {
+  return (dividend >> 8) < tempo * 2
+      ? static_cast<u8>(dividend / tempo)
+      : static_cast<u8>(255 - (dividend - tempo * 512) / (256 - tempo));
 }
 
+// One tick lasts 125 us per timer unit; a zero timer target means 256.
+// The 48-PPQN export timebase does not make the operand itself the exported BPM.
 [[nodiscard]] u32 tempoUs(u8 divisor) {
   return kPpqn * 125u * (divisor == 0 ? 256u : divisor);
 }
@@ -183,7 +181,7 @@ struct TrackState {
   u16 length = 1;
   u8 gate = 0;
   u8 velocity = 0;
-  std::optional<u8> pendingVelocity;
+  u8 tieVelocity = 0;
   u16 tiedLength = 0;
   bool tieEligible = false;
   u64 noteStartTick = 0;
@@ -307,11 +305,7 @@ struct Playback : SequencePlayback<TrackState> {
     track.length = length;
     if (packed) {
       track.gate = (*packed >> 4) & 7;
-      if (program.config.earlier) {
-        track.pendingVelocity = velocity;
-      } else {
-        track.velocity = velocity;
-      }
+      track.velocity = velocity;
     }
   }
 
@@ -500,20 +494,17 @@ struct Playback : SequencePlayback<TrackState> {
     if (program.config.earlier) {
       // This revision follows calls and returns during tie lookahead. Extending
       // the original event as ties execute preserves that behavior across patterns.
-      if (opcode == 0xc8 && track.tieEligible) {
-        track.tiedLength = static_cast<u16>(track.tiedLength + track.length);
-        if (track.lastNote.valid()) {
-          out.setNoteEnd(track.lastNote, track.noteStartTick + duration(track.tiedLength));
-        }
-      }
-      if ((opcode != 0xc8 || !track.tieEligible) && track.pendingVelocity) {
-        track.velocity = *track.pendingVelocity;
-      }
-      track.pendingVelocity.reset();
       if (opcode == 0xc8) {
-        return track.tieEligible ? Effects::wait(track.length) : Effects{};
+        if (!track.tieEligible) {
+          return {};
+        }
+        track.velocity = track.tieVelocity;
+        track.tiedLength = static_cast<u16>(track.tiedLength + track.length);
+        out.setNoteEnd(track.lastNote, track.noteStartTick + duration(track.tiedLength));
+        return Effects::wait(track.length);
       }
       track.tieEligible = true;
+      track.tieVelocity = track.velocity;
       track.tiedLength = track.length;
       track.noteStartTick = vm.tick();
       if (opcode == 0xc9) {
@@ -602,8 +593,6 @@ struct Playback : SequencePlayback<TrackState> {
                                      .restartsLfoPhase = !held};
     track.lastNote = held ? out.continueVoice(track.lastNote, event) : out.note(event);
     track.lastKey = key;
-    track.tiedLength = total;
-    track.noteStartTick = vm.tick();
     if (slide) {
       startSlide(*slide);
     } else if (track.pitchEnvelope) {
@@ -655,7 +644,7 @@ struct Playback : SequencePlayback<TrackState> {
 
   [[nodiscard]] Effects end() {
     if (track.calls.empty()) {
-      return vm.endSection();
+      return program.config.sfx ? vm.end() : vm.endSection();
     }
     auto& frame = track.calls.back();
     if (frame.infinite) {
@@ -731,11 +720,9 @@ struct Playback : SequencePlayback<TrackState> {
     if (program.config.sfx) {
       return;
     }
-    // Ogre Battle divides 0x082a without the later revision's overflow clamp.
-    const u8 divisor = program.config.earlier
-        ? (value >= 5 ? static_cast<u8>(0x082a / value)
-                      : static_cast<u8>(255 - (0x082a - value * 512) / (256 - value)))
-        : tempoDivisor(value);
+    // Only Tactics Ogre's immediate tempo command clamps overflowing results.
+    const u8 divisor = !program.config.earlier && value < 0x11
+        ? 0xff : tempoDivisor(value, program.config.earlier ? 0x082a : 0x1036);
     program.tempo.reset(divisor);
     out.tempo(tempoUs(divisor));
   }
@@ -743,7 +730,7 @@ struct Playback : SequencePlayback<TrackState> {
   void tempoFade(u8 length, u8 target) {
     // E8 interpolates timer divisors, so interpolating BPM would change the fade.
     if (length != 0) {
-      static_cast<void>(program.tempo.begin(program.tempo.toRawTarget(tempoDivisor(target, false), length)));
+      static_cast<void>(program.tempo.begin(program.tempo.toRawTarget(tempoDivisor(target, 0x1036), length)));
     }
   }
 
@@ -1591,32 +1578,10 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, SectionPla
   program.behavior.initialTempoMicrosecondsPerQuarter = tempoUs(config.sfx ? 0x43 : 0x80);
   program.behavior.initialMasterLevel = config.sfx ? (0xe6 / 255.0) * (0xe6 / 255.0) : 0;
   program.behavior.initialPitchBendRangeSemitones = 24;
-  if (config.sfx) {
-    const u32 start = layout.playlistAddress, end = start + layout.trackCount() * 2;
-    PlaylistCommand section{.address = Address{start}, .fallthrough = Address{end},
-                            .range = reader.range(start, end - start), .kind = PlaylistCommandKind::PlaySection,
-                            .target = Address{start}};
-    section.trackStarts.resize(layout.trackCount());
-    if (sourceMap) {
-      parent = sourceMap->header("SFX Section", section.range).owner(ObjectRefs::sequence(sequenceId)).id();
-    }
-    for (u8 track = 0; track < layout.trackCount(); ++track) {
-      const u16 address = reader.le16(start + track * 2);
-      if (address < 0x100) {
-        break;
-      }
-      section.trackStarts[track] = Address{address};
-    }
-    playlist.startAddress = Address{start};
-    playlist.commands = {std::move(section), PlaylistCommand{.address = Address{end}}};
+  if (config.sfx && sourceMap) {
+    parent = sourceMap->header("SFX Section", reader.range(layout.playlistAddress, layout.trackCount() * 2))
+                 .owner(ObjectRefs::sequence(sequenceId)).id();
   }
-  program.sectionPlaylist = std::move(playlist);
-  // Playlists contain words: zero ends, 01-FE count additional plays, FF
-  // repeats forever. A repeat's next word is its playlist destination; larger
-  // command words address sections of eight little-endian track pointers.
-  // A pointer with a zero high byte disables that track. The playlist advances
-  // only when every active track ends; tracks may also loop independently.
-  program.sectionPlaylist->waitForAllTracks = true;
   const TrackDecodeScope scope{.reader = reader,
                                .maxCommands = 32768,
                                .sequenceAsset = sequenceId,
@@ -1624,7 +1589,15 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, SectionPla
                                .sourceMap = sourceMap};
   for (u8 track = 0; track < layout.trackCount(); ++track) {
     std::vector<Address> starts;
-    for (const auto& section : program.sectionPlaylist->commands) {
+    // SFX streams start directly from a single section's track pointers.
+    if (config.sfx) {
+      const u16 address = reader.le16(layout.playlistAddress + track * 2);
+      if (address < 0x100) {
+        break;
+      }
+      starts.push_back(Address{address});
+    }
+    for (const auto& section : playlist.commands) {
       if (section.kind == PlaylistCommandKind::PlaySection && track < section.trackStarts.size() &&
           section.trackStarts[track]) {
         starts.push_back(*section.trackStarts[track]);
@@ -1632,6 +1605,15 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, SectionPla
     }
     program.tracks.push_back(scope.decode(
         track, starts, [&](u32 address) { return decodeCommand(reader, decodeLayout, address, diagnostics); }));
+  }
+  // Playlists contain words: zero ends, 01-FE count additional plays, FF
+  // repeats forever (Ogre Battle also repeats FE forever). A repeat's next word
+  // is its playlist destination; larger words address sections of eight track
+  // pointers. A zero high byte disables a track. All active tracks must finish
+  // before advancing to the next section; tracks may also loop independently.
+  if (!config.sfx) {
+    playlist.waitForAllTracks = true;
+    program.sectionPlaylist = std::move(playlist);
   }
   program.runtime = makeCompiledRuntime<Playback, ProgramState>(std::move(config));
   auto recipes = analyzeCompiledProgram<ProgramState>(program, &ProgramState::recipes, diagnostics);

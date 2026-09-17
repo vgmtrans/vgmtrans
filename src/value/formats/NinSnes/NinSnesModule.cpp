@@ -19,7 +19,7 @@ namespace {
 
 [[nodiscard]] SourceRange sequenceRange(ByteReader reader, const Layout& layout, const SequenceProgram& program) {
   u64 first = layout.playlistAddress;
-  u64 last = first + 2;
+  u64 last = first + (layout.questSfx ? layout.trackCount() * 2 : 2);
   if (program.sectionPlaylist) {
     for (const PlaylistCommand& command : program.sectionPlaylist->commands) {
       if (command.kind == PlaylistCommandKind::PlaySection && !command.trackStarts.empty()) {
