@@ -79,7 +79,8 @@ public:
 
   void render(const SequenceRenderOptions& options, DynamicEnvelopePolicy dynamicEnvelopes,
               bool materializeSignedStereo = false);
-  void prepareSynth(ModulationConversionPolicy conversion, ModulationScalingPolicy scaling);
+  // MIDI and synth export share one observed controller range.
+  void prepareModulation(ModulationConversionPolicy conversion, ModulationScalingPolicy scaling);
 
   [[nodiscard]] const PerformanceSequence* performance() const noexcept;
   [[nodiscard]] std::vector<const SoundBankAsset*> soundBankView() const;

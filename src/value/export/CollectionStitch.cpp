@@ -90,7 +90,7 @@ void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulation
     return false;
   }
 
-  workspace.prepareSynth(request.modulationConversion, request.modulationScaling);
+  workspace.prepareModulation(request.modulationConversion, request.modulationScaling);
   const PerformanceSequence* performance = workspace.performance();
   const auto instruments = workspace.soundBankView();
   part.midi = renderMidiSequence(*performance, request.sequence.midi, request.modulationConversion, instruments,
