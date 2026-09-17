@@ -142,7 +142,6 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.h
     ${PROJECT_SOURCE_DIR}/src/value/synth/SynthBuilder.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/scan/Scan.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/ScanResultBuilder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/CommandSourceMap.cpp
