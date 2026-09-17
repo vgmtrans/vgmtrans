@@ -2919,6 +2919,19 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   samples, start offsets, and container index limits.
 - Validation: warning-free Debug build; all 21 CTest targets pass (10.65 s).
 
+## Keep stitched timing with its part
+
+- Each internal stitch part now retains its own start tick. Removed
+  `ComposedMidi` and its separate positional list of start times; composition
+  returns MIDI directly, and result assembly reads each part's timing and banks
+  together without matching two containers by index.
+- Removed four production lines, one private type, and one parallel vector.
+  Timeline arithmetic, overflow handling, bank mapping, and emitted MIDI/SF2
+  behavior are unchanged.
+- Validation: warning-free Debug build; all 21 CTest targets pass (10.89 s),
+  including stitching with different PPQN values, dynamic instrument variants,
+  used-only samples, modulation scaling, and channel-state boundaries.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual

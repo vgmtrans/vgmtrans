@@ -34,16 +34,12 @@ constexpr u32 kMaximumPpqn = 1920;
 
 struct StitchPart {
   CollectionId collection;
+  u64 startTick = 0;
   std::vector<SoundBankAsset> instruments;
   std::vector<const SamplePoolAsset*> samples;
   MidiSequence midi;
   MidiModulationUsage modulationUsage;
   std::vector<CollectionStitchBank> banks;
-};
-
-struct ComposedMidi {
-  MidiSequence midi;
-  std::vector<u64> starts;
 };
 
 void append(std::vector<Diagnostic>& destination, const std::vector<Diagnostic>& source) {
@@ -261,21 +257,21 @@ void remapPart(StitchPart& part) {
   return true;
 }
 
-[[nodiscard]] std::optional<ComposedMidi> composeMidi(std::vector<StitchPart>& parts,
+[[nodiscard]] std::optional<MidiSequence> composeMidi(std::vector<StitchPart>& parts,
                                                       MidiBankSelectStyle bankStyle) {
-  ComposedMidi composition;
-  composition.midi.timebase.ppqn = commonPpqn(parts);
+  MidiSequence midi;
+  midi.timebase.ppqn = commonPpqn(parts);
   u64 cursor = 0;
   for (size_t partIndex = 0; partIndex < parts.size(); ++partIndex) {
     auto& part = parts[partIndex];
-    composition.starts.push_back(cursor);
+    part.startTick = cursor;
     const u32 sourcePpqn = normalizedPpqn(part.midi.timebase.ppqn);
     u64 end = 0;
     for (auto& track : part.midi.tracks) {
       end = std::max(end, track.endTick);
       for (auto& event : track.events) {
         end = std::max(end, eventEnd(event));
-        if (!retime(event, sourcePpqn, composition.midi.timebase.ppqn, cursor)) {
+        if (!retime(event, sourcePpqn, midi.timebase.ppqn, cursor)) {
           return std::nullopt;
         }
       }
@@ -296,21 +292,21 @@ void remapPart(StitchPart& part) {
         }
         track.events.insert(track.events.begin(), initialState.events.begin(), initialState.events.end());
       }
-      const auto trackEnd = scaled(track.endTick, sourcePpqn, composition.midi.timebase.ppqn);
+      const auto trackEnd = scaled(track.endTick, sourcePpqn, midi.timebase.ppqn);
       if (!trackEnd || *trackEnd > std::numeric_limits<u64>::max() - cursor) {
         return std::nullopt;
       }
       track.endTick = *trackEnd + cursor;
-      composition.midi.tracks.push_back(std::move(track));
+      midi.tracks.push_back(std::move(track));
     }
-    append(composition.midi.diagnostics, part.midi.diagnostics);
-    const auto duration = scaled(end, sourcePpqn, composition.midi.timebase.ppqn);
+    append(midi.diagnostics, part.midi.diagnostics);
+    const auto duration = scaled(end, sourcePpqn, midi.timebase.ppqn);
     if (!duration || *duration > std::numeric_limits<u64>::max() - cursor) {
       return std::nullopt;
     }
     cursor += *duration;
   }
-  return composition;
+  return midi;
 }
 
 }  // namespace
@@ -353,13 +349,13 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
     remapPart(part);
   }
 
-  auto composition = composeMidi(parts, request.sequence.midi.bankSelectStyle);
-  if (!composition) {
+  auto midi = composeMidi(parts, request.sequence.midi.bankSelectStyle);
+  if (!midi) {
     fail(result, "Stitched MIDI timeline exceeds the supported tick range");
     return result;
   }
-  result.midi.bytes = encodeMidiFile(composition->midi);
-  append(result.midi.diagnostics, composition->midi.diagnostics);
+  result.midi.bytes = encodeMidiFile(*midi);
+  append(result.midi.diagnostics, midi->diagnostics);
 
   std::vector<const SoundBankAsset*> instruments;
   std::vector<const SamplePoolAsset*> samples;
@@ -395,11 +391,11 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
   append(result.soundFont.diagnostics, soundFont.diagnostics);
 
   result.parts.reserve(parts.size());
-  for (size_t index = 0; index < parts.size(); ++index) {
+  for (auto& part : parts) {
     result.parts.push_back(CollectionStitchPart{
-        .collection = parts[index].collection,
-        .startTick = composition->starts[index],
-        .banks = std::move(parts[index].banks),
+        .collection = part.collection,
+        .startTick = part.startTick,
+        .banks = std::move(part.banks),
     });
   }
   return result;
