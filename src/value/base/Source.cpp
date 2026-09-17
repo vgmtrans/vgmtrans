@@ -197,21 +197,6 @@ const SourceFile& SourceStore::source(SourceId id) const {
   return entry(id).file;
 }
 
-const SourceFile& SourceStore::sourceAt(size_t index) const {
-  size_t activeIndex = 0;
-  for (const auto& entry : entries_) {
-    if (!entry.file.active()) {
-      continue;
-    }
-    if (activeIndex == index) {
-      return entry.file;
-    }
-    ++activeIndex;
-  }
-
-  throw std::out_of_range("Source index outside SourceStore bounds");
-}
-
 size_t SourceStore::sourceCount() const noexcept {
   return static_cast<size_t>(std::ranges::count_if(entries_, [](const Entry& entry) { return entry.file.active(); }));
 }
