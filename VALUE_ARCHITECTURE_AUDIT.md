@@ -2987,6 +2987,20 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   parent links remain unchanged.
 - Validation: warning-free Debug build; all 21 CTest targets pass (10.63 s).
 
+## Render the selected performance directly
+
+- Removed the private MIDI-rendering wrapper and its fallback between prepared
+  and canonical performances. Standalone export, collection export, and playback
+  now call the renderer with the performance they already selected, after the
+  existing success check.
+- Collection export reuses its bank view after MIDI rendering to select a
+  specific synth bank. Removed the second pointer vector; performance and
+  modulation preparation still see the complete collection.
+- Removed eleven production lines and one helper. Validation: warning-free
+  Debug build; all 21 CTest targets pass (10.67 s), including paired/standalone
+  output equivalence, selected-bank filtering, output-order independence,
+  playback, and rendering failures.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual
