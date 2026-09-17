@@ -14,6 +14,10 @@
 namespace vgmtrans::formats::mori_snes {
 
 struct DriverConfig {
+  DriverConfig(core::ByteReader reader, const Layout& layout)
+      : data(reader), traits(layout.traits), presetTable(layout.presetTableAddress),
+        presetPitchHigh(layout.presetPitchHighAddress), panTable(layout.panTableAddress) {}
+
   core::ByteReader data;
   DriverTraits traits;
   u16 presetTable = 0;

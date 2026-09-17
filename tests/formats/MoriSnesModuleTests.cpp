@@ -14,6 +14,7 @@
 #include <cmath>
 #include <initializer_list>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <variant>
@@ -185,13 +186,14 @@ PerformanceSequence render(std::vector<u8> bytes, Version version = Version::Gok
   const SequenceProgramConfig config = sequenceConfig(layout.traits);
   const ByteReader reader(SourceId{301}, bytes);
   SequenceProgram program{
-      .runtime = sequenceRuntime(reader, layout),
+      .runtime = sequenceRuntime(RetainedSource::copyOf(reader), layout),
       .timebase = config.timebase,
       .behavior = config.behavior,
   };
   for (u32 index = 0; index < starts.size(); ++index) {
     program.tracks.push_back(decodeSourceTrack(reader, layout, index, starts[index]));
   }
+  bytes = std::vector<u8>{};  // Playback must be independent of the borrowed decode buffer.
   return SequenceVm(LoopPolicy::PlayOnce).render(program);
 }
 
@@ -713,7 +715,8 @@ void liveSongSelectionAndHardwareSoundEffectsAreRecovered() {
   expect(sfxLayout && sfxLayout->songIndex == 0x15 && sfxLayout->tracks.empty() &&
              sfxLayout->sfxVoices.size() == 1 && sfxLayout->sfxVoices.front().scriptAddress == 0x1800,
          "the last hardware-only command should recover its direct voice script after source tracks end");
-  SequenceParse parsed = decodeSequence(reader, *sfxLayout, AssetId{400});
+  SequenceParse parsed = decodeSequence(RetainedSource::copyOf(reader), *sfxLayout, AssetId{400});
+  sfx = std::vector<u8>{};
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
   const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
   const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks.front());
@@ -731,9 +734,37 @@ void liveSongSelectionAndHardwareSoundEffectsAreRecovered() {
          "pitch/volume script");
 }
 
+void scannedRuntimeOwnsDriverBytes() {
+  auto bytes = std::make_shared<const std::vector<u8>>(DriverFixture().data());
+  const std::weak_ptr<const std::vector<u8>> lifetime = bytes;
+  ScanIdAllocator ids;
+  ScanResult result = module().scan(ScanInput{
+      .source = SourceFile{.name = "retained.aram"},
+      .reader = ByteReader{SourceId{401}, *bytes},
+      .ids = ids,
+      .retained = RetainedSource{SourceId{401}, bytes},
+  });
+  SequenceProgram program;
+  for (const Asset& asset : result.assets) {
+    if (const auto* sequence = std::get_if<SequenceProgramAsset>(&asset)) {
+      program = sequence->program;
+    }
+  }
+  result = {};
+  bytes.reset();
+  expect(!lifetime.expired(), "the copied runtime should retain its playback tables after the scan is released");
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
+  expect(performance.diagnostics.empty() && !performance.tracks.empty() &&
+             !events<NotePerformanceEvent>(performance.tracks.front()).empty(),
+         "the retained runtime should render notes after its scan input is gone");
+  program = {};
+  expect(lifetime.expired(), "releasing the last program should release its source bytes");
+}
+
 }  // namespace
 
 void runMoriSnesModuleTests() {
+  scannedRuntimeOwnsDriverBytes();
   eventTimingAndAuditedCommandsRenderPhysically();
   zeroDurationNotesReuseTheDriverVoice();
   cbCharaEqualPriorityVoiceCannotStealAnotherTrack();

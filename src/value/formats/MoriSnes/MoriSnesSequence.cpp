@@ -228,6 +228,13 @@ void emitVoiceVolumeChanges(const VoiceScriptAnalysis& script, PerformanceEmitte
   }
 }
 
+struct RuntimeConfig {
+  RetainedSource source;
+  Layout layout;
+
+  [[nodiscard]] DriverConfig driver() const { return {source.reader(), layout}; }
+};
+
 struct ProgramState : DriverConfig {
   struct NoteLimit {
     std::optional<u32> ticks;
@@ -253,7 +260,7 @@ struct ProgramState : DriverConfig {
     std::optional<double> audioEndMilliseconds;
   };
 
-  explicit ProgramState(const DriverConfig& config) : DriverConfig(config) {}
+  explicit ProgramState(const RuntimeConfig& config) : DriverConfig(config.driver()) {}
 
   [[nodiscard]] double millisecondsAt(u64 tick) const {
     const double tickMilliseconds =
@@ -400,8 +407,8 @@ struct RepeatFrame {
 };
 
 struct TrackState : DriverConfig {
-  TrackState(TrackStateContext source, const DriverConfig& config)
-      : DriverConfig(config), trackNumber(source.sourceTrackNumber) {}
+  TrackState(TrackStateContext source, const RuntimeConfig& config)
+      : DriverConfig(config.driver()), trackNumber(source.sourceTrackNumber) {}
 
   u32 trackNumber = 0;
   u8 delta = 0;
@@ -863,14 +870,9 @@ struct Playback : SequencePlayback<TrackState> {
 
 using Cursor = CompilerCursor<Playback>;
 
-struct SfxRuntimeConfig {
-  DriverConfig driver;
-  std::vector<u16> scripts;
-};
-
 struct SfxTrackState : DriverConfig {
-  SfxTrackState(TrackStateContext source, const SfxRuntimeConfig& config)
-      : DriverConfig(config.driver), script(config.scripts.at(source.sourceTrackNumber)) {}
+  SfxTrackState(TrackStateContext source, const RuntimeConfig& config)
+      : DriverConfig(config.driver()), script(config.layout.sfxVoices.at(source.sourceTrackNumber).scriptAddress) {}
 
   u16 script = 0;
 };
@@ -1176,14 +1178,8 @@ SequenceProgramConfig sequenceConfig(DriverTraits traits) {
   };
 }
 
-SequenceRuntime sequenceRuntime(ByteReader reader, const Layout& layout) {
-  return makeCompiledRuntime<Playback, ProgramState>(DriverConfig{
-      .data = reader,
-      .traits = layout.traits,
-      .presetTable = layout.presetTableAddress,
-      .presetPitchHigh = layout.presetPitchHighAddress,
-      .panTable = layout.panTableAddress,
-  });
+SequenceRuntime sequenceRuntime(RetainedSource source, const Layout& layout) {
+  return makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{.source = std::move(source), .layout = layout});
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, u32 trackNumber, u32 startAddress,
@@ -1193,8 +1189,9 @@ TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, u32 trac
                        [&](u32 offset) { return decodeCommand(reader, layout, offset, diagnostics); });
 }
 
-SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
+SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
                              std::vector<Diagnostic>* diagnostics) {
+  const ByteReader reader = source.reader();
   if (!layout.sfxVoices.empty()) {
     const SourceRange header = reader.range(layout.songHeaderAddress, 2u + layout.sfxVoices.size() * 3u);
     const SourceAnnotationId root = sourceMap != nullptr
@@ -1206,12 +1203,9 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     SequenceProgram program = sequenceConfig(layout.traits).makeProgram();
     program.behavior.initialLevel = 1.0;
     program.behavior.initialReverbSend = 0.0;
-    std::vector<u16> scripts;
-    scripts.reserve(layout.sfxVoices.size());
     ReferencedInstruments references;
     for (u32 index = 0; index < layout.sfxVoices.size(); ++index) {
       const SfxVoice& voice = layout.sfxVoices[index];
-      scripts.push_back(voice.scriptAddress);
       references.directScriptKeys[voice.scriptAddress].insert(60);
       const Address commandAddress{voice.range.offset};
       const Address continuation{voice.range.offset + voice.range.size};
@@ -1246,17 +1240,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
           .commands = {std::move(command)},
       });
     }
-    program.runtime = makeCompiledRuntime<SfxPlayback>(SfxRuntimeConfig{
-        .driver =
-            DriverConfig{
-                .data = reader,
-                .traits = layout.traits,
-                .presetTable = layout.presetTableAddress,
-                .presetPitchHigh = layout.presetPitchHighAddress,
-                .panTable = layout.panTableAddress,
-            },
-        .scripts = std::move(scripts),
-    });
+    program.runtime = makeCompiledRuntime<SfxPlayback>(RuntimeConfig{.source = std::move(source), .layout = layout});
     return SequenceParse{
         .program = std::move(program),
         .references = std::move(references),
@@ -1272,7 +1256,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     sequence.addTrack(track.channel, reader.range(track.range.offset + 1, 2), track.startAddress,
                       [&](u32 offset) { return decodeCommand(reader, layout, offset, diagnostics); }, encoded);
   }
-  SequenceProgram program = sequence.finish(sequenceRuntime(reader, layout));
+  SequenceProgram program = sequence.finish(sequenceRuntime(std::move(source), layout));
   const DriverTraits traits = layout.traits;
   if (reader.has(layout.panTableAddress + traits.initialPan, 1)) {
     const double center = reader.u8At(layout.panTableAddress + traits.initialPan) / 128.0;

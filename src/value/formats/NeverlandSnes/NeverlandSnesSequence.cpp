@@ -158,7 +158,7 @@ struct RepeatFrame {
 };
 
 struct RuntimeConfig {
-  ByteReader reader;
+  RetainedSource source;
   Layout layout;
 };
 
@@ -188,7 +188,7 @@ struct ProgramState {
 
 struct TrackState {
   TrackState(TrackStateContext source, const RuntimeConfig& config)
-      : reader(config.reader), layout(config.layout),
+      : reader(config.source.reader()), layout(config.layout),
         percussion(config.layout.tracks[std::min<u32>(source.sourceTrackNumber, kTrackCount - 1)].percussion),
         voiceBit(static_cast<u8>(1u << std::min<u32>(source.sourceTrackNumber, 7))) {}
 
@@ -874,8 +874,8 @@ SequenceProgramConfig sequenceConfig(const Layout& layout) {
   };
 }
 
-SequenceRuntime sequenceRuntime(ByteReader reader, const Layout& layout) {
-  return makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{.reader = reader, .layout = layout});
+SequenceRuntime sequenceRuntime(RetainedSource source, const Layout& layout) {
+  return makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{.source = std::move(source), .layout = layout});
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, u32 trackNumber, u32 playlistAddress,
@@ -884,8 +884,9 @@ TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, u32 trac
   return decodeTrack(scope, reader, layout, trackNumber, playlistAddress, diagnostics, nullptr);
 }
 
-SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
+SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
                              std::vector<Diagnostic>* diagnostics) {
+  const ByteReader reader = source.reader();
   const u32 headerSize = layout.version == Version::Modern ? 0x50 : 0x40;
   const SourceRange header = reader.range(layout.sequenceBaseAddress, headerSize);
   const SequenceProgramConfig config = sequenceConfig(layout);
@@ -914,7 +915,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         layout.version == Version::Modern ? static_cast<u16>(source.playlistAddress - layout.sequenceBaseAddress)
                                           : source.playlistAddress);
   }
-  SequenceProgram program = sequence.finish(sequenceRuntime(reader, layout));
+  SequenceProgram program = sequence.finish(sequenceRuntime(std::move(source), layout));
   return SequenceParse{.program = std::move(program), .references = std::move(references)};
 }
 
