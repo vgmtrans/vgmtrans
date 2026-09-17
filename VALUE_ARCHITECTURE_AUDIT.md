@@ -3019,6 +3019,18 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   playback, and rendering failures.
   Logs: `cmake-build-debug/value-audit/direct-midi-rendering-{build,tests}.log`.
 
+## Write sample headers from their referencing regions
+
+- Removed the SoundFont writer's intermediate sample-header record type and
+  helper, copied loop table, and separate assignment flags. The writer retains
+  each sample's first referencing region and derives pitch/loop values directly
+  when serializing that sample.
+- Removed 15 production lines. Added a serialized-output regression for first
+  region precedence, loop overrides, sample pitch correction, and unreferenced
+  samples' default pitch and padded loop offsets.
+- Validation: warning-free Debug build; all 21 CTest targets pass (11.05 s).
+  Logs: `cmake-build-debug/value-audit/direct-sample-headers-{build,tests}.log`.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual
