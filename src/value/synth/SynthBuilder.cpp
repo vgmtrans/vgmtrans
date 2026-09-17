@@ -147,13 +147,22 @@ detail::SynthBuilderSources::SynthBuilderSources(AssetId asset, SourceMapBuilder
 
 AnnotationBuilder detail::SynthBuilderSources::source(SourceRole role, std::string_view label, SourceRange range,
                                                       std::string_view kind) {
+  return annotateSource(role, label, range, kind, ObjectRefs::asset(asset_));
+}
+
+AnnotationBuilder detail::SynthBuilderSources::annotateSource(SourceRole role, std::string_view label, SourceRange range,
+                                                              std::string_view kind, ObjectRef owner,
+                                                              std::vector<SourceAnnotationId>* sources) {
   observedRange_.include(range);
   if (sourceMap_ == nullptr || !range.valid()) {
     return {};
   }
-  auto annotation = sourceMap_->annotation(role, label, range).owner(ObjectRefs::asset(asset_));
+  auto annotation = sourceMap_->annotation(role, label, range).owner(owner);
   if (!kind.empty()) {
     annotation.kind(kind);
+  }
+  if (sources != nullptr) {
+    sources->push_back(annotation.id());
   }
   return annotation;
 }
@@ -274,16 +283,7 @@ bool SamplePoolBuilder::validIndex(u32 index) const noexcept {
 
 AnnotationBuilder SamplePoolBuilder::addEntrySource(u32 index, std::string_view label, SourceRange range,
                                                     std::string_view kind) {
-  observedRange_.include(range);
-  if (sourceMap_ == nullptr || !range.valid()) {
-    return {};
-  }
-  auto annotation = sourceMap_->annotation(SourceRole::Sample, label, range).owner(ObjectRefs::sample(asset_, index));
-  if (!kind.empty()) {
-    annotation.kind(kind);
-  }
-  sources_[index].push_back(annotation.id());
-  return annotation;
+  return annotateSource(SourceRole::Sample, label, range, kind, ObjectRefs::sample(asset_, index), &sources_[index]);
 }
 
 void SamplePoolBuilder::finishSources() {
@@ -450,35 +450,25 @@ InstrumentSetBuilder::RegionEntry InstrumentSetBuilder::appendRegion(u32 instrum
 
 AnnotationBuilder InstrumentSetBuilder::addInstrumentSource(u32 index, std::string_view label, SourceRange range,
                                                             std::string_view kind) {
-  recordInstrumentRange(index, range);
-  if (sourceMap_ == nullptr || !range.valid()) {
-    return {};
+  auto& state = states_[index];
+  if (!state.rangeWasExplicit) {
+    instruments_[index].range.include(range);
   }
-  auto annotation =
-      sourceMap_->annotation(SourceRole::Instrument, label, range).owner(ObjectRefs::instrument(asset_, index));
-  if (!kind.empty()) {
-    annotation.kind(kind);
-  }
-  states_[index].sources.push_back(annotation.id());
-  return annotation;
+  return annotateSource(SourceRole::Instrument, label, range, kind, ObjectRefs::instrument(asset_, index), &state.sources);
 }
 
 AnnotationBuilder InstrumentSetBuilder::addRegionSource(u32 instrumentIndex, u32 regionIndex, std::string_view label,
                                                         SourceRange range, std::string_view kind) {
-  recordRegionRange(instrumentIndex, regionIndex, range);
-  if (sourceMap_ == nullptr || !range.valid()) {
-    return {};
+  auto& state = states_[instrumentIndex].regions[regionIndex];
+  if (!state.rangeWasExplicit) {
+    instruments_[instrumentIndex].regions[regionIndex].range.include(range);
   }
-  auto annotation = sourceMap_->annotation(SourceRole::Region, label, range)
-                        .owner(ObjectRefs::region(asset_, instrumentIndex, regionIndex));
-  if (!kind.empty()) {
-    annotation.kind(kind);
-  }
+  auto annotation = annotateSource(SourceRole::Region, label, range, kind,
+                                   ObjectRefs::region(asset_, instrumentIndex, regionIndex), &state.sources);
   const auto& instrumentSources = states_[instrumentIndex].sources;
   if (!instrumentSources.empty()) {
     annotation.parent(instrumentSources.back());
   }
-  states_[instrumentIndex].regions[regionIndex].sources.push_back(annotation.id());
   return annotation;
 }
 
@@ -507,22 +497,6 @@ void InstrumentSetBuilder::finishSources() {
         annotateSynthValue(AnnotationBuilder{*sourceMap_, source}, region);
       }
     }
-  }
-}
-
-void InstrumentSetBuilder::recordInstrumentRange(u32 index, SourceRange range) {
-  auto& state = states_[index];
-  observedRange_.include(range);
-  if (!state.rangeWasExplicit) {
-    instruments_[index].range.include(range);
-  }
-}
-
-void InstrumentSetBuilder::recordRegionRange(u32 instrumentIndex, u32 regionIndex, SourceRange range) {
-  auto& state = states_[instrumentIndex].regions[regionIndex];
-  observedRange_.include(range);
-  if (!state.rangeWasExplicit) {
-    instruments_[instrumentIndex].regions[regionIndex].range.include(range);
   }
 }
 

@@ -3100,6 +3100,20 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   polling, and per-tick callbacks. Warning-free full and incremental Debug
   builds; all 21 CTest targets pass (10.50 s).
 
+## Create synth source annotations through one path
+
+- Asset, sample, instrument, and region annotations now share source-range
+  observation, optional annotation-sink handling, owner assignment, explicit
+  kind overrides, and entry-source registration in `SynthBuilderSources`.
+  Instrument/region range inference and the most recent instrument parent stay
+  explicit at their respective call sites.
+- Removed the two one-use range-recording methods and three copies of entry
+  annotation setup: 26 fewer production lines, with no format-facing API changes.
+- Extended existing regressions for invalid source ranges, explicit and inferred
+  kinds, and asset bounds without an annotation sink. Existing ownership,
+  parent-order, fallback-annotation, and explicit-range checks also pass.
+- Validation: warning-free Debug builds; all 21 CTest targets pass (10.78 s).
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual
