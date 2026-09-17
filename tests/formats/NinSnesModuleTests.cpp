@@ -1951,7 +1951,7 @@ void ninSnesSunsoftFeAndGateFollowRevision() {
 
 Layout questLayout() {
   auto layout = standardLayout();
-  layout.profile = ProfileId::Quest;
+  layout.profile = ProfileId::QuestTacticsOgre;
   layout.signature = Signature::Quest;
   return layout;
 }
@@ -2004,7 +2004,7 @@ std::vector<u8> questDriverFixture() {
 }
 
 void ninSnesQuestSupportsTacticsOgre() {
-  expect(profile(ProfileId::Quest).id == ProfileId::Quest, "Quest must have a named profile");
+  expect(profile(ProfileId::QuestTacticsOgre).id == ProfileId::QuestTacticsOgre, "Quest must have a named profile");
   {
     const auto bytes = sequenceBytes({0xd9, 0, 0xd9, 0, 0xd8, 1, 0});
     SourceMapBuilder sourceMap;
@@ -2020,7 +2020,7 @@ void ninSnesQuestSupportsTacticsOgre() {
     auto bytes = questDriverFixture();
     const ByteReader reader(SourceId{1}, bytes);
     const auto layout = findLayout(reader);
-    expect(layout && layout->profile == ProfileId::Quest && layout->songIndex == 2 &&
+    expect(layout && layout->profile == ProfileId::QuestTacticsOgre && layout->songIndex == 2 &&
                layout->playlistAddress == 0x2200 && layout->instrumentTableAddress == 0x300 &&
                layout->spcDirAddress == 0x200 && layout->durationRateTable[6] == 0xf5 &&
                layout->volumeTable[15] == 0xff && layout->questPanTable.size() == 42,
@@ -2213,7 +2213,7 @@ void ninSnesQuestSupportsTacticsOgre() {
 
 void ninSnesQuestSupportsOgreBattle() {
   auto layout = questLayout();
-  layout.profile = ProfileId::QuestEarlier;
+  layout.profile = ProfileId::QuestOgreBattle;
   layout.instrumentTableAddress = 0x4000;
   {
     const auto bytes = sequenceBytes({0xe2, 1, 2, 0xe8, 1, 2, 0xf0, 1, 0xf2, 0xf5, 1, 2, 3,
@@ -2238,7 +2238,7 @@ void ninSnesQuestSupportsOgreBattle() {
     const std::array<u8, 4> repeated{1, 0x7f, 0x80, 0};
     std::ranges::copy(repeated, bytes.begin() + 0x400);
     expect(questNotes(render(bytes, layout)).size() == 128 &&
-               isInfinitePlaylistRepeat(PlaylistModel::QuestEarlier, 0xfe),
+               isInfinitePlaylistRepeat(PlaylistModel::QuestOgreBattle, 0xfe),
            "early Quest pattern counts 80-FE are finite, while playlist FE and FF repeat forever");
   }
   {

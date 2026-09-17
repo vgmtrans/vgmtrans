@@ -72,9 +72,9 @@ constexpr std::array<Profile, 23> kProfiles{{
     {.id = ProfileId::Sunsoft, .name = "Sunsoft", .initialMasterVolume = 0xb0, .noteGateBias = 1},
     // Benkei also says S1.20, but has only E0-FA and starts master volume at FF.
     {.id = ProfileId::SunsoftBenkei, .name = "Sunsoft (Benkei Gaiden)", .sectionTrackCount = 6},
-    {.id = ProfileId::QuestEarlier, .name = "Quest (Ogre Battle)", .playlist = PlaylistModel::QuestEarlier,
+    {.id = ProfileId::QuestOgreBattle, .name = "Quest (Ogre Battle)", .playlist = PlaylistModel::QuestOgreBattle,
      .programs = ProgramResolver::Direct, .initialMasterVolume = 0},
-    {.id = ProfileId::Quest, .name = "Quest (Tactics Ogre)", .playlist = PlaylistModel::Quest,
+    {.id = ProfileId::QuestTacticsOgre, .name = "Quest (Tactics Ogre)", .playlist = PlaylistModel::QuestTacticsOgre,
      .programs = ProgramResolver::Direct, .initialMasterVolume = 0},
 }};
 

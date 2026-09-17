@@ -2339,7 +2339,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   const Profile& selected = profile(layout.profile);
   PlaylistDecode playlist =
       layout.questSfx ? PlaylistDecode{} : decodePlaylist(reader, layout, sequenceId, sourceMap, diagnostics);
-  if (selected.id == ProfileId::Quest || selected.id == ProfileId::QuestEarlier) {
+  if (selected.id == ProfileId::QuestTacticsOgre || selected.id == ProfileId::QuestOgreBattle) {
     return quest::decodeSequence(reader, layout, std::move(playlist.playlist), sequenceId, playlist.annotation,
                                  sourceMap, diagnostics);
   }
