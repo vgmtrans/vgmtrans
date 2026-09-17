@@ -3111,6 +3111,21 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
 - Validation: warning-free Debug build; all 21 CTest targets pass (10.79 s).
   Logs: `cmake-build-debug/value-audit/sequence-finalization-*`.
 
+## Remove the VM access adapter and analysis handoff
+
+- Removed `VmApiAccess`. The internal track runtime now constructs its own
+  borrowed `VmApi`, retaining the private constructor and removing the separate
+  access type, forward declaration, and redundant runtime argument at call sites.
+- Analysis now returns its completed prepass directly from that branch. Removed
+  a second analysis-mode check and the transfer of prepass diagnostics into an
+  otherwise unused sequence. The typed analysis adapter still exposes only the
+  final program state and requested diagnostics, without a second playback pass.
+- Removed seven production lines. Existing tests cover execution with and
+  without prepass hooks, exact command/hook counts, prepass diagnostics, wait
+  polling, and per-tick callbacks. Warning-free full and incremental Debug
+  builds; all 21 CTest targets pass (10.50 s). Logs:
+  `cmake-build-debug/value-audit/runtime-api-view-*` and `direct-vm-analysis-*`.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual
@@ -3175,6 +3190,9 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   performance and synth data are the extension point for future targets;
   adding speculative Furnace interfaces would add concepts without serving a
   current conversion.
+- Keep the tempo map's value-returning `points()` contract unless its ownership
+  API is deliberately redesigned. Existing callers retain the result of a
+  temporary tempo map; replacing that result with a borrowed span would dangle.
 
 - Keep version opcode tables as direct byte-layout descriptions where the
   versions differ substantially. Factoring short repeated tails into extra
