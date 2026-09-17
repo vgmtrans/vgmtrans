@@ -328,6 +328,14 @@ public:
 private:
   [[nodiscard]] SourceAnnotation* annotation() const;
 
+  template <class Member, class Value>
+  AnnotationBuilder& set(Member SourceAnnotation::* member, const Value& value) {
+    if (auto* found = annotation()) {
+      found->*member = value;
+    }
+    return *this;
+  }
+
   SourceMapBuilder* map_ = nullptr;
   SourceAnnotationId id_;
 };
