@@ -2991,6 +2991,19 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   affected formats and applications; all 21 CTest targets pass. Logs:
   `cmake-build-debug/value-audit/annotation-setters-{build,tests}.log`.
 
+## Construct track source hierarchy from its decode scope
+
+- `TrackDecodeSession` now accepts its existing `TrackDecodeScope` directly.
+  Removed the seven-argument unpacking path and `createTrackAnnotation` helper;
+  source-track creation and trackless ownership are explicit constructor paths.
+- Removed ten production lines. Expanded the hierarchy regression to cover
+  tracked/trackless sources with and without a parent, plus annotation-free
+  decoding for all four cases. Command ownership, root ownership, and optional
+  parent links remain unchanged.
+- Validation: warning-free Debug build; all 21 CTest targets pass (10.63 s).
+  Logs: `cmake-build-debug/value-audit/track-annotation-setup-{build,tests}.log`
+  and `track-annotation-setup-regression-{build,tests}.log` in the same directory.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual

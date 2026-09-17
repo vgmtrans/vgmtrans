@@ -18,26 +18,6 @@ namespace vgmtrans::core {
 
 namespace {
 
-[[nodiscard]] std::optional<SourceAnnotationId> createTrackAnnotation(
-    ByteReader reader, u32 trackIndex, u32 startOffset, std::optional<AssetId> sequenceAsset,
-    std::optional<SourceAnnotationId> parentAnnotation, SourceMapBuilder* sourceMap) {
-  if (sourceMap == nullptr) {
-    return std::nullopt;
-  }
-
-  auto track =
-      sourceMap
-          ->annotation(SourceRole::SequenceTrack, "Track " + std::to_string(trackIndex), reader.range(startOffset, 0))
-          .kind("track");
-  if (sequenceAsset) {
-    track.owner(ObjectRefs::sequenceTrack(*sequenceAsset, trackIndex));
-  }
-  if (parentAnnotation) {
-    track.parent(*parentAnnotation);
-  }
-  return track.id();
-}
-
 [[nodiscard]] std::optional<u32> operandUnsigned32(const SemanticOperand& operand) {
   const auto* value = std::get_if<u64>(&operand.value);
   if (value == nullptr || *value > std::numeric_limits<u32>::max()) {
@@ -117,18 +97,30 @@ namespace {
 
 }  // namespace
 
-TrackDecodeSession::TrackDecodeSession(ByteReader reader, u32 trackIndex, u32 startOffset,
-                                       std::optional<AssetId> sequenceAsset,
-                                       std::optional<SourceAnnotationId> parentAnnotation, SourceMapBuilder* sourceMap,
-                                       bool sourceHasTracks)
-    : reader_(reader), startOffset_(startOffset), sourceMap_(sourceMap),
-      annotation_(sourceHasTracks
-                      ? createTrackAnnotation(reader, trackIndex, startOffset, sequenceAsset, parentAnnotation,
-                                              sourceMap)
-                      : std::nullopt),
-      commandParent_(sourceHasTracks ? annotation_ : parentAnnotation),
-      rootSequenceAsset_(sourceHasTracks || commandParent_ ? std::nullopt : sequenceAsset),
-      trackIndex_(trackIndex) {
+TrackDecodeSession::TrackDecodeSession(const TrackDecodeScope& scope, u32 trackIndex, u32 startOffset)
+    : reader_(scope.reader), startOffset_(startOffset), sourceMap_(scope.sourceMap), trackIndex_(trackIndex) {
+  if (!scope.sourceHasTracks) {
+    commandParent_ = scope.parentAnnotation;
+    if (!commandParent_) {
+      rootSequenceAsset_ = scope.sequenceAsset;
+    }
+    return;
+  }
+  if (sourceMap_ == nullptr) {
+    return;
+  }
+
+  auto track = sourceMap_->annotation(SourceRole::SequenceTrack, "Track " + std::to_string(trackIndex),
+                                      reader_.range(startOffset, 0))
+                   .kind("track");
+  if (scope.sequenceAsset) {
+    track.owner(ObjectRefs::sequenceTrack(*scope.sequenceAsset, trackIndex));
+  }
+  if (scope.parentAnnotation) {
+    track.parent(*scope.parentAnnotation);
+  }
+  annotation_ = track.id();
+  commandParent_ = annotation_;
 }
 
 const DecodedBytecodeCommand& TrackDecodeSession::findOrAppend(DecodedBytecodeCommand command, u32 offset) {

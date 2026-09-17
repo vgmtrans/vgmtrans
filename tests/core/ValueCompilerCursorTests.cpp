@@ -662,38 +662,45 @@ void trackDecodeSessionOrdersExceptionalWalkerCommands() {
 
 void trackDecodeSourceHierarchyDistinguishesTrackedAndTracklessFormats() {
   const std::vector<u8> bytes{0xff};
+  const ByteReader reader(SourceId{31}, bytes);
+  const AssetId asset{31};
+  for (const bool sourceHasTracks : {false, true}) {
+    for (const bool hasParent : {false, true}) {
+      SourceMapBuilder sourceMap;
+      const auto parent = hasParent ? std::optional{sourceMap.section("Pattern", reader.range(0, 1))
+                                                       .owner(ObjectRefs::sequence(asset)).id()}
+                                    : std::nullopt;
+      TrackDecodeScope scope{
+          .reader = reader,
+          .sourceHasTracks = sourceHasTracks,
+          .sequenceAsset = asset,
+          .parentAnnotation = parent,
+          .sourceMap = &sourceMap,
+      };
+      const auto decode = [&](u32 offset) { return decodeProbeCommand(reader, offset, 1); };
+      const TrackProgram program = scope.decode(0, 0, decode);
+      const SourceMap annotations = sourceMap.finish();
+      const auto* command = annotations.find(program.commands.front().annotation);
+      const auto commandParent = sourceHasTracks ? std::optional{program.annotation} : parent;
+      expect(program.annotation.valid() == sourceHasTracks && command != nullptr &&
+                 command->parent == commandParent && annotations.assetOwner(command->id) == asset,
+             "commands should inherit sequence ownership through the selected source hierarchy");
+      if (sourceHasTracks) {
+        expect(annotations.get(program.annotation).parent == parent && !command->owner,
+               "a source track should retain its optional parent and own its commands");
+      } else {
+        const auto owner = hasParent ? std::nullopt : std::optional{ObjectRefs::sequence(asset)};
+        expect(annotations.withRole(reader.source(), SourceRole::SequenceTrack).empty() && command->owner == owner,
+               "trackless commands should inherit from a parent or own the sequence directly at the root");
+      }
 
-  SourceMapBuilder trackedSourceMap;
-  const AssetId trackedAsset{31};
-  const TrackDecodeScope tracked{
-      .reader = ByteReader(SourceId{31}, bytes),
-      .sequenceAsset = trackedAsset,
-      .sourceMap = &trackedSourceMap,
-  };
-  const TrackProgram trackedProgram =
-      tracked.decode(0, 0, [&](u32 offset) { return decodeProbeCommand(tracked.reader, offset, 1); });
-  const SourceMap trackedAnnotations = trackedSourceMap.finish();
-  const auto sourceTracks = trackedAnnotations.withRole(SourceId{31}, SourceRole::SequenceTrack);
-  const auto* trackedCommand = trackedAnnotations.find(trackedProgram.commands.front().annotation);
-  expect(sourceTracks.size() == 1 && trackedCommand != nullptr && trackedCommand->parent == sourceTracks.front() &&
-             trackedAnnotations.assetOwner(trackedCommand->id) == trackedAsset,
-         "tracked decoding should retain its source-track parent and inherited sequence ownership");
-
-  SourceMapBuilder tracklessSourceMap;
-  const AssetId tracklessAsset{32};
-  const TrackDecodeScope trackless{
-      .reader = ByteReader(SourceId{32}, bytes),
-      .sourceHasTracks = false,
-      .sequenceAsset = tracklessAsset,
-      .sourceMap = &tracklessSourceMap,
-  };
-  const TrackProgram tracklessProgram =
-      trackless.decode(0, 0, [&](u32 offset) { return decodeProbeCommand(trackless.reader, offset, 1); });
-  const SourceMap tracklessAnnotations = tracklessSourceMap.finish();
-  const auto* rootCommand = tracklessAnnotations.find(tracklessProgram.commands.front().annotation);
-  expect(tracklessAnnotations.withRole(SourceId{32}, SourceRole::SequenceTrack).empty() && rootCommand != nullptr &&
-             !rootCommand->parent && rootCommand->owner == ObjectRefs::sequence(tracklessAsset),
-         "trackless decoding should publish sequence-owned commands directly at the source root");
+      scope.sourceMap = nullptr;
+      const TrackProgram unannotated = scope.decode(0, 0, decode);
+      expect(!unannotated.annotation.valid() && unannotated.commands.size() == program.commands.size() &&
+                 !unannotated.commands.front().annotation.valid(),
+             "decoding without a source map should keep executable commands without annotation handles");
+    }
+  }
 }
 
 }  // namespace
