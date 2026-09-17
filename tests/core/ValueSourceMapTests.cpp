@@ -294,30 +294,54 @@ void sessionStateScrubsCrossSourceObjectLinks() {
          "scrubbing a source map should keep the surviving immutable asset storage");
 }
 
-void scanValidationRejectsSourceAnnotationParentCycles() {
+void sourceMapParentTraversalHandlesBranchesAndCycles() {
   SourceStore sources;
-  const SourceId source = sources.add(SourceFile{.name = "cycle.bin"}, {0, 0});
-  ScanResult result{
-      .sourceMap = SourceMap{{
-          SourceAnnotation{
-              .id = SourceAnnotationId{1},
-              .range = SourceRange{.source = source, .offset = 0, .size = 1},
-              .label = "First",
-              .parent = SourceAnnotationId{2},
-          },
-          SourceAnnotation{
-              .id = SourceAnnotationId{2},
-              .range = SourceRange{.source = source, .offset = 1, .size = 1},
-              .label = "Second",
-              .parent = SourceAnnotationId{1},
-          },
-      }},
-  };
-  const ValidationReport report = validateScanResult(source, result, sources, {});
-  expect(std::ranges::any_of(
-             report.diagnostics(),
-             [](const Diagnostic& diagnostic) { return diagnostic.code == "scan.source-annotation.parent-cycle"; }),
-         "scan admission should reject cyclic annotation parents before a TreeView can recurse through them");
+  const SourceId source = sources.add(SourceFile{.name = "parents.bin"}, {0});
+  const SourceRange range = sources.reader(source).range(0, 1);
+  SourceMapBuilder builder;
+  const auto owner = builder.source("Owner", range).owner(ObjectRefs::misc(AssetId{1})).id();
+  const auto branch = builder.section("Branch", range).parent(owner).id();
+  const auto first = builder.entry("First", range).parent(branch).id();
+  const auto second = builder.entry("Second", range).parent(branch).id();
+  const auto unowned = builder.source("Unowned", range).id();
+  const auto child = builder.entry("Unowned child", range).parent(unowned).id();
+  auto cycleA = builder.section("Cycle A", range);
+  const auto cycleB = builder.section("Cycle B", range).parent(cycleA.id());
+  cycleA.parent(cycleB.id());
+  const auto cycleChild = builder.entry("Cycle child", range).parent(cycleB.id()).id();
+  auto self = builder.source("Owned cycle", range).owner(ObjectRefs::misc(AssetId{2}));
+  self.parent(self.id());
+  const auto selfChild = builder.entry("Owned cycle child", range).parent(self.id()).id();
+  const auto missing = builder.section("Missing parent", range).parent(SourceAnnotationId{99}).id();
+  const auto missingChild = builder.entry("Missing parent's child", range).parent(missing).id();
+  const auto map = builder.finish();
+  std::vector<SourceAnnotation> annotations(map.annotations().begin(), map.annotations().end());
+
+  for (int order = 0; order < 2; ++order) {
+    ScanResult result{
+        .assets = {
+            MiscAsset{.metadata = AssetMetadata{.id = AssetId{1}, .range = range}},
+            MiscAsset{.metadata = AssetMetadata{.id = AssetId{2}, .range = range}},
+        },
+        .sourceMap = SourceMap{annotations},
+    };
+    for (const auto id : {owner, branch, first, second}) {
+      expect(result.sourceMap.assetOwner(id) == AssetId{1}, "shared parent chains should inherit their owner");
+    }
+    for (const auto id : {unowned, child, cycleA.id(), cycleB.id(), cycleChild, missing, missingChild}) {
+      expect(!result.sourceMap.assetOwner(id), "unowned, cyclic, and missing parent chains should stay unowned");
+    }
+    expect(result.sourceMap.assetOwner(self.id()) == AssetId{2} &&
+               result.sourceMap.assetOwner(selfChild) == AssetId{2},
+           "an explicit owner should still resolve in a graph that validation must reject");
+    const auto report = validateScanResult(source, result, sources, {});
+    expect(std::ranges::count(report.diagnostics(), "scan.source-annotation.parent-cycle", &Diagnostic::code) == 2,
+           "validation should report each cycle once, including cycles with explicit owners");
+    expect(std::ranges::count(report.diagnostics(), "scan.source-annotation.unknown-parent", &Diagnostic::code) == 1 &&
+               report.diagnostics().size() == 3,
+           "shared ancestors should not appear cyclic, and missing parents should retain their own diagnostic");
+    std::ranges::reverse(annotations);
+  }
 }
 
 void scanValidationRequiresAssetOwnedAnnotationGraphs() {
@@ -496,7 +520,7 @@ void runValueSourceMapTests() {
   sessionStatePreflightsSourceAnnotationIdCollisions();
   sessionStateReleasesAnnotationIdsWithRemovedSources();
   sessionStateScrubsCrossSourceObjectLinks();
-  scanValidationRejectsSourceAnnotationParentCycles();
+  sourceMapParentTraversalHandlesBranchesAndCycles();
   scanValidationRequiresAssetOwnedAnnotationGraphs();
   scanValidationRejectsCrossAssetAnnotationParents();
   scanValidationChecksMemoizedInheritedOwnersIndependentOfAnnotationOrder();

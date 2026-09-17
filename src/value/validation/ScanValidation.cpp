@@ -115,36 +115,26 @@ void validateSourceMapReferences(ValidationReport& report, const SourceMap& sour
 }
 
 void validateSourceMapParentCycles(ValidationReport& report, const SourceMap& sourceMap) {
-  // 1 means the annotation is on the current parent path; 2 means its entire
-  // parent chain has already been checked.
-  std::unordered_map<u32, u8> state;
-  state.reserve(sourceMap.annotations().size());
+  // Revisiting this traversal's annotation is a cycle. A different traversal
+  // has already checked the rest of the chain, so shared parents stop the walk.
+  std::unordered_map<SourceAnnotationId, SourceAnnotationId> visitedFrom;
+  visitedFrom.reserve(sourceMap.annotations().size());
   for (const auto& root : sourceMap.annotations()) {
-    if (!root.id.valid() || state[root.id.value] == 2) {
+    if (!root.id.valid()) {
       continue;
     }
 
-    std::vector<u32> path;
     const SourceAnnotation* current = &root;
     while (current != nullptr) {
-      const u32 id = current->id.value;
-      if (state[id] == 1) {
-        report.error("scan.source-annotation.parent-cycle",
-                     "Scan result contained a cycle in source annotation parents", current->range);
+      const auto [previous, inserted] = visitedFrom.try_emplace(current->id, root.id);
+      if (!inserted) {
+        if (previous->second == root.id) {
+          report.error("scan.source-annotation.parent-cycle",
+                       "Scan result contained a cycle in source annotation parents", current->range);
+        }
         break;
       }
-      if (state[id] == 2) {
-        break;
-      }
-      state[id] = 1;
-      path.push_back(id);
-      if (!current->parent) {
-        break;
-      }
-      current = sourceMap.find(*current->parent);
-    }
-    for (const u32 id : path) {
-      state[id] = 2;
+      current = current->parent ? sourceMap.find(*current->parent) : nullptr;
     }
   }
 }
