@@ -2827,6 +2827,22 @@ synth-only, and paired outputs under both scaling policies, including matched
 controller expansion and synth-depth reduction. All 21 CTest targets pass and
 the full Debug build is warning-free.
 
+## Simplify source-parent traversal state
+
+Parent-cycle validation now records the traversal that first visited each
+annotation. Reaching that same traversal means a cycle; reaching an earlier
+traversal means the remaining chain has already been checked. This removes the
+separate path buffer and the pass that marked every visited node complete.
+The source-map ownership index also needs only a visited flag: its cached owner
+already distinguishes a resolved owner from an unresolved, unowned cycle.
+
+The two walks remain separate because ownership stops at an explicit owner,
+while validation must check that owner's parents too. This removes 12
+production lines and two pieces of traversal bookkeeping. Regression coverage
+checks shared ancestors, unowned chains, multi-node and explicitly owned
+self-cycles, missing parents, and reversed annotation order. The full Debug
+build and all 21 CTest targets pass without compiler warnings.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual

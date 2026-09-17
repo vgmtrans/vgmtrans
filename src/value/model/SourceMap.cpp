@@ -95,10 +95,10 @@ SourceMap::Index::Index(const std::vector<SourceAnnotation>& annotations) {
   // while building this immutable index; malformed cycles are reported by scan
   // validation before the map can enter session state.
   assetOwnerByAnnotation.resize(annotations.size());
-  std::vector<u8> state(annotations.size());
+  std::vector<bool> visited(annotations.size());
   std::vector<size_t> path;
   for (size_t root = 0; root < annotations.size(); ++root) {
-    if (!annotations[root].id.valid() || state[root] == 2) {
+    if (!annotations[root].id.valid() || visited[root]) {
       continue;
     }
 
@@ -106,15 +106,14 @@ SourceMap::Index::Index(const std::vector<SourceAnnotation>& annotations) {
     std::optional<AssetId> owner;
     size_t current = root;
     while (true) {
-      if (state[current] == 2) {
+      if (visited[current]) {
+        // A cycle reaches an unresolved (empty) owner; an earlier walk reaches
+        // its cached owner. Both terminate this chain without another state.
         owner = assetOwnerByAnnotation[current];
         break;
       }
-      if (state[current] == 1) {
-        break;
-      }
 
-      state[current] = 1;
+      visited[current] = true;
       path.push_back(current);
       const auto& annotation = annotations[current];
       if (annotation.owner && annotation.owner->asset.valid()) {
@@ -133,7 +132,6 @@ SourceMap::Index::Index(const std::vector<SourceAnnotation>& annotations) {
 
     for (const size_t index : path) {
       assetOwnerByAnnotation[index] = owner;
-      state[index] = 2;
     }
   }
 
