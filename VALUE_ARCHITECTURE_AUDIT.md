@@ -2638,7 +2638,8 @@ new corpus is now available for subsequent changes.
 
 Ignored comparison runners compile the old/new runtime and scanner units with
 ASan/UBSan, using the existing core/export libraries. They scan whole archives,
-render every discovered sequence with PlayOnce, and export MIDI, SF2, and DLS.
+render every discovered sequence with PlayOnce and zero extra repeats, and
+export MIDI, SF2, and DLS with the normal default of one extra repeat.
 All **1,323 artifact files compare byte-for-byte**, with identical discovery,
 render, and export logs across **441 sequences in 14 archives**:
 
@@ -2683,6 +2684,36 @@ SoftCreat archive comparisons: all 198 MIDI/SF2/DLS artifacts from 66 sequences
 match byte-for-byte, with unchanged logs and diagnostics, including the existing
 Plok export command-limit warning.
 
+## Share SculptSoft's bounded-phrase discovery
+
+The Standard/Extended and Late SculptSoft decoders duplicated the same pending
+phrase queue, visited entry/end pairs, command map, synthetic return insertion,
+and playback boundary wrapping. They now use one format-local
+`decodePhraseTrack` helper beside the existing phrase reader/stack. The two
+opcode decoders remain separate and pass their own typed playback context.
+
+Each stored command carries its incoming and outgoing fine-pitch mode. The
+late decoder therefore reuses a decoded state change when revisiting a command,
+rather than interpreting its raw opcode again. Conflicting entry modes still
+stop that discovery path and report the same diagnostic. Ordinary commands and
+synthetic returns check the exclusive phrase boundary before executing;
+fine-pitch bytes retain their existing boundary behavior. A real command at a
+phrase end still wins over the synthetic return.
+
+This removes **65 production lines**, the late walker's separate interpretation
+map, and its extra forwarding function. A new regression covers compatible and
+conflicting overlapping fine-pitch streams and real/synthetic phrase ends.
+Both old and new implementations pass the complete format suite, including
+those cases, when compiled with ASan/UBSan. The warning-free full build and all
+21 CTest targets pass.
+
+Real-file comparisons cover Bugs Bunny Rabbit Rampage, NHL Stanley Cup,
+Rocko's Modern Life, Return of the Jedi, and Secret of Evermore: **124 sequences
+and all 372 MIDI/SF2/DLS artifact files match byte-for-byte**, with identical
+logs. Eight Return of the Jedi sequences retain existing rotating-allocation
+or overlapping-voice diagnostics; the other four archives render without
+warnings. The shared walker does not change those playback limitations.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding
@@ -2710,8 +2741,6 @@ Plok export command-limit warning.
   Extend the current before/after value comparisons to additional formats and
   run the existing legacy/value parity modes where applicable. Keep baseline
   differences separate from regressions introduced by a simplification.
-- Inspect SculptSoft's duplicated bounded-phrase walkers. Preserve interpretation conflicts,
-  discovery order, synthetic phrase boundaries, and diagnostic attribution.
 - Investigate the Plok "Flea Pit" MIDI command-limit warning and the volume of
   existing envelope/stereo export warnings. Do not hide meaningful limitations
   merely to make corpus runs appear clean.
