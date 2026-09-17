@@ -1161,11 +1161,6 @@ struct DiscoveryPoint {
   friend auto operator<=>(const DiscoveryPoint&, const DiscoveryPoint&) = default;
 };
 
-struct DiscoveredCommand {
-  DecodedBytecodeCommand command;
-  DecodeState initialState;
-};
-
 [[nodiscard]] TrackProgram decodeTrack(const TrackDecodeScope& scope, const Layout& layout, u32 trackNumber,
                                        u32 startAddress, std::vector<Diagnostic>* diagnostics,
                                        std::set<u8>* referencedInstruments) {
@@ -1173,7 +1168,7 @@ struct DiscoveredCommand {
   auto session = scope.begin(trackNumber, startAddress);
   std::vector<DiscoveryPoint> pending{{.offset = startAddress}};
   std::set<DiscoveryPoint> visited;
-  std::map<u32, DiscoveredCommand> commands;
+  std::map<u32, DecodeState> initialStates;
 
   const auto queue = [&](Address address, DiscoveryPoint point) {
     if (address.value < kAramSize && reader.has(address.value, 1)) {
@@ -1191,10 +1186,9 @@ struct DiscoveredCommand {
     DecodeState nextState = point.state;
     DecodedBytecodeCommand decoded =
         decodeCommand(reader, layout, point.offset, nextState, diagnostics, referencedInstruments);
-    const auto [existing, inserted] = commands.try_emplace(
-        point.offset, DiscoveredCommand{.command = decoded, .initialState = point.state});
-    if (!inserted && existing->second.command.range.size != decoded.range.size) {
-      const DecodeState& original = existing->second.initialState;
+    const auto& original = initialStates.try_emplace(point.offset, point.state).first->second;
+    const auto& stored = session.findOrAppend(decoded, point.offset);
+    if (stored.range.size != decoded.range.size) {
       DecodeState withoutVolumeDifference = point.state;
       withoutVolumeDifference.perNoteVolume = original.perNoteVolume;
       const bool volumeSuffixOnly = (decoded.opcode < 0x80 || isAlias(layout, decoded.opcode)) &&
@@ -1260,9 +1254,6 @@ struct DiscoveredCommand {
     }
   }
 
-  for (auto& [offset, discovered] : commands) {
-    session.findOrAppend(std::move(discovered.command), offset);
-  }
   return session.finish();
 }
 

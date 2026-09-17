@@ -2672,6 +2672,22 @@ artifact files, logs, and JSON summaries remain under the ignored
 `retention-corpus-*.json` / `prism-walker-corpus-results.json` files. Original
 music files are unchanged and are not added to the repository.
 
+## Remove SoftCreat's second decoded-command buffer
+
+SoftCreat's stateful walker now places first interpretations directly in its
+existing `TrackDecodeSession`. Its local map records only the initial decode
+state needed to diagnose incompatible revisits. This removes the extra
+`DiscoveredCommand` type, a second full command map, and the final transfer loop.
+The walker still follows the newly decoded flow for each state and preserves
+the permitted per-note-volume suffix difference; source projection still occurs
+in address order when the session finishes.
+
+This removes **9 production lines** without a new shared API. All 21 CTest
+targets pass. An ASan/UBSan build of the changed decoder repeats the four real
+SoftCreat archive comparisons: all 198 MIDI/SF2/DLS artifacts from 66 sequences
+match byte-for-byte, with unchanged logs and diagnostics, including the existing
+Plok export command-limit warning.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding
@@ -2699,8 +2715,7 @@ music files are unchanged and are not added to the repository.
   Extend the current before/after value comparisons to additional formats and
   run the existing legacy/value parity modes where applicable. Keep baseline
   differences separate from regressions introduced by a simplification.
-- Inspect SoftCreat's redundant discovered-command staging and SculptSoft's
-  duplicated bounded-phrase walkers. Preserve interpretation conflicts,
+- Inspect SculptSoft's duplicated bounded-phrase walkers. Preserve interpretation conflicts,
   discovery order, synthetic phrase boundaries, and diagnostic attribution.
 - Investigate the Plok "Flea Pit" MIDI command-limit warning and the volume of
   existing envelope/stereo export warnings. Do not hide meaningful limitations
