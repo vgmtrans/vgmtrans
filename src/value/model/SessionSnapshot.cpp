@@ -45,8 +45,30 @@ SessionSnapshot::Storage::Storage(std::vector<SourceFile> sourcesValue, SharedSe
                                   std::vector<Collection> collectionsValue, SourceMap sourceMapValue,
                                   std::vector<Diagnostic> diagnosticsValue)
     : sources(std::move(sourcesValue)), assets(std::move(assetsValue)), collections(std::move(collectionsValue)),
-      sourceMap(std::move(sourceMapValue)), diagnostics(std::move(diagnosticsValue)),
-      index(buildIndex(sources, assets, collections)) {
+      sourceMap(std::move(sourceMapValue)), diagnostics(std::move(diagnosticsValue)) {
+  sourcesById.reserve(sources.size());
+  for (size_t i = 0; i < sources.size(); ++i) {
+    const SourceId id = sources[i].id;
+    if (id.valid()) {
+      sourcesById.emplace(id.value, i);
+    }
+  }
+
+  assetsById.reserve(assets.size());
+  for (const auto& asset : assets) {
+    const AssetId id = metadata(asset).id;
+    if (id.valid()) {
+      assetsById.emplace(id.value, &asset);
+    }
+  }
+
+  collectionsById.reserve(collections.size());
+  for (size_t i = 0; i < collections.size(); ++i) {
+    const CollectionId id = collections[i].id;
+    if (id.valid()) {
+      collectionsById.emplace(id.value, i);
+    }
+  }
 }
 
 SessionSnapshot::SessionSnapshot(std::vector<SourceFile> sources, SharedSequence<Asset> assets,
@@ -56,50 +78,19 @@ SessionSnapshot::SessionSnapshot(std::vector<SourceFile> sources, SharedSequence
                                                std::move(sourceMap), std::move(diagnostics))) {
 }
 
-SessionSnapshot::Index SessionSnapshot::buildIndex(const std::vector<SourceFile>& sources,
-                                                   const SharedSequence<Asset>& assets,
-                                                   const std::vector<Collection>& collections) {
-  Index index;
-  index.sourcesById.reserve(sources.size());
-  for (size_t i = 0; i < sources.size(); ++i) {
-    const SourceId id = sources[i].id;
-    if (id.valid()) {
-      index.sourcesById.emplace(id.value, i);
-    }
-  }
-
-  index.assetsById.reserve(assets.size());
-  for (const auto& asset : assets) {
-    const AssetId id = metadata(asset).id;
-    if (id.valid()) {
-      index.assetsById.emplace(id.value, &asset);
-    }
-  }
-
-  index.collectionsById.reserve(collections.size());
-  for (size_t i = 0; i < collections.size(); ++i) {
-    const CollectionId id = collections[i].id;
-    if (id.valid()) {
-      index.collectionsById.emplace(id.value, i);
-    }
-  }
-
-  return index;
-}
-
 const SourceFile* SessionSnapshot::source(SourceId id) const {
-  const auto found = storage_->index.sourcesById.find(id.value);
-  return found != storage_->index.sourcesById.end() ? &storage_->sources[found->second] : nullptr;
+  const auto found = storage_->sourcesById.find(id.value);
+  return found != storage_->sourcesById.end() ? &storage_->sources[found->second] : nullptr;
 }
 
 const Asset* SessionSnapshot::asset(AssetId id) const {
-  const auto found = storage_->index.assetsById.find(id.value);
-  return found != storage_->index.assetsById.end() ? found->second : nullptr;
+  const auto found = storage_->assetsById.find(id.value);
+  return found != storage_->assetsById.end() ? found->second : nullptr;
 }
 
 const Collection* SessionSnapshot::collection(CollectionId id) const {
-  const auto found = storage_->index.collectionsById.find(id.value);
-  return found != storage_->index.collectionsById.end() ? &storage_->collections[found->second] : nullptr;
+  const auto found = storage_->collectionsById.find(id.value);
+  return found != storage_->collectionsById.end() ? &storage_->collections[found->second] : nullptr;
 }
 
 const Collection* SessionSnapshot::firstCollectionContaining(AssetId asset) const {
