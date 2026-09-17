@@ -8,6 +8,7 @@
 #include "value/export/BinaryWriter.h"
 
 #include <algorithm>
+#include <array>
 #include <span>
 #include <string>
 #include <type_traits>
@@ -27,18 +28,13 @@ struct MidiMessage {
 
 void writeVariableLength(std::vector<u8>& bytes, u64 value) {
   // Standard MIDI files encode delta times as big-endian base-128 variable-length values.
-  u64 buffer = value & 0x7f;
+  std::array<u8, 10> buffer;  // At most ten seven-bit groups for a u64.
+  auto first = buffer.end();
+  *--first = static_cast<u8>(value & 0x7f);
   while ((value >>= 7) != 0) {
-    buffer <<= 8;
-    buffer |= ((value & 0x7f) | 0x80);
+    *--first = static_cast<u8>((value & 0x7f) | 0x80);
   }
-  while (true) {
-    bytes.push_back(static_cast<u8>(buffer & 0xff));
-    if ((buffer & 0x80) == 0) {
-      break;
-    }
-    buffer >>= 8;
-  }
+  bytes.insert(bytes.end(), first, buffer.end());
 }
 
 [[nodiscard]] u8 data7(s32 value) {
