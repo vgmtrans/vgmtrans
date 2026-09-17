@@ -406,6 +406,14 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
                      SourceTarget{ObjectRefs::sample(samplesAsset, 4)}) &&
              instrumentAnnotation.links.size() == 2,
          "instrument sample links should stay complete and unique regardless of call order");
+  expect(std::ranges::equal(annotations.get(latestInstrumentSource.id()).links, instrumentAnnotation.links,
+                            [](const SourceLink& left, const SourceLink& right) {
+                              return left.role == right.role && left.target == right.target && left.label == right.label;
+                            }) &&
+             annotations.get(firstRegionSource.id()).links.size() == 1 &&
+             hasLink(annotations.get(firstRegionSource.id()), SourceLinkRole::UsesSample,
+                     SourceTarget{ObjectRefs::sample(samplesAsset, 3)}),
+         "finalization must project complete sample links onto every instrument and region source record");
   expect(unsignedFieldEquals(instrumentAnnotation, "bank", 127) &&
              unsignedFieldEquals(instrumentAnnotation, "program", 5) &&
              unsignedFieldEquals(instrumentAnnotation, "region_count", 2) &&

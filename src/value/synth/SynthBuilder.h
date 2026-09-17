@@ -18,7 +18,7 @@
 
 namespace vgmtrans::core {
 
-// Add the stable, exporter-neutral properties of a synth value to a source
+// Add the stable, exporter-neutral properties and sample links of a synth value to a source
 // annotation. Builders do this automatically at finish time; scanners that
 // describe values before building them can use the same projection directly.
 void annotateSynthValue(AnnotationBuilder annotation, const Sample& sample);
@@ -207,8 +207,6 @@ private:
   AnnotationBuilder addRegionSource(u32 instrumentIndex, u32 regionIndex, std::string_view label, SourceRange range,
                                     std::string_view kind);
   void finishSources();
-  void linkInstrumentSamples(u32 instrumentIndex, SourceAnnotationId annotation);
-  void linkSample(SourceAnnotationId annotation, SampleRef sample, std::string_view label);
   void recordInstrumentRange(u32 index, SourceRange range);
   void recordRegionRange(u32 instrumentIndex, u32 regionIndex, SourceRange range);
 

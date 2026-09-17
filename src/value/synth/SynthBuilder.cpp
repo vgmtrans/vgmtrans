@@ -15,8 +15,10 @@ namespace vgmtrans::core {
 
 namespace {
 
-SourceTarget sampleTarget(SampleRef sample) {
-  return SourceTarget{ObjectRefs::sample(sample.owner(), sample.index())};
+void linkSample(AnnotationBuilder annotation, SampleRef sample) {
+  if (sample.valid()) {
+    annotation.link(SourceLinkRole::UsesSample, SourceTarget{ObjectRefs::sample(sample.owner(), sample.index())}, "Sample");
+  }
 }
 
 void annotateLoop(AnnotationBuilder& annotation, const Loop& loop) {
@@ -100,6 +102,9 @@ void annotateSynthValue(AnnotationBuilder annotation, const Sample& sample) {
 }
 
 void annotateSynthValue(AnnotationBuilder annotation, const Instrument& instrument) {
+  for (const auto& region : instrument.regions) {
+    linkSample(annotation, region.sample);
+  }
   const InstrumentAddress address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
   annotation.derived("bank", address.bank)
       .derived("program", address.program)
@@ -121,6 +126,7 @@ void annotateSynthValue(AnnotationBuilder annotation, const Instrument& instrume
 }
 
 void annotateSynthValue(AnnotationBuilder annotation, const Region& region) {
+  linkSample(annotation, region.sample);
   annotation.derived("key_low", region.keyRange.low, SourceValueDisplay::MidiNote)
       .derived("key_high", region.keyRange.high, SourceValueDisplay::MidiNote)
       .derived("velocity_low", region.velocityRange.low)
@@ -439,9 +445,6 @@ InstrumentSetBuilder::RegionEntry InstrumentSetBuilder::appendRegion(u32 instrum
   observedRange_.include(region.range);
   states_[instrumentIndex].regions.push_back(RegionState{.rangeWasExplicit = region.range.valid()});
   instruments_[instrumentIndex].regions.push_back(std::move(region));
-  for (const auto source : states_[instrumentIndex].sources) {
-    linkSample(source, sample, "Sample");
-  }
   return RegionEntry{*this, instrumentIndex, regionIndex};
 }
 
@@ -457,7 +460,6 @@ AnnotationBuilder InstrumentSetBuilder::addInstrumentSource(u32 index, std::stri
     annotation.kind(kind);
   }
   states_[index].sources.push_back(annotation.id());
-  linkInstrumentSamples(index, annotation.id());
   return annotation;
 }
 
@@ -477,7 +479,6 @@ AnnotationBuilder InstrumentSetBuilder::addRegionSource(u32 instrumentIndex, u32
     annotation.parent(instrumentSources.back());
   }
   states_[instrumentIndex].regions[regionIndex].sources.push_back(annotation.id());
-  linkSample(annotation.id(), instruments_[instrumentIndex].regions[regionIndex].sample, "Sample");
   return annotation;
 }
 
@@ -506,18 +507,6 @@ void InstrumentSetBuilder::finishSources() {
         annotateSynthValue(AnnotationBuilder{*sourceMap_, source}, region);
       }
     }
-  }
-}
-
-void InstrumentSetBuilder::linkInstrumentSamples(u32 instrumentIndex, SourceAnnotationId annotation) {
-  for (const auto& region : instruments_[instrumentIndex].regions) {
-    linkSample(annotation, region.sample, "Sample");
-  }
-}
-
-void InstrumentSetBuilder::linkSample(SourceAnnotationId annotation, SampleRef sample, std::string_view label) {
-  if (sourceMap_ != nullptr && annotation.valid() && sample.valid()) {
-    AnnotationBuilder{*sourceMap_, annotation}.link(SourceLinkRole::UsesSample, sampleTarget(sample), label);
   }
 }
 
