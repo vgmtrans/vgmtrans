@@ -39,11 +39,6 @@ struct SynthSampleIndexKey {
 using SynthSampleIndexMap = std::map<SynthSampleIndexKey, std::optional<u32>>;
 using SynthInstrumentSet = std::set<const Instrument*>;
 
-struct SamplePoolView {
-  AssetId owner;
-  const SamplePool& pool;
-};
-
 constexpr double kPerceivedHalfLoudnessDb = 10.0;
 
 bool markMatchingInstruments(SynthInstrumentSet& used, std::span<const Instrument* const> instruments,
@@ -65,83 +60,77 @@ void markSelectedInstrument(const InstrumentSelection& selection, std::span<cons
   }
 }
 
-[[nodiscard]] SynthSampleIndexMap decodeSynthSamples(PreparedSynthData& prepared,
-                                                     std::span<const SamplePoolView> samplePools,
-                                                     const SourceStore& sources,
-                                                     const SynthSampleDecodeOptions& options,
-                                                     SynthSampleIndexMap indexes, bool discardUnreferenced,
-                                                     SampleFilteringPolicy filtering) {
+void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, AssetId owner,
+                     const SamplePool& pool, const SynthExportInput& input, const SourceStore& sources,
+                     const SynthSampleDecodeOptions& options) {
   // Decode once into the final sample table, including any phase-inverted
   // variants. Container exporters share its indexes and source diagnostics.
-  for (const auto& view : samplePools) {
-    const SampleFilter selectedFilter = resolveSampleFilter(filtering, view.pool.preferredFilter);
+  const SampleFilter selectedFilter = resolveSampleFilter(input.sampleFiltering, pool.preferredFilter);
+  const bool discardUnreferenced = input.sequenceUsage != nullptr || input.filterSamplesToReferencedInstruments;
 
-    for (u32 sampleIndex = 0; sampleIndex < view.pool.samples.size(); ++sampleIndex) {
-      if (!discardUnreferenced) {
-        indexes.try_emplace({view.owner.value, sampleIndex});
-      }
-      const auto first = indexes.lower_bound({view.owner.value, sampleIndex});
-      const auto last = indexes.upper_bound({view.owner.value, sampleIndex, true, std::numeric_limits<u32>::max()});
-      if (first == last) continue;
-      const auto& sample = view.pool.samples[sampleIndex];
-      if (!sources.contains(sample.encodedData.source)) {
-        prepared.diagnostics.push_back(exportError("Sample source was not found", sample.encodedData));
-        continue;
-      }
+  for (u32 sampleIndex = 0; sampleIndex < pool.samples.size(); ++sampleIndex) {
+    if (!discardUnreferenced) {
+      indexes.try_emplace({owner.value, sampleIndex});
+    }
+    const auto first = indexes.lower_bound({owner.value, sampleIndex});
+    const auto last = indexes.upper_bound({owner.value, sampleIndex, true, std::numeric_limits<u32>::max()});
+    if (first == last) continue;
+    const auto& sample = pool.samples[sampleIndex];
+    if (!sources.contains(sample.encodedData.source)) {
+      prepared.diagnostics.push_back(exportError("Sample source was not found", sample.encodedData));
+      continue;
+    }
 
-      auto decoded = decodeSample(sample, sources.bytes(sample.encodedData.source));
-      if (!decoded) {
-        prepared.diagnostics.push_back(exportError("Unsupported sample codec", sample.encodedData));
-        continue;
-      }
+    auto decoded = decodeSample(sample, sources.bytes(sample.encodedData.source));
+    if (!decoded) {
+      prepared.diagnostics.push_back(exportError("Unsupported sample codec", sample.encodedData));
+      continue;
+    }
 
-      if (options.requireMono && decoded->channels != 1) {
-        prepared.diagnostics.push_back(exportWarning(
-            options.nonMonoWarning.empty() ? "Skipping non-mono sample for synth export" : options.nonMonoWarning,
-            sample.encodedData));
-        continue;
-      }
+    if (options.requireMono && decoded->channels != 1) {
+      prepared.diagnostics.push_back(exportWarning(
+          options.nonMonoWarning.empty() ? "Skipping non-mono sample for synth export" : options.nonMonoWarning,
+          sample.encodedData));
+      continue;
+    }
 
-      // S-DSP noise bypasses the BRR/Gaussian sample path, even when a sample
-      // response filter is explicitly requested.
-      if (sample.codec != AudioCodec::SnesDspNoise) {
-        applySampleFilter(*decoded, selectedFilter);
-      }
+    // S-DSP noise bypasses the BRR/Gaussian sample path, even when a sample
+    // response filter is explicitly requested.
+    if (sample.codec != AudioCodec::SnesDspNoise) {
+      applySampleFilter(*decoded, selectedFilter);
+    }
 
-      // Visit inverted variants first, preserving the existing sample order.
-      for (auto it = last; it != first;) {
-        auto& [key, outputIndex] = *--it;
-        auto audio = it == first ? std::move(*decoded) : *decoded;
-        if (key.startFrame != 0) {
-          const u64 skip = static_cast<u64>(key.startFrame) * audio.channels;
-          if (skip >= audio.pcm.size()) {
-            prepared.diagnostics.push_back(exportError("Sample start frame is outside decoded sample data"));
-            continue;
-          }
-          // Trim after decoding/filtering to preserve ADPCM predictor history.
-          audio.pcm.erase(audio.pcm.begin(), audio.pcm.begin() + skip);
-          const u32 loopEnd = audio.loop.start + audio.loop.length;
-          audio.loop.start -= std::min(audio.loop.start, key.startFrame);
-          audio.loop.length = loopEnd - std::min(loopEnd, key.startFrame) - audio.loop.start;
-          audio.loop.enabled &= audio.loop.length != 0;
+    // Visit inverted variants first, preserving the existing sample order.
+    for (auto it = last; it != first;) {
+      auto& [key, outputIndex] = *--it;
+      auto audio = it == first ? std::move(*decoded) : *decoded;
+      if (key.startFrame != 0) {
+        const u64 skip = static_cast<u64>(key.startFrame) * audio.channels;
+        if (skip >= audio.pcm.size()) {
+          prepared.diagnostics.push_back(exportError("Sample start frame is outside decoded sample data"));
+          continue;
         }
-        if (key.phaseInverted) {
-          for (s16& value : audio.pcm) {
-            value = value == std::numeric_limits<s16>::min() ? std::numeric_limits<s16>::max() : static_cast<s16>(-value);
-          }
-        }
-        outputIndex = static_cast<u32>(prepared.samples.size());
-        prepared.samples.push_back(DecodedSynthSample{
-            .name = sample.name + (key.startFrame ? " [sustain]" : "") + (key.phaseInverted ? " [inverted]" : ""),
-            .pitch = sample.pitch,
-            .attenuationDb = sample.attenuationDb,
-            .decoded = std::move(audio),
-        });
+        // Trim after decoding/filtering to preserve ADPCM predictor history.
+        audio.pcm.erase(audio.pcm.begin(), audio.pcm.begin() + skip);
+        const u32 loopEnd = audio.loop.start + audio.loop.length;
+        audio.loop.start -= std::min(audio.loop.start, key.startFrame);
+        audio.loop.length = loopEnd - std::min(loopEnd, key.startFrame) - audio.loop.start;
+        audio.loop.enabled &= audio.loop.length != 0;
       }
+      if (key.phaseInverted) {
+        for (s16& value : audio.pcm) {
+          value = value == std::numeric_limits<s16>::min() ? std::numeric_limits<s16>::max() : static_cast<s16>(-value);
+        }
+      }
+      outputIndex = static_cast<u32>(prepared.samples.size());
+      prepared.samples.push_back(DecodedSynthSample{
+          .name = sample.name + (key.startFrame ? " [sustain]" : "") + (key.phaseInverted ? " [inverted]" : ""),
+          .pitch = sample.pitch,
+          .attenuationDb = sample.attenuationDb,
+          .decoded = std::move(audio),
+      });
     }
   }
-
-  return indexes;
 }
 
 [[nodiscard]] SynthSampleIndexMap referencedSamples(std::span<const Instrument* const> instruments) {
@@ -449,21 +438,17 @@ PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceSt
                                    const SynthSampleDecodeOptions& options) {
   PreparedSynthData prepared;
   const auto instruments = selectSynthInstruments(input.soundBanks, input.sequenceUsage);
-  std::vector<SamplePoolView> samplePools;
-  samplePools.reserve(input.soundBanks.size() + input.samplePools.size());
+  auto samplesByReference = referencedSamples(instruments);
   for (const auto* bank : input.soundBanks) {
     if (bank != nullptr) {
-      samplePools.push_back(SamplePoolView{.owner = bank->metadata.id, .pool = bank->localSamples});
+      decodeSynthPool(prepared, samplesByReference, bank->metadata.id, bank->localSamples, input, sources, options);
     }
   }
   for (const auto* pool : input.samplePools) {
     if (pool != nullptr) {
-      samplePools.push_back(SamplePoolView{.owner = pool->metadata.id, .pool = pool->pool});
+      decodeSynthPool(prepared, samplesByReference, pool->metadata.id, pool->pool, input, sources, options);
     }
   }
-  const bool filterSamples = input.sequenceUsage != nullptr || input.filterSamplesToReferencedInstruments;
-  const auto samplesByReference = decodeSynthSamples(
-      prepared, samplePools, sources, options, referencedSamples(instruments), filterSamples, input.sampleFiltering);
   prepared.instruments = resolveSynthInstruments(instruments, samplesByReference, input, prepared.diagnostics);
   return prepared;
 }

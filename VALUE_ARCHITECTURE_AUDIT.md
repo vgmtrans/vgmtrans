@@ -2906,6 +2906,19 @@ Together these changes remove five production lines and two intermediate
 output protocols. The full Debug build is warning-free and all 21 CTest targets
 pass, including VM scheduling, prepass, and MIDI serialization regressions.
 
+## Decode synth pools directly
+
+- Removed the temporary `SamplePoolView` type and pool list from shared
+  SF2/DLS preparation. Each bank or external pool now decodes directly into
+  the prepared sample table and its existing reference index.
+- The reference index stays with preparation instead of being moved into
+  the decoder and returned. Pool order, filtering, phase variants, decoded
+  sample offsets, diagnostics, and region indexes remain unchanged.
+- Removed 15 production lines and one intermediate representation. Existing
+  regressions cover mixed local/external pools, inverted samples, filtered
+  samples, start offsets, and container index limits.
+- Validation: warning-free Debug build; all 21 CTest targets pass (10.65 s).
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual
