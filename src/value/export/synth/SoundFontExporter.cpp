@@ -77,11 +77,6 @@ struct SfSampleHeaderPitch {
   s8 correction = 0;
 };
 
-struct SfSampleHeaderInfo {
-  SfSampleHeaderPitch pitch;
-  Loop loop;
-};
-
 struct SfModulatorRecord {
   u16 source = 0;
   u16 destination = 0;
@@ -511,37 +506,27 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
           Chunk{"igen", std::move(generators)}};
 }
 
-[[nodiscard]] std::vector<SfSampleHeaderInfo> sampleHeaderInfo(
-    std::span<const DecodedSynthSample> samples, std::span<const ResolvedSynthInstrument* const> instruments) {
-  // SF2 sample headers have their own original-key/correction fields. Pick the first
-  // region that references each sample so sample headers stay consistent with zones.
-  std::vector<SfSampleHeaderInfo> info(samples.size());
-  std::vector<bool> assigned(samples.size(), false);
-  for (size_t i = 0; i < samples.size(); ++i) {
-    info[i].loop = samples[i].decoded.loop;
-  }
-  for (const auto* instrument : instruments) {
-    for (const auto& sfRegion : instrument->regions) {
-      if (sfRegion.sampleIndex >= info.size() || assigned[sfRegion.sampleIndex]) {
-        continue;
-      }
-      const auto pitch = sf2RegionPitch(sfRegion.region);
-      info[sfRegion.sampleIndex].pitch =
-          sf2SampleHeaderPitch(pitch.rootKey, clampS16(samples[sfRegion.sampleIndex].pitch.cents));
-      info[sfRegion.sampleIndex].loop = effectiveSfLoop(sfRegion.region, samples[sfRegion.sampleIndex]);
-      assigned[sfRegion.sampleIndex] = true;
-    }
-  }
-  return info;
-}
-
 [[nodiscard]] Chunk shdrChunk(std::span<const DecodedSynthSample> samples,
                               std::span<const ResolvedSynthInstrument* const> instruments) {
-  const auto headers = sampleHeaderInfo(samples, instruments);
+  // SF2 sample headers have their own original-key/correction fields. Pick the first
+  // region that references each sample so sample headers stay consistent with zones.
+  std::vector<const Region*> firstRegions(samples.size());
+  for (const auto* instrument : instruments) {
+    for (const auto& sfRegion : instrument->regions) {
+      if (sfRegion.sampleIndex >= firstRegions.size() || firstRegions[sfRegion.sampleIndex]) {
+        continue;
+      }
+      firstRegions[sfRegion.sampleIndex] = &sfRegion.region;
+    }
+  }
   std::vector<u8> payload;
   u32 startFrame = 0;
   for (size_t i = 0; i < samples.size(); ++i) {
     const auto& sample = samples[i];
+    const auto* region = firstRegions[i];
+    const auto pitch = region ? sf2SampleHeaderPitch(sf2RegionPitch(*region).rootKey, clampS16(sample.pitch.cents))
+                              : SfSampleHeaderPitch{};
+    const auto loop = region ? effectiveSfLoop(*region, sample) : sample.decoded.loop;
     // Offsets include each preceding sample's required silence padding.
     const u64 end = static_cast<u64>(startFrame) + sample.decoded.pcm.size();
     if (end > std::numeric_limits<u32>::max() - kSf2SamplePaddingFrames) {
@@ -551,13 +536,13 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
     writeFixedString(payload, sf2Name(sample.name, "Sample"), 20);
     writeLe32(payload, startFrame);
     writeLe32(payload, endFrame);
-    const u32 loopStart = startFrame + headers[i].loop.start;
-    const u32 loopEnd = loopStart + headers[i].loop.length;
+    const u32 loopStart = startFrame + loop.start;
+    const u32 loopEnd = loopStart + loop.length;
     writeLe32(payload, loopStart);
     writeLe32(payload, std::min(loopEnd, endFrame));
     writeLe32(payload, sample.decoded.sampleRate == 0 ? 32000 : sample.decoded.sampleRate);
-    writeU8(payload, headers[i].pitch.originalKey);
-    writeU8(payload, static_cast<u8>(headers[i].pitch.correction));
+    writeU8(payload, pitch.originalKey);
+    writeU8(payload, static_cast<u8>(pitch.correction));
     writeLe16(payload, 0);
     writeLe16(payload, 1);
     startFrame = endFrame + kSf2SamplePaddingFrames;

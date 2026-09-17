@@ -704,6 +704,37 @@ void soundFontExporterWritesSfbkRiffFile() {
   expect(rejectedOverflow, "SoundFont table offsets must reject generator indexes that exceed 16 bits");
 }
 
+void soundFontSampleHeadersUseTheFirstReferencingRegion() {
+  SourceStore sources;
+  const auto source = sources.add(SourceFile{.name = "headers.pcm"}, {0, 32, 64, 96});
+  SoundBankAsset bank{.metadata = {.id = AssetId{1}}};
+  bank.localSamples.samples.resize(2, Sample{
+      .codec = AudioCodec::PcmS8,
+      .encodedData = {.source = source, .size = 4},
+      .sampleRate = 32000,
+      .loop = {.enabled = true, .start = 1, .length = 2},
+      .pitch = {.cents = 125},
+  });
+  bank.instruments.push_back(Instrument{.regions = {
+      Region{.sample = SampleRef::resolved(bank.metadata.id, 0),
+             .unityKey = 65.25,
+             .loop = Loop{.enabled = true, .start = 2, .length = 1}},
+      Region{.sample = SampleRef::resolved(bank.metadata.id, 0), .unityKey = 72.0},
+  }});
+  const std::array<const SoundBankAsset*, 1> banks{&bank};
+  const auto result = buildSoundFont2(SynthExportInput{.soundBanks = banks}, sources);
+  expect(result.diagnostics.empty() && chunkSize(result.bytes, "shdr") == 3 * 46,
+         "SoundFont should retain unreferenced samples when filtering is disabled");
+  const size_t first = asciiOffset(result.bytes, "shdr") + 8;
+  const size_t second = first + 46;
+  expect(readLe32(result.bytes, first + 28) == 2 && readLe32(result.bytes, first + 32) == 3 &&
+             result.bytes[first + 40] == 64 && result.bytes[first + 41] == 25,
+         "the first referencing region must determine sample-header pitch and loop overrides");
+  expect(readLe32(result.bytes, second + 28) == 51 && readLe32(result.bytes, second + 32) == 53 &&
+             result.bytes[second + 40] == 60 && result.bytes[second + 41] == 0,
+         "unreferenced headers must retain decoded loops, padding offsets, and default pitch");
+}
+
 void synthSampleIndexesRetainTheirRangeUntilContainerExport() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "wide-sample-table.pcm"}, {0, 127});
@@ -2002,6 +2033,7 @@ void runValueSynthExportTests() {
   regionModulationExportsAtTheRegionScope();
   wavExporterWritesPcm16RiffFile();
   soundFontExporterWritesSfbkRiffFile();
+  soundFontSampleHeadersUseTheFirstReferencingRegion();
   synthSampleIndexesRetainTheirRangeUntilContainerExport();
   dlsExporterWritesDlsRiffFile();
   standaloneSynthExportsKeepNativeModulation();
