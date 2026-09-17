@@ -2714,11 +2714,49 @@ logs. Eight Return of the Jedi sequences retain existing rotating-allocation
 or overlapping-voice diagnostics; the other four archives render without
 warnings. The shared walker does not change those playback limitations.
 
+## Capture compiled command arguments directly
+
+The command body now owns its argument pack directly in its lambda capture.
+This removes the intermediate tuple, `std::apply`, and unpacking lambda.
+The existing `storedCommandValue` conversion still turns borrowed string views
+into owned strings, and invocation still passes const references to typed
+playback methods. The full rebuild exercises every compiled format and all
+21 CTest targets pass. That rebuild also exposed a shadowed Neverland track
+layout name introduced by the retained-source change; the local name is fixed.
+
+## Initial direct legacy/value corpus comparisons
+
+The unmodified parity harness ran 27 independent summary, MIDI, and synth
+checks on seven RSN archives and two PSF files. One check passed: the AKAO
+summary for FFIX's "The Place I'll Return to Someday". The other checks stop
+at their first difference or diagnostic; they do not establish whole-archive
+parity or complete DLS coverage. These results were recorded before the
+command-capture cleanup.
+
+| Input | First significant findings |
+| --- | --- |
+| Mega Man X | Full-sustain decay representation, MIDI tuning/controllers and loop endpoints, deduplicated synth instruments |
+| Final Fantasy IV | Value discovers 65 collections versus legacy's 64, adding "The Package Opens..." |
+| Final Fantasy VI | Full-sustain decay representation, controller/event and loop-end differences, an additional exported preset |
+| Axelay | Different percussion/region coverage, MIDI note/controller differences, different preset coverage |
+| Contra III | Different percussion/region coverage; MIDI and synth checks stop on existing mid-note envelope warnings |
+| Star Fox | Value discovers 53 collections versus legacy's 49 |
+| Super Metroid | Decay/tuning differences, MIDI controller and loop-end differences, synth instrument deduplication |
+| FFVIII: Balamb Garden | Different region source attribution, MIDI controllers/endpoints, synth instrument deduplication |
+| FFIX: The Place I'll Return to Someday | Summary passes; MIDI endpoints/redundant bends and exported sample PCM differ |
+
+The harness compares some destination structures directly and rejects even
+warning diagnostics. Synth deduplication, format-preferred sample filtering,
+instrument variants, and coordinated loop endpoints need to be distinguished
+from musical regressions before changing production behavior. No parity
+exceptions or expected failures were added.
+
 ## Further investigation
 
-- Prioritize structural simplification of format authoring: shared decoding
-  setup, source metadata handoffs, and repeated scan-to-playback preparation.
-  Continue checking export lowering and instrument selection for redundant work.
+- Per the user's clarification, prioritize shared architecture over individual
+  format cleanup: remove layers and duplicated state from compilation, VM
+  execution, session ownership, and export preparation. Use formats and the
+  corpus to verify shared changes. Line count alone is not sufficient justification.
 - Shared-stream channel routing must preserve unconditional time advancement
   and startup output. Source-channel metadata alone cannot gate execution:
   some channel-encoded loop commands control every playback track. Moving
