@@ -16,7 +16,6 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -67,10 +66,10 @@ using CommandResult = std::invoke_result_t<
 template <class Playback, class Callable, class... Arguments>
 [[nodiscard]] CommandBody makeCommandBody(Callable callable, Arguments... arguments) {
   static_assert(std::is_copy_constructible_v<Callable>, "Compiled sequence command callables must be copyable");
-  auto values = std::tuple{storedCommandValue(std::move(arguments))...};
-  return [callable = std::move(callable), values = std::move(values)](void* erasedPlayback) -> Effects {
+  return [callable = std::move(callable), ... values = storedCommandValue(std::move(arguments))](
+             void* erasedPlayback) -> Effects {
     auto& playback = *static_cast<Playback*>(erasedPlayback);
-    return std::apply([&](const auto&... value) { return invokeCommand(callable, playback, value...); }, values);
+    return invokeCommand(callable, playback, values...);
   };
 }
 

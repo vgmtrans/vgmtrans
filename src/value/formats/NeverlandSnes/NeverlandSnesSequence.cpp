@@ -893,27 +893,27 @@ SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetI
   SequenceDecodeSession sequence{reader, config, sequenceId, header, sourceMap, kCommandLimit, kAramSize};
   ReferencedPrograms references;
   for (u32 track = 0; track < kTrackCount; ++track) {
-    const TrackLayout& source = layout.tracks[track];
-    if (!source.active) {
+    const TrackLayout& trackLayout = layout.tracks[track];
+    if (!trackLayout.active) {
       continue;
     }
-    if (source.percussion) {
+    if (trackLayout.percussion) {
       for (const PercussionPatch& patch : layout.percussion) {
         references.insert(patch.program);
       }
     } else {
       references.insert(0);
     }
-    const std::set<u32> playlist = playlistOffsets(reader, source.playlistAddress);
+    const std::set<u32> playlist = playlistOffsets(reader, trackLayout.playlistAddress);
     sequence.addTrack(
-        track, source.pointerRange, source.playlistAddress,
+        track, trackLayout.pointerRange, trackLayout.playlistAddress,
         [&](u32 offset) {
           return playlist.contains(offset)
                      ? decodePlaylist(reader, offset, layout, diagnostics)
                      : decodeCommand(reader, offset, layout, diagnostics, &references);
         },
-        layout.version == Version::Modern ? static_cast<u16>(source.playlistAddress - layout.sequenceBaseAddress)
-                                          : source.playlistAddress);
+        layout.version == Version::Modern ? static_cast<u16>(trackLayout.playlistAddress - layout.sequenceBaseAddress)
+                                          : trackLayout.playlistAddress);
   }
   SequenceProgram program = sequence.finish(sequenceRuntime(std::move(source), layout));
   return SequenceParse{.program = std::move(program), .references = std::move(references)};
