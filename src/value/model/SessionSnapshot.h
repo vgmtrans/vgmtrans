@@ -80,12 +80,6 @@ public:
 private:
   friend class detail::SessionSnapshotAccess;
 
-  struct Index {
-    std::unordered_map<u32, size_t> sourcesById;
-    std::unordered_map<u32, const Asset*> assetsById;
-    std::unordered_map<u32, size_t> collectionsById;
-  };
-
   struct Storage {
     Storage(std::vector<SourceFile> sources, SharedSequence<Asset> assets, std::vector<Collection> collections,
             SourceMap sourceMap, std::vector<Diagnostic> diagnostics);
@@ -95,14 +89,13 @@ private:
     std::vector<Collection> collections;
     SourceMap sourceMap;
     std::vector<Diagnostic> diagnostics;
-    Index index;
+    std::unordered_map<u32, size_t> sourcesById;
+    std::unordered_map<u32, const Asset*> assetsById;
+    std::unordered_map<u32, size_t> collectionsById;
   };
 
   SessionSnapshot(std::vector<SourceFile> sources, SharedSequence<Asset> assets, std::vector<Collection> collections,
                   SourceMap sourceMap, std::vector<Diagnostic> diagnostics);
-
-  [[nodiscard]] static Index buildIndex(const std::vector<SourceFile>& sources, const SharedSequence<Asset>& assets,
-                                        const std::vector<Collection>& collections);
 
   std::shared_ptr<const Storage> storage_;
 };

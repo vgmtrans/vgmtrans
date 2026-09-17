@@ -2943,6 +2943,18 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   used-only samples, modulation scaling, and channel-state boundaries.
   Logs: `cmake-build-debug/value-audit/stitch-part-timing-{build,tests}.log`.
 
+## Build snapshot indexes with their storage
+
+- Removed the private snapshot `Index` wrapper and `buildIndex` handoff.
+  Snapshot storage constructs its three lookup maps directly from its owned
+  sources, assets, and collections. Lookup methods access those maps directly.
+- Shared immutable ownership and stable asset references are unchanged, as are
+  invalid-ID filtering and first-entry lookup behavior. No public API changed.
+- Removed 16 production lines and one private type. Validation: warning-free
+  Debug rebuild of all affected formats and applications; all 21 CTest targets
+  pass (10.79 s), including snapshot sharing and retained-revision lifetimes.
+  Logs: `cmake-build-debug/value-audit/snapshot-storage-indexes-{build,tests}.log`.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual
