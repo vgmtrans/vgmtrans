@@ -888,7 +888,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
     // exported. Keep one song-wide state object across an optional silent pass
     // and the real render so collected information is retained.
     std::any programState = runtime.createProgramState ? runtime.createProgramState(program) : std::any{};
-    const auto renderSemanticPass = [&](PerformanceSequence& target, std::any& passProgramState) {
+    const auto renderSemanticPass = [&](PerformanceSequence& target) {
       u64 outputSequence = 0;
       std::vector<std::unique_ptr<VmTrackExecutor>> executors;
       executors.reserve(program.playbackTrackCount());
@@ -899,7 +899,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
           executors.push_back(std::make_unique<VmTrackExecutor>(
               TrackStateContext{program, track, number}, runtime, TrackId{static_cast<u32>(trackIndex)},
               TrackId{static_cast<u32>(executors.size())}, options_, target, outputSequence, executors.empty(),
-              passProgramState, !hasSectionPlaylist));
+              programState, !hasSectionPlaylist));
         }
       }
 
@@ -1014,8 +1014,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
         }
       }
 
-      std::vector<PerformanceTrack> tracks;
-      tracks.reserve(executors.size());
+      target.tracks.reserve(executors.size());
       if (sequenceEndTick) {
         for (auto& executor : executors) {
           const u64 noteEndTick = executor->active() ? *sequenceEndTick : std::min(*sequenceEndTick, executor->tick());
@@ -1028,9 +1027,8 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
         if (sequenceEndTick) {
           endTrackAt(track, *sequenceEndTick);
         }
-        tracks.push_back(std::move(track));
+        target.tracks.push_back(std::move(track));
       }
-      return tracks;
     };
 
     if (runtime.finishPrepass != nullptr || analyzedProgramState != nullptr) {
@@ -1040,7 +1038,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
           .timebase = program.timebase,
           .initialTempoMicrosecondsPerQuarter = behavior.initialTempoMicrosecondsPerQuarter,
       };
-      prepass.tracks = renderSemanticPass(prepass, programState);
+      renderSemanticPass(prepass);
       if (analyzedProgramState != nullptr) {
         sequence.diagnostics = std::move(prepass.diagnostics);
       }
@@ -1053,7 +1051,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
       *analyzedProgramState = std::move(programState);
       return sequence;
     }
-    sequence.tracks = renderSemanticPass(sequence, programState);
+    renderSemanticPass(sequence);
     if (runtime.finalizePerformance != nullptr) {
       runtime.finalizePerformance(programState, sequence);
     }
