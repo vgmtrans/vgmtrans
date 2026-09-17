@@ -2878,6 +2878,17 @@ order, and the treatment of missing versus wrong-type members. Existing
 collection reconciliation regressions and all 21 CTest targets pass. The full
 Debug build is warning-free.
 
+## Remove active-position source lookup
+
+Removed the unused `SourceStore::sourceAt` API. Sources already use stable
+`SourceId` values for lookup and ordered snapshots for enumeration; this method
+introduced another index whose meaning changed whenever a source was removed.
+A repository-wide reference search found only its declaration and definition.
+
+This removes 16 production lines, the scan over active entries, and its separate
+out-of-range path. The full Debug rebuild and all 21 CTest targets pass without
+compiler warnings.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual
