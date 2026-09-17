@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <compare>
 #include <deque>
 #include <limits>
 #include <map>
@@ -21,7 +22,6 @@
 #include <set>
 #include <span>
 #include <string>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -1184,6 +1184,8 @@ struct DecodeState {
   bool specialSequence = false;
   u8 specialLogicalChannel = 0;
   u16 specialTable = 0;
+
+  friend auto operator<=>(const DecodeState&, const DecodeState&) = default;
 };
 
 struct WalkState {
@@ -1191,14 +1193,7 @@ struct WalkState {
   DecodeState decode;
   u32 returnAddress = 0;
 
-  friend bool operator<(const WalkState& left, const WalkState& right) {
-    return std::tie(left.offset, left.decode.defaultLength, left.decode.manualDuration,
-                    left.decode.autoDurationThreshold, left.decode.specialSequence, left.decode.specialLogicalChannel,
-                    left.decode.specialTable, left.returnAddress) <
-           std::tie(right.offset, right.decode.defaultLength, right.decode.manualDuration,
-                    right.decode.autoDurationThreshold, right.decode.specialSequence,
-                    right.decode.specialLogicalChannel, right.decode.specialTable, right.returnAddress);
-  }
+  friend auto operator<=>(const WalkState&, const WalkState&) = default;
 };
 
 [[nodiscard]] Timing readTiming(Cursor::Event& event, const DecodeState& state, bool readsDuration = true) {
@@ -1230,7 +1225,7 @@ struct WalkState {
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, Version version,
-                                                   const DecodeState& state, std::vector<Diagnostic>* diagnostics) {
+                                                   DecodeState& state, std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, begin, "prism-snes", diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
@@ -1302,6 +1297,7 @@ struct WalkState {
       return cursor.command(opcode == 0xd0 ? "Alternate Pan Table" : "Default Pan Table", SequenceSemantic::Pan)
           .invoke<&Playback::defaultPan>(opcode == 0xd0);
     case 0xd2:
+      state.specialSequence = false;
       return cursor.command("Subtrack Trigger Mode Off", SequenceSemantic::State)
           .set<&TrackState::specialSequence>(false);
     case 0xd3:
@@ -1330,10 +1326,11 @@ struct WalkState {
     case 0xdb:
       return cursor.ignored("Driver Parameters", 2, "driver-parameters");
     case 0xdc:
+      state.defaultLength = 0;
       return cursor.sourceOnly("Default Length Off", "default-length-off");
     case 0xdd: {
       auto event = cursor.sourceOnly("Default Length", "default-length");
-      event.u8("length");
+      state.defaultLength = event.u8("length");
       return event;
     }
     case 0xde:
@@ -1341,7 +1338,8 @@ struct WalkState {
       auto event = cursor.command(opcode == 0xde ? "Repeat" : "Repeat (Alternate)", SequenceSemantic::Loop);
       const u8 count = event.u8("count");
       const Address destination = event.addressLe("destination", SemanticOperandRole::LoopTarget);
-      return count == 0 ? event.declaredLoop(destination)
+      // Keep the encoded continuation discoverable even for an infinite repeat.
+      return count == 0 ? event.declaredLoop(destination).discoverTarget(event.nextAddress())
                         : event.repeatUntil(static_cast<u8>(opcode - 0xde), static_cast<u32>(count) + 1, destination);
     }
     case 0xe0:
@@ -1399,9 +1397,12 @@ struct WalkState {
     }
     case 0xed: {
       auto event = cursor.command("Subtrack Trigger Mode", SequenceSemantic::State);
-      const u8 logical = event.u8("logical_channel");
-      return event.invoke<&Playback::specialSequence>(logical,
-                                                      event.u16le("pointer_table", SourceValueDisplay::Address));
+      state.specialSequence = true;
+      state.manualDuration = false;
+      state.autoDurationThreshold = 0;
+      state.specialLogicalChannel = event.u8("logical_channel");
+      state.specialTable = event.u16le("pointer_table", SourceValueDisplay::Address);
+      return event.invoke<&Playback::specialSequence>(state.specialLogicalChannel, state.specialTable);
     }
     case 0xee: {
       auto event = cursor.command("Tie", SequenceSemantic::Note);
@@ -1418,12 +1419,15 @@ struct WalkState {
       return event.invoke<&Playback::release>(time, event.u8("gain", SourceValueDisplay::Hex));
     }
     case 0xf1:
+      state.manualDuration = false;
       return cursor.sourceOnly("Automatic Duration", "automatic-duration");
     case 0xf2:
+      state.manualDuration = true;
       return cursor.sourceOnly("Manual Duration", "manual-duration");
     case 0xf3: {
       auto event = cursor.sourceOnly("Automatic Duration Threshold", "automatic-duration-threshold");
-      event.u8("threshold");
+      state.autoDurationThreshold = event.u8("threshold");
+      state.manualDuration = false;
       return event;
     }
     case 0xf4: {
@@ -1513,50 +1517,23 @@ struct WalkState {
       continue;
     }
     states.try_emplace(walk.offset, walk.decode);
-    const DecodedBytecodeCommand& command =
-        session.findOrAppend(decodeCommand(reader, walk.offset, version, walk.decode, diagnostics), walk.offset);
-    const u32 continuation = static_cast<u32>(command.flow.continuation.value);
     DecodeState next = walk.decode;
-    if (opcode == 0xdc) {
-      next.defaultLength = 0;
-    } else if (opcode == 0xdd && reader.has(walk.offset + 1, 1)) {
-      next.defaultLength = reader.u8At(walk.offset + 1);
-    } else if (opcode == 0xf1) {
-      next.manualDuration = false;
-    } else if (opcode == 0xf2) {
-      next.manualDuration = true;
-    } else if (opcode == 0xf3 && reader.has(walk.offset + 1, 1)) {
-      next.autoDurationThreshold = reader.u8At(walk.offset + 1);
-      next.manualDuration = false;
-    } else if (opcode == 0xed) {
-      next.specialSequence = true;
-      next.manualDuration = false;
-      next.autoDurationThreshold = 0;
-      next.specialLogicalChannel = reader.u8At(walk.offset + 1);
-      next.specialTable = reader.le16(walk.offset + 2);
-    } else if (opcode == 0xd2) {
-      next.specialSequence = false;
+    const DecodedBytecodeCommand& command =
+        session.findOrAppend(decodeCommand(reader, walk.offset, version, next, diagnostics), walk.offset);
+    const u32 continuation = static_cast<u32>(command.flow.continuation.value);
+    const auto& transition = command.flow.defaultTransition;
+    if (const auto target = command.flow.defaultDestination()) {
+      queue(static_cast<u32>(target->value), next,
+            transition.kind == CommandTransitionKind::Call ? continuation : walk.returnAddress);
     }
-
-    if (opcode == 0xff || (opcode >= 0xa0 && opcode < 0xc0)) {
-      continue;
+    for (const Address target : command.discoveryTargets) {
+      queue(static_cast<u32>(target.value), next, walk.returnAddress);
     }
-    const bool cosmoPanAlias = version == Version::CosmoGang && opcode >= 0xc0 && opcode <= 0xd0;
-    const bool dualOrbConditional = version == Version::DualOrb && opcode >= 0xc0 && opcode <= 0xc5;
-    if (dualOrbConditional || (!cosmoPanAlias && opcode == 0xc5)) {
-      queue(reader.le16(walk.offset + 1), next, walk.returnAddress);
+    if (command.flow.discoveryContinuation() && transition.kind != CommandTransitionKind::Call) {
       queue(continuation, next, walk.returnAddress);
-    } else if (opcode == 0xde || opcode == 0xdf) {
-      queue(reader.le16(walk.offset + 2), next, walk.returnAddress);
-      queue(continuation, next, walk.returnAddress);
-    } else if (opcode == 0xe1) {
-      queue(reader.le16(walk.offset + 1), next, continuation);
-    } else if (opcode == 0xe2) {
-      queue(reader.le16(walk.offset + 1), next, walk.returnAddress);
-    } else if (opcode == 0xe0 && walk.returnAddress != 0) {
-      queue(walk.returnAddress, next, 0);
-    } else {
-      queue(continuation, next, walk.returnAddress);
+    } else if (transition.kind == CommandTransitionKind::Return) {
+      // This driver has one return address and treats a top-level return as a no-op.
+      queue(walk.returnAddress != 0 ? walk.returnAddress : continuation, next, 0);
     }
   }
 

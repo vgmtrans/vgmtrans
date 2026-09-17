@@ -15,6 +15,7 @@
 #include <initializer_list>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -183,6 +184,49 @@ void profileSpecificOperandLengthsRemainAligned() {
   TrackProgram modernTrack = decodeSourceTrack(ByteReader(SourceId{304}, modern.data()), Version::Modern, 0, 0x5200);
   expect(modernTrack.commands.size() == 2 && modernTrack.commands.front().range.size == 2,
          "later Prism drivers must decode C0-C4 as one-operand timer-target tempo commands");
+}
+
+void decodeStateFollowsCallsAndRepeats() {
+  DriverFixture fixture(Version::Modern);
+  fixture.commands({0xe1, 0x00, 0x54, 0x3c, 1, 0xdc, 0xf1, 0x3e, 4, 0xff})
+      .bytes(0x5400, {0xdd, 8, 0xf2, 0xe0});
+  const ByteReader reader(SourceId{310}, fixture.data());
+  const auto program = decodeSequence(reader, *findLayout(reader), AssetId{310});
+  const auto performance = SequenceVm().render(program);
+  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  expect(performance.diagnostics.empty() && notes.size() == 2 && notes[0]->header.tick == 0 &&
+             notes[1]->header.tick == 8 && performance.tracks.front().endTick == 12,
+         "a called block must carry duration-mode changes back to its caller");
+
+  for (const u8 count : {0, 1}) {
+    fixture.commands({0xdd, 2, 0x3c, 0xde, count, 0x02, 0x52, 0xff});
+    const auto repeated = decodeSequence(reader, *findLayout(reader), AssetId{310});
+    expect(repeated.tracks.front().commandIndex(Address{0x5207}).has_value(),
+           "repeat discovery must retain the encoded continuation, including after an infinite repeat");
+    const auto rendered = SequenceVm().render(repeated);
+    expect(events<NotePerformanceEvent>(rendered.tracks.front()).size() == (count == 0 ? 1 : 2),
+           "repeat discovery must preserve finite and infinite playback policy");
+  }
+}
+
+void truncatedFlowAndModeCommandsStopDecoding() {
+  for (const Version version : {Version::CosmoGang, Version::DualOrb, Version::Modern}) {
+    for (const auto [opcode, size] : std::array<std::pair<u8, u8>, 6>{
+             {{0xc5, 3}, {0xde, 4}, {0xdf, 4}, {0xe1, 3}, {0xe2, 3}, {0xed, 4}}}) {
+      if (opcode == 0xc5 && version == Version::CosmoGang) {
+        continue;  // This version uses C5 as a one-byte pan alias.
+      }
+      for (u8 available = 1; available < size; ++available) {
+        std::vector<u8> bytes(available);
+        bytes.front() = opcode;
+        std::vector<Diagnostic> diagnostics;
+        const auto track = decodeSourceTrack(ByteReader(SourceId{311}, bytes), version, 0, 0, &diagnostics);
+        expect(track.commands.size() == 1 && track.commands.front().semantic == SequenceSemantic::Unsupported &&
+                   track.commands.front().flow.endsPlayback() && diagnostics.size() == 1,
+               "truncated branches and mode changes must stop without rereading missing operands");
+      }
+    }
+  }
 }
 
 void dynamicDriverFeaturesRenderFromCapturedTables() {
@@ -365,6 +409,8 @@ void subtrackTriggersRunTheirChildScore() {
 void runPrismSnesModuleTests() {
   layoutProfilesAndLiveSongAreAudited();
   profileSpecificOperandLengthsRemainAligned();
+  decodeStateFollowsCallsAndRepeats();
+  truncatedFlowAndModeCommandsStopDecoding();
   dynamicDriverFeaturesRenderFromCapturedTables();
   gainTablesControlNoteAmplitude();
   instrumentChangesWaitForTheNextAttack();
