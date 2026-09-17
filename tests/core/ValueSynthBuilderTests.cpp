@@ -277,6 +277,8 @@ void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
                                   .encodedData = SourceRange{.source = source, .offset = 100, .size = 9},
                               });
   expect(first.ref().index() == 0, "first sample source key should receive dense index zero");
+  expect(!first.source("Invalid sample range", SourceRange{}).id().valid(),
+         "invalid source ranges must not publish sample annotations");
   const SourceRecord firstRecord{
       .range = SourceRange{.source = source, .offset = 8, .size = 4},
       .fields = {SourceField{
@@ -318,6 +320,8 @@ void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
   const auto firstSources = annotations.ownedBy(ObjectRefs::sample(asset, 0));
   expect(firstSources.size() == 2, "additional source records should retain the same sample owner");
   const SourceAnnotation& firstAnnotation = annotations.get(firstSources[0]);
+  expect(annotations.get(root.id()).kind == "probe-sample-table" && firstAnnotation.kind == "probe-sample-entry",
+         "asset and sample annotations must retain explicitly supplied kinds");
   const SourceField* srcn = fieldNamed(firstAnnotation, "srcn");
   expect(firstAnnotation.outline == SourceOutlinePolicy::Show && srcn != nullptr &&
              srcn->range == SourceRange{.source = source, .offset = 8, .size = 1} &&
@@ -326,7 +330,8 @@ void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
              unsignedFieldEquals(firstAnnotation, "effective_sample_rate", 0),
          "synth source records should retain field ranges, display hints, and outline presentation for future views");
   const auto fallbackSources = annotations.ownedBy(ObjectRefs::sample(asset, 1));
-  expect(fallbackSources.size() == 1 && annotations.get(fallbackSources[0]).range == collection.samples[1].encodedData,
+  expect(fallbackSources.size() == 1 && annotations.get(fallbackSources[0]).range == collection.samples[1].encodedData &&
+             annotations.get(fallbackSources[0]).kind == "fallback",
          "a source-backed sample without source() should receive a generic payload annotation");
   expect(annotations.ownedBy(ObjectRefs::asset(asset)) == std::vector<SourceAnnotationId>{root.id()},
          "asset-level source structures should receive the sample collection owner automatically");
@@ -344,8 +349,12 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
 
   auto kit = instruments.getOrAdd(
       700, Instrument{.explicitAddress = InstrumentAddress{.bank = 127, .program = 5}, .name = "Drum Kit"});
+  expect(!kit.source("Invalid instrument range", SourceRange{}).id().valid(),
+         "invalid source ranges must not publish instrument annotations or become region parents");
   auto firstRegion = kit.region(SampleRef::resolved(samplesAsset, 3),
                                 Region{.keyRange = KeyRange{.low = 36, .high = 36}});
+  expect(!firstRegion.source("Invalid region range", SourceRange{}).id().valid(),
+         "invalid source ranges must not publish region annotations");
   const auto firstRegionSource =
       firstRegion.source("Kick",
                          SourceRecord{
@@ -401,6 +410,8 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
   expect(instrumentSources == std::vector<SourceAnnotationId>{instrumentSource.id(), latestInstrumentSource.id()},
          "instrument annotations should use the dense model index rather than the grouping key");
   const SourceAnnotation& instrumentAnnotation = annotations.get(instrumentSource.id());
+  expect(instrumentAnnotation.kind == "probe-drum-kit" && annotations.get(firstRegionSource.id()).kind == "probe-kick",
+         "instrument and region annotations must retain explicitly supplied kinds");
   expect(hasLink(instrumentAnnotation, SourceLinkRole::UsesSample, SourceTarget{ObjectRefs::sample(samplesAsset, 3)}) &&
              hasLink(instrumentAnnotation, SourceLinkRole::UsesSample,
                      SourceTarget{ObjectRefs::sample(samplesAsset, 4)}) &&
@@ -660,6 +671,9 @@ void detachedBuildersUseTheSameAuthoringSurface() {
 
   const auto sampleValues = std::move(samples).finish();
   const auto instrumentValues = std::move(instruments).finish();
+  expect(sampleValues.range == SourceRange{.source = source, .offset = 20, .size = 89} &&
+             instrumentValues.range == SourceRange{.source = source, .offset = 40, .size = 8},
+         "source ranges must contribute to asset bounds even without an annotation sink");
   expect(sampleValues.value.samples.size() == 1 && instrumentValues.values.size() == 1 &&
              instrumentValues.values[0].regions.size() == 1,
          "detached builders should finish ordinary values through the scan-time vocabulary");

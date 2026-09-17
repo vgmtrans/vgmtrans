@@ -40,6 +40,8 @@ public:
 
 protected:
   SynthBuilderSources(AssetId asset, SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics);
+  AnnotationBuilder annotateSource(SourceRole role, std::string_view label, SourceRange range, std::string_view kind,
+                                   ObjectRef owner, std::vector<SourceAnnotationId>* sources = nullptr);
   void report(Severity severity, std::string code, std::string message, SourceRange range);
 
   AssetId asset_;
@@ -207,8 +209,6 @@ private:
   AnnotationBuilder addRegionSource(u32 instrumentIndex, u32 regionIndex, std::string_view label, SourceRange range,
                                     std::string_view kind);
   void finishSources();
-  void recordInstrumentRange(u32 index, SourceRange range);
-  void recordRegionRange(u32 instrumentIndex, u32 regionIndex, SourceRange range);
 
   std::vector<Instrument> instruments_;
   std::vector<InstrumentState> states_;
