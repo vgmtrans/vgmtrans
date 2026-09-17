@@ -3052,6 +3052,16 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
 - Validation: warning-free Debug incremental build; all 21 CTest targets pass
   (10.79 s).
 
+## Declare runtime hooks where they are stored
+
+- Removed eight standalone callback aliases used only by `SequenceRuntime`'s
+  corresponding fields. Hook signatures are now visible on the runtime itself;
+  state factories remain closures and execution hooks remain function pointers.
+  The one test naming a callback alias now derives its type from the runtime.
+- Removed nine production lines and eight names from the shared API without
+  changing callback signatures or the typed format adapter.
+- Validation: warning-free full Debug build and all 21 CTest targets pass.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual
