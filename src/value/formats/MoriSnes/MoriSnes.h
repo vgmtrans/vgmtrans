@@ -157,11 +157,11 @@ struct SequenceParse {
 [[nodiscard]] core::TrackProgram decodeSourceTrack(core::ByteReader reader, const Layout& layout, u32 trackNumber,
                                                    u32 startAddress,
                                                    std::vector<core::Diagnostic>* diagnostics = nullptr);
-[[nodiscard]] SequenceParse decodeSequence(core::ByteReader reader, const Layout& layout, core::AssetId sequenceId,
+[[nodiscard]] SequenceParse decodeSequence(core::RetainedSource source, const Layout& layout, core::AssetId sequenceId,
                                            core::SourceMapBuilder* sourceMap = nullptr,
                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] core::SequenceProgramConfig sequenceConfig(DriverTraits traits);
-[[nodiscard]] core::SequenceRuntime sequenceRuntime(core::ByteReader reader, const Layout& layout);
+[[nodiscard]] core::SequenceRuntime sequenceRuntime(core::RetainedSource source, const Layout& layout);
 [[nodiscard]] core::Envelope driverEnvelope(u8 adsr1, u8 adsr2, u8 gain);
 [[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
                                                                const ReferencedInstruments& references,

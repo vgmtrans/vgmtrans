@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <variant>
@@ -76,11 +77,12 @@ PerformanceSequence render(std::vector<u8> bytes, Layout layout = runtimeLayout(
   const ByteReader reader{SourceId{301}, bytes};
   const SequenceProgramConfig config = sequenceConfig(layout);
   SequenceProgram program{
-      .runtime = sequenceRuntime(reader, layout),
+      .runtime = sequenceRuntime(RetainedSource::copyOf(reader), layout),
       .timebase = config.timebase,
       .behavior = config.behavior,
       .tracks = {decodeSourceTrack(reader, layout, 0, 0)},
   };
+  bytes = std::vector<u8>{};  // Playback must be independent of the borrowed decode buffer.
   return SequenceVm(LoopPolicy::PlayOnce).render(program);
 }
 
@@ -241,7 +243,7 @@ SourceAnnotation extendedCommandAnnotation(Version version, bool pitchDrift, u8 
   layout.hasPitchDrift = pitchDrift;
   const ByteReader reader{SourceId{304}, bytes};
   SourceMapBuilder sourceMap;
-  static_cast<void>(decodeSequence(reader, layout, AssetId{304}, &sourceMap));
+  static_cast<void>(decodeSequence(RetainedSource::copyOf(reader), layout, AssetId{304}, &sourceMap));
   const SourceMap annotations = sourceMap.finish();
   return commandAnnotationAt(annotations, reader.source(), 0x60);
 }
@@ -324,9 +326,37 @@ void originalAdsrSiblingResetAndEnergyDriftAreAudited() {
          "Energy Breaker's FF 05 drift should accumulate on the fixed 64 Hz driver clock");
 }
 
+void scannedRuntimeOwnsDriverBytes() {
+  auto bytes = std::make_shared<const std::vector<u8>>(scannerFixture());
+  const std::weak_ptr<const std::vector<u8>> lifetime = bytes;
+  ScanIdAllocator ids;
+  ScanResult result = module().scan(ScanInput{
+      .source = SourceFile{.name = "retained.aram"},
+      .reader = ByteReader{SourceId{401}, *bytes},
+      .ids = ids,
+      .retained = RetainedSource{SourceId{401}, bytes},
+  });
+  SequenceProgram program;
+  for (const Asset& asset : result.assets) {
+    if (const auto* sequence = std::get_if<SequenceProgramAsset>(&asset)) {
+      program = sequence->program;
+    }
+  }
+  result = {};
+  bytes.reset();
+  expect(!lifetime.expired(), "the copied runtime should retain its playback tables after the scan is released");
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
+  expect(performance.diagnostics.empty() && !performance.tracks.empty() &&
+             !events<NotePerformanceEvent>(performance.tracks.front()).empty(),
+         "the retained runtime should render notes after its scan input is gone");
+  program = {};
+  expect(lifetime.expired(), "releasing the last program should release its source bytes");
+}
+
 }  // namespace
 
 void runNeverlandSnesModuleTests() {
+  scannedRuntimeOwnsDriverBytes();
   relocatedLayoutUsesDriverCodeAndHeaderContracts();
   playlistsCallSectionsAndRespectDialectTranspose();
   playlistTransposeDoesNotLeakIntoLaterSections();

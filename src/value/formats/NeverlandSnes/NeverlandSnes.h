@@ -83,11 +83,11 @@ struct SequenceParse {
 [[nodiscard]] core::TrackProgram decodeSourceTrack(core::ByteReader reader, const Layout& layout, u32 trackNumber,
                                                    u32 playlistAddress,
                                                    std::vector<core::Diagnostic>* diagnostics = nullptr);
-[[nodiscard]] SequenceParse decodeSequence(core::ByteReader reader, const Layout& layout, core::AssetId sequenceId,
+[[nodiscard]] SequenceParse decodeSequence(core::RetainedSource source, const Layout& layout, core::AssetId sequenceId,
                                            core::SourceMapBuilder* sourceMap = nullptr,
                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] core::SequenceProgramConfig sequenceConfig(const Layout& layout);
-[[nodiscard]] core::SequenceRuntime sequenceRuntime(core::ByteReader reader, const Layout& layout);
+[[nodiscard]] core::SequenceRuntime sequenceRuntime(core::RetainedSource source, const Layout& layout);
 [[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
                                                                const ReferencedPrograms& references,
                                                                std::string_view displayName);

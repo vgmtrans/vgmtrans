@@ -165,13 +165,7 @@ struct Patch {
 
 [[nodiscard]] std::vector<Patch> collectPatches(ByteReader reader, const Layout& layout,
                                                 const ReferencedInstruments& references) {
-  const DriverConfig driver{
-      .data = reader,
-      .traits = layout.traits,
-      .presetTable = layout.presetTableAddress,
-      .presetPitchHigh = layout.presetPitchHighAddress,
-      .panTable = layout.panTableAddress,
-  };
+  const DriverConfig driver{reader, layout};
   std::vector<Patch> patches;
   for (const u16 descriptor : references.descriptors) {
     if (!reader.has(descriptor, 1)) {

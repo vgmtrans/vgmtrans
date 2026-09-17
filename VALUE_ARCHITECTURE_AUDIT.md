@@ -2586,6 +2586,31 @@ The old implementation fails the assertion that an unknown-format source is
 offered to every processor; the simplified implementation passes all session
 tests. All 21 CTest targets also pass in the normal build.
 
+## Retain Mori and Neverland playback data through the existing ownership contract
+
+Mori SNES and Neverland SNES stored borrowed `ByteReader` values in their
+persistent runtimes. A program copied out of its scan/session snapshot could
+therefore read freed source bytes during later playback. Their sequence/runtime
+entry points now take `RetainedSource`, and scanners pass `input.retain()`.
+Session scans share their immutable storage; callers with borrowed buffers
+explicitly capture it before creating a deferred runtime.
+
+Mori now uses one owning runtime configuration for songs and sound effects.
+The sound-effect state reads its script address from the existing layout,
+removing a second configuration type and a separately assembled script list.
+One `DriverConfig` constructor supplies the same lightweight reader/table view
+to playback and immediate synth analysis. Synth analysis does not copy or retain
+source bytes. The production changes remove **17 lines** while fixing ownership.
+
+New tests copy programs out of scan results, release the input and result, then
+render and verify that releasing the last program releases its retained bytes.
+Existing direct-playback fixtures now release their decode buffers before
+rendering, including Mori's hardware-only sound effect. Ignored ASan/UBSan
+probes compile the old/new scanner and runtime implementations: both old
+implementations fail the new ownership assertion, and both new implementations
+pass their complete format suites. All 21 CTest targets pass. These are generated
+fixtures, not real-file corpus validation.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding
