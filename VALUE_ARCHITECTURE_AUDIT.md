@@ -2546,13 +2546,28 @@ truncated jump, repeat, call, or subtrack-mode command. Such commands now stop
 through the compiler's existing unsupported/end transition.
 
 All 21 CTest targets pass. New regression cases cover state carried through
-calls, finite/infinite repeat discovery, and 46 truncated control/mode encodings
+calls, finite/infinite repeat discovery, and 43 truncated control/mode encodings
 across the three driver profiles. An ignored differential probe compiles both
 old and new Prism implementations with ASan/UBSan: 1,800 generated decoded
 programs and source maps match, as do 180 serialized MIDI outputs. The changed
 malformed-input behavior is covered separately by the regression cases. No
 real-file corpus is configured; these checks establish fixture/generated-input
 coverage only.
+
+## Fold bytecode discovery into its only consumer
+
+`decodeBytecode` exposed a generic command-buffer protocol solely to implement
+`TrackDecodeScope::decode`. The traversal now lives directly in that scope,
+using the concrete session's command count and the already-clamped input bound.
+Format-facing APIs and the discovery policy stay unchanged: sequential
+continuations are decoded first, pending blocks are visited last-in-first-out,
+and already decoded offsets are skipped.
+
+This removes **12 production lines**, an unused generic extension point, and a
+redundant command counter. An ignored ASan/UBSan differential probe compares
+30,000 generated graphs, including empty/multiple roots, cycles, truncated
+bounds, and command caps. Callback order, emitted command order, entry points,
+and limit behavior match. All 21 CTest targets pass.
 
 ## Further investigation
 
