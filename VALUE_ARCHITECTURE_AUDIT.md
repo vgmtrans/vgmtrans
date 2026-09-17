@@ -2865,6 +2865,19 @@ rewrite. Existing native-portamento, mixed pitch-bend, physical note-limit,
 and linked-voice regressions pass with all 21 CTest targets. The full Debug
 build is warning-free.
 
+## Share collection reference admission checks
+
+The sequence member and the three asset lists now use one local check for
+missing and wrong-type references. The optional sequence still resets itself;
+each list uses ordinary erase-if. This removes the separate sequence validation
+branch and the callback-based list-filter wrapper. The unused grammatical
+article parameter is gone too; every supported role used the same article.
+
+This removes six production lines while preserving issue text, diagnostic
+order, and the treatment of missing versus wrong-type members. Existing
+collection reconciliation regressions and all 21 CTest targets pass. The full
+Debug build is warning-free.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual

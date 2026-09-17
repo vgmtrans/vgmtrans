@@ -357,9 +357,9 @@ void SessionState::validateCollectionAssetReferences(std::string_view resolver, 
       });
     }
   };
-  const auto addWrongType = [&](AssetId id, std::string_view role, std::string_view article) {
+  const auto addWrongType = [&](AssetId id, std::string_view role) {
     addError("Collection resolver '" + std::string(resolver) + "' returned " + std::string(role) + " asset id " +
-             std::to_string(id.value) + " that is not " + std::string(article) + " " + std::string(role) + " asset");
+             std::to_string(id.value) + " that is not a " + std::string(role) + " asset");
     desired.issues.push_back(CollectionIssue{
         .impact = CollectionIssueImpact::Incomplete,
         .severity = Severity::Error,
@@ -369,35 +369,29 @@ void SessionState::validateCollectionAssetReferences(std::string_view resolver, 
     });
   };
 
-  if (desired.members.sequence) {
-    if (!containsAsset(*desired.members.sequence)) {
-      addMissing(*desired.members.sequence, "sequence");
-      desired.members.sequence.reset();
-    } else if (asset<SequenceProgramAsset>(*desired.members.sequence) == nullptr) {
-      addWrongType(*desired.members.sequence, "sequence", "a");
-      desired.members.sequence.reset();
-    }
-  }
-
-  const auto filter = [&](std::vector<AssetId>& ids, std::string_view role, std::string_view article,
-                          auto hasExpectedType) {
-    std::erase_if(ids, [&](AssetId id) {
-      if (!containsAsset(id)) {
-        addMissing(id, role);
-        return true;
-      }
-      if (hasExpectedType(id)) {
-        return false;
-      }
-      addWrongType(id, role, article);
+  const auto invalid = [&](AssetId id, std::string_view role, bool hasExpectedType) {
+    if (!containsAsset(id)) {
+      addMissing(id, role);
       return true;
-    });
+    }
+    if (!hasExpectedType) {
+      addWrongType(id, role);
+      return true;
+    }
+    return false;
   };
-  filter(desired.members.soundBanks, "sound-bank", "a",
-         [&](AssetId id) { return asset<SoundBankAsset>(id) != nullptr; });
-  filter(desired.members.samplePools, "sample-pool", "a",
-         [&](AssetId id) { return asset<SamplePoolAsset>(id) != nullptr; });
-  filter(desired.members.miscAssets, "misc", "a", [&](AssetId id) { return asset<MiscAsset>(id) != nullptr; });
+  auto& members = desired.members;
+  if (members.sequence &&
+      invalid(*members.sequence, "sequence", asset<SequenceProgramAsset>(*members.sequence) != nullptr)) {
+    members.sequence.reset();
+  }
+  std::erase_if(members.soundBanks, [&](AssetId id) {
+    return invalid(id, "sound-bank", asset<SoundBankAsset>(id) != nullptr);
+  });
+  std::erase_if(members.samplePools, [&](AssetId id) {
+    return invalid(id, "sample-pool", asset<SamplePoolAsset>(id) != nullptr);
+  });
+  std::erase_if(members.miscAssets, [&](AssetId id) { return invalid(id, "misc", asset<MiscAsset>(id) != nullptr); });
 }
 
 CollectionId SessionState::nextCollectionId(ScanIdAllocator& ids) const {
