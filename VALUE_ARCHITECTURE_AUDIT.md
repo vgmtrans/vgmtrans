@@ -2843,6 +2843,19 @@ checks shared ancestors, unowned chains, multi-node and explicitly owned
 self-cycles, missing parents, and reversed annotation order. The full Debug
 build and all 21 CTest targets pass without compiler warnings.
 
+## Trim portamento segments in place
+
+Pitch-transition lowering now removes superseded or empty segments from the
+existing note, adjusts the surviving overlaps, and appends its new segment.
+It no longer builds a replacement vector by copying every retained segment.
+Filtering precedes the edits because overlap adjustment cannot turn an empty
+retained segment into an audible one.
+
+This removes six production lines and one temporary collection/allocation per
+rewrite. Existing native-portamento, mixed pitch-bend, physical note-limit,
+and linked-voice regressions pass with all 21 CTest targets. The full Debug
+build is warning-free.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual
