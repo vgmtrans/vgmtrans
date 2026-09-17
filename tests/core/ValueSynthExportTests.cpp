@@ -1448,7 +1448,7 @@ void collectionBindingAppliesToWholeExport() {
   for (const auto scaling : {ModulationScalingPolicy::FullFormatRange, ModulationScalingPolicy::ObservedSequenceRange}) {
     ExportRequest request{.kinds = {ExportKind::Midi, ExportKind::SoundFont2}, .modulationScaling = scaling};
     const auto paired = exportCollection(snapshot, sources, CollectionId{0}, request);
-    request.kinds = {ExportKind::Midi};
+    request.kinds.clear();
     const auto midiOnly = exportCollection(snapshot, sources, CollectionId{0}, request);
     request.kinds = {ExportKind::SoundFont2};
     const auto bankOnly = exportCollection(snapshot, sources, CollectionId{0}, request);
@@ -1456,7 +1456,7 @@ void collectionBindingAppliesToWholeExport() {
     const std::array<u8, 3> tremolo{0xb0, 92, static_cast<u8>(observed ? 127 : 64)};
     expect(paired.size() == 2 && midiOnly.size() == 1 && bankOnly.size() == 1 &&
                !paired[0].bytes.empty() && paired[0].bytes == midiOnly[0].bytes && paired[1].bytes == bankOnly[0].bytes,
-           "MIDI-only, synth-only, and paired export must share the same modulation policy");
+           "default MIDI-only, synth-only, and paired export must share the same modulation policy");
     expect(std::search(paired[0].bytes.begin(), paired[0].bytes.end(), tremolo.begin(), tremolo.end()) !=
                    paired[0].bytes.end() && soundFontImodContains(paired[1].bytes, 220, 13, observed ? 30 : 60),
            "observed-range scaling must expand MIDI controls and reduce companion synth depth by the same ratio");

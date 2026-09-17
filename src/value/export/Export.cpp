@@ -63,15 +63,6 @@ namespace {
          filenamePart(std::move(sampleName)) + ".wav";
 }
 
-[[nodiscard]] std::vector<ExportKind> requestedKinds(const ExportRequest& request) {
-  // MIDI remains the default single artifact because it only requires a sequence asset.
-  // Synth/sample exports must be requested explicitly.
-  if (!request.kinds.empty()) {
-    return request.kinds;
-  }
-  return {ExportKind::Midi};
-}
-
 [[nodiscard]] Artifact exportMidi(std::string_view baseName, const RenderedCollection& rendering,
                                   const std::optional<MidiSequence>& midi) {
   return Artifact{
@@ -382,7 +373,9 @@ std::vector<Artifact> exportCollectionImpl(const SessionSnapshot& snapshot, cons
   }
   CollectionWorkspace workspace{std::move(*binding.collection), std::move(binding.diagnostics)};
   const auto& bound = workspace.collection;
-  const auto kinds = requestedKinds(request);
+  // An empty request exports MIDI; other artifacts must be requested explicitly.
+  static constexpr std::array defaultKinds{ExportKind::Midi};
+  const std::span<const ExportKind> kinds = request.kinds.empty() ? std::span{defaultKinds} : std::span{request.kinds};
   const bool exportsMidi = std::ranges::find(kinds, ExportKind::Midi) != kinds.end();
   const bool exportsSynth = std::ranges::any_of(
       kinds, [](ExportKind kind) { return kind == ExportKind::SoundFont2 || kind == ExportKind::Dls; });
