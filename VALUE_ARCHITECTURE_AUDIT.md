@@ -3086,6 +3086,20 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   Logs: `cmake-build-debug/value-audit/runtime-hook-types-*` and
   `sequence-finalization-*` (final suite: 10.79 s).
 
+## Finalize each VM track with its cutoff
+
+- `VmTrackExecutor::finish` now closes active notes at the appropriate endpoint
+  and applies the optional common sequence cutoff before returning its track.
+  Removed the coordinator's separate note-closing pass, track-clipping step,
+  and the executor's public note-closing wrapper.
+- Source spans are trimmed after all tracks finish, preserving their indexes
+  while active notes update them. Early-ending tracks retain their shorter note
+  durations; ordinary completion still retains scheduled release tails.
+- Removed five production lines. Existing VM regressions cover inactive-track
+  note closure, common loop cutoffs, section clipping, finalized source spans,
+  and release-tail automation. Warning-free Debug build; all 21 CTest targets
+  pass (10.79 s). Logs: `cmake-build-debug/value-audit/sequence-finalization-*`.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual

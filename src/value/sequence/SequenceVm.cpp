@@ -436,20 +436,22 @@ public:
   }
 
   void trimAt(u64 tick, bool retainBoundaryEvents) {
-    closeActiveNotesAt(tick);
+    outputAt(tick, runtime_.lastCommand).allNotesOff();
     endTrackAt(performanceTrack_, tick, retainBoundaryEvents);
   }
-
-  void closeActiveNotesAt(u64 tick) { outputAt(tick, runtime_.lastCommand).allNotesOff(); }
 
   void preserveLoop(u64 startTick, u64 endTick) {
     addLoopMarker(performanceTrack_, {sourceTrackId_, {}}, startTick, outputSequence_, "Loop Start");
     addLoopMarker(performanceTrack_, {sourceTrackId_, runtime_.lastCommand}, endTick, outputSequence_, "Loop End");
   }
 
-  [[nodiscard]] PerformanceTrack finish() {
-    closeActiveNotesAt(runtime_.tick);
+  [[nodiscard]] PerformanceTrack finish(std::optional<u64> endTick) {
+    const u64 finalTick = endTick.value_or(runtime_.tick);
+    outputAt(active() ? finalTick : std::min(finalTick, runtime_.tick), runtime_.lastCommand).allNotesOff();
     performanceTrack_.endTick = runtime_.tick;
+    if (endTick) {
+      endTrackAt(performanceTrack_, *endTick);
+    }
     // Commands may schedule events inside an earlier note (for example a
     // delayed pitch slide discovered after that note has advanced the VM).
     // Keep the target-neutral performance timeline chronological while
@@ -1015,19 +1017,12 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
       }
 
       target.tracks.reserve(executors.size());
-      if (sequenceEndTick) {
-        for (auto& executor : executors) {
-          const u64 noteEndTick = executor->active() ? *sequenceEndTick : std::min(*sequenceEndTick, executor->tick());
-          executor->closeActiveNotesAt(noteEndTick);
-        }
-        endSourceSpansAt(target.sourceSpans, *sequenceEndTick);
-      }
       for (auto& executor : executors) {
-        auto track = executor->finish();
-        if (sequenceEndTick) {
-          endTrackAt(track, *sequenceEndTick);
-        }
-        target.tracks.push_back(std::move(track));
+        target.tracks.push_back(executor->finish(sequenceEndTick));
+      }
+      if (sequenceEndTick) {
+        // Closing notes updates their source spans; trim only after all tracks finish.
+        endSourceSpansAt(target.sourceSpans, *sequenceEndTick);
       }
     };
 
