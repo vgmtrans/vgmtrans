@@ -563,12 +563,10 @@ void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
   }
 
   const u64 clampedStart = std::min(startTick, note.endTick);
-  std::vector<PortamentoSegment> segments;
-  segments.reserve(note.portamentoSegments.size() + 1);
-  for (auto segment : note.portamentoSegments) {
-    if (segment.startTick >= clampedStart) {
-      continue;
-    }
+  std::erase_if(note.portamentoSegments, [=](const PortamentoSegment& segment) {
+    return segment.startTick >= clampedStart || segment.endTick <= segment.startTick;
+  });
+  for (auto& segment : note.portamentoSegments) {
     if (segment.endTick > clampedStart) {
       const u32 overlap = transition.portamentoRendering.overlapTicks;
       segment.endTick = std::min(note.endTick, addTicks(clampedStart, overlap));
@@ -577,12 +575,9 @@ void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
         segment.bendBaseKey = transition.startKey;
       }
     }
-    if (segment.endTick > segment.startTick) {
-      segments.push_back(std::move(segment));
-    }
   }
   if (clampedStart < note.endTick) {
-    segments.push_back(PortamentoSegment{
+    note.portamentoSegments.push_back(PortamentoSegment{
         .header = automation.header,
         .startTick = clampedStart,
         .endTick = note.endTick,
@@ -591,7 +586,6 @@ void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
         .restartsEnvelope = false,
     });
   }
-  note.portamentoSegments = std::move(segments);
 }
 
 void linkPitchBendVoices(std::vector<NoteSpan>& notes, const std::vector<const PerformanceAutomation*>& transitions) {
