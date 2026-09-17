@@ -237,28 +237,20 @@ void SessionState::reconcileCollections(std::string_view resolver, std::vector<D
     }
 
     validateCollectionAssetReferences(resolver, candidate);
-    CollectionBinder candidateBinder = candidate.binder ? std::move(candidate.binder) : binder;
-    CollectionKey key{
-        .resolver = std::string(resolver),
-        .value = std::move(candidate.localKey),
-    };
-    const auto sameKey = [&](const Collection& collection) { return collection.key == key; };
-    if (auto found = std::ranges::find_if(collections_, sameKey); found != collections_.end()) {
-      found->name = std::move(candidate.name);
-      found->binder = std::move(candidateBinder);
-      found->members = std::move(candidate.members);
-      found->issues = std::move(candidate.issues);
-      continue;
-    }
-
-    collections_.push_back(Collection{
-        .id = nextCollectionId(ids),
+    Collection collection{
         .name = std::move(candidate.name),
-        .key = std::move(key),
-        .binder = std::move(candidateBinder),
+        .key = CollectionKey{.resolver = std::string(resolver), .value = std::move(candidate.localKey)},
+        .binder = candidate.binder ? std::move(candidate.binder) : binder,
         .members = std::move(candidate.members),
         .issues = std::move(candidate.issues),
-    });
+    };
+    if (auto found = std::ranges::find(collections_, collection.key, &Collection::key); found != collections_.end()) {
+      collection.id = found->id;
+      *found = std::move(collection);
+    } else {
+      collection.id = nextCollectionId(ids);
+      collections_.push_back(std::move(collection));
+    }
   }
 
   std::erase_if(collections_, [&](const Collection& collection) {
@@ -310,21 +302,17 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
     return sourceIds.contains(entry.origin.value) || referencesAnyAsset(entry.collection.members, assetIds);
   });
 
-  std::vector<ScanChunk> remainingChunks;
-  remainingChunks.reserve(scanChunks_.size());
-  for (const auto& chunk : scanChunks_) {
-    auto assets = without(chunk.assets, removesAsset);
+  for (auto& chunk : scanChunks_) {
+    chunk.assets = without(chunk.assets, removesAsset);
 
-    SourceMap sourceMap = chunk.sourceMap;
-    const bool sourceMapChanged = std::ranges::any_of(sourceMap.annotations(), [&](const SourceAnnotation& annotation) {
-      return removedAnnotations.contains(annotation.id.value) ||
-             (annotation.parent && removedAnnotations.contains(annotation.parent->value)) ||
-             std::ranges::any_of(annotation.links, removesLink);
-    });
-    if (sourceMapChanged) {
+    if (std::ranges::any_of(chunk.sourceMap.annotations(), [&](const SourceAnnotation& annotation) {
+          return removedAnnotations.contains(annotation.id.value) ||
+                 (annotation.parent && removedAnnotations.contains(annotation.parent->value)) ||
+                 std::ranges::any_of(annotation.links, removesLink);
+        })) {
       std::vector<SourceAnnotation> annotations;
-      annotations.reserve(sourceMap.annotations().size());
-      for (const auto& value : sourceMap.annotations()) {
+      annotations.reserve(chunk.sourceMap.annotations().size());
+      for (const auto& value : chunk.sourceMap.annotations()) {
         if (removedAnnotations.contains(value.id.value)) {
           continue;
         }
@@ -335,23 +323,10 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
         std::erase_if(annotation.links, removesLink);
         annotations.push_back(std::move(annotation));
       }
-      sourceMap = SourceMap{std::move(annotations)};
-    }
-
-    const bool changed = assets != chunk.assets || sourceMapChanged;
-    if (!changed) {
-      remainingChunks.push_back(chunk);
-      continue;
-    }
-    ScanChunk filtered{
-        .assets = std::move(assets),
-        .sourceMap = std::move(sourceMap),
-    };
-    if (!filtered.empty()) {
-      remainingChunks.push_back(std::move(filtered));
+      chunk.sourceMap = SourceMap{std::move(annotations)};
     }
   }
-  scanChunks_ = std::move(remainingChunks);
+  std::erase_if(scanChunks_, [](const ScanChunk& chunk) { return chunk.empty(); });
 
   std::erase_if(diagnostics_, removesDiagnostic);
 

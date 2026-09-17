@@ -275,6 +275,9 @@ void sessionStateScrubsCrossSourceObjectLinks() {
           }}},
       });
 
+  const SourceMap before = state.sourceMap();
+  const auto beforeAssets = state.assets();
+  const auto* survivingAsset = state.asset(AssetId{2});
   const std::array removedSources{firstSource};
   state.removeSources(removedSources);
 
@@ -284,6 +287,11 @@ void sessionStateScrubsCrossSourceObjectLinks() {
   expect(remaining.annotations().size() == 1 && remaining.annotations().front().id == SourceAnnotationId{2} &&
              remaining.annotations().front().links.empty(),
          "source removal should scrub surviving links to removed assets");
+  expect(before.annotations().size() == 2 && before.get(SourceAnnotationId{2}).links.size() == 1 &&
+             beforeAssets.size() == 2 && metadata(beforeAssets.front()).id == AssetId{1},
+         "source removal should preserve assets and cross-source links in retained snapshots");
+  expect(state.asset(AssetId{2}) == survivingAsset,
+         "scrubbing a source map should keep the surviving immutable asset storage");
 }
 
 void scanValidationRejectsSourceAnnotationParentCycles() {
