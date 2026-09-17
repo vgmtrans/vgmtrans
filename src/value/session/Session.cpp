@@ -41,22 +41,6 @@ void prepareDiagnosticRanges(std::vector<Diagnostic>& diagnostics, const SourceF
   }
 }
 
-void prepareDiagnostics(ScanResult& result, const SourceFile& source) {
-  for (const auto& asset : result.assets) {
-    const auto* sequence = std::get_if<SequenceProgramAsset>(&asset);
-    if (sequence == nullptr || sequence->program.runtime.valid()) {
-      continue;
-    }
-
-    result.diagnostics.push_back(Diagnostic{
-        .severity = Severity::Error,
-        .message = "Sequence program has no runtime executor",
-        .range = sequence->metadata.range,
-    });
-  }
-  prepareDiagnosticRanges(result.diagnostics, source);
-}
-
 [[nodiscard]] bool accepts(const SourceFile& source, const std::vector<std::string>& acceptedFormats) {
   return !source.knownFormat || std::ranges::find(acceptedFormats, *source.knownFormat) != acceptedFormats.end();
 }
@@ -76,15 +60,6 @@ void runFormatScans(std::span<FormatScan> scans, const ScanInput& input) {
   const size_t workerLimit = available == 0 ? 2 : available;
   const size_t workerCount = std::min(scans.size(), workerLimit);
 
-  const auto scanAt = [&](size_t index) noexcept {
-    auto& scan = scans[index];
-    try {
-      scan.result = scan.format->scan(input);
-    } catch (...) {
-      scan.failure = std::current_exception();
-    }
-  };
-
   std::atomic_size_t nextTask{0};
   const auto work = [&] {
     while (true) {
@@ -92,7 +67,12 @@ void runFormatScans(std::span<FormatScan> scans, const ScanInput& input) {
       if (index >= scans.size()) {
         return;
       }
-      scanAt(index);
+      auto& scan = scans[index];
+      try {
+        scan.result = scan.format->scan(input);
+      } catch (...) {
+        scan.failure = std::current_exception();
+      }
     }
   };
 
@@ -463,10 +443,17 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue) {
         bank->localSamples.preferredFilter = module.preferredSampleFilter;
       } else if (auto* samples = std::get_if<SamplePoolAsset>(&asset)) {
         samples->pool.preferredFilter = module.preferredSampleFilter;
+      } else if (const auto* sequence = std::get_if<SequenceProgramAsset>(&asset);
+                 sequence != nullptr && !sequence->program.runtime.valid()) {
+        scan.result.diagnostics.push_back(Diagnostic{
+            .severity = Severity::Error,
+            .message = "Sequence program has no runtime executor",
+            .range = sequence->metadata.range,
+        });
       }
     }
     normalizeScanResult(scan.result, ids_);
-    prepareDiagnostics(scan.result, source);
+    prepareDiagnosticRanges(scan.result.diagnostics, source);
     auto validation = validateScanResult(source.id, scan.result, sources_, state_->assets());
     if (!validation.empty()) {
       addValidationFailure(module.name, "scan", std::move(validation));

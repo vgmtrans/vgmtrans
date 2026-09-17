@@ -2943,6 +2943,18 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   Debug rebuild of all affected formats and applications; all 21 CTest targets
   pass (10.79 s), including snapshot sharing and retained-revision lifetimes.
 
+## Prepare scanned assets in one admission pass
+
+- Folded the missing-runtime diagnostic into the existing per-asset preparation
+  loop, alongside sample-filter policy. Removed the separate diagnostic asset
+  walk and its forwarding call to source-range attribution.
+- Scan workers now execute and capture failures directly in their work loop;
+  removed the one-use `scanAt` callback. Worker bounds, exception capture,
+  registry-ordered admission, ID normalization, and diagnostics are preserved.
+- Removed 13 production lines and two one-use helpers. Validation: warning-free
+  Debug build; all 21 CTest targets pass (10.88 s), including concurrent scans,
+  ordered admission, missing runtime errors, and source-backed diagnostics.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual
