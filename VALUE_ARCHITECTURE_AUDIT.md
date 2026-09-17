@@ -2979,6 +2979,18 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   including delayed/mixed pitch transitions, linked voices, and physical limits.
   Logs: `cmake-build-debug/value-audit/portamento-segment-time-{build,tests}.log`.
 
+## Share plain annotation assignment
+
+- Ten `AnnotationBuilder` setters now use one private, typed member-assignment
+  helper. This removes repeated annotation lookup, absent-builder handling, and
+  fluent-return boilerplate while retaining the named format-facing methods.
+- Label/kind derivation, field accumulation, and link deduplication keep their
+  explicit implementations. Strings are still owned by the annotation; the
+  helper performs assignment only when the annotation exists.
+- Removed 22 production lines. Validation: warning-free Debug rebuild of all
+  affected formats and applications; all 21 CTest targets pass. Logs:
+  `cmake-build-debug/value-audit/annotation-setters-{build,tests}.log`.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual

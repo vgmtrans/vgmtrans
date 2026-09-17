@@ -312,17 +312,11 @@ SourceAnnotation* AnnotationBuilder::annotation() const {
 }
 
 AnnotationBuilder& AnnotationBuilder::role(SourceRole role) {
-  if (auto* found = annotation()) {
-    found->role = role;
-  }
-  return *this;
+  return set(&SourceAnnotation::role, role);
 }
 
 AnnotationBuilder& AnnotationBuilder::range(SourceRange range) {
-  if (auto* found = annotation()) {
-    found->range = range;
-  }
-  return *this;
+  return set(&SourceAnnotation::range, range);
 }
 
 AnnotationBuilder& AnnotationBuilder::label(std::string_view label) {
@@ -336,59 +330,35 @@ AnnotationBuilder& AnnotationBuilder::label(std::string_view label) {
 }
 
 AnnotationBuilder& AnnotationBuilder::description(std::string_view description) {
-  if (auto* found = annotation()) {
-    found->description = std::string(description);
-  }
-  return *this;
+  return set(&SourceAnnotation::description, description);
 }
 
 AnnotationBuilder& AnnotationBuilder::kind(std::string_view kind) {
-  if (auto* found = annotation()) {
-    found->kind = std::string(kind);
-  }
-  return *this;
+  return set(&SourceAnnotation::kind, kind);
 }
 
 AnnotationBuilder& AnnotationBuilder::parent(SourceAnnotationId parent) {
-  if (auto* found = annotation()) {
-    found->parent = parent;
-  }
-  return *this;
+  return set(&SourceAnnotation::parent, parent);
 }
 
 AnnotationBuilder& AnnotationBuilder::owner(ObjectRef owner) {
-  if (auto* found = annotation()) {
-    found->owner = owner;
-  }
-  return *this;
+  return set(&SourceAnnotation::owner, owner);
 }
 
 AnnotationBuilder& AnnotationBuilder::outline(SourceOutlinePolicy policy) {
-  if (auto* found = annotation()) {
-    found->outline = policy;
-  }
-  return *this;
+  return set(&SourceAnnotation::outline, policy);
 }
 
 AnnotationBuilder& AnnotationBuilder::fieldsAsChildren(bool enabled) {
-  if (auto* found = annotation()) {
-    found->fieldsAsChildren = enabled;
-  }
-  return *this;
+  return set(&SourceAnnotation::fieldsAsChildren, enabled);
 }
 
 AnnotationBuilder& AnnotationBuilder::sequenceSemantic(SequenceSemantic semantic) {
-  if (auto* found = annotation()) {
-    found->sequenceSemantic = semantic;
-  }
-  return *this;
+  return set(&SourceAnnotation::sequenceSemantic, semantic);
 }
 
 AnnotationBuilder& AnnotationBuilder::playbackStatus(CommandPlaybackStatus status) {
-  if (auto* found = annotation()) {
-    found->playbackStatus = status;
-  }
-  return *this;
+  return set(&SourceAnnotation::playbackStatus, status);
 }
 
 AnnotationBuilder& AnnotationBuilder::field(std::string_view name, SourceRange range, SourceValue value,
