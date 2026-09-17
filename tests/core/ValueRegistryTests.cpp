@@ -284,14 +284,17 @@ void scanResultBuilderInfersSequenceRangesUnlessExplicit() {
   }
 }
 
-void scanResultBuilderRejectsIncompleteSequenceDrafts() {
+void scanResultBuilderChecksAllDraftsBeforeConsumingValues() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "builder-uncommitted.probe"}, {0xaa});
   ScanIdAllocator ids;
   ScanInput input{.source = sources.source(source), .reader = sources.reader(source), .ids = ids};
 
   ScanResultBuilder out(input, "ProbeBuilder");
-  const auto sequence = out.sequence("Incomplete Sequence");
+  auto bank = out.soundBank("Complete Bank");
+  bank.instruments().append(Instrument{.name = "Retained Instrument"});
+  auto sequence = out.sequence("Incomplete Sequence");
+  auto misc = out.misc("Incomplete Misc", input.reader.range(0, 1));
   out.collection("Broken").sequence(sequence);
 
   bool threw = false;
@@ -301,6 +304,24 @@ void scanResultBuilderRejectsIncompleteSequenceDrafts() {
     threw = true;
   }
   expect(threw, "scan result builder should reject a sequence draft that was never given a program");
+
+  sequence.program(SequenceProgram{.tracks = {TrackProgram{.name = "Retained Track"}}});
+  threw = false;
+  try {
+    static_cast<void>(out.finish());
+  } catch (const std::logic_error&) {
+    threw = true;
+  }
+  expect(threw, "scan result builder should reject a misc draft that was never given a payload");
+
+  misc.payload({});
+  const auto result = out.finish();
+  expect(result.assets.size() == 3 && std::get<SoundBankAsset>(result.assets[0]).instruments.size() == 1 &&
+             std::get<SoundBankAsset>(result.assets[0]).instruments[0].name == "Retained Instrument" &&
+             std::get<SequenceProgramAsset>(result.assets[1]).program.tracks.size() == 1 &&
+             std::get<SequenceProgramAsset>(result.assets[1]).program.tracks[0].name == "Retained Track" &&
+             std::get<MiscAsset>(result.assets[2]).payload.empty(),
+         "failed finalization must leave every draft intact for repair, including an explicitly empty payload");
 }
 
 void scanResultBuilderPublishesEmptySynthDrafts() {
@@ -359,7 +380,7 @@ void runValueRegistryTests() {
   scanResultBuilderCoversCommonScannerPlumbing();
   scanResultBuilderNamesSourceCollections();
   scanResultBuilderInfersSequenceRangesUnlessExplicit();
-  scanResultBuilderRejectsIncompleteSequenceDrafts();
+  scanResultBuilderChecksAllDraftsBeforeConsumingValues();
   scanResultBuilderPublishesEmptySynthDrafts();
   scanResultBuilderCursorReportsMalformedFields();
   sessionStoresTheOwningFormatsPreferredSampleFilter();
