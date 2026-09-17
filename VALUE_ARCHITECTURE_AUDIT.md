@@ -3012,6 +3012,19 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   samples' default pitch and padded loop offsets.
 - Validation: warning-free Debug build; all 21 CTest targets pass (11.05 s).
 
+## Define envelope fields once in the shared model
+
+- Moved the export layer's field-to-member table beside `EnvelopeFields`.
+  Compiler emission, explicit-envelope detection, and export variant updates
+  now use that same table. Removed the compiler's six-way assignment branch and
+  the export-only field record/alias; format-facing commands remain unchanged.
+- Removed 15 production lines. Added VM coverage for all six individual stage
+  updates, exact field masks, and future/active voice scope. Existing variant
+  and synth-validation tests cover clearing, restoration, and invalid values.
+- Validation: full Debug rebuild followed by a warning-free incremental build
+  after changing table iteration to references; all 21 CTest targets pass
+  (10.79 s).
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual

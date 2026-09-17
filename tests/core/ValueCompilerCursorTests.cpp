@@ -128,6 +128,14 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
       domain.assign(domain.size(), 'x');
       return event.emitLevel(0.5).emitLevel(0.75, ValueQuantization{.levels = 64});
     }
+    case 0x2e:
+      return cursor.command("Envelope Stages", SequenceSemantic::State)
+          .emitEnvelopeField<EnvelopeFields::Attack>(1.0)
+          .emitEnvelopeField<EnvelopeFields::Hold>(2.0)
+          .emitEnvelopeField<EnvelopeFields::Decay>(3.0)
+          .emitEnvelopeField<EnvelopeFields::SecondDecay>(4.0)
+          .emitEnvelopeField<EnvelopeFields::Release>(5.0)
+          .emitEnvelopeField<EnvelopeFields::Sustain>(0.5, VoiceEnvelopeScope::ActiveVoices);
     case 0x40:
     case 0x41:
     case 0x42:
@@ -323,6 +331,28 @@ void compilerCursorOwnsOutputValuesAfterDecoding() {
   expect(continuous.linearGain == 0.5 && continuous.sourceQuantization.levels == 0 && quantized.linearGain == 0.75 &&
              quantized.sourceQuantization.levels == 64,
          "compiled level output must distinguish unspecified quantization from a declared native scale");
+}
+
+void compilerCursorEmitsIndividualEnvelopeStages() {
+  const std::vector<u8> bytes{0x2e, 0xff};
+  const SequenceProgram program{
+      .runtime = compilerProbeRuntime(),
+      .tracks = {decodeProbeTrack(ByteReader(SourceId{7}, bytes), static_cast<u32>(bytes.size()))},
+  };
+  const auto performance = SequenceVm().render(program);
+  const auto& events = performance.tracks[0].events;
+  const std::array expected{
+      Envelope{.attackSeconds = 1.0}, Envelope{.holdSeconds = 2.0}, Envelope{.decaySeconds = 3.0},
+      Envelope{.secondDecaySeconds = 4.0}, Envelope{.releaseSeconds = 5.0}, Envelope{.sustainAmplitude = 0.5},
+  };
+  expect(performance.diagnostics.empty() && events.size() == expected.size(),
+         "compiled envelope operations must emit one update per selected stage");
+  for (size_t i = 0; i < expected.size(); ++i) {
+    const auto& event = std::get<EnvelopePerformanceEvent>(events[i]);
+    expect(event.update.values == expected[i] && event.update.fields == static_cast<EnvelopeFields>(1 << i) &&
+               event.scope == (i == 5 ? VoiceEnvelopeScope::ActiveVoices : VoiceEnvelopeScope::FutureAttacks),
+           "each compiled update must affect exactly its selected envelope stage and voice scope");
+  }
 }
 
 void compilerCursorPreservesEncodedAndResolvedSourceFields() {
@@ -708,6 +738,7 @@ void trackDecodeSourceHierarchyDistinguishesTrackedAndTracklessFormats() {
 void runValueCompilerCursorTests() {
   compilerCursorCompilesAndExecutesTypedCommands();
   compilerCursorOwnsOutputValuesAfterDecoding();
+  compilerCursorEmitsIndividualEnvelopeStages();
   compilerCursorPreservesEncodedAndResolvedSourceFields();
   compilerCursorCompilesControlFlow();
   compilerCursorCompilesRepeatsAndConditionalFields();
