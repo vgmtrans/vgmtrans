@@ -3039,6 +3039,19 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
 - Removed three production lines. Validation: full Debug rebuild; all 21 CTest
   targets pass (10.79 s after the final incremental build).
 
+## Assemble RIFF files in the final byte buffer
+
+- The shared RIFF writer now reserves its size field, appends children directly
+  into the returned buffer, and fills the size afterward. Removed the complete
+  intermediate payload buffer and its final copy for SF2, DLS, and WAV output.
+  Child layout, root/child padding rules, and overflow errors remain unchanged.
+- This adds two production lines but removes a full-file staging allocation and
+  copy, with no new API or helper. Expanded the RIFF regression with a 65,537-byte
+  child to check high size bytes and odd-payload alignment, alongside existing
+  nested-chunk and exporter checks.
+- Validation: warning-free Debug incremental build; all 21 CTest targets pass
+  (10.79 s).
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual
