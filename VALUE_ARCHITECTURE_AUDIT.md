@@ -2795,6 +2795,22 @@ preserved. The full Debug build and all 21 CTest targets pass without compiler
 warnings, including playback failure cases, used-instrument filtering, and
 collection export policy coverage.
 
+## Project synth sample relationships at finalization
+
+Sample links now come from the same `annotateSynthValue` projection as the
+finished instrument and region properties. The builder no longer maintains
+those links incrementally when regions are appended or source annotations are
+added. This removes two member helpers and three synchronization sites while
+preserving the completed source graph, link deduplication, and annotation
+ownership. Region parenting still records the explicitly established source
+hierarchy at annotation creation time.
+
+This removes 13 production lines. Production callers finalize their synth
+builders before publishing the source map. The existing mixed call-order test
+now also checks that every instrument annotation gets the complete sample-link
+set and that a region annotated before its instrument retains its sample link.
+The full Debug build and all 21 CTest targets pass without compiler warnings.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual
