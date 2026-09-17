@@ -7,6 +7,7 @@
 #include "value/formats/SoftCreatSnes/SoftCreatSnes.h"
 
 #include "../MidiTestSupport.h"
+#include "ValueFormatTestSupport.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
@@ -100,6 +101,7 @@ PerformanceSequence render(const std::vector<u8>& commands, Version version = Ve
   SequenceProgram program = sequenceConfig().makeProgram();
   program.runtime = sequenceRuntime(RetainedSource::copyOf(reader), layout);
   program.tracks.push_back(decodeSourceTrack(reader, layout, 0, start));
+  bytes = std::vector<u8>{};
   return SequenceVm(LoopPolicy::PlayOnce).render(program);
 }
 
@@ -565,6 +567,9 @@ void legatoSlidesClearVibratoDuringEachNotesDelay() {
 }  // namespace
 
 void runSoftCreatSnesModuleTests() {
+  auto retainedFixture = modernScannerFixture();
+  writeBytes(retainedFixture, 0x3000, {0x3c, 4, 0x80});
+  expectScanSharesPlaybackSource(module(), std::move(retainedFixture));
   modernLayoutFindsRelocatedTables();
   v5LayoutUsesOverlappingPointerColumns();
   v7LayoutAlignsPrefixedDspValues();

@@ -13,7 +13,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <memory>
 #include <stdexcept>
 #include <string>
 #include <variant>
@@ -326,37 +325,10 @@ void originalAdsrSiblingResetAndEnergyDriftAreAudited() {
          "Energy Breaker's FF 05 drift should accumulate on the fixed 64 Hz driver clock");
 }
 
-void scannedRuntimeOwnsDriverBytes() {
-  auto bytes = std::make_shared<const std::vector<u8>>(scannerFixture());
-  const std::weak_ptr<const std::vector<u8>> lifetime = bytes;
-  ScanIdAllocator ids;
-  ScanResult result = module().scan(ScanInput{
-      .source = SourceFile{.name = "retained.aram"},
-      .reader = ByteReader{SourceId{401}, *bytes},
-      .ids = ids,
-      .retained = RetainedSource{SourceId{401}, bytes},
-  });
-  SequenceProgram program;
-  for (const Asset& asset : result.assets) {
-    if (const auto* sequence = std::get_if<SequenceProgramAsset>(&asset)) {
-      program = sequence->program;
-    }
-  }
-  result = {};
-  bytes.reset();
-  expect(!lifetime.expired(), "the copied runtime should retain its playback tables after the scan is released");
-  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
-  expect(performance.diagnostics.empty() && !performance.tracks.empty() &&
-             !events<NotePerformanceEvent>(performance.tracks.front()).empty(),
-         "the retained runtime should render notes after its scan input is gone");
-  program = {};
-  expect(lifetime.expired(), "releasing the last program should release its source bytes");
-}
-
 }  // namespace
 
 void runNeverlandSnesModuleTests() {
-  scannedRuntimeOwnsDriverBytes();
+  expectScanSharesPlaybackSource(module(), scannerFixture());
   relocatedLayoutUsesDriverCodeAndHeaderContracts();
   playlistsCallSectionsAndRespectDialectTranspose();
   playlistTransposeDoesNotLeakIntoLaterSections();

@@ -6,6 +6,8 @@
 
 #include "value/formats/PrismSnes/PrismSnes.h"
 
+#include "ValueFormatTestSupport.h"
+
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 
@@ -191,7 +193,7 @@ void decodeStateFollowsCallsAndRepeats() {
   fixture.commands({0xe1, 0x00, 0x54, 0x3c, 1, 0xdc, 0xf1, 0x3e, 4, 0xff})
       .bytes(0x5400, {0xdd, 8, 0xf2, 0xe0});
   const ByteReader reader(SourceId{310}, fixture.data());
-  const auto program = decodeSequence(reader, *findLayout(reader), AssetId{310});
+  const auto program = decodeSequence(RetainedSource::copyOf(reader), *findLayout(reader), AssetId{310});
   const auto performance = SequenceVm().render(program);
   const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 2 && notes[0]->header.tick == 0 &&
@@ -200,7 +202,7 @@ void decodeStateFollowsCallsAndRepeats() {
 
   for (const u8 count : {0, 1}) {
     fixture.commands({0xdd, 2, 0x3c, 0xde, count, 0x02, 0x52, 0xff});
-    const auto repeated = decodeSequence(reader, *findLayout(reader), AssetId{310});
+    const auto repeated = decodeSequence(RetainedSource::copyOf(reader), *findLayout(reader), AssetId{310});
     expect(repeated.tracks.front().commandIndex(Address{0x5207}).has_value(),
            "repeat discovery must retain the encoded continuation, including after an infinite repeat");
     const auto rendered = SequenceVm().render(repeated);
@@ -236,7 +238,7 @@ void dynamicDriverFeaturesRenderFromCapturedTables() {
                     0xf7, 0x00, 0x73, 0xfa, 0xf3, 0x04, 0x3c, 0x08, 0xe9, 0x3c, 0x40, 0x08, 0xff});
   const ByteReader reader(SourceId{305}, fixture.data());
   const Layout layout = *findLayout(reader);
-  SequenceProgram parsed = decodeSequence(reader, layout, AssetId{305});
+  SequenceProgram parsed = decodeSequence(RetainedSource::copyOf(reader), layout, AssetId{305});
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed);
   const PerformanceTrack& track = performance.tracks.front();
 
@@ -275,7 +277,7 @@ void gainTablesControlNoteAmplitude() {
   fixture.commands({0xc4, 0x85, 0xfe, 0x02, 0xfd, 0x00, 0x72, 0xec, 0xc0, 0x3c, 0x20, 0xff});
   const ByteReader reader(SourceId{307}, fixture.data());
   const Layout layout = *findLayout(reader);
-  SequenceProgram parsed = decodeSequence(reader, layout, AssetId{307});
+  SequenceProgram parsed = decodeSequence(RetainedSource::copyOf(reader), layout, AssetId{307});
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed);
   const PerformanceTrack& track = performance.tracks.front();
   const auto expression = events<ExpressionPerformanceEvent>(track);
@@ -306,7 +308,7 @@ void instrumentChangesWaitForTheNextAttack() {
       .commands({0xfe, 0x02, 0xfd, 0x00, 0x72, 0xef, 0x20, 0x72, 0x3c, 0x08, 0xfe, 0x03, 0xee, 0x08, 0x3e, 0x08, 0xff});
   const ByteReader reader(SourceId{308}, fixture.data());
   const Layout layout = *findLayout(reader);
-  SequenceProgram parsed = decodeSequence(reader, layout, AssetId{308});
+  SequenceProgram parsed = decodeSequence(RetainedSource::copyOf(reader), layout, AssetId{308});
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed);
   const PerformanceTrack& track = performance.tracks.front();
   const auto instruments = events<InstrumentPerformanceEvent>(track);
@@ -335,7 +337,7 @@ void leadingTiesAreSilentDelays() {
   DriverFixture fixture(Version::Modern);
   fixture.commands({0xef, 0x20, 0x72, 0xee, 0x02, 0x3c, 0x08, 0xff});
   const ByteReader reader(SourceId{309}, fixture.data());
-  const auto parsed = decodeSequence(reader, *findLayout(reader), AssetId{309});
+  const auto parsed = decodeSequence(RetainedSource::copyOf(reader), *findLayout(reader), AssetId{309});
   const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed);
   const PerformanceTrack& track = performance.tracks.front();
   const auto notes = events<NotePerformanceEvent>(track);
@@ -388,7 +390,7 @@ void subtrackTriggersRunTheirChildScore() {
       .bytes(0x7500, {0xfe, 0x02, 0xec, 0xc0, 0xeb, 0x0a, 0x3c, 0x04, 0xff});
   const ByteReader reader(SourceId{306}, fixture.data());
   const Layout layout = *findLayout(reader);
-  SequenceProgram parsed = decodeSequence(reader, layout, AssetId{306});
+  SequenceProgram parsed = decodeSequence(RetainedSource::copyOf(reader), layout, AssetId{306});
   expect(parsed.tracks.front().commands.size() == 4 && parsed.tracks.front().commands[2].range.size == 2,
          "ED must reset manual duration before decoding its trigger notes");
 
@@ -407,6 +409,7 @@ void subtrackTriggersRunTheirChildScore() {
 }  // namespace
 
 void runPrismSnesModuleTests() {
+  expectScanSharesPlaybackSource(module(), DriverFixture(Version::Modern).commands({0x3c, 4, 0xff}).data());
   layoutProfilesAndLiveSongAreAudited();
   profileSpecificOperandLengthsRemainAligned();
   decodeStateFollowsCallsAndRepeats();
