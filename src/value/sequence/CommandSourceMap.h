@@ -22,6 +22,7 @@
 namespace vgmtrans::core {
 
 struct SequenceProgramConfig;
+struct TrackDecodeScope;
 
 // One track's annotation and command-projection lifecycle. Most formats use
 // TrackDecodeScope::decode; exceptional walkers can begin a session
@@ -36,9 +37,7 @@ public:
 private:
   friend struct TrackDecodeScope;
 
-  TrackDecodeSession(ByteReader reader, u32 trackIndex, u32 startOffset, std::optional<AssetId> sequenceAsset,
-                     std::optional<SourceAnnotationId> parentAnnotation, SourceMapBuilder* sourceMap,
-                     bool sourceHasTracks);
+  TrackDecodeSession(const TrackDecodeScope& scope, u32 trackIndex, u32 startOffset);
 
   ByteReader reader_;
   u32 startOffset_ = 0;
@@ -65,8 +64,7 @@ struct TrackDecodeScope {
   SourceMapBuilder* sourceMap = nullptr;
 
   [[nodiscard]] TrackDecodeSession begin(u32 trackIndex, u32 startOffset) const {
-    return TrackDecodeSession(reader, trackIndex, startOffset, sequenceAsset, parentAnnotation, sourceMap,
-                              sourceHasTracks);
+    return TrackDecodeSession(*this, trackIndex, startOffset);
   }
 
   // Decode every block reachable from the track start within bytecodeEnd.

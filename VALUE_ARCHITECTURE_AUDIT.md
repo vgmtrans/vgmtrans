@@ -2976,6 +2976,17 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
 - Removed 22 production lines. Validation: warning-free Debug rebuild of all
   affected formats and applications; all 21 CTest targets pass.
 
+## Construct track source hierarchy from its decode scope
+
+- `TrackDecodeSession` now accepts its existing `TrackDecodeScope` directly.
+  Removed the seven-argument unpacking path and `createTrackAnnotation` helper;
+  source-track creation and trackless ownership are explicit constructor paths.
+- Removed ten production lines. Expanded the hierarchy regression to cover
+  tracked/trackless sources with and without a parent, plus annotation-free
+  decoding for all four cases. Command ownership, root ownership, and optional
+  parent links remain unchanged.
+- Validation: warning-free Debug build; all 21 CTest targets pass (10.63 s).
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual
