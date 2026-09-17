@@ -2773,6 +2773,21 @@ regression test now also checks that retained snapshots keep removed assets and
 their original links, and that surviving assets keep their addresses. The full
 Debug build and all 21 CTest targets pass without compiler warnings.
 
+## Keep instrument-variant state together by lane
+
+Instrument variant materialization now keeps envelope overrides, pan, and the
+sounding voice's endpoint in one lane-state map. This removes three independent
+lookup/default paths and the helper that switched between lane-specific and
+track-wide voice queries. Instrument selection resets only each lane's envelope;
+pan and sounding voices continue. The global stereo query explicitly checks all
+lanes, while lane events inspect their own state directly.
+
+The production change removes four lines, but its main benefit is replacing
+three partially overlapping state tables with one. A new multi-lane regression
+checks independent pan/envelopes, reset behavior, and active-voice diagnostics
+after an instrument change. The full Debug build and all 21 CTest targets pass
+without compiler warnings.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual

@@ -653,6 +653,59 @@ void signedStereoMaterializationUsesAttackTimeVariants() {
          "shared synth preparation should create one saturated phase-inverted PCM copy");
 }
 
+void variantLaneStateSurvivesInstrumentChanges() {
+  std::array banks{SoundBankAsset{.instruments = {testInstrument(0, Envelope{.attackSeconds = 1.0})}}};
+  std::vector<PerformanceEvent> events{
+      StereoBalancePerformanceEvent{.header = eventHeader(0, 0), .leftGain = -1.0},
+  };
+  for (u32 lane = 0; lane < 2; ++lane) {
+    events.emplace_back(ChannelPanPerformanceEvent{
+        .header = eventHeader(0, events.size()), .position = double(lane), .lane = PerformanceLaneId{lane}});
+    events.emplace_back(EnvelopePerformanceEvent{
+        .header = eventHeader(0, events.size()),
+        .update = EnvelopeUpdate::set(Envelope{.attackSeconds = 0.25 + 0.5 * lane}, EnvelopeFields::Attack),
+        .lane = PerformanceLaneId{lane},
+    });
+    events.emplace_back(NotePerformanceEvent{.header = eventHeader(0, events.size()),
+                                             .key = 60,
+                                             .durationTicks = lane == 0 ? 20u : 2u,
+                                             .note = PerformanceNoteId{lane + 1},
+                                             .lane = PerformanceLaneId{lane}});
+  }
+  events.emplace_back(InstrumentPerformanceEvent{.header = eventHeader(4, events.size())});
+  events.emplace_back(StereoBalancePerformanceEvent{.header = eventHeader(4, events.size())});
+  events.emplace_back(ChannelPanPerformanceEvent{
+      .header = eventHeader(5, events.size()), .position = 0.5, .lane = PerformanceLaneId{1}});
+  events.emplace_back(EnvelopePerformanceEvent{
+      .header = eventHeader(5, events.size()),
+      .update = EnvelopeUpdate::set(Envelope{.attackSeconds = 0.1}, EnvelopeFields::Attack),
+      .scope = VoiceEnvelopeScope::ActiveVoices,
+  });
+  for (u32 lane = 0; lane < 2; ++lane) {
+    events.emplace_back(NotePerformanceEvent{.header = eventHeader(20, events.size()),
+                                             .key = 60,
+                                             .durationTicks = 4,
+                                             .note = PerformanceNoteId{lane + 3},
+                                             .lane = PerformanceLaneId{lane}});
+  }
+
+  const auto result = materializeInstrumentVariants(sequenceWithEvents(std::move(events)), banks,
+                                                     {.dynamicEnvelopes = true, .signedStereo = true});
+  for (u32 lane = 0; lane < 2; ++lane) {
+    const auto& before = banks[0].instruments[selectedInstrumentForNote(result, PerformanceNoteId{lane + 1}, banks[0])];
+    const auto& after = banks[0].instruments[selectedInstrumentForNote(result, PerformanceNoteId{lane + 3}, banks[0])];
+    expect(before.regions.size() == 1 && before.regions[0].pan == double(lane) &&
+               before.regions[0].envelope.attackSeconds == 0.25 + 0.5 * lane,
+           "simultaneous lanes must retain independent pan and envelope overrides");
+    expect(after.regions.size() == lane + 1 && after.regions[0].pan == 0.0 &&
+               after.regions[0].envelope.attackSeconds == 1.0,
+           "instrument changes must reset every envelope override while retaining lane pan");
+  }
+  expect(result.diagnostics.size() == 2 && result.diagnostics[0].code == "signed-stereo-active-voice" &&
+             result.diagnostics[1].code == "dynamic-envelope-active-voice",
+         "instrument changes must retain sounding voices, and inactive lanes must not report active-voice warnings");
+}
+
 void signedStereoMaterializationLeavesOrdinaryTracksAlone() {
   std::vector<SoundBankAsset> sets{SoundBankAsset{
       .instruments = {testInstrument(0, {})},
@@ -698,5 +751,6 @@ void runValueInstrumentVariantTests() {
     dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(changesInstrument);
   }
   signedStereoMaterializationUsesAttackTimeVariants();
+  variantLaneStateSurvivesInstrumentChanges();
   signedStereoMaterializationLeavesOrdinaryTracksAlone();
 }

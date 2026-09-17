@@ -28,6 +28,12 @@ struct EnvelopeOverride {
   EnvelopeFields fields = EnvelopeFields::None;
 };
 
+struct LaneState {
+  EnvelopeOverride envelope;
+  double pan = 0.5;
+  u64 voiceEnd = 0;
+};
+
 struct InstrumentRef {
   u32 set = invalidIdValue;
   const Instrument* instrument = nullptr;
@@ -237,15 +243,6 @@ struct VariantRecord {
   });
 }
 
-[[nodiscard]] bool hasActiveVoice(const std::unordered_map<PerformanceLaneId, u64>& voiceEnds, u64 tick,
-                                  std::optional<PerformanceLaneId> lane = std::nullopt) {
-  if (lane) {
-    const auto found = voiceEnds.find(*lane);
-    return found != voiceEnds.end() && found->second > tick;
-  }
-  return std::ranges::any_of(voiceEnds, [tick](const auto& voice) { return voice.second > tick; });
-}
-
 void appendStereoLayers(std::vector<Region>& layers, const Region& source, double leftGain, double rightGain,
                         double pan) {
   constexpr double piOverTwo = 1.57079632679489661923;
@@ -289,17 +286,13 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
     // variants so ordinary MIDI pan does not also affect the layered output.
     const bool materializeStereo = options.signedStereo && requiresSignedStereoVariants(track);
     auto selectedInstrument = resolveSelection({}, soundBanks);
-    std::unordered_map<PerformanceLaneId, EnvelopeOverride> envelopeStates;
-    std::unordered_map<PerformanceLaneId, double> pans;
-    std::unordered_map<PerformanceLaneId, u64> voiceEnds;
+    std::unordered_map<PerformanceLaneId, LaneState> lanes;
     double leftGain = 1.0;
     double rightGain = 1.0;
     bool warnedMissingInstrument = false;
     bool previousAttackUsedVariant = false;
-    const auto warnActiveStereoChange = [&](bool changed, const PerformanceEventHeader& header,
-                                            std::optional<PerformanceLaneId> lane = std::nullopt) {
-      if (changed && hasActiveVoice(voiceEnds, header.tick, lane) &&
-          activeStereoWarnings.insert(warningSourceKey(header)).second) {
+    const auto warnActiveStereoChange = [&](bool changed, bool active, const PerformanceEventHeader& header) {
+      if (changed && active && activeStereoWarnings.insert(warningSourceKey(header)).second) {
         result.diagnostics.push_back(variantWarning(
             "signed-stereo-active-voice",
             "A phase or pan change occurred during a sounding note; stereo instrument variants apply it to "
@@ -313,7 +306,9 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
         selectedInstrument = resolveSelection(selection->instrument, soundBanks);
         previousAttackUsedVariant = false;
         if (selection->envelopeMode == InstrumentEnvelopeMode::UseInstrumentEnvelope) {
-          envelopeStates.clear();
+          for (auto& [_, lane] : lanes) {
+            lane.envelope = {};
+          }
         }
         continue;
       }
@@ -328,7 +323,8 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
 
         const bool affectsActive = envelope->scope != VoiceEnvelopeScope::FutureAttacks;
         const bool affectsFuture = envelope->scope != VoiceEnvelopeScope::ActiveVoices;
-        if (affectsActive && hasActiveVoice(voiceEnds, envelope->header.tick, envelope->lane) &&
+        auto& lane = lanes[envelope->lane];
+        if (affectsActive && lane.voiceEnd > envelope->header.tick &&
             activeEnvelopeWarnings.insert(warningSourceKey(envelope->header)).second) {
           result.diagnostics.push_back(variantWarning(
               "dynamic-envelope-active-voice",
@@ -337,24 +333,27 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
               envelope->header));
         }
         if (affectsFuture) {
-          applyEnvelopeUpdate(envelopeStates[envelope->lane], envelope->update);
+          applyEnvelopeUpdate(lane.envelope, envelope->update);
         }
         continue;
       }
 
       if (const auto* balance = std::get_if<StereoBalancePerformanceEvent>(&event);
           balance != nullptr && materializeStereo) {
-        warnActiveStereoChange(balance->leftGain != leftGain || balance->rightGain != rightGain, balance->header);
+        const bool active = std::ranges::any_of(lanes, [&](const auto& lane) {
+          return lane.second.voiceEnd > balance->header.tick;
+        });
+        warnActiveStereoChange(balance->leftGain != leftGain || balance->rightGain != rightGain, active, balance->header);
         leftGain = balance->leftGain;
         rightGain = balance->rightGain;
         continue;
       }
 
       if (const auto* pan = std::get_if<ChannelPanPerformanceEvent>(&event); pan != nullptr && materializeStereo) {
-        auto& position = pans.try_emplace(pan->lane, 0.5).first->second;
+        auto& lane = lanes[pan->lane];
         const double next = std::clamp(pan->position, 0.0, 1.0);
-        warnActiveStereoChange(next != position, pan->header, pan->lane);
-        position = next;
+        warnActiveStereoChange(next != lane.pan, lane.voiceEnd > pan->header.tick, pan->header);
+        lane.pan = next;
         continue;
       }
 
@@ -364,16 +363,14 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
       }
 
       const u64 noteEnd = addTicks(note->header.tick, note->durationTicks);
-      auto& voiceEnd = voiceEnds[note->lane];
+      auto& lane = lanes[note->lane];
       const bool continuesVoice = note->extendsPrevious || continuedNotes.contains(note->note);
-      voiceEnd = continuesVoice ? std::max(voiceEnd, noteEnd) : noteEnd;
+      lane.voiceEnd = continuesVoice ? std::max(lane.voiceEnd, noteEnd) : noteEnd;
       if (continuesVoice) {
         continue;
       }
 
-      const auto envelope = envelopeStates.find(note->lane);
-      const bool hasEnvelope = options.dynamicEnvelopes && envelope != envelopeStates.end() &&
-                               envelope->second.fields != EnvelopeFields::None;
+      const bool hasEnvelope = options.dynamicEnvelopes && lane.envelope.fields != EnvelopeFields::None;
       const bool envelopeOnly = hasEnvelope && !materializeStereo;
       const auto baseRef =
           note->instrumentAddress ? resolveSelection(*note->instrumentAddress, soundBanks) : selectedInstrument;
@@ -408,13 +405,12 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
         } else {
           std::vector<Region> regions;
           regions.reserve(base.regions.size() * (materializeStereo ? 2 : 1));
-          const double pan = materializeStereo ? pans.try_emplace(note->lane, 0.5).first->second : 0.5;
           for (auto region : base.regions) {
             if (hasEnvelope) {
-              region.envelope = applyEnvelopeOverride(region.envelope, envelope->second);
+              region.envelope = applyEnvelopeOverride(region.envelope, lane.envelope);
             }
             if (materializeStereo) {
-              appendStereoLayers(regions, region, leftGain, rightGain, pan);
+              appendStereoLayers(regions, region, leftGain, rightGain, lane.pan);
             } else {
               regions.push_back(std::move(region));
             }
