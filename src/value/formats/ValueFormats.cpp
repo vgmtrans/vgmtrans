@@ -6,6 +6,7 @@
 
 #include "value/formats/ValueFormats.h"
 
+#include "value/extractors/CueExtractor.h"
 #include "value/extractors/MameRomSetExtractor.h"
 #include "value/extractors/PsfExtractor.h"
 #include "value/extractors/SnesRsnExtractor.h"
@@ -94,6 +95,7 @@ void registerValueFormats(core::Session& session) {
 }
 
 void registerValueFormats(core::Session& session, const ValueFormatOptions& options) {
+  session.registerExtractor(cue::cueExtractor());
   const auto mameDatabasePath = options.mameRomDatabase ? options.mameRomDatabase : defaultMameRomDatabasePath();
   if (mameDatabasePath) {
     try {

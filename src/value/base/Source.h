@@ -27,6 +27,7 @@ using SharedSourceBytes = std::shared_ptr<const std::vector<u8>>;
 namespace source_formats {
 inline constexpr char kCps1[] = "CPS1";
 inline constexpr char kCps2[] = "CPS2";
+inline constexpr char kCue[] = "Cue";
 inline constexpr char kGbaRom[] = "GbaRom";
 inline constexpr char kKonamiArcade[] = "KonamiArcade";
 inline constexpr char kKonamiTMNT2[] = "KonamiTMNT2";

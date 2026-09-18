@@ -69,6 +69,11 @@ target_compile_features(vgmtrans-value-core-tests PRIVATE cxx_std_20)
 
 add_test(NAME vgmtrans-value-core-tests COMMAND vgmtrans-value-core-tests)
 
+add_executable(vgmtrans-cue-tests core/ValueCueTests.cpp)
+target_link_libraries(vgmtrans-cue-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
+target_compile_features(vgmtrans-cue-tests PRIVATE cxx_std_20)
+add_test(NAME vgmtrans-cue-tests COMMAND vgmtrans-cue-tests)
+
 add_executable(vgmtrans-nin-snes-tests
   formats/NinSnesModuleTests.cpp
   formats/NinSnesTestMain.cpp)
