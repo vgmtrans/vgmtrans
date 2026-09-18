@@ -666,7 +666,7 @@ void runSonyPs1CollectionBindingTests() {
   }
 
   {
-    Session session = sonyPs1CollectionSession({"BANK.VH"}, {"BANK.VB", "BANK.VB"});
+    Session session = sonyPs1CollectionSession({"BANK.VH"}, {"BANK.VB", "BANK.raw"});
     const SessionSnapshot snapshot = session.snapshot();
     const Collection& collection = sonyPs1Collection(snapshot, 1, 0);
     expect(collection.issueImpact() == CollectionIssueImpact::Ambiguous && collection.members.samplePools.empty(),

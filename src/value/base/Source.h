@@ -16,6 +16,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -70,7 +71,7 @@ struct SourceFile {
   std::string name;
   std::optional<std::string> title;
   // Host filesystem location. Derived sources retain their outer container's
-  // path; a future container member path should be modeled separately.
+  // path. Archive members have a separate path within their immediate parent.
   std::filesystem::path path;
   u64 size = 0;
   // Derived sources are real session entries, such as archive members, SPC RAM,
@@ -85,6 +86,8 @@ struct SourceFile {
   // loader pointers or process-global side channels.
   std::map<std::string, std::string, std::less<>> attributes;
   std::vector<SourceSegment> segments;
+  // Set only for actual container members, not transformed data such as SPC RAM.
+  std::optional<std::filesystem::path> memberPath;
 
   [[nodiscard]] bool derived() const noexcept { return kind == SourceKind::Derived; }
   [[nodiscard]] bool active() const noexcept { return status == SourceStatus::Active; }
@@ -159,6 +162,9 @@ public:
   SourceId add(SourceFile file, std::vector<u8> bytes);
   SourceId addDerived(SourceFile file, std::vector<u8> bytes, SourceId defaultParent);
   [[nodiscard]] std::vector<SourceId> removeFamily(SourceId id);
+  // Finds an active file by canonical host path, or by member path within parent.
+  [[nodiscard]] std::optional<SourceId> findFile(const std::filesystem::path& path,
+                                               std::optional<SourceId> parent = {}) const;
 
   [[nodiscard]] bool contains(SourceId id) const noexcept;
   [[nodiscard]] bool hasSlot(SourceId id) const noexcept;
@@ -175,11 +181,14 @@ private:
   struct Entry {
     SourceFile file;
     SharedSourceBytes bytes;
+    std::unordered_map<std::filesystem::path, SourceId> members;
   };
 
   [[nodiscard]] const Entry& entry(SourceId id) const;
 
   std::vector<Entry> entries_;
+  // Indexes can retain removed IDs; findFile checks the source's active state.
+  std::unordered_map<std::filesystem::path, SourceId> fileIds_;
 };
 
 }  // namespace vgmtrans::core

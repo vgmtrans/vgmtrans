@@ -108,23 +108,45 @@ SourceId Session::addSource(SourceFile file, std::vector<u8> bytes) {
   if (file.knownFormat && file.knownFormat->empty()) {
     throw std::invalid_argument("Cannot add a source with an empty known format");
   }
+  if (const auto existing = sources_.findFile(file.path)) {
+    return *existing;
+  }
   sealFormats();
   invalidateSnapshot();
   file.kind = SourceKind::UserLoaded;
   return sources_.add(std::move(file), std::move(bytes));
 }
 
-SourceId Session::addSourceFromPath(std::filesystem::path path) {
+SourceFile Session::resolveSource(const std::filesystem::path& path, std::optional<SourceId> parent) const {
   SourceFile source{.path = path};
   for (const auto& extractor : formats_.extractors()) {
     if (extractor.resolvePath) {
-      if (auto resolved = extractor.resolvePath(path)) {
+      if (auto resolved = extractor.resolvePath(path, [&](const auto& candidate) {
+            return parent ? sources_.findFile(candidate, parent).has_value()
+                          : std::filesystem::is_regular_file(candidate);
+          })) {
         source = std::move(*resolved);
         break;
       }
     }
   }
+  if (const auto id = sources_.findFile(source.path, parent)) {
+    auto existing = sources_.source(*id);
+    existing.knownFormat = source.knownFormat ? source.knownFormat : existing.knownFormat;
+    return existing;
+  }
+  if (parent) {
+    throw std::runtime_error("Resolved archive member is missing: " + source.path.string());
+  }
+  source.id = {};
+  return source;
+}
 
+SourceId Session::addSourceFromPath(std::filesystem::path path) {
+  auto source = resolveSource(path);
+  if (source.id.valid()) {
+    return source.id;
+  }
   std::ifstream file(source.path, std::ios::binary);
   if (!file) {
     throw std::runtime_error("failed to open source file: " + source.path.string());
@@ -345,7 +367,19 @@ void Session::scanSourceAndDerived(SourceId id) {
   std::vector<SourceId> queue{id};
 
   for (size_t index = 0; index < queue.size(); ++index) {
-    scanOneSource(queue[index], queue);
+    const auto current = queue[index];
+    if (!scannedSources_.insert(current.value).second) {
+      continue;
+    }
+    try {
+      const auto& source = sources_.source(current);
+      const auto resolved = source.memberPath ? resolveSource(*source.memberPath, source.parent) : source;
+      if (resolved.id == current || scannedSources_.insert(resolved.id.value).second) {
+        scanOneSource(resolved, queue);
+      }
+    } catch (const std::exception& ex) {
+      state_->addError(ex.what(), sources_.reader(current).range(0, sources_.source(current).size));
+    }
   }
 
   // Diagnostic-only scans remain open so their failures retain valid source
@@ -359,12 +393,8 @@ void Session::scanSourceAndDerived(SourceId id) {
 
 // Unknown sources use normal discovery. A known format restricts both stages to
 // processors that advertise that representation, independent of source origin.
-void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue) {
-  if (!scannedSources_.insert(id.value).second) {
-    return;
-  }
-
-  const auto source = sources_.source(id);
+void Session::scanOneSource(const SourceFile& source, std::vector<SourceId>& queue) {
+  const auto id = source.id;
   bool acceptsKnownFormat = false;
   const auto addValidationFailure = [&](std::string_view processor, std::string_view operation,
                                         ValidationReport validation) {
@@ -389,6 +419,7 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue) {
       ExtractionResult result = extractor.extract(ExtractionInput{
           .source = source,
           .reader = sources_.reader(id),
+          .sources = sources_,
       });
       prepareDiagnosticRanges(result.diagnostics, source);
       auto validation = validateExtractionResult(source.id, result, sources_);

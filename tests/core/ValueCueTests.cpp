@@ -49,7 +49,7 @@ struct Fixture {
     Session session;
     session.registerExtractor(cueExtractor());
     const auto id = session.addSourceFromPath(directory / "disc.cue");
-    return cueExtractor().extract({session.sources().source(id), session.sources().reader(id)});
+    return cueExtractor().extract({session.sources().source(id), session.sources().reader(id), session.sources()});
   }
 };
 
@@ -245,6 +245,9 @@ void routesBinPathsAndScansDerivedSources() {
     expect(session.sources().source(id).knownFormat == source_formats::kCue &&
                session.sources().source(id).name == "disc.cue" && session.sources().reader(id).size() < 100,
            "CUE resolution should set metadata and read the cue instead of the bin");
+    expect(session.addSourceFromPath(fixture.directory / "disc.bin") == id &&
+               session.addSourceFromPath(fixture.directory / "disc.cue") == id,
+           "BIN and CUE paths should share the same resolved source");
     session.scanSource(id);
     expect(scans == 1 && session.sources().sourceCount() == 2, "extraction must consume the cue without recursing");
     const auto diagnostics = session.snapshot().diagnostics();
@@ -253,6 +256,10 @@ void routesBinPathsAndScansDerivedSources() {
     expect(session.sources().source(SourceId{1}).parent == id, "extracted tracks must belong to the cue source family");
     session.removeSource(id);
     expect(session.sources().sourceCount() == 0, "removing the cue must remove its tracks");
+    const auto reloaded = session.addSourceFromPath(fixture.directory / "disc.bin");
+    session.scanSource(reloaded);
+    expect(reloaded != id && scans == 2 && session.sources().sourceCount() == 2,
+           "removing a cue should allow its BIN alias and derived tracks to load again");
   }
   std::filesystem::remove(fixture.directory / "disc.cue");
   Session session;
@@ -260,6 +267,90 @@ void routesBinPathsAndScansDerivedSources() {
   const auto id = session.addSourceFromPath(fixture.directory / "disc.bin");
   expect(session.sources().reader(id).size() == 2352 && !session.sources().source(id).knownFormat,
          "a BIN without a sibling cue should retain ordinary source loading");
+}
+
+void archiveMembersResolveAndLoadOncePerContainer() {
+  Fixture fixture;
+  const std::string text = "FILE disc.bin BINARY\n TRACK 01 MODE2/2352\n INDEX 01 00:00:00\n"
+                           "FILE second.bin BINARY\n TRACK 02 MODE2/2352\n INDEX 01 00:00:00\n";
+  Session session;
+  session.registerExtractor(SourceExtractor{
+      .name = "FixtureArchive",
+      .acceptedFormats = {"FixtureArchive"},
+      .extract = [&](const ExtractionInput& input) {
+        if (input.source.knownFormat != "FixtureArchive") {
+          return ExtractionResult{};
+        }
+        ExtractionResult result;
+        const auto member = [&](std::string name, std::vector<u8> bytes) {
+          result.sources.push_back(ExtractedSource{
+              .file = SourceFile{.name = name, .path = input.source.path, .memberPath = name},
+              .bytes = std::move(bytes),
+          });
+        };
+        member("game/disc.bin", sectors(2352, {false}));
+        member("game/second.bin", sectors(2352, {true}));
+        member("game/disc.cue", {text.begin(), text.end()});
+        member("game/./disc.cue", {text.begin(), text.end()});
+        return result;
+      },
+      // Add a second alias alongside the CUE extractor's normal disc.bin redirect.
+      .resolvePath = [](const std::filesystem::path& path,
+                        const SourceExtractor::FileExists& exists) -> std::optional<SourceFile> {
+        const auto cue = path.parent_path() / "disc.cue";
+        if (path.filename() == "second.bin" && exists(cue)) {
+          return SourceFile{.path = cue};
+        }
+        return std::nullopt;
+      },
+  });
+  size_t cueLoads = 0;
+  auto cue = cueExtractor();
+  const auto extract = cue.extract;
+  cue.extract = [&](const ExtractionInput& input) {
+    if (input.source.knownFormat == source_formats::kCue) {
+      ++cueLoads;
+    }
+    return extract(input);
+  };
+  session.registerExtractor(std::move(cue));
+  size_t trackScans = 0;
+  session.registerFormat(FormatModule{
+      .name = "TrackProbe",
+      .scan = [&](const ScanInput& input) {
+        ++trackScans;
+        expect(!input.source.memberPath && (input.reader.size() == 2048 || input.reader.size() == 2324),
+               "only extracted user data should reach scanners, not redirected archive members");
+        expect(std::ranges::all_of(input.reader.slice(0, input.reader.size()), [](u8 byte) { return byte == 1; }),
+               "CUE tracks should read payloads from sibling archive members");
+        ScanResult result;
+        result.diagnostics.push_back(Diagnostic{.severity = Severity::Info, .message = "track inspected"});
+        return result;
+      },
+  });
+  const auto addArchive = [&](const char* name) {
+    return session.addSource(SourceFile{.path = fixture.directory / name, .knownFormat = "FixtureArchive"}, {0x7a});
+  };
+  const auto first = addArchive("first.archive");
+  session.scanSource(first);
+  expect(cueLoads == 1 && trackScans == 2 && session.sources().sourceCount() == 6,
+         "member aliases and duplicate entries should extract one cue and its two tracks");
+  expect(session.snapshot().diagnostics().size() == 2 &&
+             std::ranges::all_of(session.snapshot().diagnostics(), [](const Diagnostic& d) {
+               return d.severity == Severity::Info;
+             }), "archive extraction should complete without errors or warnings");
+  expect(addArchive("first.archive") == first, "reopening an archive should reuse its source family");
+  const auto second = addArchive("second.archive");
+  session.scanPendingSources();
+  expect(second != first && cueLoads == 2 && trackScans == 4 && session.sources().sourceCount() == 12,
+         "identical member names in different archives must remain distinct");
+  session.removeSource(first);
+  expect(!session.sources().findFile("game/disc.cue", first),
+         "members of a removed archive must no longer be found");
+  const auto reloaded = addArchive("first.archive");
+  session.scanSource(reloaded);
+  expect(reloaded != first && cueLoads == 3 && trackScans == 6 && session.sources().sourceCount() == 12,
+         "removing an archive should release the identities of its complete extracted family");
 }
 
 }  // namespace
@@ -272,6 +363,7 @@ int main() {
     supportsDifferentSectorSizesInOneFile();
     reportsInvalidInputsAndContinuesOtherFiles();
     routesBinPathsAndScansDerivedSources();
+    archiveMembersResolveAndLoadOncePerContainer();
     std::cout << "CUE tests passed\n";
     return 0;
   } catch (const std::exception& ex) {

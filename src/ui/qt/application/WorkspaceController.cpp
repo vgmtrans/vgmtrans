@@ -35,10 +35,13 @@ std::shared_ptr<const core::SourceInspection> WorkspaceController::inspect(core:
 
 OpenResult WorkspaceController::openPaths(std::span<const std::filesystem::path> paths) {
   OpenResult result;
+  std::unordered_set<u32> opened;
   for (const auto& path : paths) {
     try {
-      session_.addSourceFromPath(path);
-      result.opened.push_back(path);
+      const auto id = session_.addSourceFromPath(path);
+      if (snapshot_.source(id) == nullptr && opened.insert(id.value).second) {
+        result.opened.push_back(path);
+      }
     } catch (const std::exception& error) {
       result.failures.push_back(OpenFailure{
           .path = path,

@@ -63,11 +63,11 @@ std::string upper(std::string text) {
   return text;
 }
 
-std::optional<SourceFile> resolveCuePath(std::filesystem::path path) {
+std::optional<SourceFile> resolveCuePath(std::filesystem::path path, const SourceExtractor::FileExists& exists) {
   const auto extension = upper(path.extension().string());
   if (extension == ".BIN") {
     path.replace_extension(".cue");
-    if (!std::filesystem::is_regular_file(path)) {
+    if (!exists(path)) {
       return std::nullopt;
     }
   } else if (extension != ".CUE") {
@@ -129,11 +129,16 @@ std::vector<File> parseCue(ByteReader reader) {
   return files;
 }
 
-std::vector<u8> readTrack(std::ifstream& file, u64 start, u64 end, const TrackMode& mode) {
+std::vector<u8> readTrack(std::ifstream& file, std::optional<ByteReader> member,
+                          u64 start, u64 end, const TrackMode& mode) {
   std::vector<u8> bytes(static_cast<size_t>(end - start));
-  file.seekg(static_cast<std::streamoff>(start));
-  if (!file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()))) {
-    throw std::runtime_error("could not read track data");
+  if (member) {
+    std::ranges::copy(member->slice(start, end - start), bytes.begin());
+  } else {
+    file.seekg(static_cast<std::streamoff>(start));
+    if (!file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()))) {
+      throw std::runtime_error("could not read track data");
+    }
   }
   if (mode.payloadOffset == 0) {
     return bytes;
@@ -158,7 +163,7 @@ std::vector<u8> readTrack(std::ifstream& file, u64 start, u64 end, const TrackMo
 }
 
 ExtractionResult extractCue(const ExtractionInput& input) {
-  if (input.source.derived() ||
+  if ((input.source.derived() && !input.source.memberPath) ||
       (input.source.knownFormat != source_formats::kCue &&
        upper(std::filesystem::path(input.source.name).extension().string()) != ".CUE")) {
     return {};
@@ -180,8 +185,18 @@ ExtractionResult extractCue(const ExtractionInput& input) {
           throw std::runtime_error("missing or unordered track indexes");
         }
       }
-      std::ifstream file(input.source.path.parent_path() / entry.name, std::ios::binary | std::ios::ate);
-      const auto length = file.tellg();
+      std::ifstream file;
+      std::optional<ByteReader> member;
+      if (input.source.memberPath) {
+        const auto id = input.sources.findFile(input.source.memberPath->parent_path() / entry.name, input.source.parent);
+        if (!id) {
+          throw std::runtime_error("could not find track in archive");
+        }
+        member = input.sources.reader(*id);
+      } else {
+        file.open(input.source.path.parent_path() / entry.name, std::ios::binary | std::ios::ate);
+      }
+      const auto length = member ? static_cast<std::streamoff>(member->size()) : std::streamoff{file.tellg()};
       if (length < 0) {
         throw std::runtime_error("could not open track file");
       }
@@ -207,7 +222,7 @@ ExtractionResult extractCue(const ExtractionInput& input) {
                   .name = entry.name + " (Track " + std::to_string(track.number) + ")",
                   .path = input.source.path,
               },
-              .bytes = readTrack(file, start, end, mode),
+              .bytes = readTrack(file, member, start, end, mode),
           });
         }
         offset = end;

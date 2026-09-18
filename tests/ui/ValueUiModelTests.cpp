@@ -102,6 +102,12 @@ void workspacePublishesModelsAndRemovesSourceFamilies() {
   expect(assets.index(0, 0).data(Qt::DisplayRole).toString() == QStringLiteral("Probe asset"),
          "asset model should expose value metadata");
 
+  size_t publications = 0;
+  QObject::connect(&workspace, &WorkspaceController::snapshotChanged, &workspace, [&] { ++publications; });
+  const OpenResult reopened = workspace.openPaths(path);
+  expect(reopened.opened.empty() && reopened.failures.empty() && publications == 0,
+         "opening an existing source should leave the current views unchanged");
+
   const auto collectionId = CollectionId{collections.index(0, 0).data(IdRole).toUInt()};
   const auto normalCollectionIcon = collections.index(0, 0).data(Qt::DecorationRole).value<QIcon>();
   collections.setPlayingCollection(collectionId);
@@ -157,6 +163,9 @@ void workspacePublishesModelsAndRemovesSourceFamilies() {
          "all models should reset to the new immutable snapshot after removal");
   expect(inspector->bytes().size() == 3 && inspector->annotation(*magic) != nullptr,
          "an open source inspection should retain its immutable source data after removal");
+  const OpenResult reloaded = workspace.openPaths(path);
+  expect(reloaded.opened.size() == 1 && reloaded.failures.empty() && sources.rowCount() == 1,
+         "removing a source should allow it to be opened again");
 }
 
 void workspaceDoesNotPublishEmptyScansAsSources() {
