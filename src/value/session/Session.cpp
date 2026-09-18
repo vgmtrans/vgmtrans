@@ -17,7 +17,6 @@
 #include <algorithm>
 #include <atomic>
 #include <array>
-#include <cctype>
 #include <exception>
 #include <fstream>
 #include <future>
@@ -116,26 +115,25 @@ SourceId Session::addSource(SourceFile file, std::vector<u8> bytes) {
 }
 
 SourceId Session::addSourceFromPath(std::filesystem::path path) {
-  auto extension = path.extension().string();
-  std::ranges::transform(extension, extension.begin(), [](unsigned char c) { return std::tolower(c); });
-  if (extension == ".bin") {
-    auto cue = path;
-    cue.replace_extension(".cue");
-    if (std::filesystem::is_regular_file(cue)) {
-      path = std::move(cue);
-      extension = ".cue";
+  SourceFile source{.path = path};
+  for (const auto& extractor : formats_.extractors()) {
+    if (extractor.resolvePath) {
+      if (auto resolved = extractor.resolvePath(path)) {
+        source = std::move(*resolved);
+        break;
+      }
     }
   }
 
-  std::ifstream file(path, std::ios::binary);
+  std::ifstream file(source.path, std::ios::binary);
   if (!file) {
-    throw std::runtime_error("failed to open source file: " + path.string());
+    throw std::runtime_error("failed to open source file: " + source.path.string());
   }
 
   file.seekg(0, std::ios::end);
   const auto size = file.tellg();
   if (size < 0) {
-    throw std::runtime_error("failed to stat source file: " + path.string());
+    throw std::runtime_error("failed to stat source file: " + source.path.string());
   }
   file.seekg(0, std::ios::beg);
 
@@ -144,16 +142,10 @@ SourceId Session::addSourceFromPath(std::filesystem::path path) {
     file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
   }
   if (!file) {
-    throw std::runtime_error("failed to read source file: " + path.string());
+    throw std::runtime_error("failed to read source file: " + source.path.string());
   }
 
-  return addSource(
-      SourceFile{
-          .name = path.filename().string(),
-          .path = std::move(path),
-          .knownFormat = extension == ".cue" ? std::optional<std::string>{source_formats::kCue} : std::nullopt,
-      },
-      std::move(bytes));
+  return addSource(std::move(source), std::move(bytes));
 }
 
 void Session::removeSource(SourceId id) {

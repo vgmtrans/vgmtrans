@@ -1252,6 +1252,47 @@ void sessionAddsSourceFromPath() {
   expect(project.collections().size() == 1, "path source should scan through registered modules");
   expect(project.sources().front().path == path, "session snapshot should preserve path source metadata");
 
+  const auto alias = std::filesystem::path(path.string() + ".alias");
+  expect(!std::filesystem::exists(alias), "test alias should not exist on disk");
+  Session redirected;
+  redirected.registerExtractor(probeSequenceContainerExtractor());  // No path hook.
+  std::vector<std::string> attempts;
+  redirected.registerExtractor(SourceExtractor{
+      .name = "DeclinePath",
+      .extract = [](const ExtractionInput&) { return ExtractionResult{}; },
+      .resolvePath = [&](const std::filesystem::path& input) -> std::optional<SourceFile> {
+        expect(input == alias, "resolvers should receive the requested path");
+        attempts.push_back("decline");
+        return std::nullopt;
+      },
+  });
+  redirected.registerExtractor(SourceExtractor{
+      .name = "ResolvePath",
+      .acceptedFormats = {"probe-path"},
+      .extract = [](const ExtractionInput&) { return ExtractionResult{}; },
+      .resolvePath = [&](const std::filesystem::path& input) -> std::optional<SourceFile> {
+        expect(input == alias, "declining a path should leave it unchanged for later resolvers");
+        attempts.push_back("resolve");
+        return SourceFile{.name = "Resolved source", .path = path, .knownFormat = "probe-path"};
+      },
+  });
+  redirected.registerExtractor(SourceExtractor{
+      .name = "LaterResolver",
+      .extract = [](const ExtractionInput&) { return ExtractionResult{}; },
+      .resolvePath = [](const std::filesystem::path&) -> std::optional<SourceFile> {
+        throw std::runtime_error("path resolution should stop at the first match");
+      },
+  });
+  const auto resolved = redirected.addSourceFromPath(alias);
+  const auto& resolvedFile = redirected.sources().source(resolved);
+  expect(resolvedFile.name == "Resolved source" && resolvedFile.path == path && resolvedFile.knownFormat == "probe-path",
+         "path resolution should preserve the returned source metadata");
+  expect(std::ranges::equal(redirected.sources().bytes(resolved), expectedBytes),
+         "path resolution must happen before opening the original path");
+  redirected.addSource(SourceFile{.path = alias}, {0xaa});
+  expect(attempts == std::vector<std::string>{"decline", "resolve"},
+         "hooks should run in registration order for filesystem loads only");
+
   std::filesystem::remove(path);
 }
 

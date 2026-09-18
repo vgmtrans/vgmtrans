@@ -63,6 +63,19 @@ std::string upper(std::string text) {
   return text;
 }
 
+std::optional<SourceFile> resolveCuePath(std::filesystem::path path) {
+  const auto extension = upper(path.extension().string());
+  if (extension == ".BIN") {
+    path.replace_extension(".cue");
+    if (!std::filesystem::is_regular_file(path)) {
+      return std::nullopt;
+    }
+  } else if (extension != ".CUE") {
+    return std::nullopt;
+  }
+  return SourceFile{.path = std::move(path), .knownFormat = source_formats::kCue};
+}
+
 std::vector<File> parseCue(ByteReader reader) {
   const auto bytes = reader.slice(0, reader.size());
   std::string text(bytes.begin(), bytes.end());
@@ -215,7 +228,12 @@ ExtractionResult extractCue(const ExtractionInput& input) {
 }  // namespace
 
 SourceExtractor cueExtractor() {
-  return SourceExtractor{.name = "Cue", .acceptedFormats = {source_formats::kCue}, .extract = extractCue};
+  return SourceExtractor{
+      .name = "Cue",
+      .acceptedFormats = {source_formats::kCue},
+      .extract = extractCue,
+      .resolvePath = resolveCuePath,
+  };
 }
 
 }  // namespace vgmtrans::formats::cue
