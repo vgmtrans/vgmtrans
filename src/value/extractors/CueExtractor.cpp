@@ -34,6 +34,30 @@ struct File {
   std::vector<Track> tracks;
 };
 
+struct TrackMode {
+  std::string_view name;
+  size_t sectorSize;
+  size_t payloadOffset;
+  size_t payloadSize;  // Zero means XA: the subheader selects Form 1 or Form 2.
+};
+
+const TrackMode& trackMode(std::string_view name) {
+  static constexpr TrackMode modes[]{
+      {"AUDIO", 2352, 0, 2352},
+      {"MODE1/2048", 2048, 0, 2048},
+      {"MODE1/2352", 2352, 16, 2048},
+      {"MODE2/2048", 2048, 0, 2048},
+      {"MODE2/2324", 2324, 0, 2324},
+      {"MODE2/2336", 2336, 8, 0},
+      {"MODE2/2352", 2352, 24, 0},
+  };
+  const auto found = std::ranges::find(modes, name, &TrackMode::name);
+  if (found == std::end(modes)) {
+    throw std::runtime_error("unsupported track mode: " + std::string(name));
+  }
+  return *found;
+}
+
 std::string upper(std::string text) {
   std::ranges::transform(text, text.begin(), [](unsigned char c) { return std::toupper(c); });
   return text;
@@ -92,23 +116,27 @@ std::vector<File> parseCue(ByteReader reader) {
   return files;
 }
 
-std::vector<u8> readTrack(std::ifstream& file, u64 start, u64 end, size_t sectorSize) {
+std::vector<u8> readTrack(std::ifstream& file, u64 start, u64 end, const TrackMode& mode) {
   std::vector<u8> bytes(static_cast<size_t>(end - start));
   file.seekg(static_cast<std::streamoff>(start));
   if (!file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()))) {
     throw std::runtime_error("could not read track data");
   }
-  const size_t header = sectorSize == 2352 ? 16 : 0;
+  if (mode.payloadOffset == 0) {
+    return bytes;
+  }
   size_t written = 0;
-  for (size_t offset = 0; offset < bytes.size(); offset += sectorSize) {
+  for (size_t offset = 0; offset < bytes.size(); offset += mode.sectorSize) {
     const auto* sector = bytes.data() + offset;
-    if (header != 0 && sector[15] != 2) {
-      throw std::runtime_error("expected a MODE2 sector");
+    if (mode.sectorSize == 2352 && sector[15] != (mode.name.starts_with("MODE1/") ? 1 : 2)) {
+      throw std::runtime_error("sector mode does not match " + std::string(mode.name));
     }
-    // XA submode bit 5 selects Form 2. Both forms have an eight-byte
-    // subheader; only user bytes are retained, excluding EDC/ECC.
-    const size_t size = (sector[header + 2] & 0x20) != 0 ? 2324 : 2048;
-    std::memmove(bytes.data() + written, sector + header + 8, size);
+    size_t size = mode.payloadSize;
+    if (size == 0) {
+      // XA submode is six bytes before the payload; bit 5 selects Form 2.
+      size = (sector[mode.payloadOffset - 6] & 0x20) != 0 ? 2324 : 2048;
+    }
+    std::memmove(bytes.data() + written, sector + mode.payloadOffset, size);
     written += size;
   }
   // Compact in place so large images need only one backing allocation.
@@ -124,21 +152,16 @@ ExtractionResult extractCue(const ExtractionInput& input) {
   }
   ExtractionResult result;
   for (const auto& entry : parseCue(input.reader)) {
-    if (!std::ranges::any_of(entry.tracks, [](const Track& track) { return track.mode.starts_with("MODE2/"); })) {
+    if (!std::ranges::any_of(entry.tracks, [](const Track& track) { return track.mode != "AUDIO"; })) {
       continue;
     }
     try {
       if (entry.type != "BINARY") {
-        throw std::runtime_error("MODE2 tracks require a BINARY file");
+        throw std::runtime_error("data tracks require a BINARY file");
       }
-      // Require one physical sector size per FILE, including audio tracks.
-      const size_t sectorSize = entry.tracks.front().mode == "MODE2/2336" ? 2336 : 2352;
       for (size_t i = 0; i < entry.tracks.size(); ++i) {
         const auto& track = entry.tracks[i];
-        if ((sectorSize == 2336 && track.mode != "MODE2/2336") ||
-            (sectorSize == 2352 && track.mode != "MODE2/2352" && track.mode != "MODE1/2352" && track.mode != "AUDIO")) {
-          throw std::runtime_error("unsupported or mixed sector sizes");
-        }
+        trackMode(track.mode);
         if (!track.start || (track.pregap && *track.pregap > *track.start) ||
             (i != 0 && track.pregap.value_or(*track.start) <= *entry.tracks[i - 1].start)) {
           throw std::runtime_error("missing or unordered track indexes");
@@ -150,24 +173,31 @@ ExtractionResult extractCue(const ExtractionInput& input) {
         throw std::runtime_error("could not open track file");
       }
       const auto fileSize = static_cast<u64>(length);
-      if (fileSize % sectorSize != 0 || *entry.tracks.back().start >= fileSize / sectorSize) {
-        throw std::runtime_error("truncated track file or index past end of file");
-      }
+      const auto& first = entry.tracks.front();
+      u64 offset = first.pregap.value_or(*first.start) * trackMode(first.mode).sectorSize;
       for (size_t i = 0; i < entry.tracks.size(); ++i) {
         const auto& track = entry.tracks[i];
-        if (!track.mode.starts_with("MODE2/")) {
-          continue;
-        }
+        const auto& mode = trackMode(track.mode);
+        const u64 firstSector = track.pregap.value_or(*track.start);
+        const u64 start = offset + (*track.start - firstSector) * mode.sectorSize;
+        // CUE indexes count sectors, even when adjacent tracks store different sector sizes.
         const u64 end = i + 1 == entry.tracks.size()
                             ? fileSize
-                            : entry.tracks[i + 1].pregap.value_or(*entry.tracks[i + 1].start) * sectorSize;
-        result.sources.push_back(ExtractedSource{
-            .file = SourceFile{
-                .name = entry.name + " (Track " + std::to_string(track.number) + ")",
-                .path = input.source.path,
-            },
-            .bytes = readTrack(file, *track.start * sectorSize, end, sectorSize),
-        });
+                            : offset + (entry.tracks[i + 1].pregap.value_or(*entry.tracks[i + 1].start) - firstSector) *
+                                           mode.sectorSize;
+        if (end > fileSize || start >= end || (end - offset) % mode.sectorSize != 0) {
+          throw std::runtime_error("truncated track file or index past end of file");
+        }
+        if (track.mode != "AUDIO") {
+          result.sources.push_back(ExtractedSource{
+              .file = SourceFile{
+                  .name = entry.name + " (Track " + std::to_string(track.number) + ")",
+                  .path = input.source.path,
+              },
+              .bytes = readTrack(file, start, end, mode),
+          });
+        }
+        offset = end;
       }
     } catch (const std::exception& ex) {
       result.diagnostics.push_back(Diagnostic{
@@ -177,7 +207,7 @@ ExtractionResult extractCue(const ExtractionInput& input) {
     }
   }
   if (result.sources.empty() && result.diagnostics.empty()) {
-    result.diagnostics.push_back(Diagnostic{.severity = Severity::Warning, .message = "CUE contains no MODE2 tracks"});
+    result.diagnostics.push_back(Diagnostic{.severity = Severity::Warning, .message = "CUE contains no data tracks"});
   }
   return result;
 }

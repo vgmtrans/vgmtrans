@@ -9,8 +9,8 @@
 
 namespace vgmtrans::formats::cue {
 
-// MODE2/2352 and MODE2/2336 tracks become concatenated XA user payloads
-// (2048 bytes for Form 1, 2324 for Form 2), with one derived source per track.
+// Mode 1 and Mode 2 tracks become concatenated user payloads, with one derived
+// source per track. XA subheaders select 2048-byte Form 1 or 2324-byte Form 2 data.
 [[nodiscard]] core::SourceExtractor cueExtractor();
 
 }  // namespace vgmtrans::formats::cue

@@ -85,9 +85,46 @@ void extractsBothSectorLayoutsAndForms() {
   }
 }
 
+void extractsMode1AndPayloadOnlyTracks() {
+  Fixture fixture;
+  struct Layout {
+    const char* mode;
+    size_t sectorSize;
+    size_t offset;
+    size_t payloadSize;
+  };
+  for (const auto& layout : {Layout{"MODE1/2048", 2048, 0, 2048}, Layout{"MODE1/2352", 2352, 16, 2048},
+                             Layout{"MODE2/2048", 2048, 0, 2048}, Layout{"MODE2/2324", 2324, 0, 2324}}) {
+    std::vector<u8> bytes(layout.sectorSize * 2, 0xee);
+    std::vector<u8> expected;
+    for (size_t i = 0; i < 2; ++i) {
+      if (layout.sectorSize == 2352) {
+        bytes[i * layout.sectorSize + 15] = 1;
+      }
+      // Payload bytes resembling XA submode flags must remain ordinary data.
+      const auto value = static_cast<u8>(0x20 + i);
+      std::fill_n(bytes.begin() + i * layout.sectorSize + layout.offset, layout.payloadSize, value);
+      expected.insert(expected.end(), layout.payloadSize, value);
+    }
+    fixture.write("disc.bin", bytes);
+    fixture.cue("FILE disc.bin BINARY\n TRACK 01 " + std::string(layout.mode) + "\n INDEX 01 00:00:00\n");
+    const auto result = fixture.extract();
+    expect(result.diagnostics.empty() && result.sources.size() == 1, "every Mode 1 and payload-only mode should load");
+    expect(result.sources.front().bytes == expected, "fixed payloads must retain every byte and exclude raw overhead");
+    bytes.pop_back();
+    fixture.write("disc.bin", bytes);
+    const auto truncated = fixture.extract();
+    expect(truncated.sources.empty() && !truncated.diagnostics.empty(),
+           "partial sectors must be rejected in every mode");
+  }
+}
+
 void respectsFilesTrackBoundariesAndPregaps() {
   Fixture fixture;
-  fixture.write("disc.bin", sectors(2352, {false, false, false, false, false, false, false}));
+  auto bytes = sectors(2352, {false, false, false, false, false, false, false});
+  bytes[15] = 1;
+  std::fill_n(bytes.begin() + 16, 2048, 1);
+  fixture.write("disc.bin", bytes);
   fixture.write("second.bin", sectors(2336, {true}));
   fixture.cue("FILE disc.bin BINARY\n"
               " TRACK 01 MODE1/2352\n INDEX 01 00:00:00\n"
@@ -97,12 +134,39 @@ void respectsFilesTrackBoundariesAndPregaps() {
               "FILE missing-audio.wav WAVE\n TRACK 05 AUDIO\n INDEX 01 00:00:00\n"
               "FILE second.bin BINARY\n TRACK 06 MODE2/2336\n PREGAP 00:02:00\n INDEX 01 00:00:00\n");
   const auto result = fixture.extract();
-  expect(result.diagnostics.empty() && result.sources.size() == 3, "all MODE2 tracks and only those should load");
+  expect(result.diagnostics.empty() && result.sources.size() == 4,
+         "all data tracks should load and audio should be skipped");
+  expect(result.sources[0].bytes == std::vector<u8>(2048, 1), "Mode 1 data must load before neighboring Mode 2 tracks");
   std::vector<u8> expected(2048, 3);
   expected.insert(expected.end(), 2048, 4);
-  expect(result.sources[0].bytes == expected, "INDEX 01 starts data; the next INDEX 00 ends it");
-  expect(result.sources[1].bytes == std::vector<u8>(2048, 7), "later tracks must not duplicate earlier data");
-  expect(result.sources[2].bytes == std::vector<u8>(2324, 1), "file indexes reset and synthetic pregaps add no bytes");
+  expect(result.sources[1].bytes == expected, "INDEX 01 starts data; the next INDEX 00 ends it");
+  expect(result.sources[2].bytes == std::vector<u8>(2048, 7), "later tracks must not duplicate earlier data");
+  expect(result.sources[3].bytes == std::vector<u8>(2324, 1), "file indexes reset and synthetic pregaps add no bytes");
+}
+
+void supportsDifferentSectorSizesInOneFile() {
+  Fixture fixture;
+  std::vector<u8> bytes(2048, 0xee);  // Leading stored pregap.
+  bytes.insert(bytes.end(), 2048, 1);
+  bytes.insert(bytes.end(), 2336, 0xee);  // Next track's stored pregap uses its own sector size.
+  const auto xa = sectors(2336, {true, false});
+  bytes.insert(bytes.end(), xa.begin(), xa.end());
+  bytes.insert(bytes.end(), 2352, 0xee);  // Audio.
+  bytes.insert(bytes.end(), 2324, 3);
+  fixture.write("disc.bin", bytes);
+  fixture.cue("FILE disc.bin BINARY\n"
+              " TRACK 01 MODE1/2048\n INDEX 00 00:00:00\n INDEX 01 00:00:01\n"
+              " TRACK 02 MODE2/2336\n INDEX 00 00:00:02\n INDEX 01 00:00:03\n"
+              " TRACK 03 AUDIO\n INDEX 01 00:00:05\n"
+              " TRACK 04 MODE2/2324\n INDEX 01 00:00:06\n");
+  const auto result = fixture.extract();
+  expect(result.diagnostics.empty() && result.sources.size() == 3,
+         "sector sizes may change between tracks in one file");
+  std::vector<u8> expected(2324, 1);
+  expected.insert(expected.end(), 2048, 2);
+  expect(result.sources[0].bytes == std::vector<u8>(2048, 1) && result.sources[1].bytes == expected &&
+             result.sources[2].bytes == std::vector<u8>(2324, 3),
+         "byte offsets must account for preceding tracks and pregaps at their stored sector sizes");
 }
 
 void reportsInvalidInputsAndContinuesOtherFiles() {
@@ -114,7 +178,8 @@ void reportsInvalidInputsAndContinuesOtherFiles() {
            "TRACK 01 MODE2/2352\n INDEX 01 00:00:02\n",
            "TRACK 01 MODE2/2352\n INDEX 00 00:00:01\n INDEX 01 00:00:00\n",
            "TRACK 01 MODE2/2352\n INDEX 01 00:00:01\n TRACK 02 AUDIO\n INDEX 01 00:00:00\n",
-           "TRACK 01 MODE2/2048\n INDEX 01 00:00:00\n"}) {
+           "TRACK 01 MODE1/2324\n INDEX 01 00:00:00\n",
+           "TRACK 01 MODE0/2352\n INDEX 01 00:00:00\n"}) {
     fixture.cue(std::string("FILE disc.bin BINARY\n") + directives);
     const auto result = fixture.extract();
     expect(result.sources.empty() && !result.diagnostics.empty(), "invalid track layouts must report a diagnostic");
@@ -197,7 +262,9 @@ void routesBinPathsAndScansDerivedSources() {
 int main() {
   try {
     extractsBothSectorLayoutsAndForms();
+    extractsMode1AndPayloadOnlyTracks();
     respectsFilesTrackBoundariesAndPregaps();
+    supportsDifferentSectorSizesInOneFile();
     reportsInvalidInputsAndContinuesOtherFiles();
     routesBinPathsAndScansDerivedSources();
     std::cout << "CUE tests passed\n";
