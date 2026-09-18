@@ -433,7 +433,7 @@ void loadIntelligentTables(ByteReader reader, const VoiceCommandInfo& commands, 
       } else {
         // FC deinterleaves triples into three 16-byte arrays. Derive their
         // base from the actual stores, since FE4 and TA use different RAM.
-        for (u32 offset = handler; offset < handler + 48 && reader.has(offset, 15); ++offset) {
+        for (u32 offset = handler; offset < handler + 48u && reader.has(offset, 15); ++offset) {
           if (reader.u8At(offset) == 0xd5 && reader.u8At(offset + 3) == 0xfc &&
               reader.u8At(offset + 4) == 0xf7 && reader.u8At(offset + 6) == 0xd5 &&
               reader.u8At(offset + 9) == 0xfc && reader.u8At(offset + 10) == 0xf7 &&

@@ -828,7 +828,7 @@ void emitProgramSampleRegion(const InstrumentSetBuilder::Entry& instrument, Byte
                   (program.detune + split.detune + sample.detune) / 128.0 + 12.0 * std::log2(48000.0 / vag.sampleRate),
   };
   const auto evaluate = [program, split, sample, low, high, keys, velocities, curve = sampleSet.velocityCurve](
-                            Region& region, u8 key, u8 velocity) {
+                            Region& evaluatedRegion, u8 key, u8 velocity) {
     if (!keys) {
       key = std::clamp<int>(split.keyFollowPitchCenter, split.low & 0x7f, split.high & 0x7f);
     }
@@ -843,10 +843,10 @@ void emitProgramSampleRegion(const InstrumentSetBuilder::Entry& instrument, Byte
                         crossfade(split.low, split.cross, split.high, key) *
                         crossfade(sample.low, sample.cross, sample.high, raw) *
                         velocityCurveCorrection(curve, raw, velocity);
-    region.envelope = keyFollowEnvelope(sample, key);
-    region.pan = panPositionFrom7Bit(static_cast<u8>(regionPan(program, split, sample, key)));
-    region.attenuationDb = attenuation(gain);
-    region.modulation = modulation(program, split, sample, key, raw);
+    evaluatedRegion.envelope = keyFollowEnvelope(sample, key);
+    evaluatedRegion.pan = panPositionFrom7Bit(static_cast<u8>(regionPan(program, split, sample, key)));
+    evaluatedRegion.attenuationDb = attenuation(gain);
+    evaluatedRegion.modulation = modulation(program, split, sample, key, raw);
   };
   evaluate(region, region.keyRange.low, region.velocityRange.low);
   if (keys || velocities) {
@@ -1035,14 +1035,14 @@ void addSetbNote(InstrumentSetBuilder& instruments, const InstrumentSetBuilder::
       .envelope = psxSpuEnvelope(lfoSample.adsr1, lfoSample.adsr2, PsxSpuGeneration::Ps2),
       .pan = panPositionFrom7Bit(static_cast<u8>(panMagnitude(lfo.pan))),
   };
-  const auto evaluate = [note, velocityZones](Region& region, u8, u8 velocity) {
+  const auto evaluate = [note, velocityZones](Region& evaluatedRegion, u8, u8 velocity) {
     if (!velocityZones) {
       velocity = 127;
     }
     const int raw = velocityZones ? rawVelocityFromMidi(velocity) : 127;
-    region.attenuationDb =
+    evaluatedRegion.attenuationDb =
         attenuation(gainFromRaw(note.program.volume) * velocityCurveCorrection(note.velocityCurve, raw, velocity));
-    region.modulation = modulation(note.program, note.split, note.sample, note.key, raw);
+    evaluatedRegion.modulation = modulation(note.program, note.split, note.sample, note.key, raw);
   };
   evaluate(region, note.key, region.velocityRange.low);
   if (velocityZones) {

@@ -324,7 +324,7 @@ const Collection* firstCollection(const SessionSnapshot& snapshot) {
 }
 
 SourceFile archiveMember(std::string name, std::string_view ini = {}) {
-  SourceFile source{.name = name, .path = "/fixture/music.psf2"};
+  SourceFile source{.name = name, .path = std::filesystem::path("/fixture") / name};
   source.attributes.emplace("container-format", "PSF2");
   source.attributes.emplace("container-member", std::move(name));
   if (!ini.empty()) {

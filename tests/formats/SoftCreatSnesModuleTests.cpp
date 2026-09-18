@@ -212,6 +212,28 @@ void modernLayoutFindsRelocatedTables() {
          "SoftCreatSnes layout should use the live song and recover every relocated driver table");
 }
 
+void modernLayoutScoresPartialTrackSets() {
+  for (u32 activeTracks = 1; activeTracks <= kTrackCount; ++activeTracks) {
+    auto bytes = modernScannerFixture();
+    const auto columns = pointerColumns(0x2000, 0x10);
+    std::fill(bytes.begin() + 0x2000, bytes.begin() + 0x2080, 0);
+    bytes[0xe4] = 0xff;  // Force selection from cursor distances instead of the live song.
+    for (u32 track = 0; track < activeTracks; ++track) {
+      const u16 first = static_cast<u16>(0x3000 + track * 0x40);
+      const u16 second = static_cast<u16>(0x3800 + track * 0x40);
+      writeSplitPointer(bytes, columns[track], columns[track] + 5, 0, first);
+      writeSplitPointer(bytes, columns[track], columns[track] + 5, 1, second);
+      bytes[first] = bytes[second] = 0x40;
+      // With three or more voices, two SFX cursors must be excluded from the score.
+      const bool sfx = activeTracks > 2 && track >= activeTracks - 2;
+      writeLe16(bytes, 0x30 + track * 2, sfx ? 0x1000 : static_cast<u16>(second + 1));
+    }
+    const auto layout = findLayout(ByteReader(SourceId{302}, bytes));
+    expect(layout && layout->songIndex == 1 && layout->tracks[0].address == 0x3800,
+           "SoftCreatSnes song scoring should ignore inactive tracks and discard the two SFX cursor outliers");
+  }
+}
+
 void v5LayoutUsesOverlappingPointerColumns() {
   auto bytes = modernScannerFixture();
   bytes[0x0206] = 0xb9;
@@ -571,6 +593,7 @@ void runSoftCreatSnesModuleTests() {
   writeBytes(retainedFixture, 0x3000, {0x3c, 4, 0x80});
   expectScanSharesPlaybackSource(module(), std::move(retainedFixture));
   modernLayoutFindsRelocatedTables();
+  modernLayoutScoresPartialTrackSets();
   v5LayoutUsesOverlappingPointerColumns();
   v7LayoutAlignsPrefixedDspValues();
   v1LayoutSelectsTheCurrentSequence();

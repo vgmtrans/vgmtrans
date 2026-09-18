@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <array>
+#include <limits>
 #include <numeric>
 #include <optional>
 
@@ -135,6 +136,8 @@ struct SongScore {
 [[nodiscard]] SongScore scoreSong(ByteReader reader, const PointerTables& tables, u8 song) {
   SongScore score{.song = song};
   std::array<u16, kTrackCount> distances{};
+  // Inactive tracks sort after every active distance.
+  distances.fill(std::numeric_limits<u16>::max());
   for (u32 track = 0; track < kTrackCount; ++track) {
     const u16 start = trackAddress(reader, tables, song, track);
     if (!validTrackPointer(reader, start)) {
@@ -146,7 +149,7 @@ struct SongScore {
     distances[score.activeTracks - 1] = current > start ? current - start : start - current;
   }
   if (score.activeTracks != 0) {
-    std::sort(distances.begin(), distances.begin() + score.activeTracks);
+    std::sort(distances.begin(), distances.end());
     // Two hardware voices may hold unrelated SFX cursors.
     const unsigned kept = score.activeTracks > 2 ? score.activeTracks - 2 : score.activeTracks;
     score.cursorDistance = std::accumulate(distances.begin(), distances.begin() + kept, 0u);
@@ -255,7 +258,7 @@ struct SongScore {
 [[nodiscard]] u16 musicVolume(ByteReader reader, u32 load) {
   if (reader.has(load + 23, 1) && reader.u8At(load + 20) == 0x3f) {
     const u16 initializeTrack = reader.le16(load + 21);
-    for (u32 offset = initializeTrack; offset < initializeTrack + 32 && reader.has(offset, 5); ++offset) {
+    for (u32 offset = initializeTrack; offset < initializeTrack + 32u && reader.has(offset, 5); ++offset) {
       if (reader.u8At(offset) == 0xe4 && reader.u8At(offset + 2) == 0xd5 &&
           reader.u8At(offset + 3) == 0x66 && reader.u8At(offset + 4) == 0x03) {
         return reader.u8At(reader.u8At(offset + 1));
