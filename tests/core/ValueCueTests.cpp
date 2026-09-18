@@ -47,6 +47,7 @@ struct Fixture {
 
   ExtractionResult extract() const {
     Session session;
+    session.registerExtractor(cueExtractor());
     const auto id = session.addSourceFromPath(directory / "disc.cue");
     return cueExtractor().extract({session.sources().source(id), session.sources().reader(id)});
   }
@@ -241,6 +242,9 @@ void routesBinPathsAndScansDerivedSources() {
     const auto id = session.addSourceFromPath(fixture.directory / name);
     expect(session.sources().source(id).path == fixture.directory / "disc.cue",
            "BIN paths should load their sibling CUE");
+    expect(session.sources().source(id).knownFormat == source_formats::kCue &&
+               session.sources().source(id).name == "disc.cue" && session.sources().reader(id).size() < 100,
+           "CUE resolution should set metadata and read the cue instead of the bin");
     session.scanSource(id);
     expect(scans == 1 && session.sources().sourceCount() == 2, "extraction must consume the cue without recursing");
     const auto diagnostics = session.snapshot().diagnostics();
@@ -252,6 +256,7 @@ void routesBinPathsAndScansDerivedSources() {
   }
   std::filesystem::remove(fixture.directory / "disc.cue");
   Session session;
+  session.registerExtractor(cueExtractor());
   const auto id = session.addSourceFromPath(fixture.directory / "disc.bin");
   expect(session.sources().reader(id).size() == 2352 && !session.sources().source(id).knownFormat,
          "a BIN without a sibling cue should retain ordinary source loading");

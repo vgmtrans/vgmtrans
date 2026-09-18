@@ -29,10 +29,15 @@ struct ExtractionResult {
 // result leaves it available to later extractors and format modules.
 struct SourceExtractor {
   using Extract = std::function<ExtractionResult(const ExtractionInput& input)>;
+  using ResolvePath = std::function<std::optional<SourceFile>(const std::filesystem::path& path)>;
 
   std::string name;
   std::vector<std::string> acceptedFormats;
   Extract extract;
+  // Optional hook for filesystem loads, before reading bytes. Return metadata
+  // with the path to load, or nullopt to decline. The first match in registration
+  // order wins; its path is not resolved again. An empty name defaults to the filename.
+  ResolvePath resolvePath;
 };
 
 }  // namespace vgmtrans::core
