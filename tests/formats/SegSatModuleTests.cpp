@@ -707,9 +707,11 @@ void segSatSsfExtractorUsesFourByteMiniHeader() {
   std::ranges::copy(compressed, ssf.begin() + 16);
 
   const auto extractor = vgmtrans::formats::psf::psfExtractor();
+  const SourceStore sources;
   ExtractionInput input{
       .source = SourceFile{.id = SourceId{9}, .name = "fixture.ssf", .size = ssf.size()},
       .reader = ByteReader(SourceId{9}, ssf),
+      .sources = sources,
   };
   const ExtractionResult result = extractor.extract(input);
   expect(result.diagnostics.empty() && result.sources.size() == 1 &&

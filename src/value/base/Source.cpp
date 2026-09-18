@@ -12,6 +12,19 @@
 
 namespace vgmtrans::core {
 
+namespace {
+
+std::filesystem::path fileIdentity(const std::filesystem::path& path, bool member) {
+  if (member) {
+    auto name = path.generic_string();
+    std::ranges::replace(name, '\\', '/');
+    return std::filesystem::path(name).lexically_normal();
+  }
+  return path.empty() ? path : std::filesystem::weakly_canonical(std::filesystem::absolute(path));
+}
+
+}  // namespace
+
 std::optional<std::string_view> SourceSegment::attribute(std::string_view key) const noexcept {
   const auto found = attributes.find(key);
   return found != attributes.end() ? std::optional<std::string_view>{found->second} : std::nullopt;
@@ -136,6 +149,14 @@ void ByteReader::require(u64 offset, u64 size) const {
 }
 
 SourceId SourceStore::add(SourceFile file, std::vector<u8> bytes) {
+  const auto path = file.derived() ? file.memberPath.value_or(std::filesystem::path{}) : file.path;
+  if (const auto existing = findFile(path, file.parent)) {
+    return *existing;
+  }
+  const auto identity = fileIdentity(path, file.parent.has_value());
+  if (file.memberPath) {
+    file.memberPath = identity;
+  }
   const auto id = SourceId{static_cast<u32>(entries_.size())};
   file.id = id;
   file.status = SourceStatus::Active;
@@ -147,7 +168,22 @@ SourceId SourceStore::add(SourceFile file, std::vector<u8> bytes) {
       .file = std::move(file),
       .bytes = std::make_shared<const std::vector<u8>>(std::move(bytes)),
   });
+  if (!identity.empty()) {
+    const auto parent = entries_.back().file.parent;
+    auto& files = parent ? entries_[parent->value].members : fileIds_;
+    files.insert_or_assign(identity, id);
+  }
   return id;
+}
+
+std::optional<SourceId> SourceStore::findFile(const std::filesystem::path& path,
+                                            std::optional<SourceId> parent) const {
+  if (parent && !contains(*parent)) {
+    return std::nullopt;
+  }
+  const auto& files = parent ? entry(*parent).members : fileIds_;
+  const auto found = files.find(fileIdentity(path, parent.has_value()));
+  return found != files.end() && contains(found->second) ? std::optional{found->second} : std::nullopt;
 }
 
 SourceId SourceStore::addDerived(SourceFile file, std::vector<u8> bytes, SourceId defaultParent) {
@@ -165,6 +201,7 @@ std::vector<SourceId> SourceStore::removeFamily(SourceId id) {
   const auto family = sourceFamily(id);
   for (const SourceId source : family) {
     auto& entry = entries_[source.value];
+    entry.members.clear();
     entry.file.status = SourceStatus::Removed;
     entry.file.size = 0;
     entry.bytes.reset();

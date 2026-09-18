@@ -1245,6 +1245,17 @@ void sessionAddsSourceFromPath() {
   const std::array<u8, 3> expectedBytes{0xaa, 0x34, 0x12};
   expect(std::ranges::equal(session.sources().bytes(sourceId), expectedBytes),
          "path source should preserve file bytes");
+  expect(session.addSourceFromPath(path) == sourceId &&
+             session.addSourceFromPath(path.parent_path() / "." / path.filename()) == sourceId &&
+             session.addSourceFromPath(std::filesystem::relative(path)) == sourceId,
+         "repeated and equivalent file paths should reuse the open source");
+  const auto link = std::filesystem::path(path.string() + ".link");
+  std::error_code linkError;
+  std::filesystem::create_symlink(path, link, linkError);
+  if (!linkError) {
+    expect(session.addSourceFromPath(link) == sourceId, "symlink aliases should reuse the open source");
+    std::filesystem::remove(link);
+  }
 
   session.scanPendingSources();
 
@@ -1260,7 +1271,8 @@ void sessionAddsSourceFromPath() {
   redirected.registerExtractor(SourceExtractor{
       .name = "DeclinePath",
       .extract = [](const ExtractionInput&) { return ExtractionResult{}; },
-      .resolvePath = [&](const std::filesystem::path& input) -> std::optional<SourceFile> {
+      .resolvePath = [&](const std::filesystem::path& input,
+                         const SourceExtractor::FileExists&) -> std::optional<SourceFile> {
         expect(input == alias, "resolvers should receive the requested path");
         attempts.push_back("decline");
         return std::nullopt;
@@ -1270,7 +1282,8 @@ void sessionAddsSourceFromPath() {
       .name = "ResolvePath",
       .acceptedFormats = {"probe-path"},
       .extract = [](const ExtractionInput&) { return ExtractionResult{}; },
-      .resolvePath = [&](const std::filesystem::path& input) -> std::optional<SourceFile> {
+      .resolvePath = [&](const std::filesystem::path& input,
+                         const SourceExtractor::FileExists&) -> std::optional<SourceFile> {
         expect(input == alias, "declining a path should leave it unchanged for later resolvers");
         attempts.push_back("resolve");
         return SourceFile{.name = "Resolved source", .path = path, .knownFormat = "probe-path"};
@@ -1279,7 +1292,7 @@ void sessionAddsSourceFromPath() {
   redirected.registerExtractor(SourceExtractor{
       .name = "LaterResolver",
       .extract = [](const ExtractionInput&) { return ExtractionResult{}; },
-      .resolvePath = [](const std::filesystem::path&) -> std::optional<SourceFile> {
+      .resolvePath = [](const std::filesystem::path&, const SourceExtractor::FileExists&) -> std::optional<SourceFile> {
         throw std::runtime_error("path resolution should stop at the first match");
       },
   });
@@ -1293,6 +1306,23 @@ void sessionAddsSourceFromPath() {
   expect(attempts == std::vector<std::string>{"decline", "resolve"},
          "hooks should run in registration order for filesystem loads only");
 
+  // The file can disappear or change on disk while it remains open in the session.
+  std::filesystem::remove(path);
+  expect(session.addSourceFromPath(path) == sourceId, "an open file should not be read again");
+  session.scanPendingSources();
+  expect(session.sources().sourceCount() == 1 && session.snapshot().assets().size() == 1,
+         "reopening a source must not duplicate scans or assets");
+  session.removeSource(sourceId);
+  {
+    std::ofstream out(path, std::ios::binary);
+    out.put(static_cast<char>(0xaa));
+    out.put(static_cast<char>(0x56));
+  }
+  const auto reloaded = session.addSourceFromPath(path);
+  session.scanSource(reloaded);
+  expect(reloaded != sourceId && session.sources().reader(reloaded).size() == 2 &&
+             session.snapshot().assets().size() == 1,
+         "removing a source should allow reopening and scanning the current file bytes");
   std::filesystem::remove(path);
 }
 

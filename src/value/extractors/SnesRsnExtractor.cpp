@@ -73,7 +73,7 @@ constexpr std::array<u8, 7> kRarSignature{'R', 'a', 'r', '!', 0x1a, 0x07, 0x00};
     }
 
     result.sources.push_back(ExtractedSource{
-        .file = SourceFile{.name = rawName, .path = input.source.path, .origin = sourceRange},
+        .file = SourceFile{.name = rawName, .path = input.source.path, .origin = sourceRange, .memberPath = rawName},
         .bytes = std::move(entryBytes),
     });
   }

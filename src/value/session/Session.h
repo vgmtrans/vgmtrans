@@ -66,10 +66,12 @@ public:
   [[nodiscard]] const FormatRegistry& formats() const noexcept { return formats_; }
 
 private:
+  [[nodiscard]] SourceFile resolveSource(const std::filesystem::path& path,
+                                        std::optional<SourceId> parent = {}) const;
   void invalidateSnapshot() noexcept;
   void sealFormats() noexcept;
   void scanSourceAndDerived(SourceId id);
-  void scanOneSource(SourceId source, std::vector<SourceId>& queue);
+  void scanOneSource(const SourceFile& source, std::vector<SourceId>& queue);
   void removeSourceFamily(SourceId source, std::vector<SourceId>& removed);
   void rebuildCollections();
 

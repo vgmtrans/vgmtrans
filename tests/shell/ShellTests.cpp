@@ -276,6 +276,10 @@ void loadingAndErrors(const std::filesystem::path& directory) {
   fixture.fails("load '" + unknown.string() + "'");
   expect(fixture.errors.str().find("no supported music") != std::string::npos, "unrecognized input should be reported");
   fixture.ok("load '" + source.string() + "'");
+  expect(fixture.session.snapshot().collections().size() == 1, "loading an open file should leave the session unchanged");
+  const auto anotherSource = directory / "another.bin";
+  std::filesystem::copy_file(source, anotherSource);
+  fixture.ok("load '" + anotherSource.string() + "'");
   expect(fixture.session.snapshot().collections().size() == 2, "load should add to the existing session");
   fixture.ok("dump 1 '" + (directory / "dump.bin").string() + "'");
   expect(readFile(directory / "dump.bin") == readFile(source), "dump should preserve source bytes");
