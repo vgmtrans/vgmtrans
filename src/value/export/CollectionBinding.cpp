@@ -139,8 +139,8 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
       failed = context.failed;
       for (size_t index = 0; index < soundBanks.size(); ++index) {
         const auto& metadata = soundBanks[index].metadata;
-        const auto& original = snapshot.asset<SoundBankAsset>(members.soundBanks[index])->metadata;
-        if (metadata.id != original.id || metadata.format != original.format) {
+        const auto* original = snapshot.asset<SoundBankAsset>(members.soundBanks[index]);
+        if (original == nullptr || metadata.id != original->metadata.id || metadata.format != original->metadata.format) {
           diagnostics.push_back(exportError("Collection binding changed sound bank identity, format, or order"));
           failed = true;
           break;
