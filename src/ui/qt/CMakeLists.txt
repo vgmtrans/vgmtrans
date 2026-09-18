@@ -1,10 +1,7 @@
 set(QT_NO_PRIVATE_MODULE_WARNING ON)
-find_package(Qt6 REQUIRED COMPONENTS Core Gui ShaderTools Widgets Svg)
-# GuiPrivate was moved to a CMake component starting Qt 6.9,
-# so look for it separately to avoid breaking older versions
-find_package(Qt6 COMPONENTS GuiPrivate QUIET)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg)
+find_package(Qt6 REQUIRED COMPONENTS GuiPrivate)
 message(STATUS "Using Qt: ${Qt6_VERSION}")
-message(STATUS "Has own QtGuiPrivate: ${Qt6GuiPrivate_FOUND}")
 
 if(NOT TARGET QWindowKit::Widgets)
   set(QWINDOWKIT_BUILD_STATIC ON CACHE BOOL "" FORCE)
@@ -14,12 +11,9 @@ if(NOT TARGET QWindowKit::Widgets)
   set(QWINDOWKIT_INSTALL OFF CACHE BOOL "" FORCE)
   add_subdirectory(${PROJECT_SOURCE_DIR}/lib/qwindowkit
                    ${CMAKE_CURRENT_BINARY_DIR}/lib/qwindowkit
-                   EXCLUDE_FROM_ALL
-                   SYSTEM)
+                   EXCLUDE_FROM_ALL SYSTEM)
 endif()
 
-# D-Bus is used on Linux for the XDG FileTransfer portal
-# and on macOS to workaround a macdeployqt bug
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin|FreeBSD|OpenBSD|Linux")
   find_package(Qt6 COMPONENTS DBus QUIET)
 endif()
@@ -34,111 +28,112 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set(GUI_TYPE WIN32)
 endif()
 
+# Qt-facing state and models live in a small library so their value-only
+# dependency boundary can be tested without constructing the full window.
+add_library(vgmtransqtvalue STATIC)
+vgmtrans_enable_project_warnings(vgmtransqtvalue)
+target_sources(vgmtransqtvalue
+  PRIVATE
+    application/WorkspaceController.cpp
+    models/ValueModels.cpp
+  PUBLIC
+    FILE_SET HEADERS TYPE HEADERS
+    FILES
+      application/WorkspaceController.h
+      models/ValueModels.h
+)
+set_target_properties(vgmtransqtvalue PROPERTIES AUTOMOC ON)
+target_compile_features(vgmtransqtvalue PUBLIC cxx_std_20)
+target_include_directories(vgmtransqtvalue PUBLIC ${CMAKE_CURRENT_LIST_DIR})
+target_link_libraries(vgmtransqtvalue PUBLIC vgmtransvalueformats Qt6::Core Qt6::Gui Qt6::Svg)
+
 add_executable(vgmtrans ${GUI_TYPE})
 vgmtrans_enable_project_warnings(vgmtrans)
 target_sources(vgmtrans
   PRIVATE
     About.cpp
-    PlaybackControls.cpp
     Logger.cpp
-    MainWindow.cpp
-    MainWindowDockLayout.cpp
     ManualCollectionDialog.cpp
-    MenuBar.cpp
-    QtVGMRoot.cpp
+    PlaybackControls.cpp
     ReportDialog.cpp
     SequencePlayer.cpp
+    MainWindow.cpp
+    MainWindowDockLayout.cpp
+    MenuBar.cpp
     main_ui.cpp
-    services/MenuManager.cpp
     services/Settings.cpp
-    services/NotificationCenter.cpp
-    services/commands/StitchCommands.cpp
+    util/CapsuleText.cpp
     util/ColorHelpers.cpp
-    util/Helpers.cpp
+    util/ExternalUrl.cpp
     util/InstructionHintLayout.cpp
     util/UIHelpers.cpp
-    widgets/ItemViewDensity.cpp
     widgets/EmptyStateWidget.cpp
-    widgets/SeekBar.cpp
-    widgets/MarqueeLabel.cpp
+    widgets/ItemViewDensity.cpp
     widgets/SnappingSplitter.cpp
+    widgets/StitchPlanModel.cpp
     widgets/StitchUI.cpp
+    widgets/SeekBar.cpp
     widgets/StatusBarContent.cpp
-    widgets/Toast.cpp
-    widgets/ToastHost.cpp
     widgets/TableView.cpp
     widgets/TitleBar.cpp
+    widgets/Toast.cpp
+    widgets/ToastHost.cpp
+    widgets/ToastWindow.cpp
     widgets/Windows11ProxyStyle.cpp
     widgets/WindowBar.cpp
+    workarea/CollectionListView.cpp
+    workarea/MdiArea.cpp
+    workarea/SourceInspectorPresentation.cpp
+    workarea/VGMFileTreeView.cpp
+    workarea/VGMFileView.cpp
     workarea/hexview/HexView.cpp
     workarea/hexview/HexViewRhiHost.cpp
     workarea/hexview/HexViewRhiRenderer.cpp
     workarea/hexview/HexViewRhiWidget.cpp
     workarea/hexview/HexViewRhiWindow.cpp
-    workarea/MdiArea.cpp
-    workarea/RawFileListView.cpp
-    workarea/VGMCollListView.cpp
-    workarea/VGMCollView.cpp
-    workarea/VGMFileTreeView.cpp
-    workarea/VGMFileView.cpp
-    workarea/VGMFileListView.cpp
-
   PRIVATE
     FILE_SET HEADERS TYPE HEADERS
     FILES
       About.h
-      PlaybackControls.h
       Logger.h
-      MainWindow.h
-      MainWindowDockLayout.h
       ManualCollectionDialog.h
-      MenuBar.h
-      QtVGMRoot.h
+      PlaybackPosition.h
+      PlaybackControls.h
       ReportDialog.h
       SequencePlayer.h
-      services/MenuManager.h
-      services/NotificationCenter.h
+      MainWindow.h
+      MainWindowDockLayout.h
+      MenuBar.h
       services/Settings.h
-      services/commands/Command.h
-      services/commands/GeneralCommands.h
-      services/commands/SaveCommands.h
-      services/commands/StitchCommands.h
-      services/commands/VGMCollCommands.h
-  PRIVATE
-    FILE_SET headers_util TYPE HEADERS BASE_DIRS util
-    FILES
+      util/CapsuleText.h
       util/ColorHelpers.h
+      util/ExternalUrl.h
       util/Colors.h
-      util/Helpers.h
       util/InstructionHintLayout.h
       util/LambdaEventFilter.h
       util/Metrics.h
+      util/NonTransientScrollBarStyle.h
       util/TintableSvgIconEngine.h
       util/UIHelpers.h
-  PRIVATE
-    FILE_SET headers_widgets TYPE HEADERS BASE_DIRS widgets
-    FILES
-      widgets/FixedHeightListDelegate.h
       widgets/EmptyStateWidget.h
+      widgets/FixedHeightListDelegate.h
       widgets/ItemViewDensity.h
-      widgets/SeekBar.h
-      widgets/MarqueeLabel.h
       widgets/SnappingSplitter.h
+      widgets/StitchPlanModel.h
+      widgets/StitchUI.h
+      widgets/SeekBar.h
       widgets/StatusBarContent.h
       widgets/TableView.h
       widgets/TitleBar.h
       widgets/Toast.h
       widgets/ToastHost.h
+      widgets/ToastWindow.h
       widgets/Windows11ProxyStyle.h
       widgets/WindowBar.h
-  PRIVATE
-    FILE_SET headers_workarea TYPE HEADERS BASE_DIRS workarea
-    FILES
+      workarea/CollectionListView.h
       workarea/MdiArea.h
-      workarea/RawFileListView.h
-      workarea/VGMCollListView.h
-      workarea/VGMCollView.h
-      workarea/VGMFileListView.h
+      workarea/SourceInspectorPresentation.h
+      workarea/SplitterSnapProvider.h
       workarea/VGMFileTreeView.h
       workarea/VGMFileView.h
       workarea/hexview/HexView.h
@@ -150,62 +145,90 @@ target_sources(vgmtrans
       workarea/hexview/HexViewRhiRenderer.h
       workarea/hexview/HexViewRhiWidget.h
       workarea/hexview/HexViewRhiWindow.h
+      workarea/rhi/RhiWindowDragDropEvents.h
+      workarea/rhi/RhiWindowMainWindowLocator.h
 )
+target_compile_features(vgmtrans PRIVATE cxx_std_20)
+target_include_directories(vgmtrans PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}
+  ${CMAKE_CURRENT_LIST_DIR}/util
+  ${CMAKE_CURRENT_LIST_DIR}/widgets
+  ${CMAKE_CURRENT_LIST_DIR}/workarea)
+target_link_libraries(vgmtrans PRIVATE vgmtransqtvalue vgmtransversion BASS::MIDI
+                      QWindowKit::Widgets Qt6::Widgets Qt6::GuiPrivate Qt6::Svg)
+set_target_properties(vgmtrans PROPERTIES AUTOMOC ON)
 
 if(APPLE)
-  target_sources(vgmtrans PRIVATE util/Helpers_mac.mm)
+  target_sources(vgmtrans PRIVATE
+    util/ExternalUrl_mac.mm
+    widgets/ToastWindow_mac.mm)
   set_target_properties(vgmtrans PROPERTIES OBJCXX_STANDARD 20)
 endif()
 
-target_compile_features(vgmtrans PRIVATE cxx_std_20)
+# These files contain UI behavior that still needs to be reworked against value
+# IDs and snapshots. Keep them visible in the project as reference
+# implementations; they are intentionally not linked into the value-only UI.
+set(VGMTRANS_UI_VALUE_PORT_REFERENCE_SOURCES
+  services/MenuManager.cpp
+  services/MenuManager.h
+  services/NotificationCenter.cpp
+  services/NotificationCenter.h
+  services/commands/Command.h
+  services/commands/GeneralCommands.h
+  services/commands/SaveCommands.h
+  services/commands/StitchCommands.cpp
+  services/commands/StitchCommands.h
+  services/commands/VGMCollCommands.h
+  workarea/RawFileListView.cpp
+  workarea/RawFileListView.h
+  workarea/VGMCollListView.cpp
+  workarea/VGMCollListView.h
+  workarea/VGMCollView.cpp
+  workarea/VGMCollView.h
+  workarea/VGMFileListView.cpp
+  workarea/VGMFileListView.h
+)
+add_custom_target(vgmtrans-ui-value-port-reference
+  SOURCES ${VGMTRANS_UI_VALUE_PORT_REFERENCE_SOURCES})
+set_target_properties(vgmtrans-ui-value-port-reference PROPERTIES
+  FOLDER "VGMTrans/UI migration")
 
-target_link_libraries(
-  vgmtrans
-  PRIVATE vgmtranscore
-          QWindowKit::Widgets
-          Qt6::Widgets
-          Qt6::GuiPrivate
-          Qt6::Svg
-          BASS::MIDI)
+set(VGMTRANS_HEX_VIEW_SHADER_SOURCES
+  workarea/hexview/shaders/hexquad.vert
+  workarea/hexview/shaders/hexquad.frag
+  workarea/hexview/shaders/hexglyph.vert
+  workarea/hexview/shaders/hexglyph.frag
+  workarea/hexview/shaders/hexscreen.vert
+  workarea/hexview/shaders/hexedge.vert
+  workarea/hexview/shaders/hexedge_effect.frag
+  workarea/hexview/shaders/hexcomposite.frag)
+
+# Keep the HexView shader bundle attached through one helper so other UI test or
+# preview targets can opt into the same renderer resources later.
+function(vgmtrans_add_hex_view_shaders target)
+  find_package(Qt6 REQUIRED COMPONENTS ShaderTools)
+  target_compile_definitions(${target} PRIVATE VGMTRANS_VALUE_HEX_VIEW)
+  qt_add_shaders(${target}
+    "hexview_shaders"
+    PREFIX "/shaders"
+    BASE "workarea/hexview/shaders"
+    FILES ${VGMTRANS_HEX_VIEW_SHADER_SOURCES})
+endfunction()
+
+vgmtrans_add_hex_view_shaders(vgmtrans)
 
 if(Qt6DBus_FOUND)
   target_link_libraries(vgmtrans PRIVATE Qt6::DBus)
   target_compile_definitions(vgmtrans PRIVATE VGMTRANS_HAVE_DBUS)
-else()
-  if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-    message(WARNING "Qt6::DBus not found, Wayland drag-and-drop will not work")
-  elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-    message(WARNING "Qt6::DBus not found, final .app bundle may not work")
-  endif()
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  message(WARNING "Qt6::DBus not found, Wayland drag-and-drop will not work")
 endif()
 
-qt_add_shaders(
-  vgmtrans
-  "hexview_shaders"
-  PREFIX "/shaders"
-  BASE "workarea/hexview/shaders"
-  FILES
-    workarea/hexview/shaders/hexquad.vert
-    workarea/hexview/shaders/hexquad.frag
-    workarea/hexview/shaders/hexglyph.vert
-    workarea/hexview/shaders/hexglyph.frag
-    workarea/hexview/shaders/hexscreen.vert
-    workarea/hexview/shaders/hexedge.vert
-    workarea/hexview/shaders/hexedge_effect.frag
-    workarea/hexview/shaders/hexcomposite.frag
-)
-
-# Workaround macdeployqt not correctly deploying QtDbus
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  target_link_libraries(vgmtrans PUBLIC Qt6::DBus)
-endif()
-
-set_target_properties(vgmtrans PROPERTIES AUTOMOC ON)
 qt_add_resources(UI_RESOURCES
                  "${CMAKE_CURRENT_LIST_DIR}/resources/resources.qrc")
 target_sources(vgmtrans PRIVATE ${UI_RESOURCES})
 
-# DLLs need to live next to the main executable for development testing
+# DLLs need to live next to the main executable for development testing.
 if(WIN32)
   add_custom_command(TARGET vgmtrans POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -276,54 +299,31 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
                "${CMAKE_CURRENT_LIST_DIR}/resources/Info.plist.in"
                OUTPUT_NAME VGMTrans)
 
-  target_sources(vgmtrans
-                 PRIVATE "${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns"
-                         "${PROJECT_SOURCE_DIR}/bin/mame_roms.json")
-                         
+  target_sources(vgmtrans PRIVATE "${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns")
   set_source_files_properties(
     "${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns"
-    "${PROJECT_SOURCE_DIR}/bin/mame_roms.json"
-    PROPERTIES MACOSX_PACKAGE_LOCATION Resources
-  )
-
+    PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
   set_target_properties(vgmtrans PROPERTIES
       INSTALL_RPATH "@executable_path/../Frameworks"
-      INSTALL_RPATH_USE_LINK_PATH TRUE
-  )
-
-  install(FILES
-          $<TARGET_FILE:BASS::BASS>
-          $<TARGET_FILE:BASS::MIDI>
-          DESTINATION "VGMTrans.app/Contents/Frameworks"
-  )
+      INSTALL_RPATH_USE_LINK_PATH TRUE)
+  install(FILES $<TARGET_FILE:BASS::BASS> $<TARGET_FILE:BASS::MIDI>
+          DESTINATION "VGMTrans.app/Contents/Frameworks")
 elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
-  target_sources(vgmtrans
-                 PRIVATE "${CMAKE_CURRENT_LIST_DIR}/resources/VGMTrans.rc")
-                 
-  install(FILES "${PROJECT_SOURCE_DIR}/bin/mame_roms.json"
-          DESTINATION "${CMAKE_INSTALL_BINDIR}")
+  target_sources(vgmtrans PRIVATE "${CMAKE_CURRENT_LIST_DIR}/resources/VGMTrans.rc")
   install(FILES $<TARGET_RUNTIME_DLLS:vgmtrans>
           DESTINATION "${CMAKE_INSTALL_BINDIR}")
 
-	set(DEPLOY_EXTRA_OPTIONS
+  set(DEPLOY_EXTRA_OPTIONS
       --no-system-d3d-compiler
       --no-opengl-sw
-      --skip-plugin-types tls
-  )
+      --skip-plugin-types tls)
 elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
   set(APP_ID "io.github.vgmtrans.vgmtrans")
 
-  install(FILES
-          $<TARGET_FILE:BASS::BASS>
-          $<TARGET_FILE:BASS::MIDI>
-	        DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-
+  install(FILES $<TARGET_FILE:BASS::BASS> $<TARGET_FILE:BASS::MIDI>
+          DESTINATION "${CMAKE_INSTALL_LIBDIR}")
   set_target_properties(vgmtrans PROPERTIES
-    INSTALL_RPATH "\$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
-  )
-
-  install(FILES "${CMAKE_SOURCE_DIR}/bin/mame_roms.json"
-          DESTINATION "${CMAKE_INSTALL_DATADIR}/vgmtrans")
+      INSTALL_RPATH "\$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
 
   install(FILES resources/vgmtrans.png
           DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/512x512/apps"
@@ -345,24 +345,23 @@ endif()
 
 install(TARGETS vgmtrans
         BUNDLE DESTINATION .
-        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-)
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 
-if (NOT NO_QT_DEPLOY)
+if(NOT NO_QT_DEPLOY)
   qt_generate_deploy_app_script(
       TARGET vgmtrans
       OUTPUT_SCRIPT deploy_script
       NO_UNSUPPORTED_PLATFORM_ERROR
       NO_TRANSLATIONS
       NO_COMPILER_RUNTIME
-      DEPLOY_TOOL_OPTIONS ${DEPLOY_EXTRA_OPTIONS}
-  )
+      DEPLOY_TOOL_OPTIONS ${DEPLOY_EXTRA_OPTIONS})
   install(SCRIPT ${deploy_script})
 endif()
 
 # ~~~
 # CPack Setup
 # ~~~
+
 set(CPACK_PACKAGE_NAME "vgmtrans")
 set(CPACK_PACKAGE_VENDOR "VGMTrans Team")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
@@ -370,9 +369,9 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
 
 # This is unbranded because generating a .DS_Store on the fly is a nightmare
 # and storing it in the repo has all kind of issues. CI can use a fancy DMG
-# creation method, for local testing this is fine
+# creation method, for local testing this is fine.
 if("DragNDrop" IN_LIST CPACK_GENERATOR)
-  set(CPACK_DMG_VOLUME_NAME "VGMTrans")  
+  set(CPACK_DMG_VOLUME_NAME "VGMTrans")
 
   install(FILES "${PROJECT_SOURCE_DIR}/bin/dmg/README.txt" DESTINATION "." COMPONENT Runtime)
   install(PROGRAMS "${PROJECT_SOURCE_DIR}/bin/dmg/selfsign" DESTINATION "." RENAME "Unblock & Sign" COMPONENT Runtime)
@@ -383,16 +382,16 @@ endif()
 
 if(NOT CPACK_GENERATOR)
   message(STATUS "Falling back to default CPack generator: ZIP")
-	set(CPACK_GENERATOR "ZIP")
+  set(CPACK_GENERATOR "ZIP")
 endif()
 
 if(NOT CPACK_SOURCE_GENERATOR)
   message(STATUS "Falling back to default source archive CPack generator: ZIP")
-	set(CPACK_SOURCE_GENERATOR "TGZ;ZIP")
+  set(CPACK_SOURCE_GENERATOR "TGZ;ZIP")
 endif()
 
-# Prevent hell from populating source packages
-set(CPACK_SOURCE_IGNORE_FILES "/build.*/;/\\\\.git/")
+# Prevent generated build trees from entering source packages.
+set(CPACK_SOURCE_IGNORE_FILES "/build.*/;/\\.git/")
 list(APPEND CPACK_SOURCE_IGNORE_FILES "${CMAKE_BINARY_DIR}")
 
 include(CPack)

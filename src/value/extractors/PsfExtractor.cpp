@@ -1,0 +1,609 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include "value/extractors/PsfExtractor.h"
+
+#include <zlib.h>
+
+#include <algorithm>
+#include <array>
+#include <cctype>
+#include <filesystem>
+#include <fstream>
+#include <limits>
+#include <map>
+#include <optional>
+#include <span>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+namespace vgmtrans::formats::psf {
+
+using namespace core;
+
+namespace {
+
+constexpr u8 kNds2sfVersion = 0x24;
+constexpr u8 kNcsfVersion = 0x25;
+constexpr u8 kGsfVersion = 0x22;
+constexpr u8 kPsf1Version = 0x01;
+constexpr u8 kPsf2Version = 0x02;
+constexpr u8 kSsfVersion = 0x11;
+constexpr u32 kGbaRomBase = 0x08000000;
+constexpr size_t kPsf1DataOffset = 0x800;
+constexpr size_t kPsf1LoadAddressOffset = 0x18;
+constexpr int kMaxRecursion = 10;
+
+struct PsfData {
+  u8 version = 0;
+  std::vector<u8> reserved;
+  std::vector<u8> exe;
+  std::map<std::string, std::string> tags;
+};
+
+struct Image {
+  // PSF libraries overlay byte ranges into an executable image. start/end track the
+  // address span represented by data.
+  u32 start = 0;
+  u32 end = 0;
+  std::vector<u8> data;
+};
+
+[[nodiscard]] bool supportedVersion(u8 version) {
+  return version == kPsf1Version || version == kPsf2Version || version == kSsfVersion || version == kGsfVersion ||
+         version == kNds2sfVersion || version == kNcsfVersion;
+}
+
+[[nodiscard]] std::optional<size_t> dataOffsetForVersion(u8 version) {
+  switch (version) {
+    case kPsf1Version:
+      return kPsf1DataOffset;
+    case kSsfVersion:
+      // SSF uses the ordinary PSF mini-header: a little-endian load address
+      // followed immediately by bytes to overlay into Saturn sound RAM.
+      return 0x04;
+    case kGsfVersion:
+      return 0x0c;
+    case kNds2sfVersion:
+      return 0x08;
+    case kNcsfVersion:
+      return 0x00;
+    default:
+      return std::nullopt;
+  }
+}
+
+[[nodiscard]] bool hasPsfSignature(std::span<const u8> bytes) {
+  return bytes.size() >= 16 && bytes[0] == 'P' && bytes[1] == 'S' && bytes[2] == 'F' && supportedVersion(bytes[3]);
+}
+
+[[nodiscard]] u32 le32(std::span<const u8> bytes, size_t offset) {
+  if (offset > bytes.size() || bytes.size() - offset < 4) {
+    throw std::runtime_error("PSF file is truncated");
+  }
+  return static_cast<u32>(bytes[offset]) | (static_cast<u32>(bytes[offset + 1]) << 8) |
+         (static_cast<u32>(bytes[offset + 2]) << 16) | (static_cast<u32>(bytes[offset + 3]) << 24);
+}
+
+[[nodiscard]] Diagnostic warning(std::string message, SourceRange range) {
+  return Diagnostic{.severity = Severity::Warning, .message = std::move(message), .range = range};
+}
+
+[[nodiscard]] std::vector<u8> inflateZlib(std::span<const u8> compressed) {
+  z_stream stream{};
+  stream.next_in = const_cast<Bytef*>(reinterpret_cast<const Bytef*>(compressed.data()));
+  stream.avail_in = static_cast<uInt>(compressed.size());
+  if (inflateInit(&stream) != Z_OK) {
+    throw std::runtime_error("PSF executable zlib stream could not be initialized");
+  }
+
+  std::vector<u8> output;
+  std::array<u8, 32768> buffer{};
+  int status = Z_OK;
+  while (status == Z_OK) {
+    stream.next_out = reinterpret_cast<Bytef*>(buffer.data());
+    stream.avail_out = static_cast<uInt>(buffer.size());
+    status = inflate(&stream, Z_NO_FLUSH);
+    const auto produced = buffer.size() - stream.avail_out;
+    output.insert(output.end(), buffer.begin(), buffer.begin() + static_cast<std::ptrdiff_t>(produced));
+  }
+
+  inflateEnd(&stream);
+  if (status != Z_STREAM_END) {
+    throw std::runtime_error("PSF executable zlib stream could not be decompressed");
+  }
+  return output;
+}
+
+struct Psf2Member {
+  std::string path;
+  std::vector<u8> bytes;
+};
+
+using Psf2Filesystem = std::map<std::string, Psf2Member>;
+
+[[nodiscard]] std::string psf2PathKey(std::string path) {
+  std::ranges::transform(path, path.begin(), [](unsigned char ch) {
+    return ch == '\\' ? '/' : static_cast<char>(std::tolower(ch));
+  });
+  return path;
+}
+
+[[nodiscard]] std::string psf2Name(std::span<const u8> bytes, size_t offset) {
+  if (offset > bytes.size() || bytes.size() - offset < 36) {
+    throw std::runtime_error("PSF2 directory entry is truncated");
+  }
+  const auto end = std::find(bytes.begin() + static_cast<std::ptrdiff_t>(offset),
+                             bytes.begin() + static_cast<std::ptrdiff_t>(offset + 36), u8{0});
+  if (end == bytes.begin() + static_cast<std::ptrdiff_t>(offset)) {
+    throw std::runtime_error("PSF2 directory entry has an empty name");
+  }
+  return {reinterpret_cast<const char*>(bytes.data() + offset),
+          static_cast<size_t>(end - bytes.begin()) - offset};
+}
+
+void unpackPsf2Directory(std::span<const u8> bytes, size_t tableOffset, u32 count, std::string_view prefix,
+                         Psf2Filesystem& filesystem, int depth = 0) {
+  constexpr size_t kEntrySize = 48;
+  constexpr u32 kMaxEntries = 65536;
+  if (depth >= kMaxRecursion || count > kMaxEntries || tableOffset > bytes.size() ||
+      static_cast<u64>(count) * kEntrySize > bytes.size() - tableOffset) {
+    throw std::runtime_error("PSF2 directory table is invalid");
+  }
+
+  for (u32 i = 0; i < count; ++i) {
+    const size_t entry = tableOffset + static_cast<size_t>(i) * kEntrySize;
+    const std::string name = psf2Name(bytes, entry);
+    const u32 offset = le32(bytes, entry + 36);
+    const u32 fileSize = le32(bytes, entry + 40);
+    const u32 blockSize = le32(bytes, entry + 44);
+    const std::string path = prefix.empty() ? name : std::string(prefix) + "/" + name;
+
+    if (fileSize == 0 && blockSize == 0) {
+      if (offset == 0) {
+        filesystem.insert_or_assign(psf2PathKey(path), Psf2Member{.path = path});
+        continue;
+      }
+      const u32 childCount = le32(bytes, offset);
+      unpackPsf2Directory(bytes, static_cast<size_t>(offset) + 4, childCount, path, filesystem, depth + 1);
+      continue;
+    }
+    if (blockSize == 0) {
+      throw std::runtime_error("PSF2 file has a zero block size");
+    }
+
+    const u32 blockCount = fileSize == 0 ? 0 : 1 + (fileSize - 1) / blockSize;
+    const size_t sizeTable = offset;
+    if (sizeTable > bytes.size() || static_cast<u64>(blockCount) * 4 > bytes.size() - sizeTable) {
+      throw std::runtime_error("PSF2 block table is truncated");
+    }
+
+    size_t compressedOffset = sizeTable + static_cast<size_t>(blockCount) * 4;
+    std::vector<u8> output;
+    output.reserve(fileSize);
+    for (u32 block = 0; block < blockCount; ++block) {
+      const u32 compressedSize = le32(bytes, sizeTable + static_cast<size_t>(block) * 4);
+      if (compressedOffset > bytes.size() || compressedSize > bytes.size() - compressedOffset) {
+        throw std::runtime_error("PSF2 compressed block is truncated");
+      }
+      uLongf decodedSize = std::min<u32>(blockSize, fileSize - static_cast<u32>(output.size()));
+      std::vector<u8> decoded(decodedSize);
+      const int status = uncompress(reinterpret_cast<Bytef*>(decoded.data()), &decodedSize,
+                                    reinterpret_cast<const Bytef*>(bytes.data() + compressedOffset), compressedSize);
+      if (status != Z_OK || decodedSize != decoded.size()) {
+        throw std::runtime_error("PSF2 compressed block could not be decompressed");
+      }
+      output.insert(output.end(), decoded.begin(), decoded.end());
+      compressedOffset += compressedSize;
+    }
+    filesystem.insert_or_assign(psf2PathKey(path), Psf2Member{.path = path, .bytes = std::move(output)});
+  }
+}
+
+[[nodiscard]] Psf2Filesystem unpackPsf2(std::span<const u8> bytes) {
+  Psf2Filesystem filesystem;
+  unpackPsf2Directory(bytes, 4, le32(bytes, 0), {}, filesystem);
+  return filesystem;
+}
+
+void overlayPsf2(Psf2Filesystem& filesystem, Psf2Filesystem overlay) {
+  for (auto& [path, member] : overlay) {
+    filesystem.insert_or_assign(path, std::move(member));
+  }
+}
+
+void parseTags(PsfData& psf, std::span<const u8> bytes, size_t offset) {
+  if (offset > bytes.size() || bytes.size() - offset < 5 ||
+      !std::equal(bytes.begin() + offset, bytes.begin() + offset + 5, std::string_view("[TAG]").begin())) {
+    return;
+  }
+
+  size_t cursor = offset + 5;
+  while (cursor < bytes.size()) {
+    const size_t lineEnd =
+        std::find(bytes.begin() + static_cast<std::ptrdiff_t>(cursor), bytes.end(), u8{'\n'}) - bytes.begin();
+    const size_t equals = std::find(bytes.begin() + static_cast<std::ptrdiff_t>(cursor),
+                                    bytes.begin() + static_cast<std::ptrdiff_t>(lineEnd), u8{'='}) -
+                          bytes.begin();
+    if (equals < lineEnd) {
+      size_t nameBegin = cursor;
+      size_t nameEnd = equals;
+      size_t valueBegin = equals + 1;
+      size_t valueEnd = lineEnd;
+      while (nameBegin < nameEnd && bytes[nameBegin] <= 0x20) {
+        ++nameBegin;
+      }
+      while (nameEnd > nameBegin && bytes[nameEnd - 1] <= 0x20) {
+        --nameEnd;
+      }
+      while (valueBegin < valueEnd && bytes[valueBegin] <= 0x20) {
+        ++valueBegin;
+      }
+      while (valueEnd > valueBegin && bytes[valueEnd - 1] <= 0x20) {
+        --valueEnd;
+      }
+
+      std::string name(reinterpret_cast<const char*>(bytes.data() + nameBegin), nameEnd - nameBegin);
+      std::string value(reinterpret_cast<const char*>(bytes.data() + valueBegin), valueEnd - valueBegin);
+      std::transform(name.begin(), name.end(), name.begin(),
+                     [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+      auto [it, inserted] = psf.tags.emplace(std::move(name), std::move(value));
+      if (!inserted) {
+        it->second += "\n";
+        it->second.append(reinterpret_cast<const char*>(bytes.data() + valueBegin), valueEnd - valueBegin);
+      }
+    }
+    cursor = lineEnd == bytes.size() ? bytes.size() : lineEnd + 1;
+  }
+}
+
+[[nodiscard]] PsfData parsePsf(std::span<const u8> bytes) {
+  // PSF stores a compressed executable payload followed by text tags. The version byte
+  // determines how to interpret the decompressed payload header.
+  if (!hasPsfSignature(bytes)) {
+    throw std::runtime_error("Unsupported or invalid PSF file");
+  }
+
+  const u8 version = bytes[3];
+  const u32 reservedSize = le32(bytes, 4);
+  const u32 exeSize = le32(bytes, 8);
+  const u32 expectedCrc = le32(bytes, 12);
+  if (reservedSize > bytes.size() || exeSize > bytes.size() ||
+      static_cast<u64>(16) + reservedSize + exeSize > bytes.size()) {
+    throw std::runtime_error("PSF header sizes are invalid");
+  }
+
+  const size_t exeOffset = 16 + reservedSize;
+  PsfData psf{.version = version,
+              .reserved = std::vector<u8>(bytes.begin() + 16, bytes.begin() + 16 + reservedSize)};
+  if (exeSize != 0) {
+    const auto compressed = bytes.subspan(exeOffset, exeSize);
+    const uLong actualCrc = crc32(crc32(0L, nullptr, 0), reinterpret_cast<const Bytef*>(compressed.data()), exeSize);
+    if (actualCrc != expectedCrc) {
+      throw std::runtime_error("PSF executable CRC32 mismatch");
+    }
+    psf.exe = inflateZlib(compressed);
+  }
+
+  parseTags(psf, bytes, exeOffset + exeSize);
+  return psf;
+}
+
+[[nodiscard]] std::optional<std::string> primaryLibName(const PsfData& psf) {
+  if (auto it = psf.tags.find("_lib"); it != psf.tags.end()) {
+    return it->second;
+  }
+  return std::nullopt;
+}
+
+void overlay(Image& image, u32 address, const u8* data, size_t dataSize, size_t imageSize) {
+  // Libraries can extend the image before or after previous payloads. Resize and zero-fill
+  // so later overlays land at their emulated addresses. Some containers omit a zero-filled
+  // tail while retaining its size in the executable header.
+  if (dataSize > imageSize || imageSize > std::numeric_limits<u32>::max() - address) {
+    throw std::runtime_error("PSF executable overlay range is invalid");
+  }
+  if (imageSize == 0) {
+    return;
+  }
+  const u32 overlayEnd = address + static_cast<u32>(imageSize);
+  if (image.data.empty()) {
+    image.start = address;
+    image.end = overlayEnd;
+    image.data.assign(imageSize, 0);
+    std::copy(data, data + dataSize, image.data.begin());
+    return;
+  }
+
+  const u32 newStart = std::min(image.start, address);
+  const u32 newEnd = std::max(image.end, overlayEnd);
+  if (newStart != image.start) {
+    image.data.insert(image.data.begin(), image.start - newStart, 0);
+    image.start = newStart;
+  }
+  if (newEnd > image.end) {
+    image.data.resize(newEnd - image.start, 0);
+    image.end = newEnd;
+  }
+  const auto destination = image.data.begin() + (address - image.start);
+  std::fill(destination, destination + static_cast<std::ptrdiff_t>(imageSize), 0);
+  std::copy(data, data + dataSize, destination);
+}
+
+[[nodiscard]] std::vector<u8> readFile(const std::filesystem::path& path) {
+  std::ifstream stream(path, std::ios::binary);
+  if (!stream) {
+    throw std::runtime_error("could not open PSF library file");
+  }
+
+  stream.seekg(0, std::ios::end);
+  const auto size = stream.tellg();
+  if (size < 0) {
+    throw std::runtime_error("could not stat PSF library file");
+  }
+  stream.seekg(0, std::ios::beg);
+
+  std::vector<u8> bytes(static_cast<size_t>(size));
+  if (!bytes.empty()) {
+    stream.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+  }
+  if (!stream) {
+    throw std::runtime_error("could not read PSF library file");
+  }
+  return bytes;
+}
+
+void overlayPsfExe(const PsfData& psf, Image& image) {
+  // The decompressed executable carries version-specific load metadata. PSF1 stores a
+  // PS-X EXE header; GSF keeps its overlay address in the second word of its mini-header.
+  if (psf.exe.empty()) {
+    return;
+  }
+  const auto dataOffset = dataOffsetForVersion(psf.version);
+  size_t addressOffset = 0;
+  if (psf.version == kPsf1Version) {
+    addressOffset = kPsf1LoadAddressOffset;
+  } else if (psf.version == kGsfVersion) {
+    addressOffset = 4;
+  }
+  if (!dataOffset || psf.exe.size() < *dataOffset || psf.exe.size() < addressOffset + 4) {
+    throw std::runtime_error("PSF executable header is invalid");
+  }
+  const u32 address = le32(psf.exe, addressOffset);
+  const size_t storedSize = psf.exe.size() - *dataOffset;
+  size_t imageSize = storedSize;
+  if (psf.version == kGsfVersion) {
+    const u32 declaredSize = le32(psf.exe, 8);
+    if (declaredSize < storedSize) {
+      throw std::runtime_error("GSF executable payload exceeds its declared size");
+    }
+    imageSize = declaredSize;
+  }
+  overlay(image, address, psf.exe.data() + *dataOffset, storedSize, imageSize);
+}
+
+void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Image& image,
+                  std::vector<Diagnostic>& diagnostics, SourceRange range, int depth = 0);
+
+void loadPsf2WithLibs(const PsfData& psf, const std::filesystem::path& basePath,
+                      Psf2Filesystem& filesystem, std::vector<Diagnostic>& diagnostics, SourceRange range,
+                      int depth = 0);
+
+template <class Load>
+void tryOpenLibrary(const std::filesystem::path& basePath, std::string libName, std::string_view kind,
+                    std::vector<Diagnostic>& diagnostics, SourceRange range, Load&& load) {
+  if (basePath.empty()) {
+    diagnostics.push_back(
+        warning(std::string(kind) + " library could not be resolved without a source path: " + libName, range));
+    return;
+  }
+
+  std::ranges::replace(libName, '\\', '/');
+  const auto libPath = basePath / libName;
+  try {
+    load(parsePsf(readFile(libPath)), libPath.parent_path());
+  } catch (const std::exception& ex) {
+    diagnostics.push_back(
+        warning(std::string(kind) + " library could not be loaded: " + libPath.string() + ": " + ex.what(), range));
+  }
+}
+
+template <class Load>
+void loadNumberedLibraries(const PsfData& psf, Load&& load) {
+  for (int i = 2;; ++i) {
+    const auto found = psf.tags.find("_lib" + std::to_string(i));
+    if (found == psf.tags.end()) {
+      return;
+    }
+    load(found->second);
+  }
+}
+
+void loadPsf2WithLibs(const PsfData& psf, const std::filesystem::path& basePath,
+                      Psf2Filesystem& filesystem, std::vector<Diagnostic>& diagnostics, SourceRange range,
+                      int depth) {
+  if (depth >= kMaxRecursion) {
+    diagnostics.push_back(warning("PSF2 library recursion limit was reached", range));
+    return;
+  }
+
+  const auto loadLibrary = [&](const std::string& name) {
+    tryOpenLibrary(basePath, name, "PSF2", diagnostics, range,
+                   [&](const PsfData& library, const std::filesystem::path& libraryBase) {
+                     if (library.version != kPsf2Version) {
+                       throw std::runtime_error("referenced file is not a PSF2 library");
+                     }
+                     loadPsf2WithLibs(library, libraryBase, filesystem, diagnostics, range, depth + 1);
+                   });
+  };
+  if (const auto lib = primaryLibName(psf)) {
+    loadLibrary(*lib);
+  }
+  loadNumberedLibraries(psf, loadLibrary);
+
+  // PSF2 libraries form a case-insensitive filesystem overlay: every library
+  // is loaded first, then the referring mini replaces conflicting members.
+  overlayPsf2(filesystem, unpackPsf2(psf.reserved));
+}
+
+void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Image& image,
+                  std::vector<Diagnostic>& diagnostics, SourceRange range, int depth) {
+  // Load _lib first, overlay the current file, then load numbered libraries. This matches
+  // common PSF dependency ordering where the track file patches a shared driver image.
+  if (depth >= kMaxRecursion) {
+    diagnostics.push_back(warning("PSF library recursion limit was reached", range));
+    return;
+  }
+
+  const auto loadLibrary = [&](const std::string& name) {
+    tryOpenLibrary(basePath, name, "PSF", diagnostics, range,
+                   [&](const PsfData& library, const std::filesystem::path& libraryBase) {
+                     loadWithLibs(library, libraryBase, image, diagnostics, range, depth + 1);
+                   });
+  };
+  if (const auto lib = primaryLibName(psf)) {
+    loadLibrary(*lib);
+  }
+
+  overlayPsfExe(psf, image);
+  loadNumberedLibraries(psf, loadLibrary);
+}
+
+[[nodiscard]] std::string sourceName(const SourceFile& source) {
+  if (!source.name.empty()) {
+    return source.name;
+  }
+  if (!source.path.empty()) {
+    return source.path.filename().string();
+  }
+  return "PSF image";
+}
+
+[[nodiscard]] std::optional<u32> gsfSongIndex(const PsfData& psf) {
+  if (psf.version != kGsfVersion || psf.exe.size() <= 0x0c || le32(psf.exe, 0) != kGbaRomBase ||
+      le32(psf.exe, 8) != psf.exe.size() - 0x0c) {
+    return std::nullopt;
+  }
+  const auto payload = std::span<const u8>(psf.exe).subspan(0x0c);
+  if (payload.size() == 1) {
+    return payload[0];
+  }
+  if (payload.size() == 2) {
+    return static_cast<u32>(payload[0]) | (static_cast<u32>(payload[1]) << 8);
+  }
+  if (payload.size() == 4) {
+    return le32(payload, 0);
+  }
+  return std::nullopt;
+}
+
+[[nodiscard]] std::string_view extractedFormat(u8 version) {
+  switch (version) {
+    case kPsf1Version:
+      return source_formats::kPlayStationRam;
+    case kSsfVersion:
+      return source_formats::kSaturnRam;
+    case kGsfVersion:
+      return source_formats::kGbaRom;
+    case kNds2sfVersion:
+    case kNcsfVersion:
+      return source_formats::kNintendoDsRom;
+    default:
+      throw std::logic_error("Unsupported PSF version reached extraction");
+  }
+}
+
+}  // namespace
+
+[[nodiscard]] ExtractionResult extractPsf(const ExtractionInput& input) {
+  // The extractor emits one derived executable image. Platform-specific format modules then
+  // inspect that image exactly as if it came from a ROM/container file.
+  const auto bytes = input.reader.slice(0, input.reader.size());
+  if (!hasPsfSignature(bytes)) {
+    return {};
+  }
+
+  ExtractionResult result;
+  const auto range = input.reader.range(0, input.reader.size());
+  const auto psf = parsePsf(bytes);
+
+  if (psf.version == kPsf2Version) {
+    Psf2Filesystem filesystem;
+    const std::filesystem::path basePath =
+        input.source.path.empty() ? std::filesystem::path{} : input.source.path.parent_path();
+    loadPsf2WithLibs(psf, basePath, filesystem, result.diagnostics, range);
+    std::optional<std::string> ini;
+    const auto iniMember = filesystem.find("psf2.ini");
+    if (iniMember != filesystem.end() && iniMember->second.bytes.size() <= 65536) {
+      const auto& iniBytes = iniMember->second.bytes;
+      ini.emplace(iniBytes.begin(), iniBytes.end());
+    }
+    result.sources.reserve(filesystem.size());
+    for (auto& [_, member] : filesystem) {
+      SourceFile file{
+          .name = std::filesystem::path(member.path).filename().string(),
+          .path = input.source.path,
+          .origin = range,
+      };
+      file.attributes.emplace("container-format", "PSF2");
+      file.attributes.emplace("container-member", member.path);
+      if (ini) {
+        file.attributes.emplace(kPsf2IniAttribute, *ini);
+      }
+      result.sources.push_back(ExtractedSource{
+          .file = std::move(file),
+          .bytes = std::move(member.bytes),
+      });
+    }
+    if (result.sources.empty()) {
+      result.diagnostics.push_back(warning("PSF2 filesystem did not contain any files", range));
+    }
+    return result;
+  }
+
+  Image image;
+  const std::filesystem::path basePath =
+      input.source.path.empty() ? std::filesystem::path{} : input.source.path.parent_path();
+  loadWithLibs(psf, basePath, image, result.diagnostics, range);
+  if (image.data.empty()) {
+    result.diagnostics.push_back(warning("PSF file did not produce an executable image", range));
+    return result;
+  }
+
+  SourceFile file{
+      .name = sourceName(input.source),
+      .path = input.source.path,
+      .origin = range,
+      .knownFormat = std::string(extractedFormat(psf.version)),
+  };
+  if (auto title = psf.tags.find("title"); title != psf.tags.end() && !title->second.empty()) {
+    file.title = title->second;
+  }
+  if (const auto songIndex = gsfSongIndex(psf)) {
+    file.attributes.emplace("mp2k.song-index", std::to_string(*songIndex));
+  }
+  if (psf.version == kGsfVersion) {
+    file.attributes.emplace("container-format", "GSF");
+  }
+  result.sources.push_back(ExtractedSource{
+      .file = std::move(file),
+      .bytes = std::move(image.data),
+  });
+  return result;
+}
+
+SourceExtractor psfExtractor() {
+  return SourceExtractor{
+      .name = "PSF",
+      .acceptedFormats = {source_formats::kPsf},
+      .extract = extractPsf,
+  };
+}
+
+}  // namespace vgmtrans::formats::psf

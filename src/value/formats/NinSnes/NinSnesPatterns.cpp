@@ -1,0 +1,140 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include "value/formats/NinSnes/NinSnesPatterns.h"
+
+#include "value/scan/BytePattern.h"
+
+#include <array>
+#include <cstring>
+
+namespace vgmtrans::formats::nin_snes {
+
+Pattern::Pattern(const char* bytes, const char* mask, size_t size)
+    : bytes_(reinterpret_cast<const u8*>(bytes), reinterpret_cast<const u8*>(bytes) + size), mask_(mask, size) {
+}
+
+std::optional<u32> Pattern::find(core::ByteReader reader) const {
+  return core::findBytePattern(reader, core::MaskedBytePattern{bytes_, mask_});
+}
+
+bool Pattern::matches(core::ByteReader reader, u32 offset) const {
+  return core::matchesBytePattern(reader, offset, core::MaskedBytePattern{bytes_, mask_});
+}
+
+#define NINSNES_BYTE_PATTERN Pattern
+#define NINSNES_PATTERN_OWNER Patterns
+#include "../../../shared/NinSnesScannerPatterns.inc"
+#undef NINSNES_PATTERN_OWNER
+#undef NINSNES_BYTE_PATTERN
+
+// FE4 adds only the high byte of its page-aligned instrument table, after
+// checking the voice mask. It does not use the standard two-byte ADC probe.
+Pattern Patterns::ptnLoadInstrTableAddressFE4(
+    "\x8d\x06\xcf\xda\x0e\xe4\x14\x24\x15\xd0\x2a\x60\x98\xfe\x0f\x4d\x7d\x9f\x5c\x08\x04\x5d",
+    "xxxx?x?x?x?xx??xxxxxxx", 22);
+
+// FE3 / Metal Combat FB: keep transpose when the upper nibble is zero,
+// otherwise look up one of seven signed offsets in the driver's own table.
+Pattern Patterns::ptnFe3VoiceTranspose(
+    "\x28\x70\xf0\x08\x9f\xfd\xf6\xfd\x08\xd5\x41\x03\xae",
+    "xxxxxxx??x??x", 13);
+
+// Super Mario World and Pilotwings:
+//   setc / sbc a,#$d0 / mov y,#6 / mov $14,#<table / mov $15,#>table / call instrument-loader
+Pattern Patterns::ptnEarlierPercussionTable("\x80\xa8\xd0\x8d\x06\x8f\x00\x14\x8f\x00\x15\x3f\x00\x00",
+                                            "xxxxxx?xx?xx??", 14);
+
+// Konami:
+//   compare against percussion status, multiply the slot by three, then read
+//   pan, volume reduction, and the note byte from a driver-resident table.
+Pattern Patterns::ptnKonamiPercussionDispatch(
+    "\xad\xca\x90\x00\x3f\x00\x00\xf5\x11\x02\x80\xa8\xca\xc4\x1e\x1c\x84\x1e\xfd\xe4\x00\x24\x47\xf0\x00\xf6\x00\x00",
+    "xxx?x??xxxxxxxxxxxxx?xxx?x??", 28);
+
+// Konami N-SPC derivatives disable the timers, set timer 0's target, then
+// enable timer 0. Gradius III uses absolute register writes; Parodius Da! uses
+// direct-page writes. Both schedulers advance the sequence once per timer 0
+// result, so the immediate operand is the sequence tick duration in units of
+// 125 microseconds.
+Pattern Patterns::ptnKonamiTimer0Direct("\xe8\xf0\xc4\xf1\xe8\x00\xc4\xfa\xe8\x01\xc4\xf1", "xxxxx?xxxxxx", 12);
+Pattern Patterns::ptnKonamiTimer0Absolute("\xe8\xf0\xc5\xf1\x00\xe8\x00\xc5\xfa\x00\xe8\x01\xc5\xf1\x00",
+                                         "xxxxxx?xxxxxxxx", 15);
+
+// Koei places the BGM and SFX section readers together; the first cursor is BGM.
+Pattern Patterns::ptnKoeiSectionPointers("\x8d\x00\xf7\x1d\x3a\x1d\x2d\xf7\x1d\x3a\x1d\x2f\x0b\x8d"
+                                         "\x00\xf7\x1b\x3a\x1b\x2d\xf7\x1b\x3a\x1b\xfd\xae\x6f",
+                                         "xxxxxxxxxxxxxxxxxxxxxxxxxxx", 27);
+
+// Pilotwings:
+//   mov a,$00 / cmp a,#$ff / beq / and a,#$1f / bne start-song
+// $00-$03 are the canonical mirrors of input ports $F4-$F7.
+Pattern Patterns::ptnReadSongRequestPort("\xe4\x00\x68\xff\xf0\x00\x28\x1f\xd0\x00", "x?xxx?xxx?", 10);
+
+// Sunsoft FB sets this voice in the echo-enable mask and clears it in the
+// echo-disable mask. Match the actual command target, not an SFX copy.
+Pattern Patterns::ptnSunsoftEchoOn(
+    "\xe5\xbc\x03\x04\x47\xc5\xbc\x03\xe4\x47\x48\xff\x25\xbe\x03\xc5\xbe\x03\x2f\x12",
+    "x??xxx??xxxxx??x??xx", 20);
+
+// Sunsoft FD builds the voice's ADSR1 register address, then writes two DSP
+// registers. Both revisions share this prefix; the earlier one also saves
+// the values for restoration after a sound effect.
+Pattern Patterns::ptnSunsoftAdsr("\x7d\x9f\x5c\x08\x05\xc4\x14\xdd\xeb\x14", "xxxxxx?xx?", 10);
+
+// Copy BGM section pointers into $30 onwards. Keep the destination fixed
+// to exclude the separate SFX loader at $20 in Hebereke no Popun.
+Pattern Patterns::ptnSunsoftSectionTracks("\xda\x16\x8d\x0f\xf7\x16\xd6\x30\x00\xdc\x10\xf8",
+                                        "xxx?xxxxxxxx", 12);
+
+// Benkei Gaiden places the SFX reader ($D0) immediately before BGM ($40).
+// Both match the standard reader signature; the second one selects music.
+Pattern Patterns::ptnSunsoftBenkeiSectionPointers(
+    "\x8d\x00\xf7\xd0\x3a\xd0\x2d\xf7\xd0\x3a\xd0\xfd\xae\x6f"
+    "\x8d\x00\xf7\x40\x3a\x40\x2d\xf7\x40\x3a\x40\xfd\xae\x6f",
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxx", 28);
+
+// Some HAL derivatives bypass the variable written by FA and apply a fixed
+// percussion base directly in either note dispatch or the instrument loader.
+//
+// Kirby's Dream Land 3:
+//   cmp a,#$ca / bcc / sbc a,#$a7 / call loader / mov y,#$a4
+Pattern Patterns::ptnFixedPercussionBaseDispatch("\x68\xca\x90\x07\xa8\xa7\x3f\x11\x0b\x8d\xa4", "x?x?x?x??xx", 11);
+
+// Vegas Stakes:
+//   mov abs+x,a / mov y,a / bpl +3 / setc / sbc a,#$ca / mov y,#6 / mul ya
+Pattern Patterns::ptnFixedPercussionBaseLoader("\xd5\x11\x02\xfd\x10\x03\x80\xa8\xca\x8d\x06\xcf", "x??xxxxx?xxx", 12);
+
+std::optional<u8> detectFixedPercussionBase(core::ByteReader reader, u8 percussionMinimum) {
+  if (const auto offset = Patterns::ptnFixedPercussionBaseDispatch.find(reader)) {
+    const u8 detectedMinimum = reader.u8At(*offset + 1);
+    const u8 subtract = reader.u8At(*offset + 5);
+    if (detectedMinimum == percussionMinimum && subtract <= detectedMinimum) {
+      return static_cast<u8>(detectedMinimum - subtract);
+    }
+  }
+  if (const auto offset = Patterns::ptnFixedPercussionBaseLoader.find(reader)) {
+    const u8 subtract = reader.u8At(*offset + 8);
+    if (subtract <= percussionMinimum) {
+      return static_cast<u8>(percussionMinimum - subtract);
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<u8> detectKonamiTempoTimerTarget(core::ByteReader reader) {
+  if (const auto offset = Patterns::ptnKonamiTimer0Direct.find(reader)) {
+    const u8 target = reader.u8At(*offset + 5);
+    return target == 0 ? std::nullopt : std::optional{target};
+  }
+  if (const auto offset = Patterns::ptnKonamiTimer0Absolute.find(reader)) {
+    const u8 target = reader.u8At(*offset + 6);
+    return target == 0 ? std::nullopt : std::optional{target};
+  }
+  return std::nullopt;
+}
+
+}  // namespace vgmtrans::formats::nin_snes

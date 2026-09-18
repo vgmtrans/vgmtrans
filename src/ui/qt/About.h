@@ -7,6 +7,8 @@
 #pragma once
 
 #include <QDialog>
+#include <QHash>
+#include <QString>
 
 class QTabWidget;
 

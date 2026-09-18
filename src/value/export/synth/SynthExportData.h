@@ -1,0 +1,104 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#pragma once
+
+#include "value/base/Source.h"
+#include "value/export/synth/ModulationScaling.h"
+#include "value/synth/SampleFiltering.h"
+#include "value/synth/SynthModel.h"
+
+#include <span>
+#include <string>
+#include <vector>
+
+namespace vgmtrans::core {
+
+struct PerformanceSequence;
+
+struct SynthExportInput {
+  std::string name;
+  std::span<const SoundBankAsset* const> soundBanks;
+  std::span<const SamplePoolAsset* const> samplePools;
+  // Null retains every instrument. A performance selects the instruments used
+  // by its notes; sample filtering can also be requested independently.
+  const PerformanceSequence* sequenceUsage = nullptr;
+  bool filterSamplesToReferencedInstruments = false;
+  const MidiModulationUsage* midiModulationUsage = nullptr;
+  ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
+  ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;
+  SampleFilteringPolicy sampleFiltering = SampleFilteringPolicy::FormatPreferred;
+};
+
+struct SynthExportResult {
+  std::vector<u8> bytes;
+  std::vector<Diagnostic> diagnostics;
+};
+
+[[nodiscard]] SynthExportResult buildDls(const SynthExportInput& input, const SourceStore& sources);
+[[nodiscard]] SynthExportResult buildSoundFont2(const SynthExportInput& input, const SourceStore& sources);
+
+struct SynthSampleDecodeOptions {
+  bool requireMono = false;
+  std::string nonMonoWarning;
+};
+
+// One entry in the flat sample table consumed by synth container writers.
+struct DecodedSynthSample {
+  std::string name;
+  Tuning pitch;
+  double attenuationDb = 0.0;
+  DecodedSample decoded;
+};
+
+struct ResolvedSynthRegion {
+  Region region;
+  u32 sampleIndex = 0;
+  LoweredSynthModulation modulation;
+};
+
+struct ResolvedSynthInstrument {
+  // Borrows source instrument metadata; sampled region values below are owned.
+  const Instrument* instrument = nullptr;
+  InstrumentAddress address;
+  std::vector<ResolvedSynthRegion> regions;
+  LoweredSynthModulation modulation;
+};
+
+// Sample references and modulation policy are resolved before container layout.
+struct PreparedSynthData {
+  std::vector<DecodedSynthSample> samples;
+  std::vector<ResolvedSynthInstrument> instruments;
+  std::vector<Diagnostic> diagnostics;
+};
+
+// Apply the same performance-based instrument selection used by SF2 and DLS
+// preparation without decoding samples or lowering a container.
+[[nodiscard]] std::vector<const Instrument*> selectSynthInstruments(std::span<const SoundBankAsset* const> soundBanks,
+                                                                    const PerformanceSequence* sequenceUsage);
+
+// SF2 and DLS have one decay followed by a fixed sustain level. Approximate a
+// richer envelope using both endpoint timing and perceptual salience, without
+// changing the instrument data kept by the scanner. attenuationRangeDb is the
+// target's full-scale volume-envelope range.
+[[nodiscard]] Envelope approximateEnvelopeAsAdsr(Envelope envelope, double attenuationRangeDb = 100.0);
+
+// Use one resolution across a bank, including its static regions. The default
+// leaves room for generators/modulators in SF2's 16-bit tables and is also used
+// by DLS and instrument variants to keep their zones consistent.
+[[nodiscard]] u32 regionSamplingStep(const SoundBankAsset& bank, std::vector<Diagnostic>& diagnostics,
+                                     u32 maxRegions = 3000);
+
+// Sample cell midpoints only on dependent axes. Returned regions own their
+// values and have no pending response, so later envelope/stereo edits persist.
+[[nodiscard]] std::vector<Region> sampleRegionResponses(std::span<const Region> regions, u32 step);
+
+// Decode samples and resolve instrument references once before a format-specific
+// writer lays out its container.
+[[nodiscard]] PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceStore& sources,
+                                                 const SynthSampleDecodeOptions& options = {});
+
+}  // namespace vgmtrans::core
