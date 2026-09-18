@@ -235,6 +235,7 @@ add_library(vgmtransvalueformats STATIC)
 vgmtrans_enable_project_warnings(vgmtransvalueformats)
 target_sources(vgmtransvalueformats
   PRIVATE
+    ${PROJECT_SOURCE_DIR}/src/value/extractors/CueExtractor.cpp
     ${PROJECT_SOURCE_DIR}/src/value/extractors/MameRomSetExtractor.cpp
     ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.cpp
     ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesRsnExtractor.cpp
@@ -422,6 +423,7 @@ target_sources(vgmtransvalueformats
     FILE_SET HEADERS
     BASE_DIRS ${PROJECT_SOURCE_DIR}/src
     FILES
+      ${PROJECT_SOURCE_DIR}/src/value/extractors/CueExtractor.h
       ${PROJECT_SOURCE_DIR}/src/value/extractors/MameRomSetExtractor.h
       ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesRsnExtractor.h
       ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.h

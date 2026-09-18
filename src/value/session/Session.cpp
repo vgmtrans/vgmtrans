@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <atomic>
 #include <array>
+#include <cctype>
 #include <exception>
 #include <fstream>
 #include <future>
@@ -115,6 +116,17 @@ SourceId Session::addSource(SourceFile file, std::vector<u8> bytes) {
 }
 
 SourceId Session::addSourceFromPath(std::filesystem::path path) {
+  auto extension = path.extension().string();
+  std::ranges::transform(extension, extension.begin(), [](unsigned char c) { return std::tolower(c); });
+  if (extension == ".bin") {
+    auto cue = path;
+    cue.replace_extension(".cue");
+    if (std::filesystem::is_regular_file(cue)) {
+      path = std::move(cue);
+      extension = ".cue";
+    }
+  }
+
   std::ifstream file(path, std::ios::binary);
   if (!file) {
     throw std::runtime_error("failed to open source file: " + path.string());
@@ -139,6 +151,7 @@ SourceId Session::addSourceFromPath(std::filesystem::path path) {
       SourceFile{
           .name = path.filename().string(),
           .path = std::move(path),
+          .knownFormat = extension == ".cue" ? std::optional<std::string>{source_formats::kCue} : std::nullopt,
       },
       std::move(bytes));
 }
