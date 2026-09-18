@@ -448,22 +448,26 @@ template <class Validate>
 }
 
 [[nodiscard]] std::vector<MiddleProfile> middleProfiles(ByteReader reader) {
-  std::vector<MiddleProfile> profiles{
-      MiddleProfile{Variant::AceONerae, kAceONeraeCommandTable, {0x30, 0x50}},
-      MiddleProfile{Variant::DarkKingdom, kDarkKingdomCommandTable, {0x47, 0x59}},
-  };
+  std::vector<MiddleProfile> profiles;
   std::vector<u8> discoveredPages;
   appendUnique(discoveredPages, reader.u8At(kMiddleBankPageAddress));
   for (u8 page : patternImmediates(reader, {{&kMiddleSetHeaderBank, 1}})) {
     appendUnique(discoveredPages, page);
   }
+  // A known table address is not evidence unless the driver actually dispatches through it.
   u32 begin = 0;
   while (const auto found = findBytePattern(reader, kMiddleHighCommandDispatch, begin)) {
     const u32 table = reader.le16(*found + 6);
     if (usableMiddleCommandTable(reader, table) && std::ranges::none_of(profiles, [&](const MiddleProfile& profile) {
           return profile.commandTableAddress == table;
         })) {
-      profiles.push_back(MiddleProfile{Variant::Middle, table, discoveredPages});
+      if (table == kAceONeraeCommandTable) {
+        profiles.push_back(MiddleProfile{Variant::AceONerae, table, {0x30, 0x50}});
+      } else if (table == kDarkKingdomCommandTable) {
+        profiles.push_back(MiddleProfile{Variant::DarkKingdom, table, {0x47, 0x59}});
+      } else {
+        profiles.push_back(MiddleProfile{Variant::Middle, table, discoveredPages});
+      }
     }
     begin = *found + 1;
   }
@@ -589,9 +593,6 @@ std::optional<Layout> findLayout(ByteReader reader) {
 
   std::optional<std::pair<MiddleProfile, HeaderCandidate>> bestMiddle;
   for (const auto& profile : middleProfiles(reader)) {
-    if (!usableMiddleCommandTable(reader, profile.commandTableAddress)) {
-      continue;
-    }
     auto candidate = middleCandidate(reader, profile);
     if (candidate && (!bestMiddle || candidate->score > bestMiddle->second.score)) {
       bestMiddle = std::pair{profile, std::move(*candidate)};

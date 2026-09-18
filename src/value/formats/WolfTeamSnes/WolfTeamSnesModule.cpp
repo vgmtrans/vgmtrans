@@ -6,8 +6,6 @@
 
 #include "value/formats/WolfTeamSnes/WolfTeamSnes.h"
 
-#include <fmt/format.h>
-
 #include <string>
 
 namespace vgmtrans::formats::wolf_team_snes {
@@ -23,8 +21,7 @@ namespace {
   }
 
   ScanResultBuilder result(input, "WolfTeamSnes");
-  const std::string sourceName = result.sourceDisplayName();
-  const std::string displayName = fmt::format("{} ({})", sourceName, variantName(layout->variant));
+  const std::string displayName = result.sourceDisplayName();
   auto sequence = result.sequence(displayName);
   sequence.program(decodeSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics()));
 

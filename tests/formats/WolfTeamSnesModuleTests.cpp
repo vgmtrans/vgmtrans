@@ -189,7 +189,11 @@ void scannersIdentifyAllThreeDriverEras() {
              arcus->channels[1].streamStarts == std::vector<u16>{0x2120} && arcus->instruments.confirmed,
          "Arcus DIR signature should recover both active segmented channels and the six-byte patch model");
 
-  const auto middle = findLayout(ByteReader(SourceId{173}, middleScannerFixture()));
+  auto middleBytes = middleScannerFixture();
+  expect(!findLayout(ByteReader(SourceId{173}, middleBytes)),
+         "a plausible command table and header without the middle driver dispatch must not identify Wolf Team");
+  writeBytes(middleBytes, 0x1000, {0x80, 0xa8, 0xe0, 0x1c, 0x5d, 0x1f, 0x35, 0x20});
+  const auto middle = findLayout(ByteReader(SourceId{173}, middleBytes));
   expect(middle && middle->variant == Variant::DarkKingdom && middle->middleCommandTableAddress == 0x2035 &&
              middle->channels[1].streamStarts == std::vector<u16>{0x5120},
          "the audited middle command table should select Dark Kingdom and its relative segment pointers");
