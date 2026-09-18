@@ -47,7 +47,7 @@ enum class Version : u8 {
 
 struct Dialect {
   u8 commandCutoff = 0;
-  std::optional<u8> noteAliasOpcode;
+  std::optional<u8> noteAliasOpcode = std::nullopt;
 };
 
 [[nodiscard]] constexpr Dialect dialect(Version version) noexcept {
