@@ -19,6 +19,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -104,6 +105,12 @@ struct ProgramState {
     return found == regions.end() ? nullptr : &*found;
   }
 
+  [[nodiscard]] const Envelope& envelope(u16 adsr1, u16 adsr2) {
+    const u32 key = (static_cast<u32>(adsr1) << 16) | adsr2;
+    if (const auto found = envelopes.find(key); found != envelopes.end()) return found->second;
+    return envelopes.emplace(key, psxSpuEnvelope(adsr1, adsr2)).first->second;
+  }
+
   void saveLoop() {
     savedLoop.emplace(LoopState{.global = global});
     savedLoop->tracks.reserve(tracks.size());
@@ -154,6 +161,7 @@ struct ProgramState {
   double reverbSend;
   std::span<const Instrument> instruments;
   std::vector<PlaybackTrack> tracks;
+  std::unordered_map<u32, Envelope> envelopes;
   std::optional<LoopState> savedLoop;
   std::vector<u64> loopEnds;
 };
@@ -190,7 +198,7 @@ struct Playback : SequencePlayback<PlaybackTrack> {
     if (track.adsr.sustainRate) adsr2 = static_cast<u16>((adsr2 & ~0x1fc0u) | ((*track.adsr.sustainRate & 0x7f) << 6));
     if (track.adsr.sustainLevel) adsr1 = static_cast<u16>((adsr1 & ~0x000fu) | (*track.adsr.sustainLevel & 0x0f));
     if (track.adsr.releaseRate) adsr2 = static_cast<u16>((adsr2 & ~0x001fu) | (*track.adsr.releaseRate & 0x1f));
-    out.replaceEnvelope(psxSpuEnvelope(adsr1, adsr2), scope);
+    out.replaceEnvelope(program.envelope(adsr1, adsr2), scope);
   }
 
   void prepareVoice(bool reusesVoice) {
