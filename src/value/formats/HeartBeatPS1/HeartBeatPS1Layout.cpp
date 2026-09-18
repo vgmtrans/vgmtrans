@@ -212,6 +212,14 @@ std::optional<HeartBeatPs1ContainerLayout> readHeartBeatPs1Container(ByteReader 
     if (programCount == 0 || toneCount == 0 || required > descriptor.attributeSize) {
       return std::nullopt;
     }
+    for (u32 program = 0; program < programCount; ++program) {
+      for (u32 slot = 0; slot < 16; ++slot) {
+        const u16 tone = reader.le16(attributeOffset + 8 + program * 0x24 + slot * 2);
+        if (tone != 0xffff && tone >= toneCount) {
+          return std::nullopt;
+        }
+      }
+    }
     container.banks.push_back(HeartBeatPs1BankLayout{
         .sampleOffset = static_cast<u32>(cursor),
         .sampleSize = descriptor.sampleSize,

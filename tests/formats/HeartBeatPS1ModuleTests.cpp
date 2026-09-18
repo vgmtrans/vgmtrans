@@ -229,10 +229,22 @@ void moduleSkipsBanksWithoutReferencedTones() {
          "a bank without referenced tones must not publish an empty sound bank");
 }
 
+void rejectsOutOfRangeToneReferences() {
+  auto bytes = heartBeatFixture();
+  le32(bytes, 0, 0);
+  bytes.resize(0x3c + 0x20 + 8 + 0x24 + 0x14);
+  expect(readHeartBeatPs1Container(ByteReader{SourceId{91}, bytes}, 0).has_value(),
+         "a valid bank-only container should be detected");
+  le16(bytes, 0x3c + 0x20 + 8, 1);
+  expect(!readHeartBeatPs1Container(ByteReader{SourceId{91}, bytes}, 0),
+         "out-of-range tone references should reject a header-shaped non-bank");
+}
+
 }  // namespace
 
 void runHeartBeatPs1ModuleTests() {
   sequenceModelsAuditedDriverFeatures();
   moduleBuildsEmbeddedWaveBank();
   moduleSkipsBanksWithoutReferencedTones();
+  rejectsOutOfRangeToneReferences();
 }
