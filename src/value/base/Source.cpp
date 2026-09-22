@@ -173,6 +173,9 @@ void ByteReader::require(u64 offset, u64 size) const {
 }
 
 SourceId SourceStore::add(SourceFile file, std::vector<u8> bytes) {
+  if (file.parent && !contains(*file.parent)) {
+    throw std::invalid_argument("Derived source parent is not present");
+  }
   const auto path = file.derived() ? file.memberPath.value_or(std::filesystem::path{}) : file.path;
   if (const auto existing = findFile(path, file.parent)) {
     return *existing;
@@ -210,12 +213,7 @@ std::optional<SourceId> SourceStore::findFile(const std::filesystem::path& path,
 }
 
 SourceId SourceStore::addDerived(SourceFile file, std::vector<u8> bytes, SourceId defaultParent) {
-  const SourceId parent = file.origin && file.origin->source.valid() ? file.origin->source : defaultParent;
-  if (!contains(parent)) {
-    throw std::invalid_argument("Derived source parent is not present");
-  }
-
-  file.parent = parent;
+  file.parent = file.origin && file.origin->source.valid() ? file.origin->source : defaultParent;
   return add(std::move(file), std::move(bytes));
 }
 

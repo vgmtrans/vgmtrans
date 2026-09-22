@@ -3505,6 +3505,21 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   remain unavailable. No production or permanent test code changed; temporary
   probe files were removed.
 
+## Validate source parents at the insertion boundary
+
+- `SourceStore::add` now checks that a supplied parent exists and remains
+  active. `addDerived` only selects the parent before delegating. This removes
+  a local variable and ensures both public insertion paths enforce the same
+  ownership rule, with two fewer production lines.
+- Direct insertion previously admitted an orphan when its member path was
+  empty, or could index a missing parent's member table for a named member.
+  A temporary before/after probe confirmed orphan admission before the change
+  and rejection without mutation afterward. The existing parent-validation
+  fixture now exercises both entry points with missing, self, and removed
+  parents; test code grew by five net lines.
+- Validation: warning-free macOS Debug build (26 steps); all 22 CTest targets
+  pass (10.44 s). Temporary probes were removed.
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage

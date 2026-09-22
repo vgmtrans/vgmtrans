@@ -1172,13 +1172,24 @@ void sourceStoreRejectsMissingOrRemovedDerivedParents() {
   const auto empty = store.add(SourceFile{.name = "empty"}, {});
   expect(store.contains(empty) && store.bytes(empty).empty(), "an empty file is still an active source");
 
-  bool missingParentFailed = false;
-  try {
-    static_cast<void>(store.addDerived(SourceFile{.name = "missing.child"}, {0xbb}, SourceId{99}));
-  } catch (const std::invalid_argument&) {
-    missingParentFailed = true;
-  }
-  expect(missingParentFailed, "derived source parent must already exist");
+  const auto rejectParent = [&](SourceId parent) {
+    for (const bool derived : {false, true}) {
+      bool failed = false;
+      try {
+        SourceFile child{.parent = parent};
+        if (derived) {
+          static_cast<void>(store.addDerived(std::move(child), {0xbb}, parent));
+        } else {
+          static_cast<void>(store.add(std::move(child), {0xbb}));
+        }
+      } catch (const std::invalid_argument&) {
+        failed = true;
+      }
+      expect(failed && store.sourceCount() == 1, "both insertion paths require an existing active parent");
+    }
+  };
+  rejectParent(SourceId{99});
+  rejectParent(SourceId{1});  // The next insertion cannot become its own parent.
 
   const auto parent = store.add(SourceFile{.name = "parent"}, {0xaa});
   const SharedSourceBytes retainedBytes = store.sharedBytes(parent);
@@ -1186,13 +1197,7 @@ void sourceStoreRejectsMissingOrRemovedDerivedParents() {
   expect(!store.contains(parent) && store.sourceCount() == 1 && retainedBytes && *retainedBytes == std::vector<u8>{0xaa},
          "retained inspection bytes should survive removal without keeping the source active");
 
-  bool removedParentFailed = false;
-  try {
-    static_cast<void>(store.addDerived(SourceFile{.name = "removed.child"}, {0xbb}, parent));
-  } catch (const std::invalid_argument&) {
-    removedParentFailed = true;
-  }
-  expect(removedParentFailed, "derived source parent must still be active");
+  rejectParent(parent);
 }
 
 void sessionStateRebuildsLookupIndexAfterRemoval() {
