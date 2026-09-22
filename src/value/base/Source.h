@@ -45,16 +45,6 @@ inline constexpr char kSpc[] = "Spc";
 inline constexpr char kSnesAram[] = "SnesAram";
 }  // namespace source_formats
 
-enum class SourceKind {
-  UserLoaded,
-  Derived,
-};
-
-enum class SourceStatus {
-  Active,
-  Removed,
-};
-
 // A named byte range inside a container-derived source. Extractors use segments
 // to preserve the layout of assembled inputs (for example, MAME ROM regions)
 // without inventing a format-specific wrapper file.
@@ -69,8 +59,6 @@ struct SourceSegment {
 
 struct SourceFile {
   SourceId id;
-  SourceKind kind = SourceKind::UserLoaded;
-  SourceStatus status = SourceStatus::Active;
   std::string name;
   std::optional<std::string> title;
   // Host filesystem location. Derived sources retain their outer container's
@@ -78,7 +66,8 @@ struct SourceFile {
   std::filesystem::path path;
   u64 size = 0;
   // Derived sources are real session entries, such as archive members, SPC RAM,
-  // or PSF executable images. parent/origin record where they came from.
+  // or PSF executable images. A parent identifies a derived source; roots are
+  // user-loaded. origin can additionally identify the source byte range.
   std::optional<SourceId> parent;
   std::optional<SourceRange> origin;
   // Authoritative knowledge about the representation of these bytes. Modules
@@ -92,8 +81,7 @@ struct SourceFile {
   // Set only for actual container members, not transformed data such as SPC RAM.
   std::optional<std::filesystem::path> memberPath;
 
-  [[nodiscard]] bool derived() const noexcept { return kind == SourceKind::Derived; }
-  [[nodiscard]] bool active() const noexcept { return status == SourceStatus::Active; }
+  [[nodiscard]] bool derived() const noexcept { return parent.has_value(); }
   [[nodiscard]] std::optional<std::string_view> attribute(std::string_view key) const noexcept;
   [[nodiscard]] const SourceSegment* segment(std::string_view segmentName) const noexcept;
   [[nodiscard]] std::optional<SourceRange> segmentRange(std::string_view segmentName) const noexcept;
@@ -183,6 +171,7 @@ public:
 private:
   struct Entry {
     SourceFile file;
+    // Null marks a removed entry; an empty byte vector is still an active source.
     SharedSourceBytes bytes;
     std::unordered_map<std::filesystem::path, SourceId> members;
   };

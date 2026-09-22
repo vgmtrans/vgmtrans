@@ -183,7 +183,6 @@ SourceId SourceStore::add(SourceFile file, std::vector<u8> bytes) {
   }
   const auto id = SourceId{static_cast<u32>(entries_.size())};
   file.id = id;
-  file.status = SourceStatus::Active;
   file.size = bytes.size();
   if (file.name.empty() && !file.path.empty()) {
     file.name = file.path.filename().string();
@@ -216,7 +215,6 @@ SourceId SourceStore::addDerived(SourceFile file, std::vector<u8> bytes, SourceI
     throw std::invalid_argument("Derived source parent is not present");
   }
 
-  file.kind = SourceKind::Derived;
   file.parent = parent;
   return add(std::move(file), std::move(bytes));
 }
@@ -226,7 +224,6 @@ std::vector<SourceId> SourceStore::removeFamily(SourceId id) {
   for (const SourceId source : family) {
     auto& entry = entries_[source.value];
     entry.members.clear();
-    entry.file.status = SourceStatus::Removed;
     entry.file.size = 0;
     entry.bytes.reset();
   }
@@ -234,7 +231,7 @@ std::vector<SourceId> SourceStore::removeFamily(SourceId id) {
 }
 
 bool SourceStore::contains(SourceId id) const noexcept {
-  return hasSlot(id) && entries_[id.value].file.active();
+  return hasSlot(id) && entries_[id.value].bytes != nullptr;
 }
 
 bool SourceStore::hasSlot(SourceId id) const noexcept {
@@ -259,14 +256,14 @@ const SourceFile& SourceStore::source(SourceId id) const {
 }
 
 size_t SourceStore::sourceCount() const noexcept {
-  return static_cast<size_t>(std::ranges::count_if(entries_, [](const Entry& entry) { return entry.file.active(); }));
+  return static_cast<size_t>(std::ranges::count_if(entries_, [](const Entry& entry) { return entry.bytes != nullptr; }));
 }
 
 std::vector<SourceFile> SourceStore::sourceFiles() const {
   std::vector<SourceFile> files;
   files.reserve(sourceCount());
   for (const auto& e : entries_) {
-    if (e.file.active()) {
+    if (e.bytes) {
       files.push_back(e.file);
     }
   }
@@ -283,7 +280,7 @@ std::vector<SourceId> SourceStore::sourceFamily(SourceId id) const {
   for (size_t index = 0; index < family.size(); ++index) {
     const SourceId parent = family[index];
     for (const auto& entry : entries_) {
-      if (entry.file.active() && entry.file.parent == parent) {
+      if (entry.bytes && entry.file.parent == parent) {
         family.push_back(entry.file.id);
       }
     }
@@ -294,7 +291,7 @@ std::vector<SourceId> SourceStore::sourceFamily(SourceId id) const {
 std::vector<SourceId> SourceStore::activeUserSources() const {
   std::vector<SourceId> sources;
   for (const auto& entry : entries_) {
-    if (entry.file.active() && !entry.file.derived()) {
+    if (entry.bytes && !entry.file.derived()) {
       sources.push_back(entry.file.id);
     }
   }

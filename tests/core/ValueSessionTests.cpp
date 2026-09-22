@@ -62,7 +62,9 @@ void sessionScansValuesAndDerivedSources() {
   expect(snapshot.sources().size() == 2, "scan should include extracted derived source");
   expect(snapshot.source(sourceId) == &snapshot.sources()[0], "session snapshot should find a source by stable id");
   expect(snapshot.source(SourceId{99}) == nullptr, "session snapshot should return null for a missing source id");
-  expect(snapshot.sources()[1].derived(), "extracted source should be derived");
+  expect(!snapshot.sources()[0].derived() && snapshot.sources()[1].derived() &&
+             snapshot.sources()[1].parent == sourceId,
+         "only extracted sources should have a parent and be classified as derived");
   expect(snapshot.sources()[1].origin.has_value() && snapshot.sources()[1].origin->source == sourceId &&
              snapshot.sources()[1].origin->offset == 0 && snapshot.sources()[1].origin->size == 1,
          "extracted derived source should preserve its origin range");
@@ -109,6 +111,10 @@ void sessionScansValuesAndDerivedSources() {
   expect(snapshot.sources().size() == 2, "pending-source scan should not duplicate already-scanned derived sources");
   expect(snapshot.assets().size() == 1, "pending-source scan should not duplicate already-scanned assets");
   expect(snapshot.collections().size() == 1, "pending-source scan should not duplicate already-resolved collections");
+
+  const auto imported = session.addSource(snapshot.sources()[1], {0xbb});
+  expect(!session.sources().source(imported).parent && !session.sources().source(imported).derived(),
+         "adding an existing source description as user input should detach its extraction parent");
 }
 
 void sessionRoutesKnownFormatsAndConsumesExtractedParents() {
@@ -1163,6 +1169,8 @@ void retainedSourceOwnsStableCopiedBytes() {
 
 void sourceStoreRejectsMissingOrRemovedDerivedParents() {
   SourceStore store;
+  const auto empty = store.add(SourceFile{.name = "empty"}, {});
+  expect(store.contains(empty) && store.bytes(empty).empty(), "an empty file is still an active source");
 
   bool missingParentFailed = false;
   try {
@@ -1175,8 +1183,8 @@ void sourceStoreRejectsMissingOrRemovedDerivedParents() {
   const auto parent = store.add(SourceFile{.name = "parent"}, {0xaa});
   const SharedSourceBytes retainedBytes = store.sharedBytes(parent);
   static_cast<void>(store.removeFamily(parent));
-  expect(retainedBytes && *retainedBytes == std::vector<u8>{0xaa},
-         "removing a source should preserve immutable bytes retained by an open inspection");
+  expect(!store.contains(parent) && store.sourceCount() == 1 && retainedBytes && *retainedBytes == std::vector<u8>{0xaa},
+         "retained inspection bytes should survive removal without keeping the source active");
 
   bool removedParentFailed = false;
   try {

@@ -112,7 +112,7 @@ SourceId Session::addSource(SourceFile file, std::vector<u8> bytes) {
   }
   sealFormats();
   invalidateSnapshot();
-  file.kind = SourceKind::UserLoaded;
+  file.parent.reset();
   return sources_.add(std::move(file), std::move(bytes));
 }
 

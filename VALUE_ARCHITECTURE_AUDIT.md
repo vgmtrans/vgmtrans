@@ -3380,6 +3380,27 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
 - Validation: warning-free macOS Debug build; all 22 CTest targets pass
   (10.97 s).
 
+## Derive source classification and liveness from existing state
+
+- Removed `SourceKind`: the parent relationship already identifies every
+  admitted derived source. `derived()` now reads that relationship directly,
+  eliminating a flag that could disagree with the source family. Session's
+  user-input path detaches a copied description's extraction parent; derived
+  admission continues to validate and assign its parent.
+- Removed `SourceStatus` and `SourceFile::active()`. Only SourceStore consumed
+  that status, and removal already clears the entry's byte pointer. Store
+  queries now use that pointer directly; descriptions and snapshots no longer
+  carry a redundant lifecycle field. Empty byte vectors remain active, and
+  retaining shared inspection bytes does not keep a removed store entry active.
+- Removed two enums, two stored fields, their duplicate updates, and 14 net
+  production lines. Extended two existing session fixtures by eight net lines
+  for root/child classification, reimported descriptions, empty files, and
+  retained bytes. No new fixture or test infrastructure was added.
+- Validation: warning-free full macOS Debug build; all 22 CTest targets pass
+  (10.37 s), including nested archive removal/reload, snapshot lifetime, and
+  missing/removed parent handling.
+  The supplied corpus volume was unavailable during this change.
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage
