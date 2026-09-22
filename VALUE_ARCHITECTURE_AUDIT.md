@@ -3226,6 +3226,27 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   section transitions trim storage before further emission. Avoid widening the
   model or introducing identity reuse merely to remove two counters.
 
+### Keep MIDI track rendering with its state and output
+
+- Replaced `RenderTrackState` and 41 free rendering helpers with one internal
+  `MidiTrackRenderer`. It retains the output track, MIDI channel, options, and
+  tempo map alongside the existing voice/controller state. Helpers become
+  private operations on that renderer; callers supply only changing inputs.
+- One `render` method now owns per-track pitch-range changes, event ordering,
+  and final LFO flushing. Sequence-wide lowering, channel assignment, shared
+  timelines, and global metadata remain in `renderMidiSequence`. Pure numeric
+  and oscillator helpers remain independent. No source-format API changed.
+- Removed 33 production lines and 258 repeated call arguments, with no extra
+  state wrapper or permanent test changes. All 41 moved helper bodies were
+  compared after substituting member access and removing the fixed arguments.
+- Validation: warning-free macOS Debug build; all 22 CTest targets pass (10.39 s).
+  Temporary captures of the existing core fixtures produced 262 MIDI files
+  before and after, all byte-identical. Probe sources, executables, and the
+  temporary formatter installation were removed.
+- The attempted real-file comparison could not open its five archives because
+  the corpus was unavailable. The capture result above covers existing
+  fixtures, not real-file or legacy/value equivalence.
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage
