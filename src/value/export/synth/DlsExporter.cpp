@@ -12,6 +12,7 @@
 #include "value/export/synth/ModulationScaling.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <limits>
@@ -212,7 +213,7 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
 [[nodiscard]] Chunk infoList(std::string_view name, std::string_view fallback) {
   std::vector<u8> inam;
   writeFixedString(inam, name.empty() ? fallback : name);
-  return makeListChunk("INFO", {Chunk{"INAM", std::move(inam)}});
+  return makeListChunk("INFO", std::array{Chunk{"INAM", std::move(inam)}});
 }
 
 [[nodiscard]] Chunk inshChunk(const ResolvedSynthInstrument& instrument) {
@@ -314,14 +315,14 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   writeLe32(art, 8);
   writeLe32(art, static_cast<u32>(connections.size() / 12));
   art.insert(art.end(), connections.begin(), connections.end());
-  return makeListChunk("lar2", {Chunk{"art2", std::move(art)}});
+  return makeListChunk("lar2", std::array{Chunk{"art2", std::move(art)}});
 }
 
 [[nodiscard]] Chunk rgn2Chunk(const ResolvedSynthInstrument& instrument, const ResolvedSynthRegion& resolvedRegion,
                               std::span<const DecodedSynthSample> samples) {
   const auto& region = resolvedRegion.region;
   const auto& sample = samples[resolvedRegion.sampleIndex];
-  return makeListChunk("rgn2", {
+  return makeListChunk("rgn2", std::array{
                                    rgnhChunk(region),
                                    wsmpChunk(region, sample),
                                    wlnkChunk(resolvedRegion.sampleIndex),
@@ -335,11 +336,11 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   for (const auto& region : instrument.regions) {
     regions.push_back(rgn2Chunk(instrument, region, samples));
   }
-  return makeListChunk("lrgn", std::move(regions));
+  return makeListChunk("lrgn", regions);
 }
 
 [[nodiscard]] Chunk insList(const ResolvedSynthInstrument& instrument, std::span<const DecodedSynthSample> samples) {
-  return makeListChunk("ins ", {
+  return makeListChunk("ins ", std::array{
                                    inshChunk(instrument),
                                    lrgnList(instrument, samples),
                                    infoList(instrument.instrument->name, "Instrument"),
@@ -353,7 +354,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   for (const auto& instrument : instruments) {
     instrumentChunks.push_back(insList(instrument, samples));
   }
-  return makeListChunk("lins", std::move(instrumentChunks));
+  return makeListChunk("lins", instrumentChunks);
 }
 
 [[nodiscard]] Chunk fmtChunk(const DecodedSynthSample& sample) {
@@ -373,7 +374,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 }
 
 [[nodiscard]] Chunk waveList(const DecodedSynthSample& sample) {
-  return makeListChunk("wave", {
+  return makeListChunk("wave", std::array{
                                    fmtChunk(sample),
                                    dataChunk(sample),
                                    infoList(sample.name, "Wave"),
@@ -420,14 +421,14 @@ SynthExportResult buildDls(const SynthExportInput& input, const SourceStore& sou
     return SynthExportResult{.diagnostics = std::move(diagnostics)};
   }
 
-  auto waves = waveChunks(samples);
+  const auto waves = waveChunks(samples);
   return SynthExportResult{
       .bytes = makeRiff("DLS ",
-                        {
+                        std::array{
                             colhChunk(instruments),
                             linsList(instruments, samples),
                             ptblChunk(waves),
-                            makeListChunk("wvpl", std::move(waves)),
+                            makeListChunk("wvpl", waves),
                             infoList(input.name, "DLS"),
                         }),
       .diagnostics = std::move(diagnostics),

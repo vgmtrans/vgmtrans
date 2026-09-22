@@ -72,7 +72,7 @@ void regionResponsesAreSampledAtExport() {
 void riffChunksKeepLogicalSizesSeparateFromStoragePadding() {
   const RiffChunk odd{"odd ", {1, 2, 3}};
   const RiffChunk even{"even", {4, 5}};
-  const auto bytes = makeRiff("TEST", {makeListChunk("nest", {odd, even})});
+  const auto bytes = makeRiff("TEST", std::array{makeListChunk("nest", std::array{odd, even})});
   // RIFF header plus LIST header/type puts the first child at byte 24.
   const size_t first = 24;
   const size_t second = first + chunkStorageSize(odd);
@@ -82,7 +82,7 @@ void riffChunksKeepLogicalSizesSeparateFromStoragePadding() {
   expect(bytes.size() == second + chunkStorageSize(even) && readLe32(bytes, 4) == bytes.size() - 8 &&
              readLe32(bytes, 16) == bytes.size() - 20,
          "RIFF and LIST sizes must include their child chunks and padding");
-  const auto large = makeRiff("TEST", {RiffChunk{"data", std::vector<u8>(65537, 0x5a)}});
+  const auto large = makeRiff("TEST", std::array{RiffChunk{"data", std::vector<u8>(65537, 0x5a)}});
   expect(readLe32(large, 4) == 65550 && readLe32(large, 16) == 65537 && large.size() == 65558 &&
              large[20] == 0x5a && large[large.size() - 2] == 0x5a && large.back() == 0,
          "the final RIFF size must retain its high bytes and count an odd child's alignment byte");

@@ -9,6 +9,7 @@
 #include "value/base/CoreTypes.h"
 
 #include <cstddef>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -31,9 +32,9 @@ struct RiffChunk {
   std::vector<u8> payload;
 };
 
-[[nodiscard]] RiffChunk makeListChunk(std::string type, std::vector<RiffChunk> children);
+[[nodiscard]] RiffChunk makeListChunk(std::string_view type, std::span<const RiffChunk> children);
 void appendChunk(std::vector<u8>& bytes, const RiffChunk& chunk);
 [[nodiscard]] u32 chunkStorageSize(const RiffChunk& chunk);
-[[nodiscard]] std::vector<u8> makeRiff(std::string type, std::vector<RiffChunk> children);
+[[nodiscard]] std::vector<u8> makeRiff(std::string_view type, std::span<const RiffChunk> children);
 
 }  // namespace vgmtrans::core

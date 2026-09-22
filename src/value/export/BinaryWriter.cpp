@@ -79,7 +79,7 @@ u32 chunkStorageSize(const RiffChunk& chunk) {
   return static_cast<u32>(8 + chunk.payload.size() + padding);
 }
 
-RiffChunk makeListChunk(std::string type, std::vector<RiffChunk> children) {
+RiffChunk makeListChunk(std::string_view type, std::span<const RiffChunk> children) {
   std::vector<u8> payload;
   writeAscii(payload, type);
   for (const auto& child : children) {
@@ -88,7 +88,7 @@ RiffChunk makeListChunk(std::string type, std::vector<RiffChunk> children) {
   return RiffChunk{"LIST", std::move(payload)};
 }
 
-std::vector<u8> makeRiff(std::string type, std::vector<RiffChunk> children) {
+std::vector<u8> makeRiff(std::string_view type, std::span<const RiffChunk> children) {
   std::vector<u8> bytes;
   writeAscii(bytes, "RIFF");
   writeLe32(bytes, 0);

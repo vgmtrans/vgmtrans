@@ -340,7 +340,7 @@ struct SfLayout {
   return layout;
 }
 
-[[nodiscard]] std::vector<Chunk> infoChunks(std::string_view name) {
+[[nodiscard]] std::array<Chunk, 4> infoChunks(std::string_view name) {
   std::vector<u8> ifil;
   writeLe16(ifil, 2);
   writeLe16(ifil, 1);
@@ -561,7 +561,7 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
   return Chunk{"shdr", std::move(payload)};
 }
 
-[[nodiscard]] std::vector<Chunk> pdtaChunks(const SfLayout& layout, std::span<const DecodedSynthSample> samples) {
+[[nodiscard]] std::array<Chunk, 9> pdtaChunks(const SfLayout& layout, std::span<const DecodedSynthSample> samples) {
   auto [phdr, pbag, pmod, pgen] = presetChunks(layout.presets);
   auto [inst, ibag, imod, igen] = instrumentChunks(layout.instruments, samples);
   return {
@@ -594,9 +594,9 @@ SynthExportResult buildSoundFont2(const SynthExportInput& input, const SourceSto
   const auto layout = sf2Layout(instruments);
   return SynthExportResult{
       .bytes = makeRiff("sfbk",
-                        {
+                        std::array{
                             makeListChunk("INFO", infoChunks(sf2Name(input.name, "VGMTrans"))),
-                            makeListChunk("sdta", {smplChunk(samples)}),
+                            makeListChunk("sdta", std::array{smplChunk(samples)}),
                             makeListChunk("pdta", pdtaChunks(layout, samples)),
                         }),
       .diagnostics = std::move(diagnostics),

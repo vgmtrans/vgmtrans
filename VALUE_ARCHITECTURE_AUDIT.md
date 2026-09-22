@@ -3401,6 +3401,27 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   missing/removed parent handling.
   The supplied corpus volume was unavailable during this change.
 
+## Borrow RIFF children instead of copying their payloads
+
+- RIFF and LIST assembly now accept a read-only span of child chunks and a
+  string view for the four-byte type. They only serialize those inputs and
+  never retain them, so ownership no longer crosses this boundary.
+- Fixed SF2/DLS chunk lists use arrays, including the fixed four INFO and nine
+  preset-data records. This removes the initializer-list-to-vector copies
+  that previously copied payloads even when callers wrote `std::move`.
+  Variable-length region, instrument, and wave lists remain vectors and pass
+  directly to the same span API. No new helper or custom type was introduced;
+  production line count grows by two required includes.
+- A temporary before/after probe produced eight complete SF2/DLS files from
+  empty, odd-sized, and large PCM inputs with normal and phase-inverted regions.
+  All output bytes matched. For a 1 MiB source, cumulative allocated bytes
+  fell from 48,249,785 to 39,858,201 for DLS and from 46,146,847 to 37,755,979
+  for SF2. These are probe allocation totals, not peak-memory measurements.
+  Probe sources, binaries, and generated files were removed.
+- Validation: warning-free macOS Debug build; all 22 CTest targets pass
+  (10.08 s). Existing RIFF fixtures only needed their call syntax updated;
+  no tests or test lines were added.
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage
