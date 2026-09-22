@@ -3175,6 +3175,20 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
 - Validation: warning-free macOS Debug build; all 22 existing CTest targets
   pass (10.77 s).
 
+## Give each VM track one state owner
+
+- Merged the state-only `VmTrackRuntime` into `VmTrackExecutor`. `VmApi` now
+  borrows that executor and the current command directly, removing the runtime
+  factory and its separately supplied sequence reference. The format-facing
+  API and compiled playback interface remain unchanged.
+- Narrowed `LoopDetector` to recording visits and returning prior visit ticks.
+  The executor owns flow decisions and uses its current tick as the loop end,
+  eliminating the intermediate `LoopPoint` record. Call-stack/repeat identity,
+  finite-branch handling, loop markers, and replay policies are preserved.
+- Removed two internal types and 37 production lines. No test changes.
+- Validation: warning-free macOS Debug build; all 22 existing CTest targets
+  pass (10.75 s).
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage

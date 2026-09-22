@@ -20,29 +20,6 @@ namespace vgmtrans::core {
 
 namespace detail {
 
-// Mutable playback state for one track. The parsed SequenceProgram stays unchanged
-// while the VM advances ticks, calls, repeats, and loop detection.
-struct VmTrackRuntime {
-  u64 tick = 0;
-  u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  ActiveNoteState activeNotes;
-  std::vector<u32> callStack;
-  // Remaining plays distinguish legitimate finite passes in loop detection.
-  std::map<u8, u32> repeat;
-  CommandId lastCommand;
-
-  [[nodiscard]] VmApi api(PerformanceSequence& sequence, const SourceCommand& command) {
-    return VmApi(*this, sequence, command);
-  }
-};
-
-}  // namespace detail
-
-namespace {
-
-using detail::VmTrackRuntime;
-
 [[nodiscard]] Diagnostic vmWarning(std::string message, SourceRange range) {
   return Diagnostic{
       .severity = Severity::Warning,
@@ -67,35 +44,13 @@ struct VisitState {
   friend auto operator<=>(const VisitState&, const VisitState&) = default;
 };
 
-struct LoopPoint {
-  u64 startTick = 0;
-  CommandId endCommand;
-  u64 endTick = 0;
-};
-
 // LoopDetector only answers "have we executed this same playback state before?"
 // The executor decides how that loop should be exported or replayed.
 class LoopDetector {
 public:
-  [[nodiscard]] static VisitState visitState(u32 commandIndex, const VmTrackRuntime& runtime) {
-    return VisitState{
-        .commandIndex = commandIndex,
-        .callStack = runtime.callStack,
-        .repeat = runtime.repeat,
-    };
-  }
-
-  [[nodiscard]] std::optional<LoopPoint> observe(const VisitState& state, const VmTrackRuntime& runtime,
-                                                 bool arrivedByControlFlow) {
-    const auto [previous, inserted] = visited_.try_emplace(state, runtime.tick);
-    if (inserted || !arrivedByControlFlow) {
-      return std::nullopt;
-    }
-    return LoopPoint{
-        .startTick = previous->second,
-        .endCommand = runtime.lastCommand.valid() ? runtime.lastCommand : CommandId{state.commandIndex},
-        .endTick = runtime.tick,
-    };
+  [[nodiscard]] std::optional<u64> observe(const VisitState& state, u64 tick) {
+    const auto [previous, inserted] = visited_.try_emplace(state, tick);
+    return inserted ? std::nullopt : std::optional{previous->second};
   }
 
   [[nodiscard]] std::optional<u64> findExact(const VisitState& state) const {
@@ -334,12 +289,12 @@ public:
   }
 
   [[nodiscard]] bool active() const noexcept { return position_.command.has_value() || position_.pendingTicks != 0; }
-  [[nodiscard]] u64 tick() const noexcept { return runtime_.tick; }
+  [[nodiscard]] u64 tick() const noexcept { return tick_; }
   [[nodiscard]] u64 nextActionTick() const noexcept {
     if (position_.pendingTicks == 0) {
-      return runtime_.tick;
+      return tick_;
     }
-    return addTicks(runtime_.tick, observesEachWaitTick() ? 1 : position_.pendingTicks);
+    return addTicks(tick_, observesEachWaitTick() ? 1 : position_.pendingTicks);
   }
   [[nodiscard]] std::optional<u64> loopStopTick() const noexcept { return loopStopTick_; }
 
@@ -349,7 +304,7 @@ public:
     }
     if (position_.pendingTicks != 0) {
       const u32 elapsed = observesEachWaitTick() ? 1 : position_.pendingTicks;
-      runtime_.tick = addTicks(runtime_.tick, elapsed);
+      tick_ = addTicks(tick_, elapsed);
       if (elapsed == 1) {
         tickRuntime(position_.tickCommand);
         if (position_.pendingTicks > 1 && !position_.delayedCommand) {
@@ -393,10 +348,10 @@ public:
   // A section switch preserves the format's typed channel state, but resets
   // source control flow and timing to the shared boundary tick.
   void beginSection(std::optional<Address> start, u64 tick) {
-    runtime_.tick = tick;
-    runtime_.callStack.clear();
-    runtime_.repeat.clear();
-    runtime_.lastCommand = {};
+    tick_ = tick;
+    callStack_.clear();
+    repeat_.clear();
+    lastCommand_ = {};
     position_ = {.command = start ? track_.commandIndex(*start) : std::optional<u32>{}};
     arrivedByControlFlow_ = true;
     loopDetector_.clear();
@@ -415,17 +370,17 @@ public:
     // the portion that remains after it.
     TrackPosition snapshot = position_;
     if (active()) {
-      if (runtime_.tick > boundary || boundary - runtime_.tick > snapshot.pendingTicks) {
+      if (tick_ > boundary || boundary - tick_ > snapshot.pendingTicks) {
         throw std::logic_error("Synchronized loop point was not reached in global track order");
       }
-      snapshot.pendingTicks -= static_cast<u32>(boundary - runtime_.tick);
+      snapshot.pendingTicks -= static_cast<u32>(boundary - tick_);
     }
     return snapshot;
   }
 
   void restoreSynchronizedLoop(const TrackPosition& snapshot, u64 tick) {
     // Continue from the loop-end tick so each repetition follows the previous one.
-    runtime_.tick = tick;
+    tick_ = tick;
     position_ = snapshot;
     arrivedByControlFlow_ = true;
     loopDetector_.clear();
@@ -433,19 +388,19 @@ public:
   }
 
   void trimAt(u64 tick, bool retainBoundaryEvents) {
-    outputAt(tick, runtime_.lastCommand).allNotesOff();
+    outputAt(tick, lastCommand_).allNotesOff();
     endTrackAt(performanceTrack_, tick, retainBoundaryEvents);
   }
 
   void preserveLoop(u64 startTick, u64 endTick) {
     addLoopMarker(performanceTrack_, {sourceTrackId_, {}}, startTick, outputSequence_, "Loop Start");
-    addLoopMarker(performanceTrack_, {sourceTrackId_, runtime_.lastCommand}, endTick, outputSequence_, "Loop End");
+    addLoopMarker(performanceTrack_, {sourceTrackId_, lastCommand_}, endTick, outputSequence_, "Loop End");
   }
 
   [[nodiscard]] PerformanceTrack finish(std::optional<u64> endTick) {
-    const u64 finalTick = endTick.value_or(runtime_.tick);
-    outputAt(active() ? finalTick : std::min(finalTick, runtime_.tick), runtime_.lastCommand).allNotesOff();
-    performanceTrack_.endTick = runtime_.tick;
+    const u64 finalTick = endTick.value_or(tick_);
+    outputAt(active() ? finalTick : std::min(finalTick, tick_), lastCommand_).allNotesOff();
+    performanceTrack_.endTick = tick_;
     if (endTick) {
       endTrackAt(performanceTrack_, *endTick);
     }
@@ -460,6 +415,12 @@ public:
   }
 
 private:
+  friend class ::vgmtrans::core::VmApi;
+
+  [[nodiscard]] VisitState visitState(u32 commandIndex) const {
+    return {.commandIndex = commandIndex, .callStack = callStack_, .repeat = repeat_};
+  }
+
   [[nodiscard]] bool observesEachWaitTick() const noexcept {
     return sequenceRuntime_.tick != nullptr ||
            (!position_.delayedCommand && position_.command && sequenceRuntime_.readyDuringWait != nullptr &&
@@ -472,10 +433,10 @@ private:
             annotation,
             tick,
             outputSequence_,
-            runtime_.nextNote,
-            runtime_.nextAutomation,
+            nextNote_,
+            nextAutomation_,
             behavior_.panLaw,
-            &runtime_.activeNotes,
+            &activeNotes_,
             &targetSequence_.sourceSpans};
   }
 
@@ -484,8 +445,8 @@ private:
       return;
     }
     const SourceCommand& command = track_.commands.at(commandIndex);
-    auto out = outputAt(runtime_.tick, CommandId{commandIndex}, command.annotation);
-    VmApi vm = runtime_.api(targetSequence_, command);
+    auto out = outputAt(tick_, CommandId{commandIndex}, command.annotation);
+    VmApi vm(*this, command);
     sequenceRuntime_.tick(command, programState_, trackState_, out, vm);
   }
 
@@ -499,8 +460,8 @@ private:
     if (!command.execution.duringWait) {
       return;
     }
-    auto out = outputAt(runtime_.tick, CommandId{commandIndex}, command.annotation);
-    VmApi vm = runtime_.api(targetSequence_, command);
+    auto out = outputAt(tick_, CommandId{commandIndex}, command.annotation);
+    VmApi vm(*this, command);
     if (!sequenceRuntime_.readyDuringWait(command, programState_, trackState_, out, vm)) {
       return;
     }
@@ -511,7 +472,7 @@ private:
     if (executedCommands_ >= behavior_.commandLimit) {
       const SourceCommand& command = track_.commands.at(*position_.command);
       warn(fmt::format("Sequence VM command limit reached: track={}, address=${:04X}, tick={}, executed={}, limit={}",
-                       performanceTrack_.sourceTrackNumber, command.address.value, runtime_.tick, executedCommands_,
+                       performanceTrack_.sourceTrackNumber, command.address.value, tick_, executedCommands_,
                        behavior_.commandLimit),
            command.range);
       position_.command = std::nullopt;
@@ -520,20 +481,20 @@ private:
     const u32 commandIndex = *position_.command;
     const CommandId commandId{commandIndex};
     const SourceCommand& command = track_.commands.at(commandIndex);
-    const VisitState visitState = LoopDetector::visitState(commandIndex, runtime_);
-    const auto loop = loopDetector_.observe(visitState, runtime_, arrivedByControlFlow_);
-    if (behavior_.inferLoopsFromRepeatedState && loop) {
-      handleLoop(*loop, commandIndex, visitState);
+    const VisitState state = visitState(commandIndex);
+    const auto previous = loopDetector_.observe(state, tick_);
+    if (behavior_.inferLoopsFromRepeatedState && arrivedByControlFlow_ && previous) {
+      handleLoop(*previous, lastCommand_.valid() ? lastCommand_ : commandId, commandIndex, state);
       if (!position_.command) {
         return SequenceCoordinatorSignal::None;
       }
     }
 
-    const u64 beginTick = runtime_.tick;
+    const u64 beginTick = tick_;
     const size_t firstEvent = performanceTrack_.events.size();
     const size_t firstAutomation = performanceTrack_.automations.size();
     auto out = outputAt(beginTick, commandId, command.annotation);
-    VmApi vm = runtime_.api(targetSequence_, command);
+    VmApi vm(*this, command);
     const Effects effects = sequenceRuntime_.execute(command, programState_, trackState_, out, vm);
     if (duringWait) {
       if (effects.advanceTicks != 0 || effects.flowOverride ||
@@ -545,7 +506,7 @@ private:
     }
     const CommandTransition effectiveTransition = effects.flowOverride.value_or(command.flow.defaultTransition);
     if (command.annotation.valid()) {
-      u64 endTick = addTicks(runtime_.tick, std::max(effects.advanceTicks, 1u));
+      u64 endTick = addTicks(tick_, std::max(effects.advanceTicks, 1u));
       for (size_t i = firstEvent; i < performanceTrack_.events.size(); ++i) {
         endTick = std::max(endTick, eventEndTick(performanceTrack_.events[i]));
       }
@@ -560,13 +521,13 @@ private:
           .beginTick = beginTick,
           .endTick = endTick,
       });
-      for (auto& [_, note] : runtime_.activeNotes.notes) {
+      for (auto& [_, note] : activeNotes_.notes) {
         if (note.eventIndex >= firstEvent) {
           note.sourceSpanIndex = sourceSpanIndex;
         }
       }
     }
-    runtime_.lastCommand = commandId;
+    lastCommand_ = commandId;
     const SequenceCoordinatorSignal signal = effectiveTransition.kind == CommandTransitionKind::EndSection
                                                  ? SequenceCoordinatorSignal::SectionEnd
                                                  : command.execution.coordinatorSignal;
@@ -576,13 +537,14 @@ private:
     return signal;
   }
 
-  void handleLoop(const LoopPoint& loop, u32 replayIndex, std::optional<VisitState> recordAfterClear = std::nullopt) {
+  void handleLoop(u64 startTick, CommandId endCommand, u32 replayIndex,
+                  std::optional<VisitState> recordAfterClear = std::nullopt) {
     // Once a loop is identified, all loop sources use the same export policy:
     // preserve markers, replay for the requested loop count, or stop the track.
     if (loopPolicy_ == LoopPolicy::Preserve) {
-      addLoopMarker(performanceTrack_, {sourceTrackId_, CommandId{replayIndex}}, loop.startTick, outputSequence_,
+      addLoopMarker(performanceTrack_, {sourceTrackId_, CommandId{replayIndex}}, startTick, outputSequence_,
                     "Loop Start");
-      addLoopMarker(performanceTrack_, {sourceTrackId_, loop.endCommand}, loop.endTick, outputSequence_, "Loop End");
+      addLoopMarker(performanceTrack_, {sourceTrackId_, endCommand}, tick_, outputSequence_, "Loop End");
       position_.command = std::nullopt;
       arrivedByControlFlow_ = false;
       return;
@@ -595,18 +557,18 @@ private:
         // Keep shorter channel loops running while the scheduler discovers the
         // longest requested endpoint. The sequence-level cutoff removes any
         // temporary events rendered past that common boundary.
-        loopStopTick_ = loop.endTick;
+        loopStopTick_ = tick_;
       }
       loopDetector_.clear();
       if (recordAfterClear) {
-        loopDetector_.record(*recordAfterClear, loop.endTick);
+        loopDetector_.record(*recordAfterClear, tick_);
       }
       position_.command = replayIndex;
       arrivedByControlFlow_ = true;
       return;
     }
 
-    loopStopTick_ = loop.endTick;
+    loopStopTick_ = tick_;
     position_.command = std::nullopt;
     arrivedByControlFlow_ = false;
   }
@@ -634,7 +596,7 @@ private:
 
       case CommandTransitionKind::Call:
         if (const auto returnIndex = continuationIndex(track_, commandId, command.flow.continuation)) {
-          runtime_.callStack.push_back(*returnIndex);
+          callStack_.push_back(*returnIndex);
         } else {
           warn(fmt::format("Sequence call continuation ${:04X} was not decoded", command.flow.continuation.value),
                command.range);
@@ -651,13 +613,13 @@ private:
         break;
 
       case CommandTransitionKind::Return:
-        if (runtime_.callStack.empty()) {
+        if (callStack_.empty()) {
           warn("Sequence return had no active call", command.range);
           position_.command = std::nullopt;
           arrivedByControlFlow_ = false;
         } else {
-          position_.command = runtime_.callStack.back();
-          runtime_.callStack.pop_back();
+          position_.command = callStack_.back();
+          callStack_.pop_back();
           arrivedByControlFlow_ = true;
         }
         break;
@@ -686,22 +648,17 @@ private:
       case JumpSemantics::FiniteBranch:
         return;
       case JumpSemantics::LoopCandidate:
-        previous = loopDetector_.findLoopCandidateIgnoringRepeatState(*position_.command, runtime_.callStack);
+        previous = loopDetector_.findLoopCandidateIgnoringRepeatState(*position_.command, callStack_);
         if (!previous) {
           return;
         }
         break;
       case JumpSemantics::DeclaredLoop:
-        previous = loopDetector_.findExact(LoopDetector::visitState(*position_.command, runtime_));
+        previous = loopDetector_.findExact(visitState(*position_.command));
         break;
     }
 
-    const LoopPoint loop{
-        .startTick = previous.value_or(runtime_.tick),
-        .endCommand = commandId,
-        .endTick = runtime_.tick,
-    };
-    handleLoop(loop, *position_.command);
+    handleLoop(previous.value_or(tick_), commandId, *position_.command);
   }
 
   void warn(std::string message, SourceRange range) {
@@ -719,7 +676,14 @@ private:
   PerformanceTrack performanceTrack_;
   std::any trackState_;
   std::any& programState_;
-  VmTrackRuntime runtime_;
+  u64 tick_ = 0;
+  u32 nextNote_ = 0;
+  u32 nextAutomation_ = 0;
+  ActiveNoteState activeNotes_;
+  std::vector<u32> callStack_;
+  // Remaining plays distinguish legitimate finite passes in loop detection.
+  std::map<u8, u32> repeat_;
+  CommandId lastCommand_;
   LoopDetector loopDetector_;
   TrackPosition position_;
   u32 executedCommands_ = 0;
@@ -728,7 +692,7 @@ private:
   bool arrivedByControlFlow_ = true;
 };
 
-}  // namespace
+}  // namespace detail
 
 RepeatCounter::RepeatCounter(std::map<u8, u32>& remaining, u8 slot) noexcept : remaining_(&remaining), slot_(slot) {
 }
@@ -800,11 +764,11 @@ Effects VmApi::return_() const noexcept {
 }
 
 bool VmApi::inSubroutine() const noexcept {
-  return !runtime_.callStack.empty();
+  return !executor_.callStack_.empty();
 }
 
 RepeatCounter VmApi::repeatCounter(u8 slot) {
-  return RepeatCounter(runtime_.repeat, slot);
+  return RepeatCounter(executor_.repeat_, slot);
 }
 
 Effects VmApi::countedRepeatUntil(u8 slot, u32 totalPlays, Address destination) {
@@ -832,7 +796,7 @@ Effects VmApi::countedRepeatBreak(u8 slot, Address destination) {
 }
 
 u64 VmApi::tick() const noexcept {
-  return runtime_.tick;
+  return executor_.tick_;
 }
 
 SourceRange VmApi::sourceRange() const noexcept {
@@ -840,7 +804,7 @@ SourceRange VmApi::sourceRange() const noexcept {
 }
 
 const PerformanceSequence& VmApi::sequence() const noexcept {
-  return sequence_;
+  return executor_.targetSequence_;
 }
 
 void VmApi::diagnostic(Diagnostic diagnostic) {
@@ -850,11 +814,11 @@ void VmApi::diagnostic(Diagnostic diagnostic) {
   if (!diagnostic.annotation && command_.annotation.valid()) {
     diagnostic.annotation = command_.annotation;
   }
-  sequence_.diagnostics.push_back(std::move(diagnostic));
+  executor_.targetSequence_.diagnostics.push_back(std::move(diagnostic));
 }
 
-VmApi::VmApi(detail::VmTrackRuntime& runtime, PerformanceSequence& sequence, const SourceCommand& command)
-    : runtime_(runtime), sequence_(sequence), command_(command) {
+VmApi::VmApi(detail::VmTrackExecutor& executor, const SourceCommand& command)
+    : executor_(executor), command_(command) {
 }
 
 SequenceVm::SequenceVm(LoopPolicy loopPolicy) : options_(SequenceVmOptions{.loopPolicy = loopPolicy}) {
@@ -889,23 +853,23 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
     std::any programState = runtime.createProgramState ? runtime.createProgramState(program) : std::any{};
     const auto renderSemanticPass = [&](PerformanceSequence& target) {
       u64 outputSequence = 0;
-      std::vector<std::unique_ptr<VmTrackExecutor>> executors;
+      std::vector<std::unique_ptr<detail::VmTrackExecutor>> executors;
       executors.reserve(program.playbackTrackCount());
       const bool hasSectionPlaylist = program.sectionPlaylist.has_value();
       for (size_t trackIndex = 0; trackIndex < program.tracks.size(); ++trackIndex) {
         const TrackProgram& track = program.tracks[trackIndex];
         for (const u32 number : track.sourceTrackNumbers) {
-          executors.push_back(std::make_unique<VmTrackExecutor>(
+          executors.push_back(std::make_unique<detail::VmTrackExecutor>(
               TrackStateContext{program, track, number}, runtime, TrackId{static_cast<u32>(trackIndex)},
               TrackId{static_cast<u32>(executors.size())}, options_, target, outputSequence, executors.empty(),
               programState, !hasSectionPlaylist));
         }
       }
 
-      std::optional<SectionPlaylistRunner> playlist;
+      std::optional<detail::SectionPlaylistRunner> playlist;
       if (program.sectionPlaylist) {
         playlist.emplace(*program.sectionPlaylist, loopPolicy, options_);
-        const PlaylistAdvance first = playlist->advance(0);
+        const detail::PlaylistAdvance first = playlist->advance(0);
         if (first.trackStarts != nullptr) {
           for (size_t i = 0; i < executors.size(); ++i) {
             const std::optional<Address> start = i < first.trackStarts->size() ? (*first.trackStarts)[i] : std::nullopt;
@@ -919,7 +883,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
       // zero-time commands, matching how these drivers run until their next wait.
       std::optional<u64> sequenceEndTick;
       std::optional<u64> synchronizedLoopStartTick;
-      std::vector<TrackPosition> synchronizedLoopSnapshot;
+      std::vector<detail::TrackPosition> synchronizedLoopSnapshot;
       u32 synchronizedLoopRepeats = 0;
       while (true) {
         size_t selected = executors.size();
@@ -980,9 +944,9 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
           for (size_t i = 0; i < executors.size(); ++i) {
             executors[i]->trimAt(boundary, i <= selected);
           }
-          endSourceSpansAt(target.sourceSpans, boundary);
+          detail::endSourceSpansAt(target.sourceSpans, boundary);
 
-          const PlaylistAdvance next = playlist->advance(boundary);
+          const detail::PlaylistAdvance next = playlist->advance(boundary);
           if (next.preservedLoopStart) {
             for (auto& executor : executors) {
               executor->preserveLoop(*next.preservedLoopStart, boundary);
@@ -1019,7 +983,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
       }
       if (sequenceEndTick) {
         // Closing notes updates their source spans; trim only after all tracks finish.
-        endSourceSpansAt(target.sourceSpans, *sequenceEndTick);
+        detail::endSourceSpansAt(target.sourceSpans, *sequenceEndTick);
       }
     };
 
@@ -1048,7 +1012,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
     return sequence;
   }
 
-  sequence.diagnostics.push_back(vmWarning("Sequence program has no runtime executor", {}));
+  sequence.diagnostics.push_back(detail::vmWarning("Sequence program has no runtime executor", {}));
   return sequence;
 }
 

@@ -29,7 +29,7 @@ struct ActiveNoteState {
   bool sustain = false;
 };
 
-struct VmTrackRuntime;
+class VmTrackExecutor;
 [[nodiscard]] std::any analyzeSequenceProgram(const SequenceVm& vm, const SequenceProgram& program,
                                               std::vector<Diagnostic>* diagnostics);
 }  // namespace detail
@@ -338,12 +338,11 @@ public:
   void diagnostic(Diagnostic diagnostic);
 
 private:
-  friend struct detail::VmTrackRuntime;
+  friend class detail::VmTrackExecutor;
 
-  VmApi(detail::VmTrackRuntime& runtime, PerformanceSequence& sequence, const SourceCommand& command);
+  VmApi(detail::VmTrackExecutor& executor, const SourceCommand& command);
 
-  detail::VmTrackRuntime& runtime_;
-  PerformanceSequence& sequence_;
+  detail::VmTrackExecutor& executor_;
   const SourceCommand& command_;
 };
 
