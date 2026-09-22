@@ -3189,6 +3189,20 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
 - Validation: warning-free macOS Debug build; all 22 existing CTest targets
   pass (10.75 s).
 
+## Round shared fixed-point state without offsetting the accumulator
+
+- `SequenceFixedPointAutomation` now divides once into whole and fractional
+  parts. Floor and nearest rounding adjust the whole part by at most one,
+  removing the negative-value formula and full-accumulator rounding offsets.
+  Nearest still rounds ties away from zero; zero fractional bits remain exact.
+- UBSan confirmed that the old floor path negated `INT32_MIN`. The old nearest
+  path also overflowed when adding/subtracting half a unit near signed limits.
+  The replacement adds one production line and six lines to the existing
+  rounding fixture; no new test framework or fixture was introduced.
+- Validation: an ephemeral UBSan probe passed every signed/unsigned 16-bit
+  accumulator value, signed/unsigned 32-bit boundaries, and zero-fraction cases.
+  Warning-free macOS Debug build; all 22 CTest targets pass (10.99 s).
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage

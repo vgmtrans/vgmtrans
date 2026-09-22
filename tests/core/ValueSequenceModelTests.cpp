@@ -314,6 +314,12 @@ void fixedPointMotionRetargetsFromTheRoundedSourceValue() {
            "a raw target must retain the driver's fixed-point step and delay without rescaling them");
     expect(motion.tick().status == SequenceMotionStatus::Finished && motion.currentFixed() == -256,
            "fixed-step motion must stop at the scaled raw target");
+
+    motion.begin(SequenceMotionPlan<s32>::targetOverTicks(std::numeric_limits<s32>::min(), 0));
+    expect(motion.currentRaw() == -8'388'608, "rounding must preserve the lowest fixed-point value without negating it");
+    motion.begin(SequenceMotionPlan<s32>::targetOverTicks(std::numeric_limits<s32>::max(), 0));
+    expect(motion.currentRaw() == (rounding == SequenceFixedPointRounding::Nearest ? 8'388'608 : 8'388'607),
+           "rounding up must not overflow the fixed-point accumulator");
   }
 }
 

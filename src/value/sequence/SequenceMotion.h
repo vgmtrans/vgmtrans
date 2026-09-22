@@ -223,18 +223,19 @@ public:
 
 private:
   [[nodiscard]] ValueType rawFromFixed(ValueType fixedValue) const {
+    const ValueType whole = fixedValue / kScale;
+    const ValueType fraction = fixedValue % kScale;
     if (rounding_ == SequenceFixedPointRounding::TowardZero) {
-      return fixedValue / kScale;
+      return whole;
     }
     if (rounding_ == SequenceFixedPointRounding::Nearest) {
       const ValueType halfScale = kScale / 2;
-      return fixedValue >= ValueType{} ? static_cast<ValueType>((fixedValue + halfScale) / kScale)
-                                       : static_cast<ValueType>((fixedValue - halfScale) / kScale);
+      if (fraction > ValueType{} && fraction >= halfScale) {
+        return static_cast<ValueType>(whole + 1);
+      }
+      return static_cast<ValueType>(whole - (fraction < ValueType{} && fraction <= -halfScale));
     }
-    if (fixedValue >= ValueType{}) {
-      return fixedValue / kScale;
-    }
-    return static_cast<ValueType>(-((static_cast<ValueType>(-fixedValue) + kScale - 1) / kScale));
+    return static_cast<ValueType>(whole - (fraction < ValueType{}));
   }
 
   SequenceLinearMotion<ValueType> value_;
