@@ -67,8 +67,7 @@ public:
       fail("Collection binding produced a replacement sequence runtime with no executor", range);
       return false;
     }
-    if (sequenceRuntime_.family == nullptr || replacement.family == nullptr ||
-        sequenceRuntime_.family != replacement.family) {
+    if (sequenceRuntime_.execute != replacement.execute) {
       fail("Collection binding produced an incompatible sequence runtime family", range);
       return false;
     }

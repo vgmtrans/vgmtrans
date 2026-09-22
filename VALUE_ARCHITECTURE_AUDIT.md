@@ -3162,6 +3162,19 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
 - Validation: warning-free macOS Debug builds; all 22 existing CTest targets
   pass (10.91 s).
 
+## Use the typed executor as runtime identity
+
+- Removed the separate `SequenceRuntime::family` pointer and its template token.
+  `CompiledCommandRuntime<Playback, ProgramState>::execute` already identifies
+  the same compatible family independently of captured configuration. Collection
+  binding now compares those executor pointers after checking that both exist.
+- This removes one stored field, one identity mechanism, and duplicate factory
+  initialization (7 production lines). Missing and incompatible runtime
+  diagnostics remain unchanged. No permanent test changes; the existing binding
+  fixture exercises configuration replacement and rejects a foreign executor.
+- Validation: warning-free macOS Debug build; all 22 existing CTest targets
+  pass (10.77 s).
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage

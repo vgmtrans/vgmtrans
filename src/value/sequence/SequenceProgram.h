@@ -37,11 +37,10 @@ enum class PitchTransitionRenderingHint {
 // Only state creation is closure-backed so immutable typed format settings can
 // be captured without a generic configuration schema.
 struct SequenceRuntime {
-  // Runtimes created by the same typed adapter family share this token even
-  // when their state factories capture different immutable settings.
-  const void* family = nullptr;
   std::function<std::any(const SequenceProgram&)> createProgramState;
   std::function<std::any(TrackStateContext)> createTrackState;
+  // The typed executor identifies the Playback/ProgramState family even when
+  // state factories capture different immutable settings.
   Effects (*execute)(const SourceCommand&, std::any& programState, std::any& trackState,
                      PerformanceEmitter& out, VmApi& vm) = nullptr;
   bool (*readyDuringWait)(const SourceCommand&, std::any& programState, std::any& trackState,

@@ -26,9 +26,6 @@ namespace detail {
 template <class Type>
 inline constexpr bool alwaysFalse = false;
 
-template <class Playback, class ProgramState>
-inline constexpr unsigned char compiledRuntimeFamily = 0;
-
 // Program and track state follow the same rule: use context and immutable
 // settings when requested, otherwise allow a plain state object.
 template <class State, class Context>
@@ -135,7 +132,6 @@ template <class Playback, class ProgramState = EmptyCompiledProgramState>
 [[nodiscard]] SequenceRuntime makeCompiledRuntime() {
   using Compiled = CompiledCommandRuntime<Playback, ProgramState>;
   SequenceRuntime runtime;
-  runtime.family = &detail::compiledRuntimeFamily<Playback, ProgramState>;
   runtime.createProgramState = [](const SequenceProgram& program) {
     return detail::createCompiledState<ProgramState>(program);
   };
@@ -159,7 +155,6 @@ template <class Playback, class ProgramState = EmptyCompiledProgramState, class 
   static_assert(programConsumesConfig || trackConsumesConfig,
                 "A supplied runtime Config must be consumed by ProgramState or TrackState");
   SequenceRuntime runtime;
-  runtime.family = &detail::compiledRuntimeFamily<Playback, ProgramState>;
   auto settings = std::make_shared<const Config>(std::move(config));
   runtime.createProgramState = [settings](const SequenceProgram& sequence) {
     return detail::createCompiledState<ProgramState>(sequence, *settings);
