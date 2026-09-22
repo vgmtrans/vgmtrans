@@ -3468,6 +3468,43 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
 - Validation: warning-free macOS Debug build (186 steps); all 22 CTest targets
   pass (9.76 s).
 
+## Evaluate scoped threads and C++23
+
+- `runFormatScans` is the only standard-thread launch site in the value core.
+  Replacing its `async`/`future<void>` workers with `jthread` would remove the
+  explicit join loop and `<future>`: four net production lines. Scheduling,
+  per-format exception handling, and ordered admission would remain. Existing
+  async futures already wait during unwinding; no measured speedup or new
+  cancellation behavior follows from changing the worker type alone.
+- [Xcode 26 release notes](https://developer.apple.com/documentation/xcode-release-notes/xcode-26-release-notes)
+  confirm native `jthread` and stop-token support without experimental flags.
+  Xcode 26 requires macOS 15.6 or later on the development machine. This is
+  separate from the application's macOS 13 deployment target, which would
+  still need verification with the new SDK. C++23 is not required for `jthread`.
+- The [Josuttis reference implementation](https://github.com/josuttis/jthread)
+  at `0fa8d394254886c555d6faccd0a3de819b7d47f8` passes temporary AppleClang 15
+  probes for joining scan work, joining during exception unwinding, and
+  cooperative stopping. Its two headers total 740 lines and define types in
+  `std`; adoption would require compatibility integration and further review.
+  [jthread-lite](https://github.com/nonstd-lite/jthread-lite) explicitly lacks
+  functional cancellation. Prefer native support over a dependency for this
+  small cleanup; no library was added.
+- C++23 is a feasible future baseline, with incremental benefits from range
+  collection, byte swapping, and enum conversions. `expected` is not a direct
+  replacement for result objects that retain diagnostics on success, and the
+  shared builders do not have substantial CRTP or const-overload duplication
+  to remove with explicit object parameters. Retain the current standard until
+  adopting a feature provides a concrete improvement.
+- All 225 value core/format translation units pass a warning-free C++23
+  **syntax-only** check using this machine's `-std=c++2b` spelling (71.1 s).
+  This did not link the application or run it under the new language mode.
+  With AppleClang 15 and the configured macOS 14.5 SDK, isolated probes targeting
+  macOS 13 compile, link, and run on this macOS 14 host for `byteswap`, `expected`,
+  optional `transform`, `ranges::to`, `views::zip`, `to_underlying`, and string
+  `contains`. `jthread`, `move_only_function`, and explicit object parameters
+  remain unavailable. No production or permanent test code changed; temporary
+  probe files were removed.
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage
