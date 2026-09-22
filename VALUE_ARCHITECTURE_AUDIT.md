@@ -3440,6 +3440,19 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
 - Validation: warning-free full macOS Debug build (326 steps); all 22 CTest
   targets pass (10.12 s).
 
+## Share exact signature matching across byte and string inputs
+
+- Both `matchesBytes` overloads now use the same bounded span comparison.
+  String signatures expose their byte representation to that path, preserving
+  unsigned matching for high-bit bytes. `std::ranges::equal` replaces both
+  hand-written loops and their per-byte reader calls.
+- Removed 16 production lines without adding types or changing scanner call
+  sites. Empty signatures retain the same boundary rules: they match at the
+  source end, but not beyond it. Masked search remains separate because its
+  wildcard and anchor-search rules differ.
+- Validation: warning-free macOS Debug build (52 steps); all 22 CTest targets
+  pass (11.01 s). No tests were added or changed.
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage

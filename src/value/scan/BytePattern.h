@@ -16,28 +16,12 @@
 
 namespace vgmtrans::core {
 
-[[nodiscard]] inline bool matchesBytes(ByteReader reader, u64 offset, std::string_view bytes) {
-  if (!reader.has(offset, bytes.size())) {
-    return false;
-  }
-  for (size_t index = 0; index < bytes.size(); ++index) {
-    if (reader.u8At(offset + index) != static_cast<u8>(bytes[index])) {
-      return false;
-    }
-  }
-  return true;
+[[nodiscard]] inline bool matchesBytes(ByteReader reader, u64 offset, std::span<const u8> bytes) {
+  return reader.has(offset, bytes.size()) && std::ranges::equal(reader.slice(offset, bytes.size()), bytes);
 }
 
-[[nodiscard]] inline bool matchesBytes(ByteReader reader, u64 offset, std::span<const u8> bytes) {
-  if (!reader.has(offset, bytes.size())) {
-    return false;
-  }
-  for (size_t index = 0; index < bytes.size(); ++index) {
-    if (reader.u8At(offset + index) != bytes[index]) {
-      return false;
-    }
-  }
-  return true;
+[[nodiscard]] inline bool matchesBytes(ByteReader reader, u64 offset, std::string_view bytes) {
+  return matchesBytes(reader, offset, std::span{reinterpret_cast<const u8*>(bytes.data()), bytes.size()});
 }
 
 [[nodiscard]] inline std::optional<u32> findBytes(ByteReader reader, std::span<const u8> pattern, u32 begin = 0) {
