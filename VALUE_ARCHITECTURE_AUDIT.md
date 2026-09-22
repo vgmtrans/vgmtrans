@@ -3453,6 +3453,21 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
 - Validation: warning-free macOS Debug build (52 steps); all 22 CTest targets
   pass (11.01 s). No tests were added or changed.
 
+## Keep only the tempo map's physical timing state
+
+- `PerformanceTempoMap` retains its normalized pulse count directly instead of
+  copying a full `Timebase` and repeating the zero-division fallback and numeric
+  conversion in all three timing queries. The MIDI division hint is not part
+  of its retained state.
+- Millisecond-to-tick conversion derives completed ticks from `cursor -
+  startTick`; it no longer updates a second counter alongside the current
+  position. Tempo boundaries, half-down rounding, and saturation stay explicit.
+- Removed four net production lines with no API or test changes. Existing
+  timing fixtures cover tempo boundaries, large internal divisions, initial
+  tempo ownership, rounding limits, and invalid durations.
+- Validation: warning-free macOS Debug build (186 steps); all 22 CTest targets
+  pass (9.76 s).
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage
