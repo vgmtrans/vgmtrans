@@ -8,6 +8,7 @@
 
 #include "value/export/BinaryWriter.h"
 #include "value/export/ExportDiagnostics.h"
+#include "value/export/audio/WavExporter.h"
 #include "value/export/synth/ModulationScaling.h"
 
 #include <algorithm>
@@ -23,8 +24,6 @@ namespace vgmtrans::core {
 
 namespace {
 
-constexpr u16 kWaveFormatPcm = 1;
-constexpr u16 kBitsPerSample = 16;
 constexpr u16 kDlsConnSrcNone = 0;
 constexpr u16 kDlsConnSrcLfo = 0x0001;
 constexpr u16 kDlsConnSrcChannelPressure = 0x0008;
@@ -358,18 +357,8 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 }
 
 [[nodiscard]] Chunk fmtChunk(const DecodedSynthSample& sample) {
-  const u16 channels = std::max<u8>(sample.decoded.channels, 1);
-  const u32 sampleRate = sample.decoded.sampleRate == 0 ? 32000 : sample.decoded.sampleRate;
-  const u16 blockAlign = static_cast<u16>(channels * (kBitsPerSample / 8));
-  const u32 byteRate = sampleRate * blockAlign;
-
   std::vector<u8> payload;
-  writeLe16(payload, kWaveFormatPcm);
-  writeLe16(payload, channels);
-  writeLe32(payload, sampleRate);
-  writeLe32(payload, byteRate);
-  writeLe16(payload, blockAlign);
-  writeLe16(payload, kBitsPerSample);
+  writePcm16WaveFormat(payload, sample.decoded);
   writeLe16(payload, 0);
   return Chunk{"fmt ", std::move(payload)};
 }

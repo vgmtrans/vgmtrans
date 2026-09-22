@@ -885,6 +885,8 @@ void dlsExporterWritesDlsRiffFile() {
   expect(chunkSize(result.bytes, "colh") == 4, "DLS colh chunk should store one u32 count");
   expect(chunkSize(result.bytes, "ptbl") == 12, "DLS ptbl chunk should include one pool cue");
   expect(chunkSize(result.bytes, "data") == 32, "DLS data chunk should include decoded PCM bytes");
+  expect(chunkSize(result.bytes, "fmt ") == 18 && readLe16(result.bytes, asciiOffset(result.bytes, "fmt ") + 24) == 0,
+         "DLS must append an empty extension to the shared 16-byte PCM format record");
   const size_t instrumentHeader = asciiOffset(result.bytes, "insh");
   expect(readLe32(result.bytes, instrumentHeader + 12) == 0x100 && readLe32(result.bytes, instrumentHeader + 16) == 5,
          "DLS export should assign preset addressing from the neutral source identity");
@@ -928,6 +930,15 @@ void dlsExporterWritesDlsRiffFile() {
              !dlsArt2ContainsConnection(simulatedResult.bytes, 0x0000, 0x0115, 0) &&
              !dlsArt2ContainsConnection(simulatedResult.bytes, 0x0000, 0x0104, -7279 * 65536),
          "DLS sequence-event simulation export should suppress synth LFO generators");
+
+  samplePool.pool.samples.front().sampleRate = std::numeric_limits<u32>::max();
+  bool rejected = false;
+  try {
+    static_cast<void>(buildDls(SynthExportInput{.soundBanks = soundBanks, .samplePools = samples}, sources));
+  } catch (const std::overflow_error&) {
+    rejected = true;
+  }
+  expect(rejected, "DLS must reject a PCM byte rate that would overflow its WAVE format record");
 }
 
 void standaloneSynthExportsKeepNativeModulation() {

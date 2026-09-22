@@ -3363,6 +3363,23 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   (10.98 s), including default and explicit loop policies, requested replays,
   synchronized loops, and section playlists. No tests were added.
 
+## Share the PCM WAVE format record
+
+- WAV and DLS now use the same encoder for their 16-byte PCM format record.
+  DLS appends its own empty extension, preserving its 18-byte WAVEFORMATEX
+  payload; standalone WAV retains its minimal header. Removed 15 production
+  lines without introducing a new file, data type, or policy layer.
+- Both writers retain the same channel and sample-rate defaults. DLS now uses
+  WAV's byte-rate overflow check instead of silently wrapping the field.
+  Added 11 lines to the existing DLS fixture for this regression and its
+  extension field; no new test fixtures were added.
+- A temporary before/after probe compared 60 complete WAV/DLS files across
+  five channel counts and six sample rates, including defaults and the highest
+  representable byte rates. All bytes matched. Probe sources and binaries were
+  removed.
+- Validation: warning-free macOS Debug build; all 22 CTest targets pass
+  (10.97 s).
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage
