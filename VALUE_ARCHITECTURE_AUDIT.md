@@ -3294,6 +3294,26 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   The corpus was unavailable, so no real-archive comparison was run
   for these identity changes.
 
+## Derive PSF image bounds from the byte buffer
+
+- The shared PSF executable-image loader no longer stores an end address beside
+  its start address and bytes. Overlay growth follows the buffer size directly,
+  and the first payload uses the same copy/zero-tail path as later libraries.
+  This removes a separately maintained bound and the special first-overlay
+  implementation across PSF1, SSF, GSF, and DS executable payloads.
+- Overlay input is now a byte span rather than a separately passed pointer and
+  count. Declared image size remains distinct because GSF may omit a zero-filled
+  tail, including one that overwrites bytes from an earlier library.
+- Removed ten production lines and added no permanent tests. A temporary
+  differential probe ran the old and new functions through 200,000 generated
+  operations, comparing both resulting bytes and exceptions. It covered
+  overlapping and disjoint ranges, lower-address insertion, empty payloads,
+  zero tails, and the 32-bit address boundary under ASan and UBSan. All matched;
+  the probe source, executable, and debug bundle were removed.
+- Validation: warning-free full macOS Debug build; all 22 CTest targets pass
+  (10.42 s), including SSF extraction, miniGSF library overlays, and GSF sparse
+  tails.
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage
