@@ -3213,6 +3213,19 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   captures, invocation order, and effect composition are unchanged. No tests added.
 - Validation: warning-free macOS Debug build; all 22 CTest targets pass (10.85 s).
 
+### Emit VM loop markers through the ordinary performance emitter
+
+- Removed `addLoopMarker` and its manual event-header construction. Local,
+  synchronized, and playlist loop markers now use `outputAt(...).marker(...)`,
+  sharing the same source attribution, playback placement, and sequence-order
+  assignment as other VM output. Source commands and marker timing are unchanged.
+- Removed one helper and 15 production lines. No test changes.
+- Validation: warning-free macOS Debug build; all 22 CTest targets pass (10.84 s).
+- Also evaluated replacing note/automation counters with event order or vector
+  positions. Retained the counters: event order is wider than the IDs, and
+  section transitions trim storage before further emission. Avoid widening the
+  model or introducing identity reuse merely to remove two counters.
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage

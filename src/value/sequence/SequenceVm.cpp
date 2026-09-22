@@ -82,20 +82,6 @@ private:
   std::map<VisitState, u64> visited_;
 };
 
-void addLoopMarker(PerformanceTrack& track, SourceCommandRef sourceCommand, u64 tick, u64& nextSequence,
-                   std::string text) {
-  track.events.emplace_back(MarkerPerformanceEvent{
-      .header =
-          PerformanceEventHeader{
-              .sourceCommand = sourceCommand,
-              .track = track.id,
-              .tick = tick,
-              .sequence = nextSequence++,
-          },
-      .text = std::move(text),
-  });
-}
-
 void addInitialTrackEvents(PerformanceEmitter out, const SequenceProgramBehavior& behavior, bool includeGlobalEvents) {
   if (behavior.initialReverbSend) {
     out.reverb(*behavior.initialReverbSend);
@@ -393,8 +379,8 @@ public:
   }
 
   void preserveLoop(u64 startTick, u64 endTick) {
-    addLoopMarker(performanceTrack_, {sourceTrackId_, {}}, startTick, outputSequence_, "Loop Start");
-    addLoopMarker(performanceTrack_, {sourceTrackId_, lastCommand_}, endTick, outputSequence_, "Loop End");
+    outputAt(startTick).marker("Loop Start");
+    outputAt(endTick, lastCommand_).marker("Loop End");
   }
 
   [[nodiscard]] PerformanceTrack finish(std::optional<u64> endTick) {
@@ -542,9 +528,8 @@ private:
     // Once a loop is identified, all loop sources use the same export policy:
     // preserve markers, replay for the requested loop count, or stop the track.
     if (loopPolicy_ == LoopPolicy::Preserve) {
-      addLoopMarker(performanceTrack_, {sourceTrackId_, CommandId{replayIndex}}, startTick, outputSequence_,
-                    "Loop Start");
-      addLoopMarker(performanceTrack_, {sourceTrackId_, endCommand}, tick_, outputSequence_, "Loop End");
+      outputAt(startTick, CommandId{replayIndex}).marker("Loop Start");
+      outputAt(tick_, endCommand).marker("Loop End");
       position_.command = std::nullopt;
       arrivedByControlFlow_ = false;
       return;
