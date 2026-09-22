@@ -11,7 +11,6 @@
 #include "value/model/SessionSnapshot.h"
 #include "value/model/SourceInspection.h"
 #include "value/scan/FormatRegistry.h"
-#include "value/scan/ScanTypes.h"
 
 #include <filesystem>
 #include <memory>
@@ -78,7 +77,6 @@ private:
   SourceStore sources_;
   std::unique_ptr<SessionState> state_;
   FormatRegistry formats_;
-  ScanIdAllocator ids_;
   std::unordered_set<u32> scannedSources_;
   // The public Session API is single-thread-confined; format scans fan out
   // internally. This immutable revision is populated on the first snapshot

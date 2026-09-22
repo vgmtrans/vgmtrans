@@ -20,19 +20,15 @@ namespace vgmtrans::core {
 // through ScanInput::ids or through ScanResultBuilder.
 class ScanIdAllocator {
 public:
-  ScanIdAllocator() = default;
-  ScanIdAllocator(ScanIdAllocator&& other) noexcept;
-  ScanIdAllocator& operator=(ScanIdAllocator&& other) noexcept;
-  ScanIdAllocator(const ScanIdAllocator&) = delete;
-  ScanIdAllocator& operator=(const ScanIdAllocator&) = delete;
-
-  [[nodiscard]] AssetId nextAssetId() noexcept;
-  [[nodiscard]] CollectionId nextCollectionId() noexcept;
-  [[nodiscard]] SourceAnnotationId nextSourceAnnotationId() noexcept;
+  [[nodiscard]] AssetId nextAssetId() noexcept {
+    return AssetId{nextAssetId_.fetch_add(1, std::memory_order_relaxed)};
+  }
+  [[nodiscard]] SourceAnnotationId nextSourceAnnotationId() noexcept {
+    return SourceAnnotationId{nextSourceAnnotationId_.fetch_add(1, std::memory_order_relaxed)};
+  }
 
 private:
   std::atomic<u32> nextAssetId_{0};
-  std::atomic<u32> nextCollectionId_{0};
   std::atomic<u32> nextSourceAnnotationId_{0};
 };
 

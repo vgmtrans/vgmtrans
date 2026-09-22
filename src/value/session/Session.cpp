@@ -251,7 +251,7 @@ CollectionId Session::createUserCollection(std::string name, CollectionMembers m
       binder = formats_.collectionBinderForFormat(sequence->metadata.format);
     }
   }
-  const CollectionId id = state_->createUserCollection(std::move(name), std::move(members), std::move(binder), ids_);
+  const CollectionId id = state_->createUserCollection(std::move(name), std::move(members), std::move(binder));
   invalidateSnapshot();
   return id;
 }
@@ -455,7 +455,7 @@ void Session::scanOneSource(const SourceFile& source, std::vector<SourceId>& que
   const ScanInput input{
       .source = source,
       .reader = sources_.reader(id),
-      .ids = ids_,
+      .ids = state_->scanIds(),
       .retained = RetainedSource{id, sources_.sharedBytes(id)},
   };
   runFormatScans(scans, input);
@@ -538,8 +538,7 @@ void Session::rebuildCollections() {
   }
 
   for (auto& [resolverId, desiredCollections] : desiredByResolver) {
-    state_->reconcileCollections(resolverId, std::move(desiredCollections), formats_.collectionBinder(resolverId),
-                                 ids_);
+    state_->reconcileCollections(resolverId, std::move(desiredCollections), formats_.collectionBinder(resolverId));
   }
 }
 

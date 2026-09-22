@@ -3271,6 +3271,29 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   targets pass (10.54 s), including concurrent scanning, source ownership,
   collection resolution, and all format fixtures.
 
+## Keep identity allocation with session state
+
+- `SessionState` now owns the scanner allocator alongside its admitted values.
+  Moving a `Session` transfers that existing state, so the allocator no longer
+  needs custom move operations that copy atomic counters. The two remaining
+  allocation operations are simple inline atomic increments; removed
+  `ScanTypes.cpp` and its build entry.
+- Collections are created only by `SessionState`, on the session's thread.
+  Their ID counter now lives there as an ordinary integer. Removed collection
+  allocation from the scanner API, allocator arguments from collection
+  creation/reconciliation, and the defensive search through every existing
+  collection. Both creation paths share the counter; reconciliation retains
+  existing IDs, and removal does not reset it.
+- Removed 53 C++ lines and one CMake entry. Added only two lines to the existing
+  snapshot fixture to move-construct and move-assign a populated session before
+  scanning another source. Its existing assertions check continued admission,
+  source-map ownership, and preservation of earlier immutable snapshots.
+- Validation: warning-free regenerated macOS Debug build; all 22 CTest targets
+  pass (10.52 s), including concurrent format scans and mixed discovered/manual
+  collections.
+  The corpus was unavailable, so no real-archive comparison was run
+  for these identity changes.
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage

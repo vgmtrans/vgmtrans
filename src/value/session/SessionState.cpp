@@ -143,8 +143,7 @@ void SessionState::removeSources(std::span<const SourceId> sources) {
   removeDiscoveredData(sourceIds, removedAssets);
 }
 
-CollectionId SessionState::createUserCollection(std::string name, CollectionMembers members, CollectionBinder binder,
-                                                ScanIdAllocator& ids) {
+CollectionId SessionState::createUserCollection(std::string name, CollectionMembers members, CollectionBinder binder) {
   if (name.empty()) {
     throw std::invalid_argument("A user-created collection must have a name");
   }
@@ -173,7 +172,7 @@ CollectionId SessionState::createUserCollection(std::string name, CollectionMemb
   validate(members.samplePools, [this](AssetId id) { return asset<SamplePoolAsset>(id); }, "sample pool");
   validate(members.miscAssets, [this](AssetId id) { return asset<MiscAsset>(id); }, "miscellaneous");
 
-  const CollectionId id = nextCollectionId(ids);
+  const CollectionId id{nextCollectionId_++};
   collections_.push_back(Collection{
       .id = id,
       .name = std::move(name),
@@ -222,7 +221,7 @@ std::map<std::string, std::vector<DesiredCollection>> SessionState::desiredColle
 }
 
 void SessionState::reconcileCollections(std::string_view resolver, std::vector<DesiredCollection> desired,
-                                        CollectionBinder binder, ScanIdAllocator& ids) {
+                                        CollectionBinder binder) {
   std::set<std::string> seenKeys;
   for (auto& candidate : desired) {
     if (candidate.localKey.empty()) {
@@ -248,7 +247,7 @@ void SessionState::reconcileCollections(std::string_view resolver, std::vector<D
       collection.id = found->id;
       *found = std::move(collection);
     } else {
-      collection.id = nextCollectionId(ids);
+      collection.id = CollectionId{nextCollectionId_++};
       collections_.push_back(std::move(collection));
     }
   }
@@ -392,14 +391,6 @@ void SessionState::validateCollectionAssetReferences(std::string_view resolver, 
     return invalid(id, "sample-pool", asset<SamplePoolAsset>(id) != nullptr);
   });
   std::erase_if(members.miscAssets, [&](AssetId id) { return invalid(id, "misc", asset<MiscAsset>(id) != nullptr); });
-}
-
-CollectionId SessionState::nextCollectionId(ScanIdAllocator& ids) const {
-  CollectionId id;
-  do {
-    id = ids.nextCollectionId();
-  } while (std::ranges::any_of(collections_, [id](const Collection& collection) { return collection.id == id; }));
-  return id;
 }
 
 void SessionState::rebuildViews() {

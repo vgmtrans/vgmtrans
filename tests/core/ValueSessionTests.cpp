@@ -272,6 +272,8 @@ void sessionSharesOneImmutableSnapshotPerRevision() {
   expect(&afterNoOpScan.assets() == &afterScan.assets(),
          "a no-op scan should retain the already materialized snapshot revision");
 
+  Session moved(std::move(session));
+  session = std::move(moved);
   const auto secondSource = session.addSource(SourceFile{.name = "second.probe"}, {0xaa});
   const SessionSnapshot afterAdd = session.snapshot();
   expect(&afterAdd.sources() != &afterScan.sources(),

@@ -38,12 +38,12 @@ public:
     return found != nullptr ? std::get_if<T>(found) : nullptr;
   }
 
+  [[nodiscard]] ScanIdAllocator& scanIds() noexcept { return scanIds_; }
   void appendScan(SourceId origin, ScanResult result);
 
   [[nodiscard]] bool removeAssets(std::span<const AssetId> assets);
   void removeSources(std::span<const SourceId> sources);
-  [[nodiscard]] CollectionId createUserCollection(std::string name, CollectionMembers members, CollectionBinder binder,
-                                                  ScanIdAllocator& ids);
+  [[nodiscard]] CollectionId createUserCollection(std::string name, CollectionMembers members, CollectionBinder binder);
 
   void addError(std::string message, SourceRange range = {});
   void addDiagnostics(std::vector<Diagnostic> diagnostics);
@@ -51,8 +51,7 @@ public:
   [[nodiscard]] const SourceMap& sourceMap() const noexcept { return sourceMap_; }
   [[nodiscard]] SourceMap sourceMapForAsset(AssetId asset) const;
   [[nodiscard]] std::map<std::string, std::vector<DesiredCollection>> desiredCollectionsByResolver() const;
-  void reconcileCollections(std::string_view resolver, std::vector<DesiredCollection> desired, CollectionBinder binder,
-                            ScanIdAllocator& ids);
+  void reconcileCollections(std::string_view resolver, std::vector<DesiredCollection> desired, CollectionBinder binder);
 
 private:
   struct ScanChunk {
@@ -69,10 +68,11 @@ private:
 
   void removeDiscoveredData(const std::unordered_set<u32>& sourceIds, const std::unordered_set<u32>& assetIds);
   void validateCollectionAssetReferences(std::string_view resolver, DesiredCollection& desired);
-  [[nodiscard]] CollectionId nextCollectionId(ScanIdAllocator& ids) const;
   void rebuildViews();
   void rebuildIndexes();
 
+  ScanIdAllocator scanIds_;
+  u32 nextCollectionId_ = 0;
   std::vector<ScanChunk> scanChunks_;
   SharedSequence<Asset> assets_;
   SourceMap sourceMap_;
