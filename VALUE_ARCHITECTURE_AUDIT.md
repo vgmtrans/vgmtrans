@@ -3422,6 +3422,24 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   (10.08 s). Existing RIFF fixtures only needed their call syntax updated;
   no tests or test lines were added.
 
+## Keep wait predicates as capture-free function pointers
+
+- Removed `CommandPredicate` and its owning `std::function`. The compiler's
+  `duringWaitWhen` API installs a capture-free function that reads the current
+  typed Playback state; it has no closure data to retain. `CommandExecution`
+  now stores that function directly as a nullable pointer, like the runtime
+  hooks. Command bodies still own their captured operands and behavior.
+- Format calls and VM polling stay unchanged. On this x86-64 Apple Clang 15
+  build, `CommandExecution` shrinks from 112 to 64 bytes and `SourceCommand`
+  from 208 to 160 bytes (48 bytes, about 23%, per decoded command). This also
+  removes one alias and one net production line. A temporary size probe was
+  removed.
+- Existing compiler and format fixtures cover gated commands, wait boundaries,
+  and rejection of time advancement during a wait. No tests were added or
+  changed.
+- Validation: warning-free full macOS Debug build (326 steps); all 22 CTest
+  targets pass (10.12 s).
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage
