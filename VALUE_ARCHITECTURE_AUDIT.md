@@ -3137,6 +3137,15 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   and acceptance of an explicitly empty miscellaneous payload.
 - Validation: warning-free Debug builds; all 21 CTest targets pass (10.78 s).
 
+## Keep operand construction compatible with the current Apple compiler
+
+- The recent Linux-warning cleanup used parenthesized aggregate construction
+  through `emplace_back`, which the current Apple toolchain rejects. Construct
+  the operand in place, then assign its value and role. This preserves operand
+  and field capture without adding a constructor to the shared value type.
+- Validation: warning-free macOS Debug build; all 22 CTest targets pass
+  (10.91 s). Linux CI was not run locally.
+
 ## Further investigation
 
 - Per the user's clarification, prioritize shared architecture over individual

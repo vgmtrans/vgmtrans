@@ -660,7 +660,9 @@ private:
   void add(std::string_view name, SourceValue value, SourceRange range, SourceValueDisplay display,
            SemanticOperandRole role) {
     if (role != SemanticOperandRole::Value) {
-      operands_.emplace_back(value, role);
+      auto& operand = operands_.emplace_back();
+      operand.value = value;
+      operand.role = role;
     }
     if (!name.empty()) {
       fields_.push_back(SourceField{
