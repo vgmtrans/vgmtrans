@@ -18,7 +18,6 @@
 #include <atomic>
 #include <array>
 #include <exception>
-#include <fstream>
 #include <future>
 #include <iterator>
 #include <map>
@@ -147,26 +146,7 @@ SourceId Session::addSourceFromPath(std::filesystem::path path) {
   if (source.id.valid()) {
     return source.id;
   }
-  std::ifstream file(source.path, std::ios::binary);
-  if (!file) {
-    throw std::runtime_error("failed to open source file: " + source.path.string());
-  }
-
-  file.seekg(0, std::ios::end);
-  const auto size = file.tellg();
-  if (size < 0) {
-    throw std::runtime_error("failed to stat source file: " + source.path.string());
-  }
-  file.seekg(0, std::ios::beg);
-
-  std::vector<u8> bytes(static_cast<size_t>(size));
-  if (!bytes.empty()) {
-    file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-  }
-  if (!file) {
-    throw std::runtime_error("failed to read source file: " + source.path.string());
-  }
-
+  auto bytes = readFileBytes(source.path);
   return addSource(std::move(source), std::move(bytes));
 }
 

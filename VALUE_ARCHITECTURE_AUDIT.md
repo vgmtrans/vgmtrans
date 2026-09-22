@@ -3314,6 +3314,22 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   (10.42 s), including SSF extraction, miniGSF library overlays, and GSF sparse
   tails.
 
+## Share whole-file source loading
+
+- Moved the session's binary file reader into the source layer and reused it
+  for PSF libraries. Both callers now share opening, sizing, reading, and error
+  checks instead of maintaining the same algorithm twice. Session resolution,
+  deduplication, and retained-byte behavior are unchanged. CUE loading retains
+  its bounded reads, which avoid loading entire disc images.
+- PSF library I/O failures now use the shared path-bearing source-file error
+  inside the existing library warning. Library resolution, recursive loading,
+  overlay order, and exception handling are unchanged.
+- Removed 17 production lines and added no tests. Existing session fixtures
+  exercise binary reads, path resolution, caching, and reloads; miniGSF and
+  miniPSF2 fixtures load their libraries from disk.
+- Validation: warning-free full macOS Debug build; all 22 CTest targets pass
+  (10.55 s).
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage

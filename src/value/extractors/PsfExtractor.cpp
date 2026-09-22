@@ -12,7 +12,6 @@
 #include <array>
 #include <cctype>
 #include <filesystem>
-#include <fstream>
 #include <limits>
 #include <map>
 #include <optional>
@@ -326,29 +325,6 @@ void overlay(Image& image, u32 address, std::span<const u8> data, size_t imageSi
             destination + static_cast<std::ptrdiff_t>(imageSize), 0);
 }
 
-[[nodiscard]] std::vector<u8> readFile(const std::filesystem::path& path) {
-  std::ifstream stream(path, std::ios::binary);
-  if (!stream) {
-    throw std::runtime_error("could not open PSF library file");
-  }
-
-  stream.seekg(0, std::ios::end);
-  const auto size = stream.tellg();
-  if (size < 0) {
-    throw std::runtime_error("could not stat PSF library file");
-  }
-  stream.seekg(0, std::ios::beg);
-
-  std::vector<u8> bytes(static_cast<size_t>(size));
-  if (!bytes.empty()) {
-    stream.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-  }
-  if (!stream) {
-    throw std::runtime_error("could not read PSF library file");
-  }
-  return bytes;
-}
-
 void overlayPsfExe(const PsfData& psf, Image& image) {
   // The decompressed executable carries version-specific load metadata. PSF1 stores a
   // PS-X EXE header; GSF keeps its overlay address in the second word of its mini-header.
@@ -397,7 +373,7 @@ void tryOpenLibrary(const std::filesystem::path& basePath, std::string libName, 
   std::ranges::replace(libName, '\\', '/');
   const auto libPath = basePath / libName;
   try {
-    load(parsePsf(readFile(libPath)), libPath.parent_path());
+    load(parsePsf(readFileBytes(libPath)), libPath.parent_path());
   } catch (const std::exception& ex) {
     diagnostics.push_back(
         warning(std::string(kind) + " library could not be loaded: " + libPath.string() + ": " + ex.what(), range));

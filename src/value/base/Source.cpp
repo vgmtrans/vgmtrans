@@ -7,6 +7,7 @@
 #include "value/base/Source.h"
 
 #include <algorithm>
+#include <fstream>
 #include <stdexcept>
 #include <utility>
 
@@ -24,6 +25,29 @@ std::filesystem::path fileIdentity(const std::filesystem::path& path, bool membe
 }
 
 }  // namespace
+
+std::vector<u8> readFileBytes(const std::filesystem::path& path) {
+  std::ifstream file(path, std::ios::binary);
+  if (!file) {
+    throw std::runtime_error("failed to open source file: " + path.string());
+  }
+
+  file.seekg(0, std::ios::end);
+  const auto size = file.tellg();
+  if (size < 0) {
+    throw std::runtime_error("failed to stat source file: " + path.string());
+  }
+  file.seekg(0, std::ios::beg);
+
+  std::vector<u8> bytes(static_cast<size_t>(size));
+  if (!bytes.empty()) {
+    file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+  }
+  if (!file) {
+    throw std::runtime_error("failed to read source file: " + path.string());
+  }
+  return bytes;
+}
 
 std::optional<std::string_view> SourceSegment::attribute(std::string_view key) const noexcept {
   const auto found = attributes.find(key);

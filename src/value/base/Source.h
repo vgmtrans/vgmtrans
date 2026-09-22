@@ -23,6 +23,9 @@ namespace vgmtrans::core {
 
 using SharedSourceBytes = std::shared_ptr<const std::vector<u8>>;
 
+// Read a complete binary file, reporting its path if opening or reading fails.
+[[nodiscard]] std::vector<u8> readFileBytes(const std::filesystem::path& path);
+
 // Stable descriptions of source bytes whose representation is known before
 // scanning. Unknown sources omit knownFormat and retain unrestricted probing.
 namespace source_formats {
