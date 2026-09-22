@@ -3349,6 +3349,20 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
 - Validation: warning-free macOS Debug build; all 22 CTest targets pass
   (10.91 s).
 
+## Resolve VM loop options once per render
+
+- Resolve the requested loop policy against the program's default at the
+  render boundary. The sequence coordinator, track executors, and playlist
+  runner now read the same immutable options value during both the prepass
+  and ordinary playback.
+- Removed the track executor's repeated default resolution, two separately
+  stored policy fields, and the playlist runner's extra policy argument.
+  This reduces duplicated state and responsibilities without changing the
+  public API or adding another options type. Production line count is unchanged.
+- Validation: warning-free macOS Debug build; all 22 CTest targets pass
+  (10.98 s), including default and explicit loop policies, requested replays,
+  synchronized loops, and section playlists. No tests were added.
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage

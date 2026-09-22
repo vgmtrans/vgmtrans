@@ -169,8 +169,8 @@ struct PlaylistAdvance {
 // end operations; synchronized scheduling remains a generic VM concern.
 class SectionPlaylistRunner {
 public:
-  SectionPlaylistRunner(const SectionPlaylist& playlist, LoopPolicy loopPolicy, const SequenceVmOptions& options)
-      : playlist_(playlist), loopPolicy_(loopPolicy), options_(options), current_(commandIndex(playlist.startAddress)) {
+  SectionPlaylistRunner(const SectionPlaylist& playlist, const SequenceVmOptions& options)
+      : playlist_(playlist), options_(options), current_(commandIndex(playlist.startAddress)) {
   }
 
   [[nodiscard]] PlaylistAdvance advance(u64 tick) {
@@ -181,14 +181,14 @@ public:
           .repeatRemaining = repeatRemaining_,
       };
       if (const auto [previous, inserted] = visited_.try_emplace(state, tick); !inserted) {
-        if (loopPolicy_ == LoopPolicy::PlayOnce && loopRepeats_ < options_.sequenceLoops) {
+        if (options_.loopPolicy == LoopPolicy::PlayOnce && loopRepeats_ < options_.sequenceLoops) {
           ++loopRepeats_;
           visited_.clear();
           visited_.emplace(state, tick);
         } else {
           return PlaylistAdvance{
               .preservedLoopStart =
-                  loopPolicy_ == LoopPolicy::Preserve ? std::optional<u64>{previous->second} : std::nullopt,
+                  options_.loopPolicy == LoopPolicy::Preserve ? std::optional<u64>{previous->second} : std::nullopt,
           };
         }
       }
@@ -232,7 +232,6 @@ private:
   }
 
   const SectionPlaylist& playlist_;
-  LoopPolicy loopPolicy_ = LoopPolicy::PlayOnce;
   const SequenceVmOptions& options_;
   std::optional<u32> current_;
   std::map<u32, u32> repeatRemaining_;
@@ -257,9 +256,8 @@ public:
                   const SequenceVmOptions& options, PerformanceSequence& targetSequence, u64& outputSequence,
                   bool includeGlobalInitialEvents, std::any& programState, bool startsActive = true)
       : track_(context.track), sourceTrackId_(sourceTrackId), sequenceRuntime_(runtime),
-        behavior_(context.sequence.behavior),
-        loopPolicy_(options.loopPolicy == LoopPolicy::Default ? behavior_.loopPolicy : options.loopPolicy),
-        options_(options), targetSequence_(targetSequence), outputSequence_(outputSequence),
+        behavior_(context.sequence.behavior), options_(options), targetSequence_(targetSequence),
+        outputSequence_(outputSequence),
         performanceTrack_(PerformanceTrack{
             .id = trackId,
             .sourceTrackNumber = context.sourceTrackNumber,
@@ -527,7 +525,7 @@ private:
                   std::optional<VisitState> recordAfterClear = std::nullopt) {
     // Once a loop is identified, all loop sources use the same export policy:
     // preserve markers, replay for the requested loop count, or stop the track.
-    if (loopPolicy_ == LoopPolicy::Preserve) {
+    if (options_.loopPolicy == LoopPolicy::Preserve) {
       outputAt(startTick, CommandId{replayIndex}).marker("Loop Start");
       outputAt(tick_, endCommand).marker("Loop End");
       position_.command = std::nullopt;
@@ -535,7 +533,7 @@ private:
       return;
     }
 
-    if (loopPolicy_ == LoopPolicy::PlayOnce) {
+    if (options_.loopPolicy == LoopPolicy::PlayOnce) {
       if (loopRepeats_ < options_.sequenceLoops) {
         ++loopRepeats_;
       } else if (!loopStopTick_) {
@@ -654,7 +652,6 @@ private:
   TrackId sourceTrackId_;
   const SequenceRuntime& sequenceRuntime_;
   const SequenceProgramBehavior& behavior_;
-  LoopPolicy loopPolicy_;
   const SequenceVmOptions& options_;
   PerformanceSequence& targetSequence_;
   u64& outputSequence_;
@@ -829,7 +826,10 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
       .preferredPitchTransitionRendering = behavior.preferredPitchTransitionRendering,
   };
 
-  const LoopPolicy loopPolicy = options_.loopPolicy == LoopPolicy::Default ? behavior.loopPolicy : options_.loopPolicy;
+  const SequenceVmOptions options{
+      .loopPolicy = options_.loopPolicy == LoopPolicy::Default ? behavior.loopPolicy : options_.loopPolicy,
+      .sequenceLoops = options_.sequenceLoops,
+  };
 
   if (runtime.valid()) {
     // Some formats must inspect the whole song before the first event can be
@@ -846,14 +846,14 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
         for (const u32 number : track.sourceTrackNumbers) {
           executors.push_back(std::make_unique<detail::VmTrackExecutor>(
               TrackStateContext{program, track, number}, runtime, TrackId{static_cast<u32>(trackIndex)},
-              TrackId{static_cast<u32>(executors.size())}, options_, target, outputSequence, executors.empty(),
+              TrackId{static_cast<u32>(executors.size())}, options, target, outputSequence, executors.empty(),
               programState, !hasSectionPlaylist));
         }
       }
 
       std::optional<detail::SectionPlaylistRunner> playlist;
       if (program.sectionPlaylist) {
-        playlist.emplace(*program.sectionPlaylist, loopPolicy, options_);
+        playlist.emplace(*program.sectionPlaylist, options);
         const detail::PlaylistAdvance first = playlist->advance(0);
         if (first.trackStarts != nullptr) {
           for (size_t i = 0; i < executors.size(); ++i) {
@@ -900,7 +900,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
         if (signal == SequenceCoordinatorSignal::SynchronizedLoopEnd && !playlist) {
           const u64 boundary = executors[selected]->tick();
           if (!synchronizedLoopSnapshot.empty()) {
-            if (loopPolicy == LoopPolicy::PlayOnce && synchronizedLoopRepeats < options_.sequenceLoops) {
+            if (options.loopPolicy == LoopPolicy::PlayOnce && synchronizedLoopRepeats < options.sequenceLoops) {
               ++synchronizedLoopRepeats;
               for (size_t i = 0; i < executors.size(); ++i) {
                 executors[i]->restoreSynchronizedLoop(synchronizedLoopSnapshot[i], boundary);
@@ -908,7 +908,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
               continue;
             }
 
-            if (loopPolicy == LoopPolicy::Preserve && synchronizedLoopStartTick) {
+            if (options.loopPolicy == LoopPolicy::Preserve && synchronizedLoopStartTick) {
               for (auto& executor : executors) {
                 executor->preserveLoop(*synchronizedLoopStartTick, boundary);
               }
@@ -951,7 +951,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
         const bool hasLoopBoundary =
             std::ranges::any_of(executors, [](const auto& executor) { return executor->loopStopTick().has_value(); });
         if ((!playlist || program.sectionPlaylist->waitForAllTracks) &&
-            loopPolicy == LoopPolicy::PlayOnce && hasLoopBoundary &&
+            options.loopPolicy == LoopPolicy::PlayOnce && hasLoopBoundary &&
             std::ranges::all_of(executors,
                                 [](const auto& executor) { return !executor->active() || executor->loopStopTick(); })) {
           sequenceEndTick = 0;
