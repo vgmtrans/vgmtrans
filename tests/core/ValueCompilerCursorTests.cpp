@@ -415,6 +415,19 @@ void compilerCursorCompilesControlFlow() {
   expect(performance.tracks[0].events.size() == 1 &&
              std::get<NotePerformanceEvent>(performance.tracks[0].events[0]).header.tick == 0,
          "compiled call should execute its decoded subroutine before returning to fallthrough");
+
+  const TrackDecodeScope bounds{.reader = ByteReader(SourceId{8}, bytes)};
+  const auto overflowingContinuation = [&](u32 offset) {
+    auto decoded = decodeProbeCommand(bounds.reader, offset, static_cast<u32>(bytes.size()));
+    decoded.flow = CommandFlow::fallthroughTo(Address{(u64{1} << 32) + 3});
+    return decoded;
+  };
+  expect(bounds.decode(0, 0, overflowingContinuation).commands.size() == 1,
+         "an out-of-range continuation must not wrap into a decoded source address");
+  const std::array starts{Address{u64{1} << 32}};
+  const auto rejected = bounds.decode(0, starts, overflowingContinuation);
+  expect(rejected.commands.empty() && rejected.startAddress.value == starts.front().value,
+         "an out-of-range entry point must retain its address without decoding wrapped source bytes");
 }
 
 void compilerCursorCompilesRepeatsAndConditionalFields() {

@@ -29,24 +29,24 @@ struct TrackDecodeScope;
 // and append the commands they discover themselves.
 class TrackDecodeSession {
 public:
-  [[nodiscard]] bool hasCommand(u32 offset) const { return commands_.contains(offset); }
+  [[nodiscard]] bool hasCommand(u64 offset) const { return commands_.contains(offset); }
   // Revisited offsets retain their first decoded interpretation.
-  const DecodedBytecodeCommand& findOrAppend(DecodedBytecodeCommand command, u32 offset);
+  const DecodedBytecodeCommand& findOrAppend(DecodedBytecodeCommand command, u64 offset);
   [[nodiscard]] TrackProgram finish();
 
 private:
   friend struct TrackDecodeScope;
 
-  TrackDecodeSession(const TrackDecodeScope& scope, u32 trackIndex, u32 startOffset);
+  TrackDecodeSession(const TrackDecodeScope& scope, u32 trackIndex, u64 startOffset);
 
   ByteReader reader_;
-  u32 startOffset_ = 0;
+  u64 startOffset_ = 0;
   SourceMapBuilder* sourceMap_ = nullptr;
   std::optional<SourceAnnotationId> annotation_;
   std::optional<SourceAnnotationId> commandParent_;
   std::optional<AssetId> rootSequenceAsset_;
   u32 trackIndex_ = 0;
-  std::map<u32, DecodedBytecodeCommand> commands_;
+  std::map<u64, DecodedBytecodeCommand> commands_;
 };
 
 // Holds the reader, source-map context, and safety limits used to decode a
@@ -63,7 +63,7 @@ struct TrackDecodeScope {
   std::optional<SourceAnnotationId> parentAnnotation;
   SourceMapBuilder* sourceMap = nullptr;
 
-  [[nodiscard]] TrackDecodeSession begin(u32 trackIndex, u32 startOffset) const {
+  [[nodiscard]] TrackDecodeSession begin(u32 trackIndex, u64 startOffset) const {
     return TrackDecodeSession(*this, trackIndex, startOffset);
   }
 
@@ -85,27 +85,23 @@ struct TrackDecodeScope {
     if (startAddresses.empty()) {
       return TrackProgram{.sourceTrackNumbers = {trackIndex}};
     }
-    auto session = begin(trackIndex, static_cast<u32>(startAddresses.front().value));
-    const u32 end = std::min(static_cast<u32>(reader.size()), bytecodeEnd);
-    std::vector<u32> pendingBlocks;
-    pendingBlocks.reserve(startAddresses.size());
-    for (const Address start : startAddresses) {
-      pendingBlocks.push_back(static_cast<u32>(start.value));
-    }
+    auto session = begin(trackIndex, startAddresses.front().value);
+    const u64 end = std::min<u64>(reader.size(), bytecodeEnd);
+    std::vector<Address> pendingBlocks(startAddresses.begin(), startAddresses.end());
     while (!pendingBlocks.empty() && session.commands_.size() < maxCommands) {
-      u32 offset = pendingBlocks.back();
+      u64 offset = pendingBlocks.back().value;
       pendingBlocks.pop_back();
       while (offset < end && !session.hasCommand(offset) && session.commands_.size() < maxCommands) {
-        auto decoded = decodeCommand(offset);
+        auto decoded = decodeCommand(static_cast<u32>(offset));
         // Jump and call targets start new blocks. The sequential continuation
         // stays in this inner loop, preserving discovery order for stateful decoders.
         if (const auto target = decoded.flow.defaultDestination();
             target && target->value < end && !session.hasCommand(target->value)) {
-          pendingBlocks.push_back(target->value);
+          pendingBlocks.push_back(*target);
         }
         for (const Address target : decoded.discoveryTargets) {
           if (target.value < end && !session.hasCommand(target.value)) {
-            pendingBlocks.push_back(target.value);
+            pendingBlocks.push_back(target);
           }
         }
         const auto next = decoded.flow.discoveryContinuation();

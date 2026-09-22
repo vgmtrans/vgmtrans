@@ -97,7 +97,7 @@ namespace {
 
 }  // namespace
 
-TrackDecodeSession::TrackDecodeSession(const TrackDecodeScope& scope, u32 trackIndex, u32 startOffset)
+TrackDecodeSession::TrackDecodeSession(const TrackDecodeScope& scope, u32 trackIndex, u64 startOffset)
     : reader_(scope.reader), startOffset_(startOffset), sourceMap_(scope.sourceMap), trackIndex_(trackIndex) {
   if (!scope.sourceHasTracks) {
     commandParent_ = scope.parentAnnotation;
@@ -123,7 +123,7 @@ TrackDecodeSession::TrackDecodeSession(const TrackDecodeScope& scope, u32 trackI
   commandParent_ = annotation_;
 }
 
-const DecodedBytecodeCommand& TrackDecodeSession::findOrAppend(DecodedBytecodeCommand command, u32 offset) {
+const DecodedBytecodeCommand& TrackDecodeSession::findOrAppend(DecodedBytecodeCommand command, u64 offset) {
   return commands_.try_emplace(offset, std::move(command)).first->second;
 }
 

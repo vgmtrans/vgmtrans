@@ -3330,6 +3330,25 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
 - Validation: warning-free full macOS Debug build; all 22 CTest targets pass
   (10.55 s).
 
+## Keep decode addresses intact until bounds checking
+
+- Track discovery now queues the existing `Address` values directly and keeps
+  source positions at their original width. The decoder receives a 32-bit
+  offset only after it passes the bytecode window check. This removes the
+  manual entry-point conversion loop and four production lines.
+- The audit found that narrowing before validation made a 4 GiB source appear
+  empty and allowed oversized entry points or sequential continuations to wrap
+  into valid bytecode. Source-size clamping and address checking now happen
+  before narrowing. Exceptional walkers also retain exact source positions in
+  their shared decode session.
+- Added 13 lines to the existing control-flow fixture for oversized entry
+  points and continuations. A temporary ASan/UBSan probe reproduced all three
+  failures against the old implementation and passed against the new one,
+  including an actual 4 GiB virtual-memory source span. Probe sources,
+  executables, and debug bundles were removed.
+- Validation: warning-free macOS Debug build; all 22 CTest targets pass
+  (10.91 s).
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage
