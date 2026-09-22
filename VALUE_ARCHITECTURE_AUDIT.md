@@ -3146,7 +3146,27 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
 - Validation: warning-free macOS Debug build; all 22 CTest targets pass
   (10.91 s). Linux CI was not run locally.
 
+## Simplify shared chunk storage and indexed annotation queries
+
+- `SharedSequence` retains and filters the incoming chunk list directly. One
+  prefix-offset table supplies both chunk starts and total size, removing the
+  extra chunk-list allocation, stored size counter, and first-chunk lookup case.
+  Shared values and their reference lifetimes remain unchanged.
+- Source, asset, and parent annotation queries now share one indexed traversal
+  across source-map parts. Each query names its index directly; publication
+  order and the invalid-asset guard remain intact.
+- Removed 15 production lines. Added no permanent test code. Temporary checks
+  covered empty/null chunks, checked boundaries, backing identity, and indexed
+  result order across chunks; those checks passed and were removed after review
+  to avoid growing the suite for these structural refactors.
+- Validation: warning-free macOS Debug builds; all 22 existing CTest targets
+  pass (10.91 s).
+
 ## Further investigation
+
+- Keep test growth proportional to behavioral risk. Prefer existing coverage
+  for structural refactors and extend existing fixtures for meaningful gaps;
+  use temporary probes when additional investigation needs no lasting regression.
 
 - Per the user's clarification, prioritize shared architecture over individual
   format cleanup: remove layers and duplicated state from compilation, VM

@@ -89,14 +89,13 @@ public:
             std::make_shared<const std::vector<T>>(std::move(values)),
         }) {}
 
-  [[nodiscard]] bool empty() const noexcept { return storage_->size == 0; }
-  [[nodiscard]] size_t size() const noexcept { return storage_->size; }
+  [[nodiscard]] bool empty() const noexcept { return storage_->chunks.empty(); }
+  [[nodiscard]] size_t size() const noexcept { return storage_->offsets.back(); }
 
   [[nodiscard]] const T& operator[](size_t index) const noexcept {
-    const auto found = std::upper_bound(storage_->ends.begin(), storage_->ends.end(), index);
-    const size_t chunk = static_cast<size_t>(found - storage_->ends.begin());
-    const size_t begin = chunk == 0 ? 0 : storage_->ends[chunk - 1];
-    return (*storage_->chunks[chunk])[index - begin];
+    const auto found = std::upper_bound(storage_->offsets.begin(), storage_->offsets.end(), index);
+    const size_t chunk = static_cast<size_t>(found - storage_->offsets.begin() - 1);
+    return (*storage_->chunks[chunk])[index - storage_->offsets[chunk]];
   }
 
   [[nodiscard]] const T& at(size_t index) const {
@@ -116,22 +115,18 @@ private:
   friend class detail::SharedSequenceAccess;
 
   struct Storage {
-    explicit Storage(std::vector<std::shared_ptr<const std::vector<T>>> values) {
-      chunks.reserve(values.size());
-      ends.reserve(values.size());
-      for (auto& chunk : values) {
-        if (chunk == nullptr || chunk->empty()) {
-          continue;
-        }
-        size += chunk->size();
-        chunks.push_back(std::move(chunk));
-        ends.push_back(size);
+    explicit Storage(std::vector<std::shared_ptr<const std::vector<T>>> values) : chunks(std::move(values)) {
+      std::erase_if(chunks, [](const auto& chunk) { return chunk == nullptr || chunk->empty(); });
+      offsets.reserve(chunks.size() + 1);
+      offsets.push_back(0);
+      for (const auto& chunk : chunks) {
+        offsets.push_back(offsets.back() + chunk->size());
       }
     }
 
     std::vector<std::shared_ptr<const std::vector<T>>> chunks;
-    std::vector<size_t> ends;
-    size_t size = 0;
+    // Chunk starts, followed by the total element count.
+    std::vector<size_t> offsets;
   };
 
   explicit SharedSequence(std::vector<std::shared_ptr<const std::vector<T>>> chunks)

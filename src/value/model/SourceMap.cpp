@@ -26,6 +26,17 @@ namespace {
   return ids;
 }
 
+[[nodiscard]] std::vector<SourceAnnotationId> idsFromIndex(const auto& parts, auto index, u32 key) {
+  std::vector<SourceAnnotationId> ids;
+  for (const auto& part : parts) {
+    const auto& entries = part.get()->*index;
+    if (const auto found = entries.find(key); found != entries.end()) {
+      ids.insert(ids.end(), found->second.begin(), found->second.end());
+    }
+  }
+  return ids;
+}
+
 }  // namespace
 
 ObjectRef ObjectRefs::asset(AssetId asset) {
@@ -195,14 +206,7 @@ const SourceAnnotation& SourceMap::get(SourceAnnotationId id) const {
 }
 
 std::vector<SourceAnnotationId> SourceMap::annotationsForSource(SourceId source) const {
-  std::vector<SourceAnnotationId> annotations;
-  for (const auto& part : storage_->parts) {
-    const auto found = part->annotationsBySource.find(source.value);
-    if (found != part->annotationsBySource.end()) {
-      annotations.insert(annotations.end(), found->second.begin(), found->second.end());
-    }
-  }
-  return annotations;
+  return idsFromIndex(storage_->parts, &Part::annotationsBySource, source.value);
 }
 
 std::vector<SourceAnnotationId> SourceMap::intersecting(SourceRange range) const {
@@ -241,28 +245,14 @@ std::optional<AssetId> SourceMap::assetOwner(SourceAnnotationId id) const {
 }
 
 std::vector<SourceAnnotationId> SourceMap::annotationsForAsset(AssetId asset) const {
-  std::vector<SourceAnnotationId> annotations;
   if (!asset.valid()) {
-    return annotations;
+    return {};
   }
-  for (const auto& part : storage_->parts) {
-    const auto found = part->annotationsByAsset.find(asset.value);
-    if (found != part->annotationsByAsset.end()) {
-      annotations.insert(annotations.end(), found->second.begin(), found->second.end());
-    }
-  }
-  return annotations;
+  return idsFromIndex(storage_->parts, &Part::annotationsByAsset, asset.value);
 }
 
 std::vector<SourceAnnotationId> SourceMap::childrenOf(SourceAnnotationId parent) const {
-  std::vector<SourceAnnotationId> children;
-  for (const auto& part : storage_->parts) {
-    const auto found = part->annotationsByParent.find(parent.value);
-    if (found != part->annotationsByParent.end()) {
-      children.insert(children.end(), found->second.begin(), found->second.end());
-    }
-  }
-  return children;
+  return idsFromIndex(storage_->parts, &Part::annotationsByParent, parent.value);
 }
 
 std::vector<SourceAnnotationId> SourceMap::withRole(SourceId source, SourceRole role) const {
