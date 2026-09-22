@@ -3203,6 +3203,16 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   accumulator value, signed/unsigned 32-bit boundaries, and zero-fraction cases.
   Warning-free macOS Debug build; all 22 CTest targets pass (10.99 s).
 
+## Invoke compiled bodies at their construction boundary
+
+- Removed `invokeCommand`, which was called only by the captured command body.
+  Body construction now owns both typed invocation and conversion of a `void`
+  result to empty `Effects`. Its result check reuses `CommandResult`, the same
+  rule used by `invokeFlow`, including owned argument conversions.
+- Removed one private helper and five production lines. Format APIs, immutable
+  captures, invocation order, and effect composition are unchanged. No tests added.
+- Validation: warning-free macOS Debug build; all 22 CTest targets pass (10.85 s).
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage
