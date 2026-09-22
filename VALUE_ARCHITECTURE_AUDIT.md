@@ -3247,6 +3247,30 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   the corpus was unavailable. The capture result above covers existing
   fixtures, not real-file or legacy/value equivalence.
 
+## Allocate scan identities before constructing references
+
+- Removed `normalizeScanResult` and the allocator's three `reserveAfter`
+  overloads. Scanning now allocates IDs once, before constructing assets and
+  their references; admission validates the completed result. This removes a
+  late mutation pass and its atomic compare/exchange reservation machinery.
+- All 38 registered production scanners already use `ScanResultBuilder`, which
+  allocates each asset ID at draft creation. Direct test scanners also allocate
+  through `ScanInput.ids`, except deliberately malformed validation fixtures.
+  Collection and annotation ID reservation had no callers.
+- This deliberately retires the old custom-scanner contract: callers must use
+  `ScanInput.ids` (directly or through the builder), rather than relying on
+  admission to assign missing IDs or advance past manually numbered assets.
+  Late assignment could not repair annotations or collection references, and
+  post-scan reservation could not prevent concurrent scanners from choosing
+  overlapping IDs. Missing IDs now retain the existing structured validation
+  error instead of being silently filled in.
+- Removed 54 production lines. Extended the existing invalid-ID admission
+  fixture to cover both duplicate and missing IDs; removed a redundant
+  normalization call from a range-validation fixture (12 net test lines).
+- Validation: warning-free macOS Debug rebuild (300 build steps); all 22 CTest
+  targets pass (10.54 s), including concurrent scanning, source ownership,
+  collection resolution, and all format fixtures.
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage

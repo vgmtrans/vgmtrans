@@ -488,7 +488,6 @@ void Session::scanOneSource(const SourceFile& source, std::vector<SourceId>& que
         });
       }
     }
-    normalizeScanResult(scan.result, ids_);
     prepareDiagnosticRanges(scan.result.diagnostics, source);
     auto validation = validateScanResult(source.id, scan.result, sources_, state_->assets());
     if (!validation.empty()) {

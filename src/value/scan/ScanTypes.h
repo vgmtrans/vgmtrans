@@ -10,16 +10,14 @@
 #include "value/model/SessionSnapshot.h"
 
 #include <atomic>
-#include <cstddef>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace vgmtrans::core {
 
 // Thread-safe session-unique IDs for scanners building values before admission.
-// reserveAfter() keeps generated IDs ahead of explicit
-// IDs that formats reserve for cross-references.
+// Allocate IDs before constructing assets and their references, either directly
+// through ScanInput::ids or through ScanResultBuilder.
 class ScanIdAllocator {
 public:
   ScanIdAllocator() = default;
@@ -32,13 +30,7 @@ public:
   [[nodiscard]] CollectionId nextCollectionId() noexcept;
   [[nodiscard]] SourceAnnotationId nextSourceAnnotationId() noexcept;
 
-  void reserveAfter(AssetId id) noexcept;
-  void reserveAfter(CollectionId id) noexcept;
-  void reserveAfter(SourceAnnotationId id) noexcept;
-
 private:
-  // Formats may assign IDs explicitly when they need cross-references. Generated
-  // IDs always advance past any explicit IDs already seen.
   std::atomic<u32> nextAssetId_{0};
   std::atomic<u32> nextCollectionId_{0};
   std::atomic<u32> nextSourceAnnotationId_{0};
@@ -67,7 +59,5 @@ struct ScanResult {
   SourceMap sourceMap;
   std::vector<Diagnostic> diagnostics;
 };
-
-void normalizeScanResult(ScanResult& result, ScanIdAllocator& ids);
 
 }  // namespace vgmtrans::core

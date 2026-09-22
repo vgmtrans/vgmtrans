@@ -749,21 +749,34 @@ void sessionRejectsLateRegistryMutation() {
   expect(emptyScanSealed, "format registry should also be sealed by an explicit scan");
 }
 
-void sessionRejectsDuplicateAssetIdsAtAdmission() {
-  Session session;
-  session.registerFormat(probeDuplicateAssetModule());
+void sessionRejectsInvalidAssetIdsAtAdmission() {
+  for (const bool missingId : {false, true}) {
+    Session session;
+    auto module = probeDuplicateAssetModule();
+    module.scan = [missingId](const ScanInput& input) {
+      auto result = scanProbeDuplicateAssets(input);
+      if (missingId) {
+        for (auto& asset : result.assets) {
+          metadata(asset).id = {};
+        }
+      }
+      return result;
+    };
+    session.registerFormat(std::move(module));
 
-  session.addSource(SourceFile{.name = "duplicate.probe"}, {0xee});
-  session.scanPendingSources();
-  const SessionSnapshot project = session.snapshot();
-  expect(project.assets().empty(), "duplicate asset ids should reject the whole scan result before admission");
-  expect(project.collections().empty(), "rejected duplicate asset scan should not create collections");
-  expect(diagnosticWithMessage(project.diagnostics(),
-                               "ProbeDuplicate scan failed: Scan result contained duplicate asset id 7")
-                 .code == "scan.asset.duplicate-id",
-         "session admission should preserve structured validation diagnostics");
-  expectDiagnosticRange(project.diagnostics(), "ProbeDuplicate scan failed: Scan result contained duplicate asset id 7",
-                        SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
+    session.addSource(SourceFile{.name = "invalid-ids.probe"}, {0xee});
+    session.scanPendingSources();
+    const SessionSnapshot project = session.snapshot();
+    expect(project.assets().empty(), "invalid asset ids should reject the whole scan result before admission");
+    expect(project.collections().empty(), "rejected scan should not create collections");
+    const std::string message = missingId ? "ProbeDuplicate scan failed: Scan result contained an asset without an id"
+                                          : "ProbeDuplicate scan failed: Scan result contained duplicate asset id 7";
+    expect(diagnosticWithMessage(project.diagnostics(), message).code ==
+               (missingId ? "scan.asset.missing-id" : "scan.asset.duplicate-id"),
+           "session admission should preserve structured validation diagnostics");
+    expectDiagnosticRange(project.diagnostics(), message,
+                          SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
+  }
 }
 
 void sessionRejectsExtractedSourcesWithMissingParents() {
@@ -958,7 +971,6 @@ void scanValidationRejectsOutOfBoundsScanResultRanges() {
     ScanIdAllocator ids;
     ScanResult result = badRangeScanResult(testCase.kind, ids.nextAssetId(), sources.reader(source).range(0, 2),
                                            sources.reader(source).range(3, 1));
-    normalizeScanResult(result, ids);
     const auto message = firstValidationMessage(validateScanResult(source, result, sources, {}));
     expect(message == testCase.message, "scan validation should reject out-of-bounds source ranges");
   }
@@ -1419,7 +1431,7 @@ void runValueSessionTests() {
   sessionResolverFailureKeepsExplicitCollections();
   sessionResolverFailureDropsRemovedCollections();
   sessionRejectsLateRegistryMutation();
-  sessionRejectsDuplicateAssetIdsAtAdmission();
+  sessionRejectsInvalidAssetIdsAtAdmission();
   sessionRejectsExtractedSourcesWithMissingParents();
   extractionValidationRejectsEmptyKnownFormats();
   scanValidationReportsMultipleAdmissionErrors();
