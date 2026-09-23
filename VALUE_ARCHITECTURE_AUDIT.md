@@ -3836,6 +3836,71 @@ not a large total line-count reduction. The four direct migrations and focused
 lifecycle cleanup form a coherent stopping point; forcing NamcoSnes through a
 new broadcast abstraction would weaken that result.
 
+## Execution stream real-archive verification
+
+The music corpus became available for this follow-up.
+Compared the saved pre-change executable from `86bcee165` against `fa9bcaf88`,
+covering the complete stream/channel change and lifecycle cleanup. This is a
+before/after value-architecture comparison, not a claim of legacy parity or
+exhaustive corpus coverage. No production changes or permanent tests were needed.
+
+The run attempted 329 inputs and compared 926 unique sequences from 326 inputs:
+
+| Format | Sequences |
+| --- | ---: |
+| SegSat | 346 |
+| NinSnes | 266 |
+| SonyPS1 | 106 |
+| HeartBeatPS1 | 76 |
+| NamcoSnes | 62 |
+| SonyPS2 | 35 |
+| CapcomSnes | 35 |
+
+Selection sampled PSF/PSF2/SSF inputs across game folders, up to five evenly
+spaced sequences per input, all 76 Dragon Warrior VII miniPSFs, and every
+discovered sequence in the selected SNES archives. Exports used one extra loop
+repeat, standalone and collection MIDI, and SF2/DLS for up to three collections
+per input. Supplemental exports recovered the pre-existing failures below.
+The 2,835 artifact comparisons include those supplemental exports and multiple
+export paths for the same sequence; they are not 2,835 distinct songs.
+
+All 477 SF2 and 477 DLS comparisons matched byte for byte. Of 1,881 MIDI
+comparisons, 1,358 matched byte for byte. The remaining 523 match the previously
+identified correction to delayed loop/end boundaries: 168 change only
+end-of-track timestamps, and 355 also retain final events or extend final
+note-offs at the old cutoff. Parsing every MIDI event, including metadata and
+SysEx, confirmed identical ordered events strictly before each track's old
+cutoff, identical MIDI headers, and no earlier track endings. Asset/collection
+inventories matched for every attempted input. No new export diagnostics or
+unexplained changes were found.
+
+Successful SNES archives include Super Mario World, Ogre Battle, Tactics Ogre,
+Wagyan Paradise, Street Fighter 2, Albert Odyssey 2, Benkei Gaiden, and Hashire
+Hebereke. These exercise unchanged formats and NinSnes section behavior in
+addition to the four migrated formats. All their compared exports matched.
+
+Three inputs failed scanning in both executables and are excluded from the
+926-sequence comparison. Super Metroid reports an invalid performance automation
+binding; Porky Pig's Haunted Holiday and Batman Revenge of the Joker report no
+supported music data. These are existing limitations, not successful checks.
+
+Six inputs encountered matching export failures in both executables. Quiz
+Nanairo Dreams has a title unusable as a macOS filename; Ogre Battle and Street
+Fighter 2 have collection titles containing slashes. Temporary user collections
+with safe names and the same members allowed their exports to be compared.
+Syphon Filter and the two Atelier Marie/Elie inputs lack discovered sound banks;
+their MIDI-only exports succeeded and matched. The workarounds changed neither
+the source archives nor production code.
+
+The 35 SonyPS2 inputs expose MIDI assets. Inspection of their embedded SQ members
+found only trivial single-MIDI song wrappers, so nontrivial SonyPS2 song playlists
+and SE voice routing remain covered by generated fixtures rather than this real
+archive run. The observed endpoint changes and these coverage limits preclude
+claiming universal byte parity, but this run found no regressions in the tested
+scope.
+
+No corpus data or new permanent comparison harness was added to the repository.
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage
