@@ -21,6 +21,7 @@ struct SequenceProgramConfig {
   // parser attaches its complete, program-specific runtime before publishing.
   [[nodiscard]] SequenceProgram makeProgram() const {
     return SequenceProgram{
+        .runtime = SequenceRuntime{},
         .timebase = timebase,
         .behavior = behavior,
     };
