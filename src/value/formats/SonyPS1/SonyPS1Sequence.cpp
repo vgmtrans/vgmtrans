@@ -59,7 +59,7 @@ struct PanGains {
 struct Playback : SequencePlayback<TrackState> {
   const RuntimeConfig& config;
 
-  void beginSection() {
+  void beginSection(bool) {
     out.instrument(sonyPs1InstrumentIdentity(track.bank, track.program));
     if (track.channel == 0) {
       out.timeSignature(config.numerator, config.denominator, 24);

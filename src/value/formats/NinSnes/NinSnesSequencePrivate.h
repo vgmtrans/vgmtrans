@@ -261,8 +261,6 @@ struct KonamiLoopState {
 struct TrackState {
   TrackState(TrackStateContext track, const RuntimeConfig& config);
 
-  void beginSection();
-
   u32 trackNumber = 0;
   u8 noteLength = 1;
   u8 durationRate = 0xfc;
@@ -290,6 +288,8 @@ struct TrackState {
 
 struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
+
+  void beginSection(bool first);
 
   // Notes and instruments.
   [[nodiscard]] u8 soundingDuration() const;

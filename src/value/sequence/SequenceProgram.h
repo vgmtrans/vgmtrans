@@ -27,6 +27,7 @@ struct SequenceProgram;
 struct SourceCommand;
 struct TrackProgram;
 struct TrackStateContext;
+struct StreamStateContext;
 
 enum class PitchTransitionRenderingHint {
   Portamento,
@@ -39,10 +40,12 @@ enum class PitchTransitionRenderingHint {
 struct SequenceRuntime {
   std::function<std::any(const SequenceProgram&)> createProgramState;
   std::function<std::any(TrackStateContext)> createTrackState;
-  std::function<std::any(TrackStateContext)> createStreamState;
-  // Runs for each channel at stream/section entry, before its first command delay.
-  void (*beginPlaybackSection)(const SourceCommand&, std::any& programState, std::any& trackState,
-                               PerformanceEmitter& out, VmApi& vm) = nullptr;
+  std::function<std::any(StreamStateContext)> createStreamState;
+  // Enter an active section before its first delay: stream state first, then
+  // each playback track. first is true only on this stream's first entry.
+  void (*beginStreamSection)(std::any& streamState, bool first) = nullptr;
+  void (*beginTrackSection)(bool first, std::any& programState, std::any& trackState, PerformanceEmitter& out,
+                            VmApi& vm) = nullptr;
   // The typed executor identifies the Playback/ProgramState family even when
   // state factories capture different immutable settings.
   Effects (*execute)(const SourceCommand&, std::any& programState, std::any& trackState,
@@ -52,8 +55,6 @@ struct SequenceRuntime {
   void (*tick)(const SourceCommand&, std::any& programState, std::any& trackState,
                 PerformanceEmitter& out, VmApi& vm) = nullptr;
   void (*finishPrepass)(std::any& programState) = nullptr;
-  void (*beginTrackSection)(std::any& trackState) = nullptr;
-  void (*beginStreamSection)(std::any& streamState) = nullptr;
   void (*finalizePerformance)(std::any& programState, PerformanceSequence& performance) = nullptr;
 
   [[nodiscard]] bool valid() const noexcept { return execute != nullptr; }
@@ -205,7 +206,8 @@ struct SequenceStream {
 };
 
 struct TrackProgram {
-  // Most decoded programs have one stream. Independent voices may execute the
+  // Decoded source track, independent of its playback tracks/channels.
+  // Most source tracks have one stream. Independent voices may execute the
   // same commands separately; an interleaved stream instead lists all its channels.
   std::vector<SequenceStream> streams{{}};
   std::string name;
@@ -219,8 +221,15 @@ struct TrackProgram {
   [[nodiscard]] const SourceCommand* command(CommandId id) const;
 };
 
-// Borrowed initialization data for one playback track. The decoded track stays
-// alive throughout playback, including when format state retains a reference.
+// Borrowed source data for one execution stream. Stream state does not belong
+// to any particular playback track or channel.
+struct StreamStateContext {
+  const SequenceProgram& sequence;
+  const TrackProgram& track;
+};
+
+// Borrowed initialization data for one playback track (one musical channel in
+// an interleaved stream). The decoded source track stays alive during playback.
 struct TrackStateContext {
   const SequenceProgram& sequence;
   const TrackProgram& track;

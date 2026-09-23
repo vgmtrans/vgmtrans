@@ -94,33 +94,20 @@ struct TrackState {
   double emittedPitchBendSemitones = 0.0;
   PerformanceNoteId seNote;
   double seTerminalKey = 0.0;
-  bool initialized = false;
 };
 
 struct StreamState {
-  explicit StreamState(TrackStateContext source)
+  explicit StreamState(StreamStateContext source)
       : tempo(source.sequence.behavior.initialTempoMicrosecondsPerQuarter),
-        ppqn(std::max<u16>(source.sequence.timebase.ppqn, 1)) {
-    if (source.sequence.sectionPlaylist) {
-      sectionPan = source.sequence.behavior.initialChannelPan.value_or(0.5);
-      sectionTempo = tempo;
-    }
-  }
+        ppqn(std::max<u16>(source.sequence.timebase.ppqn, 1)),
+        sectionPan(source.sequence.behavior.initialChannelPan.value_or(0.5)), sectionTempo(tempo) {}
 
-  void beginSection() {
-    resetSectionState = sectionStarted;
-    sectionStarted = true;
-    if (resetSectionState) {
-      tempo = sectionTempo;
-    }
-  }
+  void beginSection(bool) { tempo = sectionTempo; }
 
   u32 tempo;
   u16 ppqn;
-  std::optional<double> sectionPan;
-  u32 sectionTempo = 500000;
-  bool sectionStarted = false;
-  bool resetSectionState = false;
+  double sectionPan;
+  u32 sectionTempo;
 };
 
 [[nodiscard]] double linearMidi7(u8 value) {
@@ -291,18 +278,13 @@ struct Playback : SequencePlayback<TrackState, StreamState> {
     });
   }
 
-  void beginSection() {
-    if (stream.resetSectionState) {
+  void beginSection(bool first) {
+    if (!first) {
       if (track.channel == 0) {
-        out.tempo(stream.sectionTempo);
+        out.tempo(stream.tempo);
       }
-      out.channelPan(*stream.sectionPan);
-    }
-    if (track.initialized) {
-      return;
-    }
-    track.initialized = true;
-    if (track.seSequence) {
+      out.channelPan(stream.sectionPan);
+    } else if (track.seSequence) {
       out.instrument(setbInstrumentIdentity(track.seSet, track.seTimbre));
     } else {
       out.instrument(instrumentIdentity(track.bank, track.program));

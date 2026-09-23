@@ -3741,6 +3741,41 @@ same-tick events were included.
 The music corpus was unavailable, so real-archive parity remains unverified
 for this checkpoint.
 
+## Stream construction and section entry cleanup
+
+Kept `TrackProgram`, `TrackState`, the track-facing helpers, and the term "track"
+for multi-track sequences. Comments distinguish decoded source tracks from the
+playback tracks/channels served by a stream; no blanket channel rename was made.
+
+Stream state now receives `StreamStateContext`, containing the sequence and its
+decoded source track, without an arbitrary first channel's number. Track state
+continues to receive its existing track identity through `TrackStateContext`.
+
+Section entry has two ordered hooks at one execution boundary: first
+`StreamState::beginSection(bool first)`, then each track's
+`Playback::beginSection(bool first)`, before the first command delay. Track
+resets and initial output share the Playback hook; the separate state-only track
+reset hook and `beginPlaybackSection` convention are gone. `first` means the
+stream's first actual entry, so inactive tracks initialize when they first play.
+Per-command driver work still belongs in `beforeCommand`.
+
+SonyPS2 no longer coordinates section output through `initialized`,
+`sectionStarted`, or `resetSectionState` flags, and section pan no longer needs
+an optional value. NinSnes resets live beside playback setup; Quest's initial
+volume/pan setup no longer needs an `initialized` guard on every command.
+No additional formats were migrated to shared execution streams.
+
+This follow-up removes 17 production lines. Existing VM fixtures now exercise
+stream construction, once-per-stream entry, initial/later entry, and inactive
+tracks that start later. Replacing the playlist probe's manual erased callbacks
+with its typed Playback keeps test growth to five lines, with no new test files.
+
+Validation: warning-free macOS Debug build and all 22 CTest targets passed.
+All 98 MIDI/SF2/DLS artifacts from 52 generated inputs (53 sequences) matched the
+pre-cleanup executable byte for byte. This includes five additional NinSnes
+Sunsoft/Quest fixtures with later sections and track reactivation.
+The music corpus was unavailable for this checkpoint.
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage

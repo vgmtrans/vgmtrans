@@ -461,9 +461,9 @@ TrackState::TrackState(TrackStateContext track, const RuntimeConfig& config) : t
   }
 }
 
-void TrackState::beginSection() {
-  inPattern = false;
-  patternRemaining = 0;
+void Playback::beginSection(bool) {
+  track.inPattern = false;
+  track.patternRemaining = 0;
   // Instruments, legato, volume, pan, pitch, and modulation carry across
   // section boundaries; the driver only clears its pattern/fade counters.
 }

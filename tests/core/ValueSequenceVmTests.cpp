@@ -93,16 +93,24 @@ void sequenceVmRoutesOneStreamAcrossIndependentChannels() {
     int key = 60;
   };
   struct StreamState {
+    explicit StreamState(StreamStateContext source)
+        : tempo(source.sequence.behavior.initialTempoMicrosecondsPerQuarter) {}
+    void beginSection(bool) { ++entries; }
+    u32 tempo;
+    u32 entries = 0;
     u32 notes = 0;
   };
   struct Playback : SequencePlayback<ChannelState, StreamState> {
-    void beginSection() { out.instrument(0, 7); }
+    void beginSection(bool first) {
+      expect(first, "a standalone stream should enter its initial section");
+      out.instrument(0, 7);
+    }
     void note() {
       out.noteOn(track.key++, 1.0);
       ++stream.notes;
     }
     void release() { out.noteOff(track.key - 1); }
-    void tempo() { out.tempo(500000 + stream.notes); }
+    void tempo() { out.tempo(stream.tempo + stream.notes + stream.entries); }
   };
   TrackProgram track{.streams = {{.channels = {4, 9}}}, .startAddress = Address{0}};
   auto add = [&](std::optional<u32> channel, u32 delay, void (Playback::*method)()) {
@@ -135,8 +143,8 @@ void sequenceVmRoutesOneStreamAcrossIndependentChannels() {
     expect(program.command(note.header.sourceCommand) == &program.tracks[0].commands[i == 0 ? 1 : 0],
            "channel output should retain its shared stream's source command");
   }
-  expect(std::get<TempoPerformanceEvent>(performance.tracks[0].events.back()).microsecondsPerQuarter == 500002,
-         "global commands should observe shared stream state and run once on the default channel");
+  expect(std::get<TempoPerformanceEvent>(performance.tracks[0].events.back()).microsecondsPerQuarter == 500003,
+         "stream state should initialize and enter once before routed commands execute");
 }
 
 void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
@@ -1318,29 +1326,20 @@ void sequenceVmCoordinatesSemanticLoopsAtSequenceScope() {
 struct PlaylistProbeTrackState {
   u32 sectionsStarted = 0;
   u32 persistentValue = 0;
-
-  void beginSection() { ++sectionsStarted; }
 };
 
-Effects executePlaylistProbe(const SourceCommand& command, std::any&, std::any& trackState, PerformanceEmitter& out,
-                             VmApi& vm) {
-  auto& state = std::any_cast<PlaylistProbeTrackState&>(trackState);
-  if ((command.address.value & 1) != 0) {
-    return Effects{};
+struct PlaylistProbePlayback : SequencePlayback<PlaylistProbeTrackState> {
+  void beginSection(bool first) {
+    expect(first == (track.sectionsStarted == 0), "section entry should identify the first visit");
+    ++track.sectionsStarted;
   }
 
-  ++state.persistentValue;
-  out.noteOn(state.sectionsStarted * 10 + state.persistentValue, 1.0);
-  return Effects::wait(command.opcode);
-}
-
-std::any createPlaylistProbeTrackState(TrackStateContext) {
-  return PlaylistProbeTrackState{};
-}
-
-void beginPlaylistProbeSection(std::any& trackState) {
-  std::any_cast<PlaylistProbeTrackState&>(trackState).beginSection();
-}
+  Effects note(u8 duration) {
+    ++track.persistentValue;
+    out.noteOn(track.sectionsStarted * 10 + track.persistentValue, 1.0);
+    return Effects::wait(duration);
+  }
+};
 
 TrackProgram playlistProbeTrack(u32 trackId, std::initializer_list<std::pair<u32, u8>> sections) {
   TrackProgram track{
@@ -1349,6 +1348,8 @@ TrackProgram playlistProbeTrack(u32 trackId, std::initializer_list<std::pair<u32
   };
   for (const auto [address, duration] : sections) {
     appendTestCommand(track, Address{address}, duration, {}, {}, CommandFlow::fallthroughTo(Address{address + 1}));
+    track.commands.back().execution.body =
+        detail::makeCommandBody<PlaylistProbePlayback>(&PlaylistProbePlayback::note, duration);
     appendTestCommand(track, Address{address + 1}, 0, {}, {}, CommandFlow::endSection(Address{address + 2}));
   }
   return track;
@@ -1362,11 +1363,7 @@ SequenceProgramConfig playlistProbeConfig() {
 }
 
 SequenceRuntime playlistProbeRuntime() {
-  return SequenceRuntime{
-              .createTrackState = createPlaylistProbeTrackState,
-              .execute = executePlaylistProbe,
-              .beginTrackSection = beginPlaylistProbeSection,
-  };
+  return makeCompiledRuntime<PlaylistProbePlayback>();
 }
 
 void sequenceVmSwitchesParallelSectionsAtTheFirstChannelEnd() {
@@ -1416,6 +1413,14 @@ void sequenceVmSwitchesParallelSectionsAtTheFirstChannelEnd() {
          "a section switch should trim a longer sibling channel at the boundary");
   expect(secondSectionNote.header.tick == 8 && secondSectionNote.durationTicks == 4 && secondSectionNote.key == 22.0,
          "track state should persist while the section-begin hook resets transient state");
+
+  auto laterStart = program;
+  laterStart.sectionPlaylist->commands[0].streamStarts[0] = std::nullopt;
+  laterStart.sectionPlaylist->commands[1].streamStarts[0] = Address{0};
+  const auto later = SequenceVm().render(laterStart);
+  const auto& initialNote = std::get<NotePerformanceEvent>(later.tracks[0].events[0]);
+  expect(initialNote.header.tick == 12 && initialNote.key == 11.0,
+         "an inactive track should initialize on its first actual section entry");
 }
 
 void sequenceVmExecutesFiniteAndInfiniteSectionPlaylistRepeats() {

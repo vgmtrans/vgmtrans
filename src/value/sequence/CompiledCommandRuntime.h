@@ -26,7 +26,7 @@ namespace detail {
 template <class Type>
 inline constexpr bool alwaysFalse = false;
 
-// Program and track state follow the same rule: use context and immutable
+// Program, stream, and track state follow the same rule: use context and immutable
 // settings when requested, otherwise allow a plain state object.
 template <class State, class Context>
 [[nodiscard]] std::any createCompiledState(const Context& context) {
@@ -110,10 +110,10 @@ struct CompiledCommandRuntime {
   static void installHooks(SequenceRuntime& runtime) {
     runtime.execute = execute;
     runtime.readyDuringWait = readyDuringWait;
-    if constexpr (requires(Playback& playback) { playback.beginSection(); }) {
-      runtime.beginPlaybackSection = [](const SourceCommand&, std::any& programState, std::any& trackState,
-                                        PerformanceEmitter& out, VmApi& vm) {
-        withPlayback(programState, trackState, out, vm, [](Playback& playback) { playback.beginSection(); });
+    if constexpr (requires(Playback& playback) { playback.beginSection(true); }) {
+      runtime.beginTrackSection = [](bool first, std::any& programState, std::any& trackState, PerformanceEmitter& out,
+                                     VmApi& vm) {
+        withPlayback(programState, trackState, out, vm, [first](Playback& playback) { playback.beginSection(first); });
       };
     }
     if constexpr (requires(Playback& playback) { playback.tick(); }) {
@@ -127,12 +127,11 @@ struct CompiledCommandRuntime {
       // Collected results stay in the same typed object for the real render.
       runtime.finishPrepass = [](std::any& state) { std::any_cast<ProgramState&>(state).finishPrepass(); };
     }
-    if constexpr (requires(TrackState& state) { state.beginSection(); }) {
-      runtime.beginTrackSection = [](std::any& state) { std::any_cast<TrackState&>(state).beginSection(); };
-    }
     if constexpr (!std::is_void_v<StreamState>) {
-      if constexpr (requires(StreamState& state) { state.beginSection(); }) {
-        runtime.beginStreamSection = [](std::any& state) { std::any_cast<StreamState&>(state).beginSection(); };
+      if constexpr (requires(StreamState& state) { state.beginSection(true); }) {
+        runtime.beginStreamSection = [](std::any& state, bool first) {
+          std::any_cast<StreamState&>(state).beginSection(first);
+        };
       }
     }
     if constexpr (requires(ProgramState& state, PerformanceSequence& performance) {
@@ -158,7 +157,7 @@ template <class Playback, class ProgramState = EmptyCompiledProgramState>
     return detail::createCompiledState<typename Playback::TrackState>(context);
   };
   if constexpr (!std::is_void_v<typename Playback::StreamState>) {
-    runtime.createStreamState = [](TrackStateContext context) {
+    runtime.createStreamState = [](StreamStateContext context) {
       return detail::createCompiledState<typename Playback::StreamState>(context);
     };
   }
@@ -177,8 +176,9 @@ template <class Playback, class ProgramState = EmptyCompiledProgramState, class 
                                          std::constructible_from<ProgramState, const Config&>;
   constexpr bool trackConsumesConfig = std::constructible_from<TrackState, const TrackStateContext&, const Config&> ||
                                        std::constructible_from<TrackState, const Config&>;
-  constexpr bool streamConsumesConfig = std::constructible_from<StreamState, const TrackStateContext&, const Config&> ||
-                                        std::constructible_from<StreamState, const Config&>;
+  constexpr bool streamConsumesConfig =
+      std::constructible_from<StreamState, const StreamStateContext&, const Config&> ||
+      std::constructible_from<StreamState, const Config&>;
   static_assert(programConsumesConfig || trackConsumesConfig || streamConsumesConfig,
                 "A supplied runtime Config must be consumed by program, stream, or channel state");
   SequenceRuntime runtime;
@@ -190,7 +190,7 @@ template <class Playback, class ProgramState = EmptyCompiledProgramState, class 
     return detail::createCompiledState<TrackState>(context, *settings);
   };
   if constexpr (!std::is_void_v<StreamState>) {
-    runtime.createStreamState = [settings](TrackStateContext context) {
+    runtime.createStreamState = [settings](StreamStateContext context) {
       return detail::createCompiledState<StreamState>(context, *settings);
     };
   }

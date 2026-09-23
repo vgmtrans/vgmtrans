@@ -271,8 +271,7 @@ public:
     if (stream.channels.empty()) {
       throw std::invalid_argument("A sequence stream must have at least one channel");
     }
-    const TrackStateContext context{program, track, stream.channels.front()};
-    streamState_ = runtime.createStreamState ? runtime.createStreamState(context) : std::any{};
+    streamState_ = runtime.createStreamState ? runtime.createStreamState({program, track}) : std::any{};
     channels_.reserve(stream.channels.size());
     for (const u32 number : stream.channels) {
       channels_.push_back(VmChannel{
@@ -300,14 +299,18 @@ public:
   [[nodiscard]] SequenceCoordinatorSignal executeNext() {
     if (!sectionEntered_ && position_.command) {
       sectionEntered_ = true;
-      if (sequenceRuntime_.beginPlaybackSection) {
+      if (sequenceRuntime_.beginStreamSection) {
+        sequenceRuntime_.beginStreamSection(streamState_, !started_);
+      }
+      if (sequenceRuntime_.beginTrackSection) {
         const auto& command = track_.commands.at(*position_.command);
         VmApi vm(*this, command);
         for (auto& channel : channels_) {
           auto out = outputAt(channel, tick_, CommandId{*position_.command}, command.annotation);
-          sequenceRuntime_.beginPlaybackSection(command, programState_, channel.state, out, vm);
+          sequenceRuntime_.beginTrackSection(!started_, programState_, channel.state, out, vm);
         }
       }
+      started_ = true;
     }
     if (!position_.command && position_.pendingTicks == 0) {
       return SequenceCoordinatorSignal::None;
@@ -373,14 +376,6 @@ public:
     loopStopTick_.reset();
     loopRepeats_ = 0;
     sectionEntered_ = false;
-    if (sequenceRuntime_.beginStreamSection) {
-      sequenceRuntime_.beginStreamSection(streamState_);
-    }
-    if (sequenceRuntime_.beginTrackSection) {
-      for (auto& channel : channels_) {
-        sequenceRuntime_.beginTrackSection(channel.state);
-      }
-    }
     if (start && !position_.command) {
       warn(fmt::format("Sequence section target ${:04X} was not decoded", start->value), {});
     }
@@ -733,6 +728,7 @@ private:
   std::any& programState_;
   u64 tick_ = 0;
   bool sectionEntered_ = false;
+  bool started_ = false;
   std::vector<u32> callStack_;
   // Remaining plays distinguish legitimate finite passes in loop detection.
   std::map<u8, u32> repeat_;

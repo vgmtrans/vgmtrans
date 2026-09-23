@@ -123,12 +123,6 @@ struct CallFrame {
 
 struct TrackState {
   explicit TrackState(TrackStateContext track) : number(track.sourceTrackNumber) {}
-  void beginSection() {
-    calls.clear();
-    percussionNote = 0;
-    legato = false;
-    tieEligible = false;
-  }
 
   u32 number = 0;
   u16 length = 1;
@@ -145,7 +139,6 @@ struct TrackState {
   s8 transpose = 0;
   u8 tuning = 0;
   bool legato = false;
-  bool initialized = false;
   std::optional<double> lastKey;
   PerformanceNoteId lastNote;
   std::vector<CallFrame> calls;
@@ -246,9 +239,12 @@ struct Slide {
 struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
-  void beforeCommand() {
-    if (!track.initialized) {
-      track.initialized = true;
+  void beginSection(bool first) {
+    track.calls.clear();
+    track.percussionNote = 0;
+    track.legato = false;
+    track.tieEligible = false;
+    if (first) {
       volume(program.config.ogreBattle ? (program.config.sfx ? 0xdc : 0xff) : 0);
       pan(10);
     }
