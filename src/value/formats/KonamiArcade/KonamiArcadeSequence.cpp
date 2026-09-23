@@ -625,9 +625,8 @@ struct Playback : SequencePlayback<TrackState> {
       sequence.tempo.setCurrentAt(vm.tick(), sequence.channelTempos[track.sourceTrackNumber]);
       sequence.tempoSlideLastTick = vm.tick();
       sequence.nmiRateHertz = nmiRate;
-      sequence.tempo.begin(
-          out.fade(PerformanceAutomationTarget::Tempo, tempoMicrosecondsPerQuarter(nmiRate, target), duration),
-          SequenceMotionPlan<double>::targetOverTicks(static_cast<double>(target), duration));
+      sequence.tempo.begin(out, PerformanceAutomationTarget::Tempo, tempoMicrosecondsPerQuarter(nmiRate, target),
+                           SequenceMotionPlan<double>::targetOverTicks(static_cast<double>(target), duration));
       return;
     }
 
@@ -635,7 +634,7 @@ struct Playback : SequencePlayback<TrackState> {
     const PerformanceAutomationTarget automationTarget =
         kind == 1 ? PerformanceAutomationTarget::Level : PerformanceAutomationTarget::Pan;
     const double targetValue = kind == 1 ? volumeGain(target) : (static_cast<double>(panIndex(target)) - 7.0) / 7.0;
-    state->begin(out.fade(automationTarget, targetValue, duration),
+    state->begin(out, automationTarget, targetValue,
                  SequenceMotionPlan<double>::targetOverTicks(static_cast<double>(target), duration));
   }
 

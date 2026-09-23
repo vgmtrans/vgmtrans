@@ -314,7 +314,7 @@ struct Playback : SequencePlayback<TrackState> {
       pan(target);
       return;
     }
-    track.pan.begin(out.fade(PerformanceAutomationTarget::Pan, math::panPosition(target), length),
+    track.pan.begin(out, PerformanceAutomationTarget::Pan, math::panPosition(target),
                     track.pan.toRawTarget(target, length));
   }
 
@@ -365,7 +365,7 @@ struct Playback : SequencePlayback<TrackState> {
       volume(target);
       return;
     }
-    track.volume.begin(out.fade(PerformanceAutomationTarget::Level, math::channelGain(target), length),
+    track.volume.begin(out, PerformanceAutomationTarget::Level, math::channelGain(target),
                        track.volume.toRawTarget(target, length));
   }
 
@@ -384,7 +384,7 @@ struct Playback : SequencePlayback<TrackState> {
       masterVolume(target);
       return;
     }
-    program.masterVolume.begin(out.fade(PerformanceAutomationTarget::MasterLevel, masterRelativeGain(target), length),
+    program.masterVolume.begin(out, PerformanceAutomationTarget::MasterLevel, masterRelativeGain(target),
                                program.masterVolume.toRawTarget(target, length));
     program.masterVolumeTrack = track.trackNumber;
   }

@@ -794,7 +794,7 @@ void Playback::panFade(u8 length, u8 value) {
   }
   // Interpolate the source pan index before applying its non-linear table.
   const auto gains = math::panGains(program.selected, math::kPan, value);
-  track.pan.begin(out.fade(PerformanceAutomationTarget::Pan, math::stereoPosition(gains), length),
+  track.pan.begin(out, PerformanceAutomationTarget::Pan, math::stereoPosition(gains),
                   track.pan.toRawTarget(value, length));
 }
 
@@ -876,8 +876,8 @@ void Playback::tempoFade(u8 length, u8 value) {
   const u8 driverTempo = program.commandTempo(value);
   program.tempoState.reset(program.tempo);
   program.tempoState.begin(
-      out.fade(PerformanceAutomationTarget::Tempo,
-               static_cast<double>(math::tempoMicrosecondsPerQuarter(driverTempo, program.tempoTimerTarget)), length),
+      out, PerformanceAutomationTarget::Tempo,
+      static_cast<double>(math::tempoMicrosecondsPerQuarter(driverTempo, program.tempoTimerTarget)),
       program.tempoState.toRawTarget(driverTempo, length));
   program.tempoAutomationTrack = track.trackNumber;
   advanceTempoFade();
@@ -893,7 +893,7 @@ void Playback::volumeFade(u8 length, u8 value) {
     volume(value);
     return;
   }
-  track.volume.begin(out.fade(PerformanceAutomationTarget::Level, math::levelGain(value), length),
+  track.volume.begin(out, PerformanceAutomationTarget::Level, math::levelGain(value),
                      track.volume.toRawTarget(value, length));
 }
 
@@ -923,7 +923,7 @@ void Playback::masterVolumeFade(u8 length, u8 value) {
     return;
   }
   program.masterVolumeState.reset(program.masterVolume);
-  program.masterVolumeState.begin(out.fade(PerformanceAutomationTarget::MasterLevel, masterGain(value), length),
+  program.masterVolumeState.begin(out, PerformanceAutomationTarget::MasterLevel, masterGain(value),
                                   program.masterVolumeState.toRawTarget(value, length));
   program.masterVolumeAutomationTrack = track.trackNumber;
 }

@@ -434,8 +434,8 @@ struct Playback : SequencePlayback<TrackState> {
 
   void volumeFade(u8 target, u8 duration) {
     if (duration != 0) {
-      track.volume.begin(out.fade(PerformanceAutomationTarget::Level,
-                                  math::channelGain(track.channelMaster, target, track.alternateVolume), duration),
+      track.volume.begin(out, PerformanceAutomationTarget::Level,
+                         math::channelGain(track.channelMaster, target, track.alternateVolume),
                          track.volume.toRawTarget(target, duration));
     }
   }

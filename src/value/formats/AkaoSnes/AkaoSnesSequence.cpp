@@ -1613,7 +1613,7 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
                          : event.invoke(
                                [](Playback& playback, u16 ticks, u8 volume) {
                                  playback.track.volume.begin(
-                                     playback.out.fade(PerformanceAutomationTarget::Level, channelLevel(volume), ticks),
+                                     playback.out, PerformanceAutomationTarget::Level, channelLevel(volume),
                                      playback.track.volume.toRawTarget(volume, ticks));
                                },
                                {length, target});
@@ -1630,9 +1630,8 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
                        [](Playback& playback, u16 ticks, u8 rawPan) {
                          const u8 pan = static_cast<u8>(rawPan << (playback.track.pan8Bit ? 0 : 1));
                          const double rightGain = rightGainFromPan(pan);
-                         playback.track.pan.begin(
-                             playback.out.fade(PerformanceAutomationTarget::Pan, (rightGain * 2.0) - 1.0, ticks),
-                             playback.track.pan.toRawTarget(pan, ticks));
+                         playback.track.pan.begin(playback.out, PerformanceAutomationTarget::Pan,
+                                                  (rightGain * 2.0) - 1.0, playback.track.pan.toRawTarget(pan, ticks));
                        },
                        {length, target});
     }
@@ -1901,10 +1900,9 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
                          playback.track.tempoState.reset(playback.track.tempo);
                          const u8 tempo = playback.normalizedTempo(rawTempo);
                          playback.track.tempoState.begin(
-                             playback.out.fade(PerformanceAutomationTarget::Tempo,
-                                               static_cast<double>(tempoMicrosecondsPerQuarter(
-                                                   playback.context.version, playback.context.minorVersion, tempo)),
-                                               ticks),
+                             playback.out, PerformanceAutomationTarget::Tempo,
+                             static_cast<double>(tempoMicrosecondsPerQuarter(
+                                 playback.context.version, playback.context.minorVersion, tempo)),
                              playback.track.tempoState.toRawTarget(tempo, ticks));
                        },
                        {length, target});

@@ -7,6 +7,7 @@
 #pragma once
 
 #include "value/sequence/PerformanceModel.h"
+#include "value/sequence/SequenceMotion.h"
 
 #include <any>
 #include <cstddef>
@@ -291,8 +292,12 @@ public:
     ValueState::reset(value);
   }
 
-  template <class Plan>
-  decltype(auto) begin(PerformanceAutomationBinding binding, const Plan& plan) {
+  // The plan supplies timing and progression; targetValue uses performance units.
+  template <class Value>
+  decltype(auto) begin(PerformanceEmitter out, PerformanceAutomationTarget target, double targetValue,
+                      const SequenceMotionPlan<Value>& plan) {
+    auto binding = plan.usesTicks() ? out.fade(target, targetValue, plan.ticks, plan.delay)
+                                   : out.step(target, targetValue, plan.ticks, plan.delay);
     bind(std::move(binding));
     return ValueState::begin(plan);
   }

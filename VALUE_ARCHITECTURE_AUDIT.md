@@ -3661,6 +3661,25 @@ for byte. Inventories, diagnostics, and full source trees for up to two sequence
 per input also matched. Temporary comparison tools and exports were removed.
 No new permanent test files were added.
 
+## Fade declarations use the source motion plan
+
+`PerformanceBoundValue::begin` now takes the emitter, performance target, converted
+endpoint, and source motion plan. The plan supplies duration, delay, and timed or
+step-based progression for both the motion and its performance intent. This
+replaces the overload that accepted an independently constructed binding.
+
+Migrated 19 declarations across eight formats and removed KonamiSnes's second
+timed-versus-step decision. Raw and converted endpoints remain explicit; driver
+tick ordering, zero-duration handling, and raw-only motion are unchanged. The
+performance model still retains high-level intent and linked individual events.
+The benefit is fewer facts to keep consistent, with little change in line count.
+
+Validation: warning-free macOS Debug build and all 22 CTest targets passed.
+Ten lines of assertions in existing fixtures cover delayed intent, converted
+endpoints, and Konami's step-based intent. Temporary probes also checked all
+three motion modes with delayed, linked output points. No new permanent test
+files were added.
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage

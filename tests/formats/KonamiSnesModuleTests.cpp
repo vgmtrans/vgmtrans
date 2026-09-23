@@ -1452,6 +1452,11 @@ void konamiSnesCompiledAutomationTicksFades() {
                                    return pan != nullptr && pan->header.tick > 0;
                                  }),
          "tempo, volume, and pan fades should retain structured intent and exact per-tick realizations");
+  expect(std::ranges::count_if(performance.tracks[0].automations, [](const PerformanceAutomation& automation) {
+           const auto* intent = std::get_if<ScalarPerformanceAutomationIntent>(&automation.intent);
+           return intent && intent->motion == PerformanceAutomationMotion::TargetByStep && intent->durationTicks == 0;
+         }) == 3,
+         "late Konami fades should retain step-based intent without a predetermined duration");
 }
 
 void konamiSnesPlayOnceCoordinatesGlobalLoopCompletion() {

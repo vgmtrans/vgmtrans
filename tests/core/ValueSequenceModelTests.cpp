@@ -333,9 +333,14 @@ void performanceBoundValueOwnsReplacementLifecycle() {
   PerformanceBoundValue<SequenceLinearMotion<double>> value;
   value.reset(0.0);
 
-  value.begin(out.fade(PerformanceAutomationTarget::Level, 1.0, 8),
-              SequenceMotionPlan<double>::targetOverTicks(1.0, 8));
-  value.begin(out.at(3).fade(PerformanceAutomationTarget::Level, 0.5, 4),
+  value.begin(out, PerformanceAutomationTarget::Level, 1.0,
+              SequenceMotionPlan<double>::targetOverTicks(128.0, 8, 1));
+  const auto& intent = std::get<ScalarPerformanceAutomationIntent>(track.automations[0].intent);
+  expect(intent.motion == PerformanceAutomationMotion::TargetOverTicks && intent.targetValue == 1.0 &&
+             intent.durationTicks == 8 && intent.delayTicks == 1 &&
+             track.automations[0].realization.startTick == 1 && track.automations[0].realization.endTick == 9,
+         "bound motion should retain its timing and converted target in the performance intent");
+  value.begin(out.at(3), PerformanceAutomationTarget::Level, 0.5,
               SequenceMotionPlan<double>::targetOverTicks(0.5, 4));
   value.setCurrentAt(5, 0.25);
 

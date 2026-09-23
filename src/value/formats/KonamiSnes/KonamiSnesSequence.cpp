@@ -766,9 +766,7 @@ struct Playback : SequencePlayback<TrackState> {
       state->interruptAutomationAt(vm.tick());
       state->begin(motion);
     } else {
-      auto automation =
-          stepBased ? out.step(automationTarget, targetValue, ticks) : out.fade(automationTarget, targetValue, ticks);
-      state->begin(std::move(automation), motion);
+      state->begin(out, automationTarget, targetValue, motion);
     }
   }
 

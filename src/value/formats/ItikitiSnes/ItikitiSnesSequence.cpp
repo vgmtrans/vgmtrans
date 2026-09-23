@@ -369,7 +369,7 @@ struct Playback : SequencePlayback<TrackState> {
       tempo(target);
       return;
     }
-    program.tempo.begin(out.fade(PerformanceAutomationTarget::Tempo, math::tempoMicrosecondsPerQuarter(target), length),
+    program.tempo.begin(out, PerformanceAutomationTarget::Tempo, math::tempoMicrosecondsPerQuarter(target),
                         program.tempo.toRawTarget(target, length));
     program.tempoTrack = track.trackNumber;
   }
@@ -384,9 +384,8 @@ struct Playback : SequencePlayback<TrackState> {
       volume(target);
       return;
     }
-    track.volume.begin(
-        out.fade(PerformanceAutomationTarget::Level, math::channelGain(target, track.channelVolume), length),
-        track.volume.toRawTarget(target, length));
+    track.volume.begin(out, PerformanceAutomationTarget::Level, math::channelGain(target, track.channelVolume),
+                       track.volume.toRawTarget(target, length));
   }
 
   void pan(u8 value) {
@@ -399,7 +398,7 @@ struct Playback : SequencePlayback<TrackState> {
       pan(target);
       return;
     }
-    track.pan.begin(out.fade(PerformanceAutomationTarget::Pan, math::panPosition(target), length),
+    track.pan.begin(out, PerformanceAutomationTarget::Pan, math::panPosition(target),
                     track.pan.toRawTarget(target, length));
   }
 

@@ -493,7 +493,7 @@ struct Playback : SequencePlayback<TrackState> {
     if (length == 0) {
       return;
     }
-    track.volume.begin(out.fade(PerformanceAutomationTarget::Level, math::levelGain(target), length),
+    track.volume.begin(out, PerformanceAutomationTarget::Level, math::levelGain(target),
                        track.volume.toRawTarget(target, length));
   }
 
@@ -512,7 +512,7 @@ struct Playback : SequencePlayback<TrackState> {
     if (length == 0) {
       return;
     }
-    track.pan.begin(out.fade(PerformanceAutomationTarget::Pan, math::panPosition(target), length),
+    track.pan.begin(out, PerformanceAutomationTarget::Pan, math::panPosition(target),
                     track.pan.toRawTarget(target, length));
   }
 
