@@ -53,6 +53,14 @@ concept AcceptsUnorderedNoteArguments =
     requires(Event& event) { event.template invoke<&CompilerProbePlayback::note>(u8{}, u32{}); };
 static_assert(!AcceptsUnorderedNoteArguments<ProbeCursor::Event>);
 
+template <class Event>
+concept AcceptsEmptyNoteArguments =
+    requires(Event& event) { event.template invoke<&CompilerProbePlayback::note>({}); } ||
+    requires(Event& event) { event.template invokeFlow<&CompilerProbePlayback::note>({}); } ||
+    requires(Event& event) { event.invoke([](CompilerProbePlayback&, u8) {}, {}); } ||
+    requires(Event& event) { event.invokeFlow([](CompilerProbePlayback&, u8) { return Effects{}; }, {}); };
+static_assert(!AcceptsEmptyNoteArguments<ProbeCursor::Event>);
+
 DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
                                           std::vector<Diagnostic>* diagnostics = nullptr) {
   ProbeCursor cursor(reader, begin, end, "compiler-probe", diagnostics);

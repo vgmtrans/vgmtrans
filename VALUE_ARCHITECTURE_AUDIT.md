@@ -3636,6 +3636,31 @@ Validation:
   implementation, not exhaustive format coverage or legacy/value parity.
 - Temporary executables and comparison scripts were removed after validation.
 
+## Review follow-ups for immediate cursor reads
+
+The binding API now rejects an empty argument group when the playback method or
+lambda requires values. Its small internal argument holder requires the exact
+argument count before constructing the tuple; it performs no decoding. Eight
+lines of compile-time checks cover both `invoke` and `invokeFlow` for methods and
+lambdas in the existing cursor test file.
+
+Akao consumes and annotates its subcommand opcode once, before dispatch. Shared
+helpers now construct complete commands instead of accepting both cursor and
+event. This removes the subcommand builder wrappers, the preservation helper,
+and repeated command setup at callers. Labels, operand order, branch roles, and
+version-specific layouts remain intact. The format file is 43 lines smaller.
+
+Examples beside `CompilerCursor` show independent inline reads, a transformed
+value, and locals for validation or reordered arguments. They also explain that
+braces do not order multiple reads inside a single expression.
+
+Validation: warning-free macOS Debug build and all 22 CTest targets passed.
+Before/after comparisons using Final Fantasy VII, SaGa Frontier, and Final
+Fantasy VIII inputs matched all 85 MIDI, three SF2, and three DLS artifacts byte
+for byte. Inventories, diagnostics, and full source trees for up to two sequences
+per input also matched. Temporary comparison tools and exports were removed.
+No new permanent test files were added.
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage

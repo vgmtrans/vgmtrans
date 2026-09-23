@@ -49,14 +49,25 @@ template <class T>
 
 // Playback methods supply the types for a braced list of already decoded values.
 // References are copied; makeCommandBody also owns string_view arguments.
-template <class Result, class Owner, class... Arguments>
-auto commandArguments(Result (Owner::*)(Arguments...)) -> std::tuple<std::decay_t<Arguments>...>;
+// Require every argument: a bare tuple would accept {} and value-initialize its elements.
+template <class... Arguments>
+struct CommandArguments {
+  template <class... Values>
+    requires(sizeof...(Values) == sizeof...(Arguments) &&
+             std::is_constructible_v<std::tuple<Arguments...>, Values...>)
+  CommandArguments(Values&&... arguments) : values(std::forward<Values>(arguments)...) {}
+
+  std::tuple<Arguments...> values;
+};
 
 template <class Result, class Owner, class... Arguments>
-auto commandArguments(Result (Owner::*)(Arguments...) const) -> std::tuple<std::decay_t<Arguments>...>;
+auto commandArguments(Result (Owner::*)(Arguments...)) -> CommandArguments<std::decay_t<Arguments>...>;
+
+template <class Result, class Owner, class... Arguments>
+auto commandArguments(Result (Owner::*)(Arguments...) const) -> CommandArguments<std::decay_t<Arguments>...>;
 
 template <class Playback, class... Arguments>
-auto handlerArguments(std::tuple<Playback, Arguments...>) -> std::tuple<Arguments...>;
+auto handlerArguments(CommandArguments<Playback, Arguments...>) -> CommandArguments<Arguments...>;
 
 template <class Handler>
 using HandlerArguments = decltype(handlerArguments(commandArguments(&Handler::operator())));
@@ -111,6 +122,18 @@ void emitEnvelopeField(Playback& playback, double value, VoiceEnvelopeScope scop
 // CompilerCursor gives formats one imperative command block. Reads add source
 // metadata immediately; event operations compose one typed executable body for
 // later, source-free SequenceVm execution.
+//
+// Independent fields can be read directly in a braced argument list:
+//   event.invoke<&Playback::note>({cursor.u8("key"), cursor.varLen("duration")});
+// A single read can also be transformed inline:
+//   event.emitPan(cursor.u8("pan") / 63.5 - 1.0);
+// Keep locals for validation, reuse, dependent reads, and reordered arguments:
+//   const u32 duration = cursor.varLen("duration");  // Encoded before the key.
+//   const u8 key = cursor.u8("key");
+//   if (duration == 0) return event.ignore();
+//   return event.invoke<&Playback::note>({key, duration});
+// Braces order their elements, not multiple reads inside a single element:
+// split expressions such as cursor.u8("a") + cursor.u8("b") into local reads.
 template <class PlaybackType>
 class CompilerCursor {
 public:
@@ -304,7 +327,7 @@ public:
 
     template <auto Method>
     Event& invokeFlow() {
-      return appendInvocation<true>(Method, std::tuple<>{});
+      return appendInvocation<true>(Method, detail::CommandArguments<>{});
     }
 
     template <class Handler>
@@ -314,7 +337,7 @@ public:
 
     template <class Handler>
     Event& invokeFlow(Handler handler) {
-      return appendInvocation<true>(std::move(handler), std::tuple<>{});
+      return appendInvocation<true>(std::move(handler), detail::CommandArguments<>{});
     }
 
     // The VM may execute this command while the preceding command's wait is
@@ -402,7 +425,7 @@ public:
         : cursor_(cursor), presentation_(std::move(presentation)), initialPlayback_(presentation_.playback) {}
 
     template <bool ControlFlow, class Callable, class... Arguments>
-    Event& appendInvocation(Callable callable, std::tuple<Arguments...> arguments) {
+    Event& appendInvocation(Callable callable, detail::CommandArguments<Arguments...> arguments) {
       if constexpr (ControlFlow) {
         static_assert(std::is_same_v<detail::CommandResult<Playback, Callable, Arguments...>, Effects>,
                       "A runtime control-flow handler must return Effects");
@@ -410,7 +433,7 @@ public:
       }
       return std::apply(
           [&](auto... values) -> Event& { return appendCallable(std::move(callable), std::move(values)...); },
-          std::move(arguments));
+          std::move(arguments.values));
     }
 
     template <class Callable, class... Arguments>

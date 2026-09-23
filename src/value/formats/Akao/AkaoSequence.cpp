@@ -160,19 +160,6 @@ struct Playback : SequencePlayback<TrackState> {
 };
 
 using AkaoCursor = CompilerCursor<Playback>;
-using AkaoEvent = AkaoCursor::Event;
-
-[[nodiscard]] AkaoEvent subCommand(AkaoCursor& cursor, std::string_view label, SequenceSemantic semantic) {
-  auto event = cursor.command(label, semantic);
-  cursor.u8("sub_event", SourceValueDisplay::Hex);
-  return event;
-}
-
-[[nodiscard]] AkaoEvent subSourceOnly(AkaoCursor& cursor, std::string_view label, std::string_view kind) {
-  auto event = cursor.sourceOnly(label, kind);
-  cursor.u8("sub_event", SourceValueDisplay::Hex);
-  return event;
-}
 
 // Akao stores many addresses as signed distances rather than absolute
 // positions. This general helper converts one when the caller already knows
@@ -188,13 +175,14 @@ using AkaoEvent = AkaoCursor::Event;
 // Read an unconditional jump whose destination is stored as a signed distance,
 // record the resulting absolute address, and declare its playback behavior.
 // Forward jumps skip ahead; backward jumps are marked as possible song loops.
-[[nodiscard]] DecodedBytecodeCommand relativeJump(AkaoCursor& cursor, AkaoEvent& event, const AkaoProfile& profile,
-                                                  u32 operandOffset, std::string_view name, u32 commandAddress) {
-  const s16 relative = cursor.s16le(name);
+[[nodiscard]] DecodedBytecodeCommand relativeJump(AkaoCursor& cursor, const AkaoProfile& profile,
+                                                  u32 operandOffset, u32 commandAddress) {
+  auto event = cursor.command("Jump", SequenceSemantic::Jump);
+  const s16 relative = cursor.s16le("relative");
   const Address destination{profile.relativeDestination(operandOffset, relative)};
   const bool backward = destination.value <= commandAddress;
   const SemanticOperandRole role = backward ? SemanticOperandRole::LoopTarget : SemanticOperandRole::JumpTarget;
-  cursor.derived(fmt::format("{}_absolute", name), destination, SourceValueDisplay::Address, role);
+  cursor.derived("relative_absolute", destination, SourceValueDisplay::Address, role);
   return backward ? event.loopCandidate(destination) : event.jump(destination);
 }
 
@@ -205,12 +193,8 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
   return destination.value;
 }
 
-[[nodiscard]] DecodedBytecodeCommand preserve(AkaoCursor& cursor, AkaoEvent& event, u32 operands) {
-  cursor.rawBytes("bytes", operands);
-  return event.ignore();
-}
-
-[[nodiscard]] DecodedBytecodeCommand programArticulation(AkaoCursor& cursor, AkaoEvent& event, bool noAttack = false) {
+[[nodiscard]] DecodedBytecodeCommand programArticulation(AkaoCursor& cursor, bool noAttack = false) {
+  auto event = cursor.command(noAttack ? "Program Change w/o Attack" : "Program", SequenceSemantic::Program);
   const u8 articulation = cursor.u8("articulation", SemanticOperandRole::InstrumentProgram);
   // Bank 2 selects the sustain-only variant for F2 / subcommand 0A.
   const u32 bank = noAttack ? 2u : 0u;
@@ -218,21 +202,27 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
   return event.invoke<&Playback::instrument>({bank, articulation});
 }
 
-[[nodiscard]] DecodedBytecodeCommand customInstrumentTable(AkaoCursor& cursor, AkaoEvent& event,
-                                                           const AkaoProfile& profile, u32 operandOffset) {
+[[nodiscard]] DecodedBytecodeCommand customInstrumentTable(AkaoCursor& cursor, const AkaoProfile& profile,
+                                                           u32 operandOffset) {
+  auto event = cursor.command("Program Change (Key-Split Instrument)", SequenceSemantic::Program);
   cursor.derived("bank", 1u, SemanticOperandRole::InstrumentBank);
   const u32 table = relativePointer(cursor, profile, operandOffset, SemanticOperandRole::InstrumentTablePointer);
   return event.invoke([](Playback& playback, u32 offset) { playback.out.instrument(akaoMelodicTableIdentity(offset)); },
                       {table});
 }
 
-[[nodiscard]] DecodedBytecodeCommand drumKitOn(AkaoCursor& cursor, AkaoEvent& event) {
+[[nodiscard]] DecodedBytecodeCommand drumKitOn(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandOffset) {
+  auto event = cursor.command("Drum Kit On", SequenceSemantic::Program);
+  if (!profile.version3OrLater()) {
+    relativePointer(cursor, profile, operandOffset, SemanticOperandRole::InstrumentTablePointer);
+  }
   cursor.derived("bank", 127u, SemanticOperandRole::InstrumentBank);
   event.invoke<&Playback::instrument>({127u, 127u});
   return event.set<&TrackState::drum>(true);
 }
 
-[[nodiscard]] DecodedBytecodeCommand tempo(AkaoCursor& cursor, AkaoEvent& event, const AkaoProfile& profile) {
+[[nodiscard]] DecodedBytecodeCommand tempo(AkaoCursor& cursor, const AkaoProfile& profile) {
+  auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
   const u16 raw = cursor.u16le("raw");
   const double bpm = cursor.derived("tempo", profile.tempoBpm(raw), SourceValueDisplay::BeatsPerMinute);
   const u32 micros = profile.tempoMicrosPerQuarter(raw);
@@ -240,7 +230,8 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
   return event.emitTempo(micros);
 }
 
-[[nodiscard]] DecodedBytecodeCommand timeSignature(AkaoCursor& cursor, AkaoEvent& event) {
+[[nodiscard]] DecodedBytecodeCommand timeSignature(AkaoCursor& cursor) {
+  auto event = cursor.command("Time Signature", SequenceSemantic::Meta);
   // The driver stores the metronome interval first and numerator second.
   const u8 ticksPerBeat = cursor.u8("ticks_per_beat");
   const u8 beatsPerMeasure = cursor.u8("beats_per_measure");
@@ -260,8 +251,9 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
       {ticksPerBeat, beatsPerMeasure});
 }
 
-[[nodiscard]] DecodedBytecodeCommand repeatBranch(AkaoCursor& cursor, AkaoEvent& event, const AkaoProfile& profile,
+[[nodiscard]] DecodedBytecodeCommand repeatBranch(AkaoCursor& cursor, const AkaoProfile& profile,
                                                   u32 operandOffset) {
+  auto event = cursor.command("Loop Branch", SequenceSemantic::RepeatBreak);
   const u16 count = cursor.resolved("count", cursor.rawU8("raw_count"), akaoZeroAs256);
   const Address destination =
       relativeAddress(cursor, profile, operandOffset, "relative", SemanticOperandRole::RepeatTarget);
@@ -276,30 +268,28 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
       {count, destination});
 }
 
-[[nodiscard]] DecodedBytecodeCommand passiveBranch(AkaoCursor& cursor, AkaoEvent& event, const AkaoProfile& profile,
-                                                   u32 operandOffset, std::string_view conditionName) {
+[[nodiscard]] DecodedBytecodeCommand passiveBranch(AkaoCursor& cursor, const AkaoProfile& profile,
+                                                   u32 operandOffset, std::string_view label,
+                                                   std::string_view conditionName) {
+  auto event = cursor.command(label, SequenceSemantic::Jump);
   cursor.u8(conditionName);
   const Address destination =
       relativeAddress(cursor, profile, operandOffset + 1, "relative", SemanticOperandRole::JumpTarget);
   return event.discoverTarget(destination);
 }
 
-[[nodiscard]] DecodedBytecodeCommand decodeSubEvent(AkaoCursor& cursor, ByteReader reader, u32 begin,
+[[nodiscard]] DecodedBytecodeCommand decodeSubEvent(AkaoCursor& cursor, u32 begin,
                                                     const AkaoProfile& profile) {
-  if (!reader.has(begin + 1, 1)) {
-    auto event = cursor.unsupported("Truncated Sub Event");
-    cursor.u8("sub_event", SourceValueDisplay::Hex);
-    return event.stop();
+  const u8 sub = cursor.u8("sub_event", SourceValueDisplay::Hex);
+  if (!cursor.ok()) {
+    return cursor.unsupported("Truncated Sub Event").stop();
   }
 
-  const u8 sub = reader.u8At(begin + 1);
   switch (sub) {
-    case 0x00: {
-      auto event = subCommand(cursor, "Tempo", SequenceSemantic::Tempo);
-      return tempo(cursor, event, profile);
-    }
+    case 0x00:
+      return tempo(cursor, profile);
     case 0x01: {
-      auto event = subCommand(cursor, "Tempo Fade", SequenceSemantic::Tempo);
+      auto event = cursor.command("Tempo Fade", SequenceSemantic::Tempo);
       const u16 duration = cursor.resolved("duration_ticks", cursor.rawU8("duration"), akaoZeroAs256);
       const u16 raw = cursor.u16le("raw");
       const double bpm = cursor.derived("target_tempo", profile.tempoBpm(raw), SourceValueDisplay::BeatsPerMinute);
@@ -319,52 +309,35 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
           },
           {duration, bpm, micros});
     }
-    case 0x04: {
-      auto event = subCommand(cursor, "Drum Kit On", SequenceSemantic::Program);
-      if (!profile.version3OrLater()) {
-        relativePointer(cursor, profile, begin + 2, SemanticOperandRole::InstrumentTablePointer);
-      }
-      return drumKitOn(cursor, event);
-    }
+    case 0x04:
+      return drumKitOn(cursor, profile, begin + 2);
     case 0x05:
-      return subCommand(cursor, "Drum Kit Off", SequenceSemantic::Program).set<&TrackState::drum>(false);
-    case 0x06: {
-      auto event = subCommand(cursor, "Jump", SequenceSemantic::Jump);
-      return relativeJump(cursor, event, profile, begin + 2, "relative", begin);
-    }
-    case 0x07: {
-      auto event = subCommand(cursor, "CPU Conditional Jump", SequenceSemantic::Jump);
-      return passiveBranch(cursor, event, profile, begin + 2, "condition");
-    }
-    case 0x08: {
-      auto event = subCommand(cursor, "Loop Branch", SequenceSemantic::RepeatBreak);
-      return repeatBranch(cursor, event, profile, begin + 3);
-    }
-    case 0x09: {
-      auto event = subCommand(cursor, "Loop Break", SequenceSemantic::Jump);
-      return passiveBranch(cursor, event, profile, begin + 2, "count");
-    }
-    case 0x0a: {
-      auto event = subCommand(cursor, "Program Change w/o Attack", SequenceSemantic::Program);
-      return programArticulation(cursor, event, true);
-    }
+      return cursor.command("Drum Kit Off", SequenceSemantic::Program).set<&TrackState::drum>(false);
+    case 0x06:
+      return relativeJump(cursor, profile, begin + 2, begin);
+    case 0x07:
+      return passiveBranch(cursor, profile, begin + 2, "CPU Conditional Jump", "condition");
+    case 0x08:
+      return repeatBranch(cursor, profile, begin + 3);
+    case 0x09:
+      return passiveBranch(cursor, profile, begin + 2, "Loop Break", "count");
+    case 0x0a:
+      return programArticulation(cursor, true);
     case 0x0e: {
       if (profile.version32()) {
-        return subCommand(cursor, "Play Pattern", SequenceSemantic::Call)
+        return cursor.command("Play Pattern", SequenceSemantic::Call)
             .call(relativeAddress(cursor, profile, begin + 2, "relative", SemanticOperandRole::CallTarget));
       }
-      auto event = subSourceOnly(cursor, "Unknown FE 0E", "unknown-fe-0e");
-      return preserve(cursor, event, profile.subOperandBytes(sub));
+      return cursor.ignored("Unknown FE 0E", profile.subOperandBytes(sub), "unknown-fe-0e");
     }
     case 0x0f: {
       if (profile.version32()) {
-        return subCommand(cursor, "End Pattern", SequenceSemantic::Return).return_();
+        return cursor.command("End Pattern", SequenceSemantic::Return).return_();
       }
-      auto event = subSourceOnly(cursor, "Unknown FE 0F", "unknown-fe-0f");
-      return preserve(cursor, event, profile.subOperandBytes(sub));
+      return cursor.ignored("Unknown FE 0F", profile.subOperandBytes(sub), "unknown-fe-0f");
     }
     case 0x12: {
-      auto event = subCommand(cursor, "Volume Fade", SequenceSemantic::Level);
+      auto event = cursor.command("Volume Fade", SequenceSemantic::Level);
       const u16 duration = cursor.resolved("duration_ticks", cursor.rawU8("duration"), akaoZeroAs256);
       const u8 target = cursor.u8("target_volume");
       return event.invoke(
@@ -378,22 +351,18 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
           {duration, target});
     }
     case 0x14: {
-      auto event = subCommand(cursor, "Program Change (Key-Split Instrument)", SequenceSemantic::Program);
       if (profile.version3OrLater()) {
+        auto event = cursor.command("Program Change (Key-Split Instrument)", SequenceSemantic::Program);
         const u8 program = cursor.u8("program", SemanticOperandRole::InstrumentProgram);
         cursor.derived("bank", 1u, SemanticOperandRole::InstrumentBank);
         return event.invoke<&Playback::instrument>({1u, program});
       }
-      return customInstrumentTable(cursor, event, profile, begin + 2);
+      return customInstrumentTable(cursor, profile, begin + 2);
     }
-    case 0x15: {
-      auto event = subCommand(cursor, "Time Signature", SequenceSemantic::Meta);
-      return timeSignature(cursor, event);
-    }
-    default: {
-      auto event = subSourceOnly(cursor, fmt::format("Sub Event {:02X}", sub), "sub-event");
-      return preserve(cursor, event, profile.subOperandBytes(sub));
-    }
+    case 0x15:
+      return timeSignature(cursor);
+    default:
+      return cursor.ignored(fmt::format("Sub Event {:02X}", sub), profile.subOperandBytes(sub), "sub-event");
   }
 }
 
@@ -474,16 +443,14 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
   }
 
   if (profile.isSubEventPrefix(status)) {
-    return decodeSubEvent(cursor, reader, begin, profile);
+    return decodeSubEvent(cursor, begin, profile);
   }
 
   switch (status) {
     case 0xa0:
       return cursor.command("End", SequenceSemantic::End).end();
-    case 0xa1: {
-      auto event = cursor.command("Program", SequenceSemantic::Program);
-      return programArticulation(cursor, event);
-    }
+    case 0xa1:
+      return programArticulation(cursor);
     case 0xa2: {
       auto event = cursor.command("Next Note Length", SequenceSemantic::State);
       event.set<&TrackState::oneTimeDuration>(cursor.u8("duration"));
@@ -653,8 +620,7 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
     }
     case 0xe8:
       if (profile.legacyFamily()) {
-        auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-        return tempo(cursor, event, profile);
+        return tempo(cursor, profile);
       }
       break;
     case 0xea:
@@ -666,9 +632,7 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
       break;
     case 0xec:
       if (profile.legacyFamily()) {
-        auto event = cursor.command("Drum Kit On", SequenceSemantic::Program);
-        relativePointer(cursor, profile, begin + 1, SemanticOperandRole::InstrumentTablePointer);
-        return drumKitOn(cursor, event);
+        return drumKitOn(cursor, profile, begin + 1);
       }
       break;
     case 0xed:
@@ -678,32 +642,27 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
       break;
     case 0xee:
       if (profile.legacyFamily()) {
-        auto event = cursor.command("Jump", SequenceSemantic::Jump);
-        return relativeJump(cursor, event, profile, begin + 1, "relative", begin);
+        return relativeJump(cursor, profile, begin + 1, begin);
       }
       break;
     case 0xef:
       if (profile.legacyFamily()) {
-        auto event = cursor.command("CPU Conditional Jump", SequenceSemantic::Jump);
-        return passiveBranch(cursor, event, profile, begin + 1, "condition");
+        return passiveBranch(cursor, profile, begin + 1, "CPU Conditional Jump", "condition");
       }
       break;
     case 0xf0:
       if (profile.legacyFamily()) {
-        auto event = cursor.command("Loop Branch", SequenceSemantic::RepeatBreak);
-        return repeatBranch(cursor, event, profile, begin + 2);
+        return repeatBranch(cursor, profile, begin + 2);
       }
       break;
     case 0xf1:
       if (profile.legacyFamily()) {
-        auto event = cursor.command("Loop Break", SequenceSemantic::Jump);
-        return passiveBranch(cursor, event, profile, begin + 1, "count");
+        return passiveBranch(cursor, profile, begin + 1, "Loop Break", "count");
       }
       break;
     case 0xf2:
       if (profile.legacyFamily()) {
-        auto event = cursor.command("Program Change w/o Attack", SequenceSemantic::Program);
-        return programArticulation(cursor, event, true);
+        return programArticulation(cursor, true);
       }
       break;
     case 0xf4:
@@ -738,14 +697,12 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
       break;
     case 0xfc:
       if (profile.version == AkaoPs1Version::Version1_1) {
-        auto event = cursor.command("Program Change (Key-Split Instrument)", SequenceSemantic::Program);
-        return customInstrumentTable(cursor, event, profile, begin + 1);
+        return customInstrumentTable(cursor, profile, begin + 1);
       }
       break;
     case 0xfd:
       if (profile.legacyFamily()) {
-        auto event = cursor.command("Time Signature", SequenceSemantic::Meta);
-        return timeSignature(cursor, event);
+        return timeSignature(cursor);
       }
       break;
     default:
