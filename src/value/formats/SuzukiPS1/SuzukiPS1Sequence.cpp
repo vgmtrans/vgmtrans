@@ -8,7 +8,7 @@
 
 #include "value/base/LevelScale.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompilerCursor.h"
+#include "value/sequence/CommandTable.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/PsxSpu.h"
 
@@ -362,15 +362,44 @@ using Cursor = CompilerCursor<Playback>;
     return cursor.unsupported("Undefined SuzukiPS1 Event").stop();
   }
 
+  {
+    using namespace command;
+    static const CommandTable<Playback> commands{
+        {0x80, "Rest", SequenceSemantic::Rest, &Playback::rest, Byte{"duration"}},
+        {0x81, "Tie", SequenceSemantic::Note, &Playback::tie, Byte{"duration"}},
+        {0x94, "Set Octave", SequenceSemantic::Pitch, &TrackState::octave, Byte{"octave"}},
+        {0x97, "Time Signature", SequenceSemantic::Meta, &Playback::timeSignature, Byte{"numerator"},
+         Byte{"denominator"}},
+        {0xac, "Program Change", SequenceSemantic::Program, &Playback::selectProgram,
+         Byte{.name = "program", .role = SemanticOperandRole::InstrumentProgram}},
+        {0xc1, "ADSR Modes", SequenceSemantic::Envelope, &Playback::adsrModes,
+         Byte{.name = "attack_mode", .display = SourceValueDisplay::Hex},
+         Byte{.name = "sustain_mode", .display = SourceValueDisplay::Hex},
+         Byte{.name = "release_mode", .display = SourceValueDisplay::Hex}},
+        {0xc2, "Attack Rate", SequenceSemantic::Envelope, &Playback::attackRate, Byte{"rate"}},
+        {0xc3, "Decay Rate", SequenceSemantic::Envelope, &Playback::decayRate, Byte{"rate"}},
+        {0xc4, "Sustain Rate", SequenceSemantic::Envelope, &Playback::sustainRate, Byte{"rate"}},
+        {0xc5, "Release Rate", SequenceSemantic::Envelope, &Playback::releaseRate, Byte{"rate"}},
+        {0xc6, "Sustain Level", SequenceSemantic::Envelope, &Playback::sustainLevel, Byte{"level"}},
+        {0xc7, "Decay Rate and Sustain Level", SequenceSemantic::Envelope, &Playback::decayAndSustainLevel,
+         Byte{"decay_rate"}, Byte{"sustain_level"}},
+        {0xc8, "Attack Mode", SequenceSemantic::Envelope, &Playback::attackMode,
+         Byte{.name = "mode", .display = SourceValueDisplay::Hex}},
+        {0xc9, "Sustain Mode", SequenceSemantic::Envelope, &Playback::sustainMode,
+         Byte{.name = "mode", .display = SourceValueDisplay::Hex}},
+        {0xca, "Release Mode", SequenceSemantic::Envelope, &Playback::releaseMode,
+         Byte{.name = "mode", .display = SourceValueDisplay::Hex}},
+        {0xe2, "Volume Slide", SequenceSemantic::Level, &Playback::volumeSlide, Byte{"duration"}, Byte{"target"}},
+        {0xea, "Pan Slide", SequenceSemantic::Pan, &Playback::panSlide, Byte{"duration"}, Byte{"target"}},
+        {0xfe, "WDS Bank", SequenceSemantic::Program, &TrackState::bank,
+         Byte{.name = "bank", .role = SemanticOperandRole::InstrumentBank}},
+    };
+    if (auto command = commands.decode(cursor)) {
+      return std::move(*command);
+    }
+  }
+
   switch (status) {
-    case 0x80: {
-      auto event = cursor.command("Rest", SequenceSemantic::Rest);
-      return event.invoke<&Playback::rest>(event.u8("duration"));
-    }
-    case 0x81: {
-      auto event = cursor.command("Tie", SequenceSemantic::Note);
-      return event.invoke<&Playback::tie>(event.u8("duration"));
-    }
     case 0x90: {
       auto event = cursor.command("End of Track", SequenceSemantic::End);
       if (!layout.repeatPoint) {
@@ -383,20 +412,10 @@ using Cursor = CompilerCursor<Playback>;
       auto event = cursor.command("Track Repeat Point", SequenceSemantic::Loop);
       return event.invoke([](Playback& playback) { playback.track.repeatPointOctave = playback.track.octave; });
     }
-    case 0x94: {
-      auto event = cursor.command("Set Octave", SequenceSemantic::Pitch);
-      return event.set<&TrackState::octave>(event.u8("octave"));
-    }
     case 0x95:
       return cursor.command("Octave Up", SequenceSemantic::Pitch).add<&TrackState::octave>(1);
     case 0x96:
       return cursor.command("Octave Down", SequenceSemantic::Pitch).add<&TrackState::octave>(-1);
-    case 0x97: {
-      auto event = cursor.command("Time Signature", SequenceSemantic::Meta);
-      const u8 numerator = event.u8("numerator");
-      const u8 denominator = event.u8("denominator");
-      return event.invoke<&Playback::timeSignature>(numerator, denominator);
-    }
     case 0x98: {
       auto event = cursor.command("Repeat Begin", SequenceSemantic::Repeat);
       const u8 rawCount = event.u8("count");
@@ -441,10 +460,6 @@ using Cursor = CompilerCursor<Playback>;
       event.derived("target_tempo", target * (75.0 / 64.0), SourceValueDisplay::BeatsPerMinute);
       return event.invoke<&Playback::tempoSlide>(duration, target);
     }
-    case 0xac: {
-      auto event = cursor.command("Program Change", SequenceSemantic::Program);
-      return event.invoke<&Playback::selectProgram>(event.u8("program", SemanticOperandRole::InstrumentProgram));
-    }
     case 0xae:
       return cursor.noOp("Percussion On");
     case 0xaf:
@@ -459,51 +474,6 @@ using Cursor = CompilerCursor<Playback>;
       return cursor.command("Reverb Off", SequenceSemantic::State).emitReverb(0.0);
     case 0xc0:
       return cursor.command("ADSR Reset", SequenceSemantic::Envelope).invoke<&Playback::resetAdsr>();
-    case 0xc1: {
-      auto event = cursor.command("ADSR Modes", SequenceSemantic::Envelope);
-      const u8 attack = event.u8("attack_mode", SourceValueDisplay::Hex);
-      const u8 sustain = event.u8("sustain_mode", SourceValueDisplay::Hex);
-      const u8 release = event.u8("release_mode", SourceValueDisplay::Hex);
-      return event.invoke<&Playback::adsrModes>(attack, sustain, release);
-    }
-    case 0xc2: {
-      auto event = cursor.command("Attack Rate", SequenceSemantic::Envelope);
-      return event.invoke<&Playback::attackRate>(event.u8("rate"));
-    }
-    case 0xc3: {
-      auto event = cursor.command("Decay Rate", SequenceSemantic::Envelope);
-      return event.invoke<&Playback::decayRate>(event.u8("rate"));
-    }
-    case 0xc4: {
-      auto event = cursor.command("Sustain Rate", SequenceSemantic::Envelope);
-      return event.invoke<&Playback::sustainRate>(event.u8("rate"));
-    }
-    case 0xc5: {
-      auto event = cursor.command("Release Rate", SequenceSemantic::Envelope);
-      return event.invoke<&Playback::releaseRate>(event.u8("rate"));
-    }
-    case 0xc6: {
-      auto event = cursor.command("Sustain Level", SequenceSemantic::Envelope);
-      return event.invoke<&Playback::sustainLevel>(event.u8("level"));
-    }
-    case 0xc7: {
-      auto event = cursor.command("Decay Rate and Sustain Level", SequenceSemantic::Envelope);
-      const u8 decay = event.u8("decay_rate");
-      const u8 level = event.u8("sustain_level");
-      return event.invoke<&Playback::decayAndSustainLevel>(decay, level);
-    }
-    case 0xc8: {
-      auto event = cursor.command("Attack Mode", SequenceSemantic::Envelope);
-      return event.invoke<&Playback::attackMode>(event.u8("mode", SourceValueDisplay::Hex));
-    }
-    case 0xc9: {
-      auto event = cursor.command("Sustain Mode", SequenceSemantic::Envelope);
-      return event.invoke<&Playback::sustainMode>(event.u8("mode", SourceValueDisplay::Hex));
-    }
-    case 0xca: {
-      auto event = cursor.command("Release Mode", SequenceSemantic::Envelope);
-      return event.invoke<&Playback::releaseMode>(event.u8("mode", SourceValueDisplay::Hex));
-    }
     case 0xd0:
     case 0xd1:
     case 0xd2: {
@@ -548,12 +518,6 @@ using Cursor = CompilerCursor<Playback>;
       event.s8("value");
       return event;
     }
-    case 0xe2: {
-      auto event = cursor.command("Volume Slide", SequenceSemantic::Level);
-      const u8 duration = event.u8("duration");
-      const u8 target = event.u8("target");
-      return event.invoke<&Playback::volumeSlide>(duration, target);
-    }
     case 0xe3: {
       auto event =
           cursor.command("Volume Modulation Depth", SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
@@ -579,12 +543,6 @@ using Cursor = CompilerCursor<Playback>;
       event.s8("value");
       return event;
     }
-    case 0xea: {
-      auto event = cursor.command("Pan Slide", SequenceSemantic::Pan);
-      const u8 duration = event.u8("duration");
-      const u8 target = event.u8("target");
-      return event.invoke<&Playback::panSlide>(duration, target);
-    }
     case 0xeb: {
       auto event =
           cursor.command("Pan Modulation Depth", SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
@@ -599,10 +557,6 @@ using Cursor = CompilerCursor<Playback>;
       event.u8("parameter_2");
       event.u8("parameter_3");
       return event;
-    }
-    case 0xfe: {
-      auto event = cursor.command("WDS Bank", SequenceSemantic::Program);
-      return event.set<&TrackState::bank>(event.u8("bank", SemanticOperandRole::InstrumentBank));
     }
     default:
       return cursor.ignored("Driver Command", kCommandSize[status - 0x80] - 1, "driver-command");

@@ -3520,6 +3520,44 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
 - Validation: warning-free macOS Debug build (26 steps); all 22 CTest targets
   pass (10.44 s). Temporary probes were removed.
 
+## Shared command definitions
+
+- `CommandTable<Playback>` lets formats declare ordinary opcodes with their
+  label, semantic, typed playback action, and encoded operands in one row.
+  For example, HeartBeatSnes's pan fade is now:
+
+  ```cpp
+  {0xd7, "Pan Fade", SequenceSemantic::Pan, &Playback::panFade,
+   Byte{"length"}, Byte{"target"}},
+  ```
+
+  The table reads operands in declaration order through `CompilerCursor`,
+  retaining its source fields, diagnostics, truncation, and owned compiled
+  values. A playback member function or callable handles behavior; a track
+  member pointer assigns the single operand. SequenceVM and export models are
+  unchanged. Compiled commands do not borrow the table or source bytes.
+- Migrated 80 commands across CompileSnes, FalcomSnes, HeartBeatSnes, NDS,
+  SuzukiPS1, and SuzukiSnes. Format code shrinks by 201 lines; the shared header
+  adds 121, for **80 fewer C++ production lines** (plus one CMake header entry).
+  This initial adoption establishes a systemic authoring simplification, but
+  its net line reduction is still modest. Additional adoption should remove
+  repetitive decoding without introducing a language for driver-specific logic.
+- Keep irregular reads, derived values, discovery, and control flow in explicit
+  command blocks. In particular, SuzukiSnes's version-dependent `0xe0` fallthrough
+  to `0xe2` stays together. Do not lift individual cases out of shared switch paths.
+- Reused the existing compiler fixture to exercise method calls, lambdas, state
+  assignment, ordered multi-field reads, variable-length operands, truncation,
+  and execution after the table and source bytes are destroyed. Test code grows
+  by only three net lines; no new test file or permanent harness was added.
+- Validation: warning-free macOS Debug build; all 22 CTest targets pass (10.48 s).
+  A temporary before/after decoder probe compared 40,000 generated cases across
+  the migrated opcodes and HeartBeat/Suzuki versions, including the Suzuki alias.
+  Encoded values, field ranges/displays, semantic operands, flow, presentation,
+  execution metadata, and diagnostics match exactly. This probe compares decode
+  results, not runtime callback bodies; the existing suites exercise playback.
+  The music corpus was unavailable, so this change has no real-archive parity
+  claim. Temporary sources and binaries were removed.
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage

@@ -7,7 +7,7 @@
 #include "value/formats/CompileSnes/CompileSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompilerCursor.h"
+#include "value/sequence/CommandTable.h"
 #include "value/synth/SnesDsp.h"
 
 #include <algorithm>
@@ -968,6 +968,34 @@ struct DurationValue {
     });
   }
 
+  {
+    using namespace command;
+    static const CommandTable<Playback> commands{
+        {0x83, "Vibrato Curve", SequenceSemantic::Modulation, &Playback::vibrato, Byte{"curve"}},
+        {0x84, "Portamento Rate", SequenceSemantic::Portamento, &Playback::portamento, Byte{"divisor"}},
+        {0x87, "Volume", SequenceSemantic::Level, &Playback::volume, Byte{"volume"}},
+        {0x88, "Volume Envelope / Tremolo", SequenceSemantic::Modulation, &Playback::volumeEnvelope, Byte{"curve"}},
+        {0x8a, "Volume Add", SequenceSemantic::Level, &Playback::volumeAdd, SignedByte{"delta"}},
+        {0x8d, "Loop Count", SequenceSemantic::Repeat, &Playback::loopSet, Byte{"slot"}, Byte{"count"}},
+        {0x90, "Track Flags", SequenceSemantic::State, &Playback::flags,
+         Byte{.name = "flags", .display = SourceValueDisplay::Hex}},
+        {0x92, "Stereo Phase", SequenceSemantic::Pan, &Playback::stereoPhase,
+         Byte{.name = "phase", .display = SourceValueDisplay::Hex}},
+        {0x93, "Volume Sweep", SequenceSemantic::Level, &Playback::volumeSweep,
+         Byte{.name = "target_and_direction", .display = SourceValueDisplay::Hex}, Byte{"speed"}},
+        {0x94, "Pitch Sweep", SequenceSemantic::Pitch, &TrackState::pitchSweep, SignedByte{"rate_and_direction"}},
+        {0x96, "Tempo", SequenceSemantic::Tempo, &Playback::tempo, Byte{"tempo"}},
+        {0x98, "Branch ID", SequenceSemantic::State, &TrackState::branchId, Byte{"id"}},
+        {0x9d, "Gate", SequenceSemantic::State, &TrackState::gate,
+         Byte{.name = "gate", .display = SourceValueDisplay::Hex}},
+        {0x9f, "ADSR / Dynamic GAIN", SequenceSemantic::Envelope, &Playback::setAdsr, Byte{"pattern"}},
+        {0xab, "Pan", SequenceSemantic::Pan, &Playback::pan, SignedByte{"pan"}},
+    };
+    if (auto command = commands.decode(cursor)) {
+      return std::move(*command);
+    }
+  }
+
   switch (opcode) {
     case 0x80: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
@@ -982,36 +1010,14 @@ struct DurationValue {
     case 0x82:
     case 0x86:
       return cursor.command("End", SequenceSemantic::End).end();
-    case 0x83: {
-      auto event = cursor.command("Vibrato Curve", SequenceSemantic::Modulation);
-      const u8 index = event.u8("curve");
-      return event.invoke<&Playback::vibrato>(index);
-    }
-    case 0x84: {
-      auto event = cursor.command("Portamento Rate", SequenceSemantic::Portamento);
-      return event.invoke<&Playback::portamento>(event.u8("divisor"));
-    }
     case 0x85: {
       auto event = cursor.sourceOnly("Main CPU Command", "cpu-command");
       event.rawBytes("arguments", 3);
       return event;
     }
-    case 0x87: {
-      auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(event.u8("volume"));
-    }
-    case 0x88: {
-      auto event = cursor.command("Volume Envelope / Tremolo", SequenceSemantic::Modulation);
-      const u8 index = event.u8("curve");
-      return event.invoke<&Playback::volumeEnvelope>(index);
-    }
     case 0x89: {
       auto event = cursor.command("Transpose Add", SequenceSemantic::Pitch);
       return event.add<&TrackState::transpose>(event.s8("semitones"));
-    }
-    case 0x8a: {
-      auto event = cursor.command("Volume Add", SequenceSemantic::Level);
-      return event.invoke<&Playback::volumeAdd>(event.s8("delta"));
     }
     case 0x8b: {
       auto event = cursor.sourceOnly("Voice DSP Control", "voice-dsp-control");
@@ -1020,56 +1026,26 @@ struct DurationValue {
     }
     case 0x8c:
       return cursor.sourceOnly("NOP", "nop");
-    case 0x8d: {
-      auto event = cursor.command("Loop Count", SequenceSemantic::Repeat);
-      const u8 slot = event.u8("slot");
-      return event.invoke<&Playback::loopSet>(slot, event.u8("count"));
-    }
     case 0x8e:
     case 0x8f: {
       auto event = cursor.sourceOnly(opcode == 0x8e ? "Noise Clock Envelope" : "Noise Clock Add", "noise");
       event.u8("value", SourceValueDisplay::Hex);
       return event;
     }
-    case 0x90: {
-      auto event = cursor.command("Track Flags", SequenceSemantic::State);
-      return event.invoke<&Playback::flags>(event.u8("flags", SourceValueDisplay::Hex));
-    }
     case 0x91: {
       auto event = cursor.sourceOnly("CPU Flags", "cpu-flags");
       event.u8("flags", SourceValueDisplay::Hex);
       return event;
-    }
-    case 0x92: {
-      auto event = cursor.command("Stereo Phase", SequenceSemantic::Pan);
-      return event.invoke<&Playback::stereoPhase>(event.u8("phase", SourceValueDisplay::Hex));
-    }
-    case 0x93: {
-      auto event = cursor.command("Volume Sweep", SequenceSemantic::Level);
-      const u8 target = event.u8("target_and_direction", SourceValueDisplay::Hex);
-      return event.invoke<&Playback::volumeSweep>(target, event.u8("speed"));
-    }
-    case 0x94: {
-      auto event = cursor.command("Pitch Sweep", SequenceSemantic::Pitch);
-      return event.set<&TrackState::pitchSweep>(event.s8("rate_and_direction"));
     }
     case 0x95: {
       auto event = cursor.command("Jump Until Volume Target", SequenceSemantic::Jump);
       const Address destination = event.addressLe("destination", SemanticOperandRole::JumpTarget);
       return event.invoke<&Playback::volumeTargetBranch>(destination).discoverTarget(destination);
     }
-    case 0x96: {
-      auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-      return event.invoke<&Playback::tempo>(event.u8("tempo"));
-    }
     case 0x97: {
       auto event = cursor.command("Tuning Add", SequenceSemantic::Pitch);
       const s16 value = layout.early() ? event.s8("delta") : event.s16le("delta", SourceValueDisplay::SignedDecimal);
       return event.invoke<&Playback::tuning>(value);
-    }
-    case 0x98: {
-      auto event = cursor.command("Branch ID", SequenceSemantic::State);
-      return event.set<&TrackState::branchId>(event.u8("id"));
     }
     case 0x99:
       return cursor.command("Toggle Slur", SequenceSemantic::State).invoke<&Playback::toggleSlur>();
@@ -1084,19 +1060,10 @@ struct DurationValue {
       event.rawBytes("arguments", 2);
       return event;
     }
-    case 0x9d: {
-      auto event = cursor.command("Gate", SequenceSemantic::State);
-      return event.set<&TrackState::gate>(event.u8("gate", SourceValueDisplay::Hex));
-    }
     case 0x9e: {
       auto event = cursor.command("Conditional Jump", SequenceSemantic::Jump);
       const Address destination = event.addressLe("destination", SemanticOperandRole::JumpTarget);
       return event.finiteBranch(destination);
-    }
-    case 0x9f: {
-      auto event = cursor.command("ADSR / Dynamic GAIN", SequenceSemantic::Envelope);
-      const u8 index = event.u8("pattern");
-      return event.invoke<&Playback::setAdsr>(index);
     }
     case 0xa0: {
       auto event = cursor.command("Program Change", SequenceSemantic::Program);
@@ -1154,10 +1121,6 @@ struct DurationValue {
       return layout.hasEchoCommands()
                  ? cursor.command("Echo Off", SequenceSemantic::State).invoke<&Playback::echoVoice>(false)
                  : cursor.sourceOnly("NOP", "nop");
-    case 0xab: {
-      auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      return event.invoke<&Playback::pan>(event.s8("pan"));
-    }
     case 0xac: {
       auto event = cursor.sourceOnly("Noise Clock", "noise");
       event.u8("clock", SourceValueDisplay::Hex);

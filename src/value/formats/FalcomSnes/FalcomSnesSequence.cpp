@@ -7,7 +7,7 @@
 #include "value/formats/FalcomSnes/FalcomSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompilerCursor.h"
+#include "value/sequence/CommandTable.h"
 #include "value/synth/SnesDsp.h"
 
 #include <algorithm>
@@ -513,6 +513,33 @@ using Cursor = CompilerCursor<Playback>;
     return event.set<&TrackState::octave>(octave);
   }
 
+  {
+    using namespace command;
+    static const CommandTable<Playback> commands{
+        {0xd9, "Vibrato", SequenceSemantic::Modulation, &Playback::vibrato, Byte{"delay"}, Byte{"depth"},
+         SignedByte{"rate"}},
+        {0xdd, "Quantize", SequenceSemantic::State, &TrackState::quantize, Byte{"keyoff_remainder"}},
+        {0xde, "Volume", SequenceSemantic::Level, &TrackState::volume, Byte{"volume"}},
+        {0xe7, "Pan", SequenceSemantic::Pan, &Playback::setPan, Byte{"pan"}},
+        {0xea, "Pan LFO", SequenceSemantic::Modulation, &Playback::configurePanLfo, Byte{"target"}, Byte{"step"},
+         Byte{"interval"}},
+        {0xec, "DSP Pitch Offset", SequenceSemantic::Pitch, &TrackState::tuning, SignedByte{"pitch_register_delta"}},
+        {0xf0, "Pitch Envelope", SequenceSemantic::Pitch, &Playback::pitchEnvelope, Byte{"delay"}, Byte{"step"},
+         SignedByte{"interval"}},
+        {0xf2, "ADSR", SequenceSemantic::Envelope, &Playback::adsr,
+         Byte{.name = "adsr1", .display = SourceValueDisplay::Hex},
+         Byte{.name = "adsr2", .display = SourceValueDisplay::Hex}},
+        {0xf3, "Broken GAIN", SequenceSemantic::Envelope, &Playback::brokenGain,
+         Byte{.name = "gain", .display = SourceValueDisplay::Hex}},
+        {0xf7, "Echo Parameters", SequenceSemantic::State, &Playback::echoParameters, Byte{"delay"},
+         SignedByte{"feedback"}, Byte{"fir_preset"}},
+        {0xf9, "Echo Volume", SequenceSemantic::State, &Playback::echoVolume, SignedByte{"left"}, SignedByte{"right"}},
+    };
+    if (auto command = commands.decode(cursor)) {
+      return std::move(*command);
+    }
+  }
+
   switch (opcode) {
     case 0xd7: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
@@ -526,12 +553,6 @@ using Cursor = CompilerCursor<Playback>;
       }
       return event.invoke<&Playback::programChange>(value);
     }
-    case 0xd9: {
-      auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
-      const u8 delay = event.u8("delay");
-      const u8 depth = event.u8("depth");
-      return event.invoke<&Playback::vibrato>(delay, depth, event.s8("rate"));
-    }
     case 0xda: {
       auto event = cursor.command("Vibrato On/Off", SequenceSemantic::Modulation);
       return event.invoke<&Playback::vibratoEnabled>(event.u8("enabled") != 0);
@@ -540,14 +561,6 @@ using Cursor = CompilerCursor<Playback>;
       return cursor.ignored("No Operation", 3, "nop");
     case 0xdc:
       return cursor.ignored("No Operation", 1, "nop");
-    case 0xdd: {
-      auto event = cursor.command("Quantize", SequenceSemantic::State);
-      return event.set<&TrackState::quantize>(event.u8("keyoff_remainder"));
-    }
-    case 0xde: {
-      auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.set<&TrackState::volume>(event.u8("volume"));
-    }
     case 0xdf:
     case 0xe0:
     case 0xe1:
@@ -566,27 +579,13 @@ using Cursor = CompilerCursor<Playback>;
       const int amount = event.derived("delta", amounts[opcode - 0xe3]);
       return event.invoke<&Playback::adjustVolume>(amount);
     }
-    case 0xe7: {
-      auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      return event.invoke<&Playback::setPan>(event.u8("pan"));
-    }
     case 0xe8:
       return cursor.command("Pan Decrease", SequenceSemantic::Pan).invoke<&Playback::adjustPan>(-8);
     case 0xe9:
       return cursor.command("Pan Increase", SequenceSemantic::Pan).invoke<&Playback::adjustPan>(8);
-    case 0xea: {
-      auto event = cursor.command("Pan LFO", SequenceSemantic::Modulation);
-      const u8 target = event.u8("target");
-      const u8 step = event.u8("step");
-      return event.invoke<&Playback::configurePanLfo>(target, step, event.u8("interval"));
-    }
     case 0xeb: {
       auto event = cursor.command("Pan LFO On/Off", SequenceSemantic::Modulation);
       return event.invoke<&Playback::panLfoEnabled>(event.u8("enabled") != 0);
-    }
-    case 0xec: {
-      auto event = cursor.command("DSP Pitch Offset", SequenceSemantic::Pitch);
-      return event.set<&TrackState::tuning>(event.s8("pitch_register_delta"));
     }
     case 0xed: {
       auto event = cursor.command("Repeat Start", SequenceSemantic::Loop);
@@ -618,24 +617,9 @@ using Cursor = CompilerCursor<Playback>;
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
       return event.invoke<&Playback::repeatEnd>(cell, destination).discoverTarget(destination);
     }
-    case 0xf0: {
-      auto event = cursor.command("Pitch Envelope", SequenceSemantic::Pitch);
-      const u8 delay = event.u8("delay");
-      const u8 depth = event.u8("step");
-      return event.invoke<&Playback::pitchEnvelope>(delay, depth, event.s8("interval"));
-    }
     case 0xf1: {
       auto event = cursor.command("Pitch Envelope On/Off", SequenceSemantic::Pitch);
       return event.invoke<&Playback::pitchEnvelopeEnabled>(event.u8("enabled") != 0);
-    }
-    case 0xf2: {
-      auto event = cursor.command("ADSR", SequenceSemantic::Envelope);
-      const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
-      return event.invoke<&Playback::adsr>(adsr1, event.u8("adsr2", SourceValueDisplay::Hex));
-    }
-    case 0xf3: {
-      auto event = cursor.command("Broken GAIN", SequenceSemantic::Envelope);
-      return event.invoke<&Playback::brokenGain>(event.u8("gain", SourceValueDisplay::Hex));
     }
     case 0xf4: {
       auto event = cursor.sourceOnly("DSP FLG / Noise", "noise");
@@ -651,20 +635,9 @@ using Cursor = CompilerCursor<Playback>;
       auto event = cursor.command("Echo Voice On/Off", SequenceSemantic::State);
       return event.set<&TrackState::echoEnabled>(event.u8("enabled") != 0);
     }
-    case 0xf7: {
-      auto event = cursor.command("Echo Parameters", SequenceSemantic::State);
-      const u8 delay = event.u8("delay");
-      const s8 feedback = event.s8("feedback");
-      return event.invoke<&Playback::echoParameters>(delay, feedback, event.u8("fir_preset"));
-    }
     case 0xf8: {
       auto event = cursor.command("Echo Volume On/Off", SequenceSemantic::State);
       return event.invoke<&Playback::echoVolumeEnabled>(event.u8("enabled") != 0);
-    }
-    case 0xf9: {
-      auto event = cursor.command("Echo Volume", SequenceSemantic::State);
-      const s8 left = event.s8("left");
-      return event.invoke<&Playback::echoVolume>(left, event.s8("right"));
     }
     case 0xfa: {
       constexpr std::array<std::string_view, 8> names{

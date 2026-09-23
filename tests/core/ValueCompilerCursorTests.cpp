@@ -7,7 +7,7 @@
 #include "ValueTestSupport.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompilerCursor.h"
+#include "value/sequence/CommandTable.h"
 
 namespace {
 
@@ -55,25 +55,31 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
     return cursor.truncated();
   }
 
+  {
+    using namespace command;
+    // Compiled commands must outlive both this table and the source bytes.
+    const CommandTable<CompilerProbePlayback> commands{
+        {0x10, "Volume", SequenceSemantic::Level,
+         [](CompilerProbePlayback& p, u8 volume) { p.out.level(LevelScale::linearFromMidi7(volume)); }, Byte{"volume"}},
+        {0x20, "Transpose", SequenceSemantic::State, &CompilerProbeState::transpose, SignedByte{"semitones"}},
+        {0x23, "Pitch Bend", SequenceSemantic::Pitch, &CompilerProbePlayback::pitchBend, SignedByte{"fraction"}},
+        {0x2a, "Wait Readiness", SequenceSemantic::State, &CompilerProbeState::readyDuringWaitAtTick, Byte{"tick"}},
+        {0x30, "Note", SequenceSemantic::Note, &CompilerProbePlayback::note, Byte{"key"}, VariableLength{"duration"}},
+        {0x50, "Rest", SequenceSemantic::Rest,
+         [](CompilerProbePlayback&, u32 duration) { return Effects::wait(duration); }, VariableLength{"duration"}},
+    };
+    if (auto command = commands.decode(cursor)) {
+      return std::move(*command);
+    }
+  }
+
   switch (cursor.opcode()) {
-    case 0x10: {
-      auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.emitLevel(LevelScale::linearFromMidi7(event.u8("volume")));
-    }
-    case 0x20: {
-      auto event = cursor.command("Transpose", SequenceSemantic::State);
-      return event.set<&CompilerProbeState::transpose>(event.s8("semitones"));
-    }
     case 0x21:
       return cursor.command("Toggle Enabled", SequenceSemantic::State).toggle<&CompilerProbeState::enabled>();
     case 0x22: {
       auto event = cursor.command("Pitch Bend Range", SequenceSemantic::Pitch);
       const u8 semitones = event.u8("semitones");
       return event.set<&CompilerProbeState::pitchBendRange>(semitones).emitPitchBendRange(semitones);
-    }
-    case 0x23: {
-      auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
-      return event.invoke<&CompilerProbePlayback::pitchBend>(event.s8("fraction"));
     }
     case 0x24: {
       auto event = cursor.command("Separate Actions", SequenceSemantic::State);
@@ -105,10 +111,6 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
       auto event = cursor.sourceOnly("Ignored Action");
       event.set<&CompilerProbeState::enabled>(false).jump(Address{0});
       return event.ignore();
-    }
-    case 0x2a: {
-      auto event = cursor.command("Wait Readiness", SequenceSemantic::State);
-      return event.set<&CompilerProbeState::readyDuringWaitAtTick>(event.u8("tick"));
     }
     case 0x2b: {
       auto event = cursor.command("During-Wait Expression", SequenceSemantic::State);
@@ -144,10 +146,6 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
       const u8 key = event.opcodeBits<0, 2>("key", SourceValueDisplay::MidiNote);
       const u32 duration = event.varLen("duration");
       return event.invoke<&CompilerProbePlayback::note>(static_cast<u8>(60 + key), duration);
-    }
-    case 0x50: {
-      auto event = cursor.command("Rest", SequenceSemantic::Rest);
-      return event.wait(event.varLen("duration"));
     }
     case 0x60: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
@@ -260,7 +258,7 @@ void compilerCursorCompilesAndExecutesTypedCommands() {
   TrackProgram track;
   SourceMap sourceMap;
   {
-    const std::vector<u8> bytes{0x10, 0x40, 0x20, 0x02, 0x21, 0x43, 0x04, 0x50, 0x03, 0x28, 0x29, 0xff};
+    const std::vector<u8> bytes{0x10, 0x40, 0x20, 0x02, 0x21, 0x30, 63, 0x04, 0x50, 0x03, 0x28, 0x29, 0xff};
     const ByteReader reader(SourceId{7}, bytes);
     ScanIdAllocator ids;
     SourceMapBuilder sourceMapBuilder([&ids]() { return ids.nextSourceAnnotationId(); });
@@ -281,6 +279,10 @@ void compilerCursorCompilesAndExecutesTypedCommands() {
   expect(volume.label == "Volume" && volume.fields.size() == 2 && volume.fields[1].name == "volume" &&
              volume.fields[1].range.offset == 1,
          "field reads should automatically preserve names and exact source ranges");
+  const auto& noteFields = sourceMap.get(annotations[3]).fields;
+  expect(noteFields.size() == 3 && noteFields[1].name == "key" && noteFields[1].range.offset == 6 &&
+             noteFields[2].name == "duration" && noteFields[2].range.offset == 7,
+         "command definitions should read and annotate operands in declaration order");
   expect(sourceMap.get(annotations[5]).playbackStatus == CommandPlaybackStatus::AffectsPlayback &&
              sourceMap.get(annotations[6]).playbackStatus == CommandPlaybackStatus::SourceOnly,
          "compiled behavior should promote source-only presentation unless the event is explicitly ignored");
@@ -564,16 +566,17 @@ void compilerCursorExecutesEligibleCommandsDuringWaits() {
 }
 
 void compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior() {
-  const std::vector<u8> bytes{0x10};
-  std::vector<Diagnostic> diagnostics;
-  const TrackProgram track =
-      decodeProbeTrack(ByteReader(SourceId{11}, bytes), static_cast<u32>(bytes.size()), nullptr, &diagnostics);
-  expect(track.commands.size() == 1 && track.commands[0].flow.endsPlayback(),
-         "truncated compiler command should become a terminal command automatically");
-  expect(track.commands[0].range.size == 1 && !track.commands[0].execution.valid(),
-         "truncated compiler command should retain its partial source range but no executable behavior");
-  expect(!diagnostics.empty() && diagnostics[0].code == "truncated-record",
-         "truncated compiler field should retain the shared RecordReader diagnostic");
+  for (const auto& bytes : {std::vector<u8>{0x10}, {0x30, 63}, {0x30, 63, 0x80}}) {
+    std::vector<Diagnostic> diagnostics;
+    const TrackProgram track =
+        decodeProbeTrack(ByteReader(SourceId{11}, bytes), static_cast<u32>(bytes.size()), nullptr, &diagnostics);
+    expect(track.commands.size() == 1 && track.commands[0].flow.endsPlayback(),
+           "truncated compiler command should become a terminal command automatically");
+    expect(track.commands[0].range.size == bytes.size() && !track.commands[0].execution.valid(),
+           "truncated compiler command should retain its partial source range but no executable behavior");
+    expect(!diagnostics.empty() && diagnostics[0].code == "truncated-record",
+           "truncated compiler field should retain the shared RecordReader diagnostic");
+  }
 }
 
 void compilerCursorKeepsExactTargetOperandRoles() {
