@@ -27,6 +27,7 @@
 namespace vgmtrans::formats::konami_tmnt2 {
 
 using namespace core;
+using namespace command;
 
 double driverTickRate(u8 clkb, u8 skipInterval) {
   const double base = kChipClock / (1024.0 * (256.0 - clkb));
@@ -647,20 +648,15 @@ struct DecodeState {
   }
 
   switch (opcode) {
-    case 0xd8: {
-      auto event = cursor.command("Attenuation Multiplier", SequenceSemantic::Level);
-      return event.invoke<&Playback::attenuationMultiplier>(event.u8("multiplier"));
-    }
+    case 0xd8:
+      return cursor.command("Attenuation Multiplier", SequenceSemantic::Level)
+          .invoke<&Playback::attenuationMultiplier>(Byte{"multiplier"});
     case 0xd9:
       return cursor.command("Extend Next Duration", SequenceSemantic::State).invoke<&Playback::extendDuration>();
-    case 0xda: {
-      auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      return event.invoke<&Playback::setPan>(event.u8("pan"));
-    }
-    case 0xdb: {
-      auto event = cursor.command("Gate Time", SequenceSemantic::Envelope);
-      return event.set<&TrackState::gate>(event.u8("fraction"));
-    }
+    case 0xda:
+      return cursor.command("Pan", SequenceSemantic::Pan).invoke<&Playback::setPan>(Byte{"pan"});
+    case 0xdb:
+      return cursor.command("Gate Time", SequenceSemantic::Envelope).set<&TrackState::gate>(Byte{"fraction"});
     case 0xdc: {
       if (vendetta) {
         return ignored(cursor, "Unused");
@@ -722,18 +718,14 @@ struct DecodeState {
       auto event = cursor.command("Percussion Bank", SequenceSemantic::Instrument);
       return event.invoke<&Playback::setPercussion>(event.u8("value"));
     }
-    case 0xe2: {
-      auto event = cursor.command("Base Duration", SequenceSemantic::State);
-      return event.invoke<&Playback::setBaseDuration>(event.u8("ticks"));
-    }
-    case 0xe3: {
-      auto event = cursor.command("Program", SequenceSemantic::Program);
-      return event.invoke<&Playback::setProgram>(event.u8("program", SemanticOperandRole::InstrumentProgram));
-    }
-    case 0xe4: {
-      auto event = cursor.command("Attenuation", SequenceSemantic::Level);
-      return event.invoke<&Playback::setAttenuation>(event.u8("attenuation"));
-    }
+    case 0xe2:
+      return cursor.command("Base Duration", SequenceSemantic::State).invoke<&Playback::setBaseDuration>(Byte{"ticks"});
+    case 0xe3:
+      return cursor.command("Program", SequenceSemantic::Program)
+          .invoke<&Playback::setProgram>(Byte{"program", SemanticOperandRole::InstrumentProgram});
+    case 0xe4:
+      return cursor.command("Attenuation", SequenceSemantic::Level)
+          .invoke<&Playback::setAttenuation>(Byte{"attenuation"});
     case 0xe5: {
       if (vendetta) {
         return ignored(cursor, "Unused");
@@ -792,14 +784,12 @@ struct DecodeState {
       auto event = cursor.command("Portamento", SequenceSemantic::Portamento);
       return event.invoke<&Playback::setPortamento>(event.u8("rate"));
     }
-    case 0xec: {
-      auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::transpose>(event.u8("packed_semitones", SourceValueDisplay::Hex));
-    }
-    case 0xed: {
-      auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::pitchBend>(event.u8("bend", SourceValueDisplay::Hex));
-    }
+    case 0xec:
+      return cursor.command("Transpose", SequenceSemantic::Pitch)
+          .invoke<&Playback::transpose>(Byte{"packed_semitones", SourceValueDisplay::Hex});
+    case 0xed:
+      return cursor.command("Pitch Bend", SequenceSemantic::Pitch)
+          .invoke<&Playback::pitchBend>(Byte{"bend", SourceValueDisplay::Hex});
     case 0xee: {
       if (vendetta) {
         return ignored(cursor, "Unused");

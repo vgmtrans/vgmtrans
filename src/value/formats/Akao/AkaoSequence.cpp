@@ -25,6 +25,7 @@
 namespace vgmtrans::formats::akao {
 
 using namespace core;
+using namespace command;
 
 namespace {
 
@@ -504,10 +505,8 @@ u32 relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOff
       const s8 semitones = event.s8("semitones");
       return event.invoke<&Playback::queuePitchSlide>(duration, semitones);
     }
-    case 0xa5: {
-      auto event = cursor.command("Octave", SequenceSemantic::State);
-      return event.set<&TrackState::octave>(event.u8("octave"));
-    }
+    case 0xa5:
+      return cursor.command("Octave", SequenceSemantic::State).set<&TrackState::octave>(Byte{"octave"});
     case 0xa6:
       return cursor.command("Octave Up", SequenceSemantic::State).add<&TrackState::octave>(1u);
     case 0xa7: {
@@ -558,10 +557,8 @@ u32 relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOff
           },
           duration, target);
     }
-    case 0xc0: {
-      auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.set<&TrackState::transpose>(event.s8("semitones"));
-    }
+    case 0xc0:
+      return cursor.command("Transpose", SequenceSemantic::Pitch).set<&TrackState::transpose>(SignedByte{"semitones"});
     case 0xc1: {
       auto event = cursor.command("Transpose (Relative)", SequenceSemantic::Pitch);
       const s8 semitones = event.s8("semitones");

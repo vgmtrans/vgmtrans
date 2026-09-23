@@ -7,7 +7,7 @@
 #include "ValueTestSupport.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CommandTable.h"
+#include "value/sequence/CompilerCursor.h"
 
 namespace {
 
@@ -47,6 +47,7 @@ struct CompilerProbePlayback : SequencePlayback<CompilerProbeState> {
 };
 
 using ProbeCursor = CompilerCursor<CompilerProbePlayback>;
+using namespace command;
 
 DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
                                           std::vector<Diagnostic>* diagnostics = nullptr) {
@@ -55,25 +56,14 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
     return cursor.truncated();
   }
 
-  {
-    using namespace command;
-    // Compiled commands must outlive both this table and the source bytes.
-    const CommandTable<CompilerProbePlayback> commands{
-        {0x10, "Volume", SequenceSemantic::Level,
-         [](CompilerProbePlayback& p, u8 volume) { p.out.level(LevelScale::linearFromMidi7(volume)); }, Byte{"volume"}},
-        {0x20, "Transpose", SequenceSemantic::State, &CompilerProbeState::transpose, SignedByte{"semitones"}},
-        {0x23, "Pitch Bend", SequenceSemantic::Pitch, &CompilerProbePlayback::pitchBend, SignedByte{"fraction"}},
-        {0x2a, "Wait Readiness", SequenceSemantic::State, &CompilerProbeState::readyDuringWaitAtTick, Byte{"tick"}},
-        {0x30, "Note", SequenceSemantic::Note, &CompilerProbePlayback::note, Byte{"key"}, VariableLength{"duration"}},
-        {0x50, "Rest", SequenceSemantic::Rest,
-         [](CompilerProbePlayback&, u32 duration) { return Effects::wait(duration); }, VariableLength{"duration"}},
-    };
-    if (auto command = commands.decode(cursor)) {
-      return std::move(*command);
-    }
-  }
-
   switch (cursor.opcode()) {
+    case 0x10:
+      return cursor.command("Volume", SequenceSemantic::Level)
+          .invoke([](CompilerProbePlayback& p, u8 volume) { p.out.level(LevelScale::linearFromMidi7(volume)); },
+                  Byte{"volume"});
+    case 0x20:
+      return cursor.command("Transpose", SequenceSemantic::State)
+          .set<&CompilerProbeState::transpose>(SignedByte{"semitones"});
     case 0x21:
       return cursor.command("Toggle Enabled", SequenceSemantic::State).toggle<&CompilerProbeState::enabled>();
     case 0x22: {
@@ -81,6 +71,9 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
       const u8 semitones = event.u8("semitones");
       return event.set<&CompilerProbeState::pitchBendRange>(semitones).emitPitchBendRange(semitones);
     }
+    case 0x23:
+      return cursor.command("Pitch Bend", SequenceSemantic::Pitch)
+          .invoke<&CompilerProbePlayback::pitchBend>(SignedByte{"fraction"});
     case 0x24: {
       auto event = cursor.command("Separate Actions", SequenceSemantic::State);
       event.set<&CompilerProbeState::transpose>(event.s8("semitones"));
@@ -90,7 +83,11 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
     case 0x25: {
       auto event = cursor.command("Inline Handler", SequenceSemantic::Pan);
       const u8 pan = event.u8("pan");
-      return event.invoke([pan](CompilerProbePlayback& playback) { playback.out.pan((pan / 63.5) - 1.0); });
+      return event.invoke(
+          [pan](CompilerProbePlayback& playback, std::pair<double, double> scale) {
+            playback.out.pan((pan / scale.first) - scale.second);
+          },
+          std::pair{63.5, 1.0});
     }
     case 0x26: {
       auto event = cursor.command("Conflicting Flow", SequenceSemantic::State);
@@ -112,11 +109,13 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
       event.set<&CompilerProbeState::enabled>(false).jump(Address{0});
       return event.ignore();
     }
-    case 0x2b: {
-      auto event = cursor.command("During-Wait Expression", SequenceSemantic::State);
-      return event.invoke<&CompilerProbePlayback::duringWaitExpression>(event.u8("value"))
+    case 0x2a:
+      return cursor.command("Wait Readiness", SequenceSemantic::State)
+          .set<&CompilerProbeState::readyDuringWaitAtTick>(Byte{"tick"});
+    case 0x2b:
+      return cursor.command("During-Wait Expression", SequenceSemantic::State)
+          .invoke<&CompilerProbePlayback::duringWaitExpression>(Byte{"value"})
           .duringWaitWhen<&CompilerProbePlayback::readyDuringWait>();
-    }
     case 0x2c: {
       auto event = cursor.command("Invalid During-Wait Wait", SequenceSemantic::State);
       event.set<&CompilerProbeState::readyDuringWaitAtTick>(1);
@@ -138,15 +137,21 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
           .emitEnvelopeField<EnvelopeFields::SecondDecay>(4.0)
           .emitEnvelopeField<EnvelopeFields::Release>(5.0)
           .emitEnvelopeField<EnvelopeFields::Sustain>(0.5, VoiceEnvelopeScope::ActiveVoices);
+    case 0x30:
+      return cursor.command("Note", SequenceSemantic::Note)
+          .invoke<&CompilerProbePlayback::note>(Byte{"key"}, VariableLength{"duration"});
     case 0x40:
     case 0x41:
     case 0x42:
     case 0x43: {
       auto event = cursor.command("Note", SequenceSemantic::Note);
       const u8 key = event.opcodeBits<0, 2>("key", SourceValueDisplay::MidiNote);
-      const u32 duration = event.varLen("duration");
-      return event.invoke<&CompilerProbePlayback::note>(static_cast<u8>(60 + key), duration);
+      return event.invoke<&CompilerProbePlayback::note>(static_cast<u8>(60 + key), VariableLength{"duration"});
     }
+    case 0x50:
+      return cursor.command("Rest", SequenceSemantic::Rest)
+          .invoke([](CompilerProbePlayback&, u32 duration) { return Effects::wait(duration); },
+                  VariableLength{"duration"});
     case 0x60: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
       return event.jump(event.address("destination", SemanticOperandRole::JumpTarget));
@@ -282,7 +287,7 @@ void compilerCursorCompilesAndExecutesTypedCommands() {
   const auto& noteFields = sourceMap.get(annotations[3]).fields;
   expect(noteFields.size() == 3 && noteFields[1].name == "key" && noteFields[1].range.offset == 6 &&
              noteFields[2].name == "duration" && noteFields[2].range.offset == 7,
-         "command definitions should read and annotate operands in declaration order");
+         "named operands should be read and annotated in argument order");
   expect(sourceMap.get(annotations[5]).playbackStatus == CommandPlaybackStatus::AffectsPlayback &&
              sourceMap.get(annotations[6]).playbackStatus == CommandPlaybackStatus::SourceOnly,
          "compiled behavior should promote source-only presentation unless the event is explicitly ignored");

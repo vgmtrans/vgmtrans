@@ -24,6 +24,7 @@
 namespace vgmtrans::formats::pandora_box_snes {
 
 using namespace core;
+using namespace command;
 
 namespace {
 
@@ -447,18 +448,13 @@ using Cursor = CompilerCursor<Playback>;
       event.derived("bpm", raw, SourceValueDisplay::BeatsPerMinute);
       return event.invoke<&Playback::tempo>(raw);
     }
-    case 0xe1: {
-      auto event = cursor.command("Fine Pitch Offset", SequenceSemantic::Pitch);
-      return event.set<&TrackState::tuning>(event.s8("dsp_pitch_offset"));
-    }
-    case 0xe2: {
-      auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.set<&TrackState::transpose>(event.s8("semitones"));
-    }
-    case 0xe3: {
-      auto event = cursor.command("Stereo Balance", SequenceSemantic::Pan);
-      return event.invoke<&Playback::balance>(event.u8("position"));
-    }
+    case 0xe1:
+      return cursor.command("Fine Pitch Offset", SequenceSemantic::Pitch)
+          .set<&TrackState::tuning>(SignedByte{"dsp_pitch_offset"});
+    case 0xe2:
+      return cursor.command("Transpose", SequenceSemantic::Pitch).set<&TrackState::transpose>(SignedByte{"semitones"});
+    case 0xe3:
+      return cursor.command("Stereo Balance", SequenceSemantic::Pan).invoke<&Playback::balance>(Byte{"position"});
     case 0xe4:
       return cursor.command("Octave Up", SequenceSemantic::Pitch).add<&TrackState::octave>(1);
     case 0xe5:

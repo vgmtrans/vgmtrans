@@ -7,7 +7,7 @@
 #include "value/formats/SuzukiSnes/SuzukiSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CommandTable.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
 
@@ -22,6 +22,7 @@
 namespace vgmtrans::formats::suzuki_snes {
 
 using namespace core;
+using namespace command;
 
 namespace {
 
@@ -654,28 +655,6 @@ using Cursor = CompilerCursor<Playback>;
     return event.invoke<&Playback::tie>(duration);
   }
 
-  {
-    using namespace command;
-    static const CommandTable<Playback> commands{
-        {0xc6, "Set Octave", SequenceSemantic::Pitch, &TrackState::octave, Byte{"octave"}},
-        {0xdd, "Duration Rate", SequenceSemantic::State, &TrackState::durationRate, Byte{"rate"}},
-        {0xde, "Program Change", SequenceSemantic::Program, &Playback::programChange,
-         Byte{.name = "program", .role = SemanticOperandRole::InstrumentProgram}},
-        {0xe3, "Relative Volume", SequenceSemantic::Level, &Playback::volumeAdd, SignedByte{"delta"}},
-        {0xe4, "Volume Fade", SequenceSemantic::Level, &Playback::volumeFade, Byte{"length"}, Byte{"target"}},
-        {0xe5, "Pitch Slide", SequenceSemantic::Pitch, &Playback::pitchSlide, Byte{"length"}, SignedByte{"semitones"}},
-        {0xe7, "Pan", SequenceSemantic::Pan, &Playback::pan, Byte{"pan"}},
-        {0xe8, "Pan Fade", SequenceSemantic::Pan, &Playback::panFade, Byte{"length"}, Byte{"target"}},
-        {0xe9, "Pan LFO On", SequenceSemantic::Modulation, &Playback::panLfo, Byte{"period"}, SignedByte{"step"}},
-        {0xec, "Transpose", SequenceSemantic::Pitch, &Playback::transpose, SignedByte{"quarter_semitones"}},
-        {0xed, "Relative Transpose", SequenceSemantic::Pitch, &Playback::transposeAdd, SignedByte{"quarter_semitones"}},
-        {0xf2, "Relative Tempo", SequenceSemantic::Tempo, &Playback::tempoAdd, SignedByte{"delta"}},
-    };
-    if (auto command = commands.decode(cursor)) {
-      return std::move(*command);
-    }
-  }
-
   switch (opcode) {
     case 0xc4:
     case 0xfe:
@@ -695,6 +674,8 @@ using Cursor = CompilerCursor<Playback>;
       }
     case 0xc5:
       return cursor.command("Octave Down", SequenceSemantic::Pitch).add<&TrackState::octave>(-1);
+    case 0xc6:
+      return cursor.command("Set Octave", SequenceSemantic::Pitch).set<&TrackState::octave>(Byte{"octave"});
     case 0xc7:
       return cursor.noOp("No Operation", "nop");
     case 0xc8:
@@ -794,6 +775,11 @@ using Cursor = CompilerCursor<Playback>;
       const u8 rate = event.u8("rate") & 0x1f;
       return event.invoke<&Playback::sustainRate>(rate);
     }
+    case 0xdd:
+      return cursor.command("Duration Rate", SequenceSemantic::State).set<&TrackState::durationRate>(Byte{"rate"});
+    case 0xde:
+      return cursor.command("Program Change", SequenceSemantic::Program)
+          .invoke<&Playback::programChange>(Byte{"program", SemanticOperandRole::InstrumentProgram});
     case 0xe0:
       if (version != Version::SeikenDensetsu3) {
         auto event = cursor.command("Gated Sustain Release", SequenceSemantic::Envelope);
@@ -801,10 +787,8 @@ using Cursor = CompilerCursor<Playback>;
         return event.invoke<&Playback::gatedSustainRelease>(rate);
       }
       [[fallthrough]];
-    case 0xe2: {
-      auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(event.u8("volume"));
-    }
+    case 0xe2:
+      return cursor.command("Volume", SequenceSemantic::Level).invoke<&Playback::volume>(Byte{"volume"});
     case 0xe1:
     case 0xfc:
     case 0xfd:
@@ -832,9 +816,32 @@ using Cursor = CompilerCursor<Playback>;
         return cursor.command("Pan LFO Off", SequenceSemantic::Modulation).invoke<&Playback::panLfoOff>();
       }
       return cursor.command("Octave Up", SequenceSemantic::Pitch).add<&TrackState::octave>(1);
+    case 0xe3:
+      return cursor.command("Relative Volume", SequenceSemantic::Level)
+          .invoke<&Playback::volumeAdd>(SignedByte{"delta"});
+    case 0xe4:
+      return cursor.command("Volume Fade", SequenceSemantic::Level)
+          .invoke<&Playback::volumeFade>(Byte{"length"}, Byte{"target"});
+    case 0xe5:
+      return cursor.command("Pitch Slide", SequenceSemantic::Pitch)
+          .invoke<&Playback::pitchSlide>(Byte{"length"}, SignedByte{"semitones"});
     case 0xe6:
       return cursor.command("Pitch Slide Repeat Toggle", SequenceSemantic::Pitch)
           .invoke<&Playback::togglePitchSlideRepeat>();
+    case 0xe7:
+      return cursor.command("Pan", SequenceSemantic::Pan).invoke<&Playback::pan>(Byte{"pan"});
+    case 0xe8:
+      return cursor.command("Pan Fade", SequenceSemantic::Pan)
+          .invoke<&Playback::panFade>(Byte{"length"}, Byte{"target"});
+    case 0xe9:
+      return cursor.command("Pan LFO On", SequenceSemantic::Modulation)
+          .invoke<&Playback::panLfo>(Byte{"period"}, SignedByte{"step"});
+    case 0xec:
+      return cursor.command("Transpose", SequenceSemantic::Pitch)
+          .invoke<&Playback::transpose>(SignedByte{"quarter_semitones"});
+    case 0xed:
+      return cursor.command("Relative Transpose", SequenceSemantic::Pitch)
+          .invoke<&Playback::transposeAdd>(SignedByte{"quarter_semitones"});
     case 0xee:
     case 0xef: {
       auto event = cursor.command(opcode == 0xee ? "Percussion On" : "Percussion Off", SequenceSemantic::Instrument);
@@ -848,6 +855,8 @@ using Cursor = CompilerCursor<Playback>;
       const u8 delay = opcode == 0xf1 ? event.u8("delay") : 0;
       return event.invoke<&Playback::vibrato>(period, step, delay);
     }
+    case 0xf2:
+      return cursor.command("Relative Tempo", SequenceSemantic::Tempo).invoke<&Playback::tempoAdd>(SignedByte{"delta"});
     case 0xf3:
       return cursor.command("Vibrato Off", SequenceSemantic::Modulation).invoke<&Playback::vibratoOff>();
     case 0xf4:

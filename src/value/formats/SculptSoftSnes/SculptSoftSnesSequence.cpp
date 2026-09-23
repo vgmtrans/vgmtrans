@@ -21,6 +21,7 @@
 namespace vgmtrans::formats::sculpt_soft_snes {
 
 using namespace core;
+using namespace command;
 
 namespace {
 
@@ -161,14 +162,11 @@ using Cursor = CompilerCursor<Playback>;
   switch (opcode) {
     case 0xf0:
       return cursor.command("End", SequenceSemantic::End).invokeFlow<&Playback::end>().end();
-    case 0xf1: {
-      auto event = cursor.command("Scale Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::scaleVolume>(event.u16le("multiplier (8.8)"));
-    }
-    case 0xf2: {
-      auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(event.u8("volume"));
-    }
+    case 0xf1:
+      return cursor.command("Scale Volume", SequenceSemantic::Level)
+          .invoke<&Playback::scaleVolume>(WordLE{"multiplier (8.8)"});
+    case 0xf2:
+      return cursor.command("Volume", SequenceSemantic::Level).invoke<&Playback::volume>(Byte{"volume"});
     case 0xf3:
     case 0xf4: {
       auto event = cursor.command(opcode == 0xf3 ? "Rest" : "Wait", SequenceSemantic::Rest);
@@ -193,20 +191,16 @@ using Cursor = CompilerCursor<Playback>;
       return event.invokeFlow<&Playback::call>(phrase).call(phrase.start);
     }
     case 0xf7:
-    case 0xf8: {
-      auto event = cursor.command(opcode == 0xf7 ? "Absolute Note" : "Absolute Pitch / Tie", SequenceSemantic::Note);
-      const u16 pitch = event.u16le("pitch (1/20 semitone)");
-      return event.invokeFlow<&Playback::timed>(opcode, pitch, event.u8("duration"));
-    }
+    case 0xf8:
+      return cursor.command(opcode == 0xf7 ? "Absolute Note" : "Absolute Pitch / Tie", SequenceSemantic::Note)
+          .invokeFlow<&Playback::timed>(opcode, WordLE{"pitch (1/20 semitone)"}, Byte{"duration"});
     case 0xf9:
       return cursor.command("Restart Track", SequenceSemantic::Loop)
           .invokeFlow<&Playback::restart>(start)
           .loopCandidate(start);
-    case 0xfa: {
-      auto event = cursor.command("Tempo / Articulation", SequenceSemantic::Tempo);
-      const u8 tempo = event.u8("tempo accumulator step");
-      return event.invoke<&Playback::tempo>(tempo, event.u16le("gate multiplier (8.8)"));
-    }
+    case 0xfa:
+      return cursor.command("Tempo / Articulation", SequenceSemantic::Tempo)
+          .invoke<&Playback::tempo>(Byte{"tempo accumulator step"}, WordLE{"gate multiplier (8.8)"});
     case 0xfb:
       if (revision == Revision::Extended) {
         auto event = cursor.command("Envelope Gate", SequenceSemantic::Envelope);

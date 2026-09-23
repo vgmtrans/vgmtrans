@@ -23,6 +23,7 @@
 namespace vgmtrans::formats::konami_arcade {
 
 using namespace core;
+using namespace command;
 
 namespace {
 
@@ -935,14 +936,11 @@ using KonamiArcadeCursor = CompilerCursor<Playback>;
       event.invoke<&Playback::hold>(delta, rate);
       return event.wait(delta);
     }
-    case 0xe2: {
-      auto event = cursor.command("Program", SequenceSemantic::Program);
-      return event.invoke<&Playback::programChange>(event.u8("program", SemanticOperandRole::InstrumentProgram));
-    }
-    case 0xe3: {
-      auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      return event.invoke<&Playback::pan>(event.u8("pan"));
-    }
+    case 0xe2:
+      return cursor.command("Program", SequenceSemantic::Program)
+          .invoke<&Playback::programChange>(Byte{"program", SemanticOperandRole::InstrumentProgram});
+    case 0xe3:
+      return cursor.command("Pan", SequenceSemantic::Pan).invoke<&Playback::pan>(Byte{"pan"});
     case 0xe4: {
       auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
       const u8 rawDelay = event.u8("delay");
@@ -1014,10 +1012,9 @@ using KonamiArcadeCursor = CompilerCursor<Playback>;
       event.derived("effective_target", target);
       return event.invoke<&Playback::beginSlide>(u8{0}, duration, target, layout.nmiRateHertz);
     }
-    case 0xec: {
-      auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.set<&TrackState::transpose>(event.s8("semitones", SourceValueDisplay::SignedDecimal));
-    }
+    case 0xec:
+      return cursor.command("Transpose", SequenceSemantic::Pitch)
+          .set<&TrackState::transpose>(SignedByte{"semitones", SourceValueDisplay::SignedDecimal});
     case 0xed: {
       auto event = cursor.command("Tremolo", SequenceSemantic::Modulation);
       const u8 rawDelay = event.u8("delay");
@@ -1028,31 +1025,23 @@ using KonamiArcadeCursor = CompilerCursor<Playback>;
       event.derived("peak_attenuation_steps", static_cast<u8>(depth >> 1));
       return event.invoke<&Playback::configureTremolo>(delay, rate, depth);
     }
-    case 0xee: {
-      auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(event.u8("volume"));
-    }
+    case 0xee:
+      return cursor.command("Volume", SequenceSemantic::Level).invoke<&Playback::volume>(Byte{"volume"});
     case 0xef: {
       auto event = cursor.command("Volume Slide", SequenceSemantic::Level);
       const u8 duration = event.u8("duration");
       const u8 target = event.u8("target");
       return event.invoke<&Playback::beginSlide>(u8{1}, duration, target, 0.0);
     }
-    case 0xf0: {
-      auto event = cursor.command("Portamento", SequenceSemantic::Portamento);
-      return event.invoke<&Playback::portamento>(event.u8("time"));
-    }
-    case 0xf1: {
-      auto event = cursor.command("Slide Mode", SequenceSemantic::Portamento);
-      const u8 delay = event.u8("delay");
-      const u8 duration = event.u8("duration");
-      const s8 depth = event.s8("depth", SourceValueDisplay::SignedDecimal);
-      return event.invoke<&Playback::slideMode>(delay, duration, depth);
-    }
-    case 0xf2: {
-      auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::pitchBend>(event.s8("bend", SourceValueDisplay::SignedDecimal));
-    }
+    case 0xf0:
+      return cursor.command("Portamento", SequenceSemantic::Portamento).invoke<&Playback::portamento>(Byte{"time"});
+    case 0xf1:
+      return cursor.command("Slide Mode", SequenceSemantic::Portamento)
+          .invoke<&Playback::slideMode>(Byte{"delay"}, Byte{"duration"},
+                                        SignedByte{"depth", SourceValueDisplay::SignedDecimal});
+    case 0xf2:
+      return cursor.command("Pitch Bend", SequenceSemantic::Pitch)
+          .invoke<&Playback::pitchBend>(SignedByte{"bend", SourceValueDisplay::SignedDecimal});
     case 0xf3: {
       auto event = cursor.command("Pitch Slide", SequenceSemantic::Portamento);
       const u8 delay = event.u8("delay");

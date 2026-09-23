@@ -21,6 +21,7 @@
 namespace vgmtrans::formats::neverland_snes {
 
 using namespace core;
+using namespace command;
 
 namespace {
 
@@ -775,16 +776,11 @@ template <auto Handler, class... Args>
       return layout.version == Version::Modern ? event.invokeFlow<&Playback::modulation>(wait, value)
                                                : event.invokeFlow<&Playback::delay>(wait);
     }
-    case 0xf1: {
-      auto event = cursor.command("Volume", SequenceSemantic::Level);
-      const u8 wait = event.u8("wait");
-      return event.invokeFlow<&Playback::volume>(wait, event.u8("volume"));
-    }
-    case 0xf2: {
-      auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      const u8 wait = event.u8("wait");
-      return event.invokeFlow<&Playback::pan>(wait, event.u8("pan"));
-    }
+    case 0xf1:
+      return cursor.command("Volume", SequenceSemantic::Level)
+          .invokeFlow<&Playback::volume>(Byte{"wait"}, Byte{"volume"});
+    case 0xf2:
+      return cursor.command("Pan", SequenceSemantic::Pan).invokeFlow<&Playback::pan>(Byte{"wait"}, Byte{"pan"});
     case 0xf3:
       if (layout.version == Version::Modern) {
         auto event = cursor.command("Delay", SequenceSemantic::Rest);
@@ -824,10 +820,8 @@ template <auto Handler, class... Args>
     case 0xfb:
       return cursor.command("Repeat Start", SequenceSemantic::Repeat)
           .invokeFlow<&Playback::repeatStart>(Address{static_cast<u16>(begin + 1)});
-    case 0xfc: {
-      auto event = cursor.command("Repeat End", SequenceSemantic::Repeat);
-      return event.invokeFlow<&Playback::repeatEnd>(event.u8("count"));
-    }
+    case 0xfc:
+      return cursor.command("Repeat End", SequenceSemantic::Repeat).invokeFlow<&Playback::repeatEnd>(Byte{"count"});
     case 0xfd:
       return cursor.command("Section End", SequenceSemantic::Return)
           .invoke<&Playback::sectionEnd>()

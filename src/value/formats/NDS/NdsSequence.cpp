@@ -10,7 +10,7 @@
 #include "value/formats/NDS/NdsEnvelope.h"
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CommandTable.h"
+#include "value/sequence/CompilerCursor.h"
 
 #include <algorithm>
 #include <cmath>
@@ -25,6 +25,7 @@
 namespace vgmtrans::formats::nds {
 
 using namespace core;
+using namespace command;
 
 namespace {
 
@@ -328,25 +329,6 @@ struct SequenceDecodeContext {
     return event.invoke<&Playback::note>(key, velocity, duration);
   }
 
-  {
-    using namespace command;
-    static const CommandTable<Playback> commands{
-        {0xc3, "Transpose", SequenceSemantic::State, &TrackState::transpose, SignedByte{"semitones"}},
-        {0xc4, "Pitch Bend", SequenceSemantic::Pitch, &Playback::pitchBend, SignedByte{"bend"}},
-        {0xc9, "Portamento Control", SequenceSemantic::Portamento, &Playback::portamentoControl,
-         Byte{.name = "key", .display = SourceValueDisplay::MidiNote}},
-        {0xca, "Modulation Depth", SequenceSemantic::Modulation, &Playback::modulationDepth, Byte{"depth"}},
-        {0xcb, "Modulation Speed", SequenceSemantic::Modulation, &Playback::modulationSpeed, Byte{"speed"}},
-        {0xcc, "Modulation Type", SequenceSemantic::Modulation, &Playback::modulationTarget, Byte{"type"}},
-        {0xcd, "Modulation Range", SequenceSemantic::Modulation, &Playback::modulationRange, Byte{"range"}},
-        {0xcf, "Portamento Time", SequenceSemantic::Portamento, &TrackState::portamentoTime, Byte{"time"}},
-        {0xe0, "Modulation Delay", SequenceSemantic::Modulation, &Playback::modulationDelay, WordLE{"delay"}},
-    };
-    if (auto command = commands.decode(cursor)) {
-      return std::move(*command);
-    }
-  }
-
   switch (cursor.opcode()) {
     case 0x80: {
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
@@ -428,6 +410,10 @@ struct SequenceDecodeContext {
     }
     case 0xc2:
       return cursor.ignored("Master Volume", 1);
+    case 0xc3:
+      return cursor.command("Transpose", SequenceSemantic::State).set<&TrackState::transpose>(SignedByte{"semitones"});
+    case 0xc4:
+      return cursor.command("Pitch Bend", SequenceSemantic::Pitch).invoke<&Playback::pitchBend>(SignedByte{"bend"});
     case 0xc5: {
       auto event = cursor.command("Pitch Bend Range", SequenceSemantic::Pitch);
       const u8 semitones = event.u8("semitones");
@@ -435,18 +421,32 @@ struct SequenceDecodeContext {
     }
     case 0xc6:
       return cursor.ignored("Priority", 1);
-    case 0xc7: {
-      auto event = cursor.command("Note Wait", SequenceSemantic::State);
-      return event.set<&TrackState::noteWait>(event.u8("enabled") != 0);
-    }
+    case 0xc7:
+      return cursor.command("Note Wait", SequenceSemantic::State).set<&TrackState::noteWait>(Byte{"enabled"});
     case 0xc8: {
       auto event = cursor.command("Tie", SequenceSemantic::State);
       return event.invoke<&Playback::tie>(event.u8("enabled") != 0);
     }
-    case 0xce: {
-      auto event = cursor.command("Portamento", SequenceSemantic::Portamento);
-      return event.set<&TrackState::portamento>(event.u8("enabled") != 0);
-    }
+    case 0xc9:
+      return cursor.command("Portamento Control", SequenceSemantic::Portamento)
+          .invoke<&Playback::portamentoControl>(Byte{"key", SourceValueDisplay::MidiNote});
+    case 0xca:
+      return cursor.command("Modulation Depth", SequenceSemantic::Modulation)
+          .invoke<&Playback::modulationDepth>(Byte{"depth"});
+    case 0xcb:
+      return cursor.command("Modulation Speed", SequenceSemantic::Modulation)
+          .invoke<&Playback::modulationSpeed>(Byte{"speed"});
+    case 0xcc:
+      return cursor.command("Modulation Type", SequenceSemantic::Modulation)
+          .invoke<&Playback::modulationTarget>(Byte{"type"});
+    case 0xcd:
+      return cursor.command("Modulation Range", SequenceSemantic::Modulation)
+          .invoke<&Playback::modulationRange>(Byte{"range"});
+    case 0xce:
+      return cursor.command("Portamento", SequenceSemantic::Portamento).set<&TrackState::portamento>(Byte{"enabled"});
+    case 0xcf:
+      return cursor.command("Portamento Time", SequenceSemantic::Portamento)
+          .set<&TrackState::portamentoTime>(Byte{"time"});
     case 0xd0: {
       auto event = cursor.command("Attack Rate", SequenceSemantic::Envelope);
       const auto seconds = ndsAttackSeconds(event.u8("attack"));
@@ -491,15 +491,16 @@ struct SequenceDecodeContext {
     }
     case 0xd6:
       return cursor.ignored("Print Variable", 1);
+    case 0xe0:
+      return cursor.command("Modulation Delay", SequenceSemantic::Modulation)
+          .invoke<&Playback::modulationDelay>(WordLE{"delay"});
     case 0xe1: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
       const u16 bpm = event.u16le("tempo", SourceValueDisplay::BeatsPerMinute);
       return bpm == 0 ? event.ignore() : event.invoke<&Playback::tempo>(bpm);
     }
-    case 0xe3: {
-      auto event = cursor.command("Sweep Pitch", SequenceSemantic::Pitch);
-      return event.set<&TrackState::sweepPitch>(event.s16le("pitch", SourceValueDisplay::SignedDecimal));
-    }
+    case 0xe3:
+      return cursor.command("Sweep Pitch", SequenceSemantic::Pitch).set<&TrackState::sweepPitch>(SignedWordLE{"pitch"});
     case 0xfc:
       return cursor.ignored("Loop End", 0);
     case 0xfd:

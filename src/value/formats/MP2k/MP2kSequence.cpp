@@ -25,6 +25,7 @@
 namespace vgmtrans::formats::mp2k {
 
 using namespace core;
+using namespace command;
 
 namespace {
 
@@ -765,14 +766,10 @@ struct DecodeContext {
       event.u8("priority");
       return event;
     }
-    case 0xbb: {
-      auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-      return event.invoke<&Playback::tempo>(event.u8("tempo"));
-    }
-    case 0xbc: {
-      auto event = cursor.command("Transpose", SequenceSemantic::State);
-      return event.set<&TrackState::transpose>(event.s8("semitones"));
-    }
+    case 0xbb:
+      return cursor.command("Tempo", SequenceSemantic::Tempo).invoke<&Playback::tempo>(Byte{"tempo"});
+    case 0xbc:
+      return cursor.command("Transpose", SequenceSemantic::State).set<&TrackState::transpose>(SignedByte{"semitones"});
     default:
       return cursor.command("Undefined MP2k Command", SequenceSemantic::End).invoke<&Playback::finish>().end();
   }

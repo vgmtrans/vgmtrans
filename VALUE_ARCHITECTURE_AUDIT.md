@@ -3520,43 +3520,67 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
 - Validation: warning-free macOS Debug build (26 steps); all 22 CTest targets
   pass (10.44 s). Temporary probes were removed.
 
-## Shared command definitions
+## Inline named operands replace the command-table experiment
 
-- `CommandTable<Playback>` lets formats declare ordinary opcodes with their
-  label, semantic, typed playback action, and encoded operands in one row.
-  For example, HeartBeatSnes's pan fade is now:
+- The first table implementation (`8cc140397`) shortened 80 commands but added a
+  second dispatch mechanism beside the ordinary compiler blocks. Replacing it
+  with named operands in `CompilerCursor` keeps every opcode in its original
+  switch, including aliases, version checks, and control flow. `CommandTable`,
+  its entries, decoder callbacks, optional lookup, and implicit member-pointer
+  assignment convention are removed.
+- Existing `invoke`, `invokeFlow`, `set`, and `add` actions now accept encoded
+  fields alongside ordinary C++ values. For example:
 
   ```cpp
-  {0xd7, "Pan Fade", SequenceSemantic::Pan, &Playback::panFade,
-   Byte{"length"}, Byte{"target"}},
+  case 0xd9:
+    return cursor.command("Vibrato", SequenceSemantic::Modulation)
+        .invoke<&Playback::vibrato>(Byte{"delay"}, Byte{"depth"}, SignedByte{"rate"});
   ```
 
-  The table reads operands in declaration order through `CompilerCursor`,
-  retaining its source fields, diagnostics, truncation, and owned compiled
-  values. A playback member function or callable handles behavior; a track
-  member pointer assigns the single operand. SequenceVM and export models are
-  unchanged. Compiled commands do not borrow the table or source bytes.
-- Migrated 80 commands across CompileSnes, FalcomSnes, HeartBeatSnes, NDS,
-  SuzukiPS1, and SuzukiSnes. Format code shrinks by 201 lines; the shared header
-  adds 121, for **80 fewer C++ production lines** (plus one CMake header entry).
-  This initial adoption establishes a systemic authoring simplification, but
-  its net line reduction is still modest. Additional adoption should remove
-  repetitive decoding without introducing a language for driver-specific logic.
-- Keep irregular reads, derived values, discovery, and control flow in explicit
-  command blocks. In particular, SuzukiSnes's version-dependent `0xe0` fallthrough
-  to `0xe2` stays together. Do not lift individual cases out of shared switch paths.
-- Reused the existing compiler fixture to exercise method calls, lambdas, state
-  assignment, ordered multi-field reads, variable-length operands, truncation,
-  and execution after the table and source bytes are destroyed. Test code grows
-  by only three net lines; no new test file or permanent harness was added.
-- Validation: warning-free macOS Debug build; all 22 CTest targets pass (10.48 s).
-  A temporary before/after decoder probe compared 40,000 generated cases across
-  the migrated opcodes and HeartBeat/Suzuki versions, including the Suzuki alias.
-  Encoded values, field ranges/displays, semantic operands, flow, presentation,
-  execution metadata, and diagnostics match exactly. This probe compares decode
-  results, not runtime callback bodies; the existing suites exercise playback.
-  The music corpus was unavailable, so this change has no real-archive parity
-  claim. Temporary sources and binaries were removed.
+  The compiler reads fields left to right through the existing annotated
+  readers, then captures only their decoded values. Operand names, displays,
+  and roles use the same argument order as those readers. State assignment
+  still uses `set`; runtime flow still uses `invokeFlow`. Actions compose with
+  the existing builder operations, including `duringWaitWhen`, without table
+  options or a second command representation. SequenceVM and exporters are
+  unchanged.
+- Applied to 267 command blocks across 25 formats. Relative to the table commit,
+  this removes **247 format lines and 45 shared C++ lines**, or **292 production
+  lines overall**. Relative to the pre-table baseline (`f6c4aedbd`), the combined
+  change removes **448 format lines and 372 production C++ lines overall**.
+  The benefit beyond line count is that routine operands need no local names,
+  explicit read sequencing, table registration, or a separate dispatch path.
+- Keep direct reads for format-specific decoding, reused values, and source
+  inspection. Do not mix immediate reads and named operands in one call: C++
+  evaluates immediate reads before entering the action. Already-decoded values
+  can freely accompany named operands. The format migrations preserve encoded
+  read order and leave driver calculations and discovery logic explicit.
+- Reused existing compiler fixtures for ordered and truncated reads, signed and
+  variable-length fields, state updates, inline handlers, mixed ordinary/encoded
+  arguments, during-wait execution, and execution after source destruction.
+  An existing inline handler also receives a plain pair, guarding against tuple
+  deduction accidentally splitting one compound argument into several. Test
+  code grows by **five net lines** from the table commit (eight from pre-table);
+  no test files or permanent harnesses were added.
+- Validation: warning-free macOS Debug build; all 22 CTest targets pass. A
+  temporary before/after decoder probe compares **184,320 cases**: every opcode,
+  eight payload patterns, lengths 1–10, and nine configurations spanning the
+  original six formats and their HeartBeat/Suzuki versions. Field values,
+  ranges/displays, semantic operands, flow, presentation, execution metadata,
+  and diagnostics match exactly. This probe compares decoded metadata; the
+  existing playback suites and the real-file comparisons below exercise bodies.
+- Real-file before/after comparisons use the supplied music corpus
+  and the pre-table decoders/`CompilerCursor` from `f6c4aedbd`, linked against
+  the same loaders, VM, and exporters. Of 25 inputs, 24 yield **1,184 sequences
+  across 21 formats**. All **1,184 MIDI, 47 SF2, and 47 DLS files match byte for
+  byte**, with no empty artifacts. MIDI covers every discovered collection;
+  sound banks cover the first two collections per input. Both HeartBeat SNES
+  versions and all three Suzuki SNES variants are represented. Scan, rendering,
+  and export diagnostics match, including the existing export limitations.
+  The remaining PSF ("Chocobo's House") yields no sequences in either
+  version, with identical diagnostics. These are value-before/value-after
+  checks, not assertions of legacy/value parity or full game coverage.
+- Temporary probe sources, objects, binaries, and export payloads were removed.
 
 ## Further investigation
 

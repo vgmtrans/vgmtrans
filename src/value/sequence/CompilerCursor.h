@@ -7,7 +7,7 @@
 #pragma once
 
 #include "value/base/RecordReader.h"
-#include "value/sequence/BytecodeDecode.h"
+#include "value/sequence/CommandOperands.h"
 #include "value/sequence/CompiledCommandRuntime.h"
 
 #include <algorithm>
@@ -16,6 +16,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -103,9 +104,11 @@ public:
 
   class Event {
   public:
-    // Source reads consume bytes immediately. Do not place multiple reads in
-    // sibling operands or function arguments: C++ does not generally define
-    // their order. Read those fields into locals first.
+    // For invoke/invokeFlow/set/add, named operands such as command::Byte{"key"}
+    // read and annotate fields in argument order. They can accompany ordinary
+    // values. Direct reads below consume bytes immediately: use locals when a
+    // field needs decoding logic, and never mix direct reads with named operands
+    // in one call or rely on the evaluation order of multiple direct reads.
     [[nodiscard]] bool ok() const noexcept { return cursor_.record_.ok(); }
 
     ::u8 u8(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
@@ -451,8 +454,8 @@ public:
 
     template <class Handler, class... Arguments>
     Event& invokeFlow(Handler handler, Arguments... arguments) {
-      static_assert(std::is_same_v<detail::CommandResult<Playback, Handler, Arguments...>, Effects>,
-                    "A runtime control-flow handler must return Effects");
+      using Result = detail::CommandResult<Playback, Handler, decltype(readArgument(std::move(arguments)))...>;
+      static_assert(std::is_same_v<Result, Effects>, "A runtime control-flow handler must return Effects");
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       return appendCallable(std::move(handler), std::move(arguments)...);
     }
@@ -541,13 +544,28 @@ public:
     Event(CompilerCursor& cursor, DecodedCommandPresentation presentation)
         : cursor_(cursor), presentation_(std::move(presentation)), initialPlayback_(presentation_.playback) {}
 
+    template <class Argument>
+    auto readArgument(Argument argument) {
+      return argument;
+    }
+
+    template <command::Encoding encoding>
+    auto readArgument(command::Operand<encoding> operand) {
+      return operand.read(*this);
+    }
+
     template <class Callable, class... Arguments>
     Event& appendCallable(Callable callable, Arguments... arguments) {
       if (presentation_.playback == CommandPlaybackStatus::SourceOnly ||
           presentation_.playback == CommandPlaybackStatus::NoOp) {
         presentation_.playback = CommandPlaybackStatus::AffectsPlayback;
       }
-      CommandBody next = detail::makeCommandBody<Playback>(std::move(callable), std::move(arguments)...);
+      // Braced initialization reads named operands in source order. Ordinary
+      // values pass through; only decoded values enter the compiled body.
+      std::tuple<decltype(readArgument(std::move(arguments)))...> values{readArgument(std::move(arguments))...};
+      CommandBody next = std::apply(
+          [&](auto... values) { return detail::makeCommandBody<Playback>(std::move(callable), std::move(values)...); },
+          std::move(values));
       if (!execution_.body) {
         execution_.body = std::move(next);
         return *this;

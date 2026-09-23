@@ -29,6 +29,7 @@
 namespace vgmtrans::formats::konami_snes {
 
 using namespace core;
+using namespace command;
 
 namespace {
 
@@ -1401,24 +1402,20 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       const u8 destination = event.u8("target");
       return event.invoke<&Playback::beginFade>(target, false, destination, ticks, s8{0});
     }
-    case 0xec: {
-      auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.set<&TrackState::transpose>(event.s8("semitones", SourceValueDisplay::SignedDecimal));
-    }
+    case 0xec:
+      return cursor.command("Transpose", SequenceSemantic::Pitch)
+          .set<&TrackState::transpose>(SignedByte{"semitones", SourceValueDisplay::SignedDecimal});
     case 0xed:
       if (isLateVersion(version)) {
         auto event = cursor.command("ADSR(1)", SequenceSemantic::Envelope);
         return event.invoke<&Playback::setAdsr1>(event.u8("adsr1", SourceValueDisplay::Hex));
       }
       return unknownCommand(cursor, 3);
-    case 0xee: {
-      auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(event.u8("volume"));
-    }
-    case 0xf0: {
-      auto event = cursor.command("Portamento", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::configurePortamento>(event.u8("speed"));
-    }
+    case 0xee:
+      return cursor.command("Volume", SequenceSemantic::Level).invoke<&Playback::volume>(Byte{"volume"});
+    case 0xf0:
+      return cursor.command("Portamento", SequenceSemantic::Pitch)
+          .invoke<&Playback::configurePortamento>(Byte{"speed"});
     case 0xf1: {
       auto event = cursor.command("Pitch Envelope", SequenceSemantic::Pitch);
       const u8 delay = event.u8("delay");
@@ -1434,29 +1431,22 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       const u8 depth = event.u8("depth");
       return event.invoke<&Playback::configurePitchEnvelope>(delay, speed, static_cast<s16>(depth));
     }
-    case 0xf2: {
-      auto event = cursor.command("Tuning", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::tuning>(event.s8("tuning", SourceValueDisplay::SignedDecimal));
-    }
+    case 0xf2:
+      return cursor.command("Tuning", SequenceSemantic::Pitch)
+          .invoke<&Playback::tuning>(SignedByte{"tuning", SourceValueDisplay::SignedDecimal});
     case 0xf3: {
       auto event = cursor.command("Pitch Slide", SequenceSemantic::Pitch);
       appendPitchSlide(event, readPitchSlide(event, version));
       return event;
     }
-    case 0xf4: {
-      auto event = cursor.command("Echo", SequenceSemantic::State);
-      const u8 channels = event.u8("channels", SourceValueDisplay::Hex);
-      const u8 volumeLeft = event.u8("volume_left");
-      const u8 volumeRight = event.u8("volume_right");
-      return event.invoke<&Playback::echo>(channels, volumeLeft, volumeRight);
-    }
-    case 0xf5: {
-      auto event = cursor.command("Echo Parameters", SequenceSemantic::State);
-      const u8 delay = event.u8("delay");
-      const u8 feedback = event.u8("feedback");
-      const u8 filter = event.u8("filter_or_ignored", SourceValueDisplay::Hex);
-      return event.invoke<&Playback::echoParameters>(delay, feedback, filter);
-    }
+    case 0xf4:
+      return cursor.command("Echo", SequenceSemantic::State)
+          .invoke<&Playback::echo>(Byte{"channels", SourceValueDisplay::Hex}, Byte{"volume_left"},
+                                   Byte{"volume_right"});
+    case 0xf5:
+      return cursor.command("Echo Parameters", SequenceSemantic::State)
+          .invoke<&Playback::echoParameters>(Byte{"delay"}, Byte{"feedback"},
+                                             Byte{"filter_or_ignored", SourceValueDisplay::Hex});
     case 0xf6: {
       auto event = cursor.command("Loop With Volta Start", SequenceSemantic::Repeat);
       const Address start = event.derived("loop_start", event.nextAddress(), SourceValueDisplay::Address,
@@ -1467,10 +1457,9 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       auto event = cursor.command("Loop With Volta End", SequenceSemantic::Repeat);
       return event.invokeFlow<&Playback::voltaEnd>(event.nextAddress());
     }
-    case 0xf9: {
-      auto event = cursor.command("Vibrato Fade", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::setVibratoFade>(event.u8("length"));
-    }
+    case 0xf9:
+      return cursor.command("Vibrato Fade", SequenceSemantic::Modulation)
+          .invoke<&Playback::setVibratoFade>(Byte{"length"});
     case 0xfa: {
       auto event = cursor.command("ADSR / GAIN", SequenceSemantic::Envelope);
       const u8 arg1 = event.u8(usesEncodedEnvelopeParameters(version) ? "attack_decay_parameter" : "adsr1",

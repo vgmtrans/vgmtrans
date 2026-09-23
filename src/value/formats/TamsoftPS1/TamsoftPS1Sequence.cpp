@@ -23,6 +23,7 @@
 namespace vgmtrans::formats::tamsoft_ps1 {
 
 using namespace core;
+using namespace command;
 
 namespace {
 
@@ -262,49 +263,36 @@ using Cursor = CompilerCursor<Playback>;
   }
 
   switch (opcode) {
-    case 0xe0: {
-      auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::setVolume>(event.u8("volume"));
-    }
-    case 0xe1: {
-      auto event = cursor.command("Stereo Balance", SequenceSemantic::Pan);
-      const u8 left = event.u8("left");
-      const u8 right = event.u8("right");
-      return event.invoke<&Playback::setStereoBalance>(left, right);
-    }
-    case 0xe2: {
-      auto event = cursor.command("Instrument", SequenceSemantic::Instrument);
-      return event.invoke<&Playback::setInstrument>(event.u8("program", SemanticOperandRole::InstrumentProgram));
-    }
+    case 0xe0:
+      return cursor.command("Volume", SequenceSemantic::Level).invoke<&Playback::setVolume>(Byte{"volume"});
+    case 0xe1:
+      return cursor.command("Stereo Balance", SequenceSemantic::Pan)
+          .invoke<&Playback::setStereoBalance>(Byte{"left"}, Byte{"right"});
+    case 0xe2:
+      return cursor.command("Instrument", SequenceSemantic::Instrument)
+          .invoke<&Playback::setInstrument>(Byte{"program", SemanticOperandRole::InstrumentProgram});
     case 0xe3: {
       auto event = cursor.noOp("Reserved Tempo Word");
       event.u16le("value", SourceValueDisplay::Hex);
       return event;
     }
-    case 0xe4: {
-      auto event = cursor.command("Pitch", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::changePitch>(event.u16le("spu_pitch", SourceValueDisplay::Hex));
-    }
-    case 0xe5: {
-      auto event = cursor.command("Key On By Pitch", SequenceSemantic::Note);
-      return event.invoke<&Playback::keyOnByPitch>(event.u16le("spu_pitch", SourceValueDisplay::Hex));
-    }
-    case 0xe6: {
-      auto event = cursor.command("Reverb Mode", SequenceSemantic::State);
-      return event.invoke<&Playback::setReverbMode>(event.u8("mode"));
-    }
-    case 0xe7: {
-      auto event = cursor.command("Reverb Depth", SequenceSemantic::State);
-      return event.invoke<&Playback::setReverbDepth>(event.u8("depth"));
-    }
+    case 0xe4:
+      return cursor.command("Pitch", SequenceSemantic::Pitch)
+          .invoke<&Playback::changePitch>(WordLE{"spu_pitch", SourceValueDisplay::Hex});
+    case 0xe5:
+      return cursor.command("Key On By Pitch", SequenceSemantic::Note)
+          .invoke<&Playback::keyOnByPitch>(WordLE{"spu_pitch", SourceValueDisplay::Hex});
+    case 0xe6:
+      return cursor.command("Reverb Mode", SequenceSemantic::State).invoke<&Playback::setReverbMode>(Byte{"mode"});
+    case 0xe7:
+      return cursor.command("Reverb Depth", SequenceSemantic::State).invoke<&Playback::setReverbDepth>(Byte{"depth"});
     case 0xe8:
       return cursor.command("Reverb Send On", SequenceSemantic::State).invoke<&Playback::setReverbSend>(true);
     case 0xe9:
       return cursor.command("Reverb Send Off", SequenceSemantic::State).invoke<&Playback::setReverbSend>(false);
-    case 0xea: {
-      auto event = cursor.command("Pitch Scale", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::setPitchScale>(event.u16le("scale", SourceValueDisplay::Hex));
-    }
+    case 0xea:
+      return cursor.command("Pitch Scale", SequenceSemantic::Pitch)
+          .invoke<&Playback::setPitchScale>(WordLE{"scale", SourceValueDisplay::Hex});
     case 0xf0:
       return cursor.command("Key Off", SequenceSemantic::Note).invoke<&Playback::keyOff>();
     case 0xf1: {

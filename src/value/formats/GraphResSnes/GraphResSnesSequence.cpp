@@ -21,6 +21,7 @@
 namespace vgmtrans::formats::graph_res_snes {
 
 using namespace core;
+using namespace command;
 
 namespace {
 
@@ -630,18 +631,12 @@ using Cursor = CompilerCursor<Playback>;
   }
 
   switch (opcode) {
-    case 0xe4: {
-      auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::transpose>(event.s8("semitones"));
-    }
-    case 0xe5: {
-      auto event = cursor.command("Master Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::masterVolume>(event.u8("volume"));
-    }
-    case 0xe6: {
-      auto event = cursor.command("Echo Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::echoVolume>(event.u8("volume"));
-    }
+    case 0xe4:
+      return cursor.command("Transpose", SequenceSemantic::Pitch).invoke<&Playback::transpose>(SignedByte{"semitones"});
+    case 0xe5:
+      return cursor.command("Master Volume", SequenceSemantic::Level).invoke<&Playback::masterVolume>(Byte{"volume"});
+    case 0xe6:
+      return cursor.command("Echo Volume", SequenceSemantic::Level).invoke<&Playback::echoVolume>(Byte{"volume"});
     case 0xe7:
       return cursor.command("Octave Down", SequenceSemantic::Pitch).invoke<&Playback::octaveAdd>(-1);
     case 0xe8:
@@ -657,15 +652,12 @@ using Cursor = CompilerCursor<Playback>;
       const Address exit{static_cast<u16>(begin + 4)};
       return event.invokeFlow<&Playback::loopEnd>(count, destination, exit).discoverTarget(destination);
     }
-    case 0xec: {
-      auto event = cursor.command("Duration Rate", SequenceSemantic::State);
-      return event.invoke<&Playback::durationRate>(event.u8("eighths"));
-    }
-    case 0xed: {
-      auto event = cursor.command("DSP Write", SequenceSemantic::State);
-      const u8 reg = event.u8("register", SourceValueDisplay::Hex);
-      return event.invoke<&Playback::dspWrite>(reg, event.u8("value", SourceValueDisplay::Hex));
-    }
+    case 0xec:
+      return cursor.command("Duration Rate", SequenceSemantic::State).invoke<&Playback::durationRate>(Byte{"eighths"});
+    case 0xed:
+      return cursor.command("DSP Write", SequenceSemantic::State)
+          .invoke<&Playback::dspWrite>(Byte{"register", SourceValueDisplay::Hex},
+                                       Byte{"value", SourceValueDisplay::Hex});
     case 0xee: {
       auto event = cursor.command("Unstacked Loop", SequenceSemantic::Repeat);
       const u8 count = event.u8("count");
@@ -673,29 +665,21 @@ using Cursor = CompilerCursor<Playback>;
       const Address exit{static_cast<u16>(begin + 4)};
       return event.invokeFlow<&Playback::unstackedLoop>(count, destination, exit).discoverTarget(destination);
     }
-    case 0xef: {
-      auto event = cursor.command("Pitch Offset", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::pitchOffset>(event.s16le("offset", SourceValueDisplay::SignedDecimal));
-    }
+    case 0xef:
+      return cursor.command("Pitch Offset", SequenceSemantic::Pitch)
+          .invoke<&Playback::pitchOffset>(SignedWordLE{"offset"});
     case 0xf0:
       return cursor.command("Toggle Noise", SequenceSemantic::State).invoke<&Playback::noiseToggle>();
-    case 0xf1: {
-      auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(event.u8("volume"));
-    }
-    case 0xf3: {
-      auto event = cursor.command("Master / Echo Fade Rate", SequenceSemantic::Level);
-      return event.invoke<&Playback::fadeRate>(event.u8("rate"));
-    }
-    case 0xf4: {
-      auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      return event.invoke<&Playback::pan>(event.s8("pan"));
-    }
-    case 0xf7: {
-      auto event = cursor.command("ADSR", SequenceSemantic::Envelope);
-      const u8 adsr2 = event.u8("adsr2", SourceValueDisplay::Hex);
-      return event.invoke<&Playback::adsr>(adsr2, event.u8("adsr1", SourceValueDisplay::Hex));
-    }
+    case 0xf1:
+      return cursor.command("Volume", SequenceSemantic::Level).invoke<&Playback::volume>(Byte{"volume"});
+    case 0xf3:
+      return cursor.command("Master / Echo Fade Rate", SequenceSemantic::Level)
+          .invoke<&Playback::fadeRate>(Byte{"rate"});
+    case 0xf4:
+      return cursor.command("Pan", SequenceSemantic::Pan).invoke<&Playback::pan>(SignedByte{"pan"});
+    case 0xf7:
+      return cursor.command("ADSR", SequenceSemantic::Envelope)
+          .invoke<&Playback::adsr>(Byte{"adsr2", SourceValueDisplay::Hex}, Byte{"adsr1", SourceValueDisplay::Hex});
     case 0xf8:
       return cursor.command("Return", SequenceSemantic::Return).return_();
     case 0xf9: {
@@ -724,10 +708,9 @@ using Cursor = CompilerCursor<Playback>;
       }
       return event.invoke<&Playback::instrument>(program);
     }
-    case 0xfd: {
-      auto event = cursor.command("Default Note Length", SequenceSemantic::State);
-      return event.invoke<&Playback::defaultLength>(event.u8("length"));
-    }
+    case 0xfd:
+      return cursor.command("Default Note Length", SequenceSemantic::State)
+          .invoke<&Playback::defaultLength>(Byte{"length"});
     case 0xfe:
       return cursor.sourceOnly("Tie Marker", "tie-marker");
     case 0xff:

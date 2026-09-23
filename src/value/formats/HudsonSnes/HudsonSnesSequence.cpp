@@ -23,6 +23,7 @@
 namespace vgmtrans::formats::hudson_snes {
 
 using namespace core;
+using namespace command;
 
 namespace {
 
@@ -1157,18 +1158,14 @@ using Cursor = CompilerCursor<Playback>;
       event.derived("microseconds_per_quarter", math::tempoMicrosecondsPerQuarter(raw, timebaseShift));
       return event.invoke<&Playback::tempo>(raw);
     }
-    case 0xd2: {
-      auto event = cursor.command("Octave", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::octave>(event.u8("octave"));
-    }
+    case 0xd2:
+      return cursor.command("Octave", SequenceSemantic::Pitch).invoke<&Playback::octave>(Byte{"octave"});
     case 0xd3:
       return cursor.command("Octave Up", SequenceSemantic::Pitch).invoke<&Playback::octaveUp>();
     case 0xd4:
       return cursor.command("Octave Down", SequenceSemantic::Pitch).invoke<&Playback::octaveDown>();
-    case 0xd5: {
-      auto event = cursor.command("Quantize", SequenceSemantic::State);
-      return event.set<&TrackState::quantize>(event.u8("quantize"));
-    }
+    case 0xd5:
+      return cursor.command("Quantize", SequenceSemantic::State).set<&TrackState::quantize>(Byte{"quantize"});
     case 0xd6: {
       auto event = cursor.command("Instrument", SequenceSemantic::Instrument);
       const u8 program = event.u8("program", SemanticOperandRole::InstrumentProgram);
@@ -1186,22 +1183,16 @@ using Cursor = CompilerCursor<Playback>;
         event.u8("unused");
         return event;
       }
-    case 0xd9: {
-      auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(event.u8("volume"));
-    }
-    case 0xda: {
-      auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      return event.invoke<&Playback::pan>(event.u8("pan"));
-    }
-    case 0xdb: {
-      auto event = cursor.command("Reverse Phase", SequenceSemantic::Pan);
-      return event.invoke<&Playback::reversePhase>(event.u8("channels", SourceValueDisplay::Hex));
-    }
-    case 0xdc: {
-      auto event = cursor.command("Relative Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volumeRelative>(event.s8("delta"));
-    }
+    case 0xd9:
+      return cursor.command("Volume", SequenceSemantic::Level).invoke<&Playback::volume>(Byte{"volume"});
+    case 0xda:
+      return cursor.command("Pan", SequenceSemantic::Pan).invoke<&Playback::pan>(Byte{"pan"});
+    case 0xdb:
+      return cursor.command("Reverse Phase", SequenceSemantic::Pan)
+          .invoke<&Playback::reversePhase>(Byte{"channels", SourceValueDisplay::Hex});
+    case 0xdc:
+      return cursor.command("Relative Volume", SequenceSemantic::Level)
+          .invoke<&Playback::volumeRelative>(SignedByte{"delta"});
     case 0xdd: {
       auto event = cursor.command("Loop Start", SequenceSemantic::Repeat);
       const u8 count = event.u8("count");
@@ -1220,10 +1211,8 @@ using Cursor = CompilerCursor<Playback>;
       const Address destination = event.addressLe("destination", SemanticOperandRole::LoopTarget);
       return destination.value < begin ? event.loopCandidate(destination) : event.jump(destination);
     }
-    case 0xe1: {
-      auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::tuning>(event.s8("tuning"));
-    }
+    case 0xe1:
+      return cursor.command("Fine Tuning", SequenceSemantic::Pitch).invoke<&Playback::tuning>(SignedByte{"tuning"});
     case 0xe2: {
       auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
       const u8 rate = event.u8("rate");
@@ -1234,31 +1223,23 @@ using Cursor = CompilerCursor<Playback>;
       }
       return event.invoke<&Playback::vibrato>(rate, depth, mode);
     }
-    case 0xe3: {
-      auto event = cursor.command("Vibrato Delay", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::vibratoDelay>(event.u8("delay"));
-    }
-    case 0xe4: {
-      auto event = cursor.command("Echo Volume", SequenceSemantic::State);
-      const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal);
-      return event.invoke<&Playback::echoVolume>(left, event.s8("right", SourceValueDisplay::SignedDecimal));
-    }
-    case 0xe5: {
-      auto event = cursor.command("Echo Parameters", SequenceSemantic::State);
-      const u8 delay = event.u8("delay");
-      const s8 feedback = event.s8("feedback");
-      return event.invoke<&Playback::echoParameters>(delay, feedback, event.u8("fir_filter"));
-    }
+    case 0xe3:
+      return cursor.command("Vibrato Delay", SequenceSemantic::Modulation)
+          .invoke<&Playback::vibratoDelay>(Byte{"delay"});
+    case 0xe4:
+      return cursor.command("Echo Volume", SequenceSemantic::State)
+          .invoke<&Playback::echoVolume>(SignedByte{"left", SourceValueDisplay::SignedDecimal},
+                                         SignedByte{"right", SourceValueDisplay::SignedDecimal});
+    case 0xe5:
+      return cursor.command("Echo Parameters", SequenceSemantic::State)
+          .invoke<&Playback::echoParameters>(Byte{"delay"}, SignedByte{"feedback"}, Byte{"fir_filter"});
     case 0xe6:
       return cursor.command("Echo On", SequenceSemantic::State).invoke<&Playback::echoOn>();
-    case 0xe7: {
-      auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::transpose>(event.s8("semitones"));
-    }
-    case 0xe8: {
-      auto event = cursor.command("Relative Transpose", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::transposeRelative>(event.s8("semitones"));
-    }
+    case 0xe7:
+      return cursor.command("Transpose", SequenceSemantic::Pitch).invoke<&Playback::transpose>(SignedByte{"semitones"});
+    case 0xe8:
+      return cursor.command("Relative Transpose", SequenceSemantic::Pitch)
+          .invoke<&Playback::transposeRelative>(SignedByte{"semitones"});
     case 0xe9: {
       auto event = cursor.command("Pitch Attack Envelope", SequenceSemantic::Pitch);
       const u8 speed = event.u8("speed");

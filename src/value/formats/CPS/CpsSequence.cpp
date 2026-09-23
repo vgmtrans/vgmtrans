@@ -20,6 +20,7 @@
 namespace vgmtrans::formats::cps {
 
 using namespace core;
+using namespace command;
 
 namespace {
 
@@ -504,10 +505,8 @@ using Cursor = CompilerCursor<Playback>;
       const u32 mpq = event.derived("microseconds_per_quarter", static_cast<u32>(encoded) << 7);
       return event.invoke<&Playback::tempo>(mpq);
     }
-    case 0x01: {
-      auto event = cursor.command("Duration", SequenceSemantic::State);
-      return event.set<&TrackState::noteDuration>(event.u8("duration"));
-    }
+    case 0x01:
+      return cursor.command("Duration", SequenceSemantic::State).set<&TrackState::noteDuration>(Byte{"duration"});
     case 0x02: {
       auto event = cursor.command("Repeat Break", SequenceSemantic::RepeatBreak);
       const auto stored = event.rawU16le("stored_destination", SourceValueDisplay::Address);
@@ -531,10 +530,9 @@ using Cursor = CompilerCursor<Playback>;
       auto event = cursor.command("Dotted Next Event", SequenceSemantic::State);
       return event.set<&TrackState::extendNext>(true);
     }
-    case 0x07: {
-      auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.set<&TrackState::cps1V1Transpose>(event.s8("semitones"));
-    }
+    case 0x07:
+      return cursor.command("Transpose", SequenceSemantic::Pitch)
+          .set<&TrackState::cps1V1Transpose>(SignedByte{"semitones"});
     case 0x08: {
       auto event = cursor.command("Tuning", SequenceSemantic::Pitch);
       const s8 raw = event.s8("tuning");
@@ -631,14 +629,10 @@ using Cursor = CompilerCursor<Playback>;
       event.derived("microseconds_per_quarter", mpq);
       return event.invoke<&Playback::tempo>(mpq);
     }
-    case 0x06: {
-      auto event = cursor.command("Duration", SequenceSemantic::State);
-      return event.set<&TrackState::noteDuration>(event.u8("duration"));
-    }
-    case 0x07: {
-      auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::earlyVolume>(event.u8("volume"));
-    }
+    case 0x06:
+      return cursor.command("Duration", SequenceSemantic::State).set<&TrackState::noteDuration>(Byte{"duration"});
+    case 0x07:
+      return cursor.command("Volume", SequenceSemantic::Level).invoke<&Playback::earlyVolume>(Byte{"volume"});
     case 0x08: {
       auto event = cursor.command("Program Change", SequenceSemantic::Program);
       const u8 raw = event.u8("program", SemanticOperandRole::Instrument);
@@ -658,19 +652,16 @@ using Cursor = CompilerCursor<Playback>;
       auto event = cursor.command("Global Transpose", SequenceSemantic::Pitch);
       return event.emitGlobalTranspose(event.s8("semitones"));
     }
-    case 0x0b: {
-      auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.set<&TrackState::transpose>(event.s8("semitones"));
-    }
+    case 0x0b:
+      return cursor.command("Transpose", SequenceSemantic::Pitch).set<&TrackState::transpose>(SignedByte{"semitones"});
     case 0x0c: {
       auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
       const s8 raw = event.s8("pitch_bend");
       return event.emitPitchBend(raw / 128.0 * 0.5);
     }
-    case 0x0d: {
-      auto event = cursor.command("Portamento Rate", SequenceSemantic::Portamento);
-      return event.set<&TrackState::portamentoRate>(event.u8("rate"));
-    }
+    case 0x0d:
+      return cursor.command("Portamento Rate", SequenceSemantic::Portamento)
+          .set<&TrackState::portamentoRate>(Byte{"rate"});
     case 0x0e:
     case 0x0f:
     case 0x10:
@@ -831,32 +822,25 @@ using Cursor = CompilerCursor<Playback>;
       const s8 raw = event.s8("pitch_bend");
       return event.emitPitchBend(raw * 12.0 / 128.0);
     }
-    case 0xc4: {
-      auto event = cursor.command("Program Change", SequenceSemantic::Program);
-      return event.invoke<&Playback::lateProgramChange>(event.u8("program", SemanticOperandRole::Instrument));
-    }
-    case 0xc5: {
-      auto event = cursor.command("Vibrato Depth", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::setVibrato>(event.u8("depth"));
-    }
-    case 0xc6: {
-      auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::lateVolume>(event.u8("volume"));
-    }
+    case 0xc4:
+      return cursor.command("Program Change", SequenceSemantic::Program)
+          .invoke<&Playback::lateProgramChange>(Byte{"program", SemanticOperandRole::Instrument});
+    case 0xc5:
+      return cursor.command("Vibrato Depth", SequenceSemantic::Modulation).invoke<&Playback::setVibrato>(Byte{"depth"});
+    case 0xc6:
+      return cursor.command("Volume", SequenceSemantic::Level).invoke<&Playback::lateVolume>(Byte{"volume"});
     case 0xc7: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
       const u8 raw = event.u8("pan");
       const auto gains = latePanGains(raw, version);
       return event.emitStereoBalance(gains.left, gains.right);
     }
-    case 0xc8: {
-      auto event = cursor.command("Expression", SequenceSemantic::Level);
-      return event.invoke<&Playback::lateExpression>(event.u8("expression"));
-    }
-    case 0xc9: {
-      auto event = cursor.command("Portamento Rate", SequenceSemantic::Portamento);
-      return event.invoke<&Playback::latePortamento>(event.u8("rate"));
-    }
+    case 0xc8:
+      return cursor.command("Expression", SequenceSemantic::Level)
+          .invoke<&Playback::lateExpression>(Byte{"expression"});
+    case 0xc9:
+      return cursor.command("Portamento Rate", SequenceSemantic::Portamento)
+          .invoke<&Playback::latePortamento>(Byte{"rate"});
     case 0xca:
       return cursor.command("Conditional Restart", SequenceSemantic::Jump)
           .invokeFlow<&Playback::conditionalStartRepeat>();
@@ -932,34 +916,26 @@ using Cursor = CompilerCursor<Playback>;
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
       return event.repeatBreak(slot, destination);
     }
-    case 0xdc: {
-      auto event = cursor.command("Set Transpose", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::setTranspose>(event.s8("semitones"));
-    }
-    case 0xdd: {
-      auto event = cursor.command("Add Transpose", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::addTranspose>(event.s8("semitones"));
-    }
-    case 0xde: {
-      auto event = cursor.command("Set Volume Adjustment", SequenceSemantic::Level);
-      return event.invoke<&Playback::setVolumeAdjustment>(event.s8("adjustment"));
-    }
-    case 0xdf: {
-      auto event = cursor.command("Add Volume Adjustment", SequenceSemantic::Level);
-      return event.invoke<&Playback::addVolumeAdjustment>(event.s8("adjustment"));
-    }
+    case 0xdc:
+      return cursor.command("Set Transpose", SequenceSemantic::Pitch)
+          .invoke<&Playback::setTranspose>(SignedByte{"semitones"});
+    case 0xdd:
+      return cursor.command("Add Transpose", SequenceSemantic::Pitch)
+          .invoke<&Playback::addTranspose>(SignedByte{"semitones"});
+    case 0xde:
+      return cursor.command("Set Volume Adjustment", SequenceSemantic::Level)
+          .invoke<&Playback::setVolumeAdjustment>(SignedByte{"adjustment"});
+    case 0xdf:
+      return cursor.command("Add Volume Adjustment", SequenceSemantic::Level)
+          .invoke<&Playback::addVolumeAdjustment>(SignedByte{"adjustment"});
     case 0xe0: {
       auto event = cursor.command("Reset LFO On Note", SequenceSemantic::Modulation);
       return event.set<&TrackState::resetLfoOnNote>(event.u8("enabled") != 0);
     }
-    case 0xe1: {
-      auto event = cursor.command("LFO Rate", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::setLfoRate>(event.u8("rate"));
-    }
-    case 0xe2: {
-      auto event = cursor.command("Tremolo Depth", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::setTremolo>(event.u8("depth"));
-    }
+    case 0xe1:
+      return cursor.command("LFO Rate", SequenceSemantic::Modulation).invoke<&Playback::setLfoRate>(Byte{"rate"});
+    case 0xe2:
+      return cursor.command("Tremolo Depth", SequenceSemantic::Modulation).invoke<&Playback::setTremolo>(Byte{"depth"});
     case 0xe3:
       return cursor.ignored("Driver State", 1);
     case 0xe4:

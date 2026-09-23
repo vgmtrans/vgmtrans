@@ -23,6 +23,7 @@
 namespace vgmtrans::formats::namco_snes {
 
 using namespace core;
+using namespace command;
 
 namespace {
 
@@ -696,28 +697,22 @@ struct SequenceReferences {
 
   const u8 opcode = cursor.opcode();
   switch (opcode) {
-    case 0x00: {
-      auto event = cursor.command("Delta Time", SequenceSemantic::State);
-      return event.invoke<&Playback::delta>(event.u8("ticks"));
-    }
-    case 0x01: {
-      auto event = cursor.command("Active Voices", SequenceSemantic::State);
-      return event.invoke<&Playback::activeVoices>(event.u8("mask", SourceValueDisplay::Hex));
-    }
+    case 0x00:
+      return cursor.command("Delta Time", SequenceSemantic::State).invoke<&Playback::delta>(Byte{"ticks"});
+    case 0x01:
+      return cursor.command("Active Voices", SequenceSemantic::State)
+          .invoke<&Playback::activeVoices>(Byte{"mask", SourceValueDisplay::Hex});
     case 0x02: {
       auto event = cursor.command("Call", SequenceSemantic::Call);
       return event.call(event.addressLe("destination", SemanticOperandRole::CallTarget));
     }
     case 0x03:
       return cursor.command("Return / End", SequenceSemantic::End).invokeFlow<&Playback::returnOrEnd>().return_();
-    case 0x04: {
-      auto event = cursor.command("Timebase Multiplier", SequenceSemantic::State);
-      return event.invoke<&Playback::multiplier>(event.u8("multiplier"));
-    }
-    case 0x05: {
-      auto event = cursor.command("Master Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::masterVolume>(event.u8("volume"));
-    }
+    case 0x04:
+      return cursor.command("Timebase Multiplier", SequenceSemantic::State)
+          .invoke<&Playback::multiplier>(Byte{"multiplier"});
+    case 0x05:
+      return cursor.command("Master Volume", SequenceSemantic::Level).invoke<&Playback::masterVolume>(Byte{"volume"});
     case 0x06:
     case 0x0f: {
       auto event = cursor.command(opcode == 0x06 ? "Repeat Until A" : "Repeat Until B", SequenceSemantic::Repeat);
@@ -757,36 +752,27 @@ struct SequenceReferences {
       }
       return event.invoke<&Playback::note>(notes);
     }
-    case 0x0a: {
-      auto event = cursor.command("Echo Delay", SequenceSemantic::State);
-      return event.invoke<&Playback::echoDelay>(event.u8("delay"));
-    }
+    case 0x0a:
+      return cursor.command("Echo Delay", SequenceSemantic::State).invoke<&Playback::echoDelay>(Byte{"delay"});
     case 0x0b: {
       auto event = cursor.command("Note Trigger Delay", SequenceSemantic::State);
       return event.invoke<&Playback::noteDelay>(maskedValues(event, "delay"));
     }
-    case 0x0c: {
-      auto event = cursor.command("Legato Voice Mask", SequenceSemantic::State);
-      return event.invoke<&Playback::slur>(event.u8("mask", SourceValueDisplay::Hex));
-    }
-    case 0x0d: {
-      auto event = cursor.command("Echo Voice Mask", SequenceSemantic::State);
-      return event.invoke<&Playback::echoVoices>(event.u8("mask", SourceValueDisplay::Hex));
-    }
+    case 0x0c:
+      return cursor.command("Legato Voice Mask", SequenceSemantic::State)
+          .invoke<&Playback::slur>(Byte{"mask", SourceValueDisplay::Hex});
+    case 0x0d:
+      return cursor.command("Echo Voice Mask", SequenceSemantic::State)
+          .invoke<&Playback::echoVoices>(Byte{"mask", SourceValueDisplay::Hex});
     case 0x0e:
       return cursor.command("Wait", SequenceSemantic::Wait).invoke<&Playback::wait>();
-    case 0x11: {
-      auto event = cursor.command("Echo Feedback", SequenceSemantic::State);
-      return event.invoke<&Playback::echoFeedback>(event.s8("feedback"));
-    }
-    case 0x12: {
-      auto event = cursor.command("Echo FIR Preset", SequenceSemantic::State);
-      return event.invoke<&Playback::echoFilter>(event.u8("preset"));
-    }
-    case 0x13: {
-      auto event = cursor.command("Echo Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::echoVolume>(event.s8("volume"));
-    }
+    case 0x11:
+      return cursor.command("Echo Feedback", SequenceSemantic::State)
+          .invoke<&Playback::echoFeedback>(SignedByte{"feedback"});
+    case 0x12:
+      return cursor.command("Echo FIR Preset", SequenceSemantic::State).invoke<&Playback::echoFilter>(Byte{"preset"});
+    case 0x13:
+      return cursor.command("Echo Volume", SequenceSemantic::Level).invoke<&Playback::echoVolume>(SignedByte{"volume"});
     case 0x14: {
       auto event = cursor.sourceOnly("Echo Start Address", "echo-start-address");
       event.u8("esa_high", SourceValueDisplay::Hex);

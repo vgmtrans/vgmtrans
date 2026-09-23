@@ -22,6 +22,7 @@
 namespace vgmtrans::formats::capcom_snes {
 
 using namespace core;
+using namespace command;
 
 namespace {
 
@@ -373,10 +374,9 @@ using CapcomCursor = CompilerCursor<Playback>;
       return cursor.command("Dotted Note", SequenceSemantic::State).set<&TrackState::noteDotted>(true);
     case 0x03:
       return cursor.command("Toggle Octave Up", SequenceSemantic::State).toggle<&TrackState::noteOctaveUp>();
-    case 0x04: {
-      auto event = cursor.command("Note Attributes", SequenceSemantic::State);
-      return event.invoke<&Playback::applyAttributes>(event.u8("attributes", SourceValueDisplay::Hex));
-    }
+    case 0x04:
+      return cursor.command("Note Attributes", SequenceSemantic::State)
+          .invoke<&Playback::applyAttributes>(Byte{"attributes", SourceValueDisplay::Hex});
     case 0x05: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
       const auto raw = event.rawU16be("raw");
@@ -384,10 +384,9 @@ using CapcomCursor = CompilerCursor<Playback>;
       event.resolvedValue("tempo", raw, tempoBeatsPerMinute(tempo), SourceValueDisplay::BeatsPerMinute);
       return event.invoke<&Playback::tempo>(tempo);
     }
-    case 0x06: {
-      auto event = cursor.command("Duration Rate", SequenceSemantic::State);
-      return event.set<&TrackState::durationRate256ths>(event.u8("rate"));
-    }
+    case 0x06:
+      return cursor.command("Duration Rate", SequenceSemantic::State)
+          .set<&TrackState::durationRate256ths>(Byte{"rate"});
     case 0x07: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
       const auto raw = event.rawU8("raw");
@@ -402,18 +401,15 @@ using CapcomCursor = CompilerCursor<Playback>;
       return event.emitInstrument(kCapcomSnesInstrumentDomain, instrument,
                                   InstrumentEnvelopeMode::PreserveDynamicOverride);
     }
-    case 0x09: {
-      auto event = cursor.command("Octave", SequenceSemantic::State);
-      return event.set<&TrackState::noteOctave>(event.u8("octave"));
-    }
+    case 0x09:
+      return cursor.command("Octave", SequenceSemantic::State).set<&TrackState::noteOctave>(Byte{"octave"});
     case 0x0a: {
       auto event = cursor.command("Global Transpose", SequenceSemantic::Pitch);
       return event.emitGlobalTranspose(event.s8("semitones"));
     }
-    case 0x0b: {
-      auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.set<&TrackState::transposeSemitones>(event.s8("semitones"));
-    }
+    case 0x0b:
+      return cursor.command("Transpose", SequenceSemantic::Pitch)
+          .set<&TrackState::transposeSemitones>(SignedByte{"semitones"});
     case 0x0c: {
       auto event = cursor.command("Tuning", SequenceSemantic::Pitch);
       const auto tuning = event.rawS8("tuning");
