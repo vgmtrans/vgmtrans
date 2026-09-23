@@ -39,7 +39,17 @@ const SourceCommand* SequenceProgram::command(SourceCommandRef source) const {
 size_t SequenceProgram::playbackTrackCount() const {
   size_t count = 0;
   for (const auto& track : tracks) {
-    count += track.sourceTrackNumbers.size();
+    for (const auto& stream : track.streams) {
+      count += stream.channels.size();
+    }
+  }
+  return count;
+}
+
+size_t SequenceProgram::streamCount() const {
+  size_t count = 0;
+  for (const auto& track : tracks) {
+    count += track.streams.size();
   }
   return count;
 }

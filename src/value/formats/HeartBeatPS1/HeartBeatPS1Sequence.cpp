@@ -13,7 +13,6 @@
 #include "value/synth/SynthMath.h"
 
 #include <algorithm>
-#include <numeric>
 #include <cmath>
 #include <limits>
 #include <string_view>
@@ -676,8 +675,10 @@ SequenceProgram parseHeartBeatPs1Sequence(ByteReader reader, AssetId id, const H
     }
     return decodeEvent(reader, layout.dataEnd, *event, diagnostics);
   });
-  track.sourceTrackNumbers.resize(layout.trackCount);
-  std::iota(track.sourceTrackNumbers.begin(), track.sourceTrackNumbers.end(), 0u);
+  track.streams.resize(layout.trackCount);
+  for (u32 number = 0; number < layout.trackCount; ++number) {
+    track.streams[number].channels = {number};
+  }
   program.tracks.push_back(std::move(track));
   return program;
 }

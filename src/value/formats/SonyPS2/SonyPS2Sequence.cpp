@@ -62,26 +62,12 @@ struct TrackState {
       : channel(isSeTrack(source.sourceTrackNumber) ? 0 : static_cast<u8>(source.sourceTrackNumber)),
         seSequence(isSeTrack(source.sourceTrackNumber)),
         seSet(static_cast<u8>((source.sourceTrackNumber >> 16) & 0x0f)),
-        seTimbre(static_cast<u8>((source.sourceTrackNumber >> 8) & 0x7f)),
-        seKey(static_cast<u8>(source.sourceTrackNumber & 0x7f)) {
-    currentTempo = source.sequence.behavior.initialTempoMicrosecondsPerQuarter;
-    ppqn = std::max<u16>(source.sequence.timebase.ppqn, 1);
-    if (source.sequence.sectionPlaylist) {
-      sectionPan = source.sequence.behavior.initialChannelPan.value_or(0.5);
-      sectionTempo = currentTempo;
-    }
-  }
-
-  void beginSection() {
-    resetSectionState = sectionStarted;
-    sectionStarted = true;
-  }
+        seTimbre(static_cast<u8>((source.sourceTrackNumber >> 8) & 0x7f)) {}
 
   u8 channel = 0;
   bool seSequence = false;
   u8 seSet = 0;
   u8 seTimbre = 0;
-  u8 seKey = 0;
   u8 bank = 0;
   u8 pendingBank = 0;
   u8 program = 0;
@@ -104,17 +90,37 @@ struct TrackState {
   bool portamentoEnabled = false;
   std::optional<u8> portamentoSource;
   u32 portamentoMilliseconds = 0;
-  bool sectionStarted = false;
-  bool resetSectionState = false;
-  std::optional<double> sectionPan;
-  u32 sectionTempo = 500000;
-  u32 currentTempo = 500000;
-  u16 ppqn = 480;
   u16 pitchBendValue = 8192;
   double emittedPitchBendSemitones = 0.0;
   PerformanceNoteId seNote;
   double seTerminalKey = 0.0;
   bool initialized = false;
+};
+
+struct StreamState {
+  explicit StreamState(TrackStateContext source)
+      : tempo(source.sequence.behavior.initialTempoMicrosecondsPerQuarter),
+        ppqn(std::max<u16>(source.sequence.timebase.ppqn, 1)) {
+    if (source.sequence.sectionPlaylist) {
+      sectionPan = source.sequence.behavior.initialChannelPan.value_or(0.5);
+      sectionTempo = tempo;
+    }
+  }
+
+  void beginSection() {
+    resetSectionState = sectionStarted;
+    sectionStarted = true;
+    if (resetSectionState) {
+      tempo = sectionTempo;
+    }
+  }
+
+  u32 tempo;
+  u16 ppqn;
+  std::optional<double> sectionPan;
+  u32 sectionTempo = 500000;
+  bool sectionStarted = false;
+  bool resetSectionState = false;
 };
 
 [[nodiscard]] double linearMidi7(u8 value) {
@@ -159,7 +165,7 @@ struct TrackState {
   }
 }
 
-struct Playback : SequencePlayback<TrackState> {
+struct Playback : SequencePlayback<TrackState, StreamState> {
   const RuntimeConfig& config;
 
   [[nodiscard]] const ProgramRuntimeInfo* selectedProgram() const {
@@ -204,7 +210,7 @@ struct Playback : SequencePlayback<TrackState> {
     return bendUnits / 128.0;
   }
 
-  void emitCurrentPitchBend(PerformanceEmitter& delayed, const TrackState::ActiveNote& note) {
+  void emitCurrentPitchBend(const TrackState::ActiveNote& note) {
     const double semitones = currentPitchBend(note);
     if (semitones == track.emittedPitchBendSemitones) {
       return;
@@ -213,7 +219,7 @@ struct Playback : SequencePlayback<TrackState> {
     // This is already the physical per-voice result. Supplying the normalized
     // wheel would make collection-aware MIDI rendering apply the instrument's
     // maximum range a second time.
-    delayed.pitchBend(semitones, kPitchWheelLayer);
+    out.pitchBend(semitones, kPitchWheelLayer);
   }
 
   void pruneReleasedNotes() {
@@ -245,18 +251,17 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   [[nodiscard]] u32 portamentoTicks() const {
-    const double ticks = track.portamentoMilliseconds * 1000.0 * track.ppqn / std::max<u32>(track.currentTempo, 1);
+    const double ticks = track.portamentoMilliseconds * 1000.0 * stream.ppqn / std::max<u32>(stream.tempo, 1);
     return static_cast<u32>(std::clamp(std::round(ticks), 1.0, static_cast<double>(std::numeric_limits<u32>::max())));
   }
 
-  void applyPortamento(PerformanceEmitter& delayed, PerformanceNoteId note, u8 key) const {
+  void applyPortamento(PerformanceNoteId note, u8 key) const {
     if (!track.portamentoEnabled || !track.portamentoSource || track.portamentoMilliseconds == 0 ||
         *track.portamentoSource == key) {
       return;
     }
-    delayed
-        .pitchSlide(note, *track.portamentoSource, key,
-                    PitchSlideTiming::fixedDuration(portamentoTicks(), track.portamentoMilliseconds))
+    out.pitchSlide(note, *track.portamentoSource, key,
+                   PitchSlideTiming::fixedDuration(portamentoTicks(), track.portamentoMilliseconds))
         .preferPortamento()
         .useCurrentPortamentoTiming();
   }
@@ -271,7 +276,7 @@ struct Playback : SequencePlayback<TrackState> {
     pruneReleasedNotes();
   }
 
-  void updateProgramSettings(PerformanceEmitter& delayed) {
+  void updateProgramSettings() {
     track.pitchBendPositive = 256;
     track.pitchBendNegative = 256;
     track.pitchBendZones.clear();
@@ -281,19 +286,17 @@ struct Playback : SequencePlayback<TrackState> {
       track.pitchBendZones = program->pitchBendZones;
     }
     const u32 maximum = std::max(track.pitchBendPositive, track.pitchBendNegative);
-    delayed.pitchBendRange(PitchBendRangePerformanceEvent{
+    out.pitchBendRange(PitchBendRangePerformanceEvent{
         .cents = static_cast<u16>(std::min<u32>(65535, (maximum * 100u + 127u) / 128u)),
     });
   }
 
-  void beforeCommand() {
-    if (track.resetSectionState) {
-      track.resetSectionState = false;
-      track.currentTempo = track.sectionTempo;
+  void beginSection() {
+    if (stream.resetSectionState) {
       if (track.channel == 0) {
-        out.tempo(track.sectionTempo);
+        out.tempo(stream.sectionTempo);
       }
-      out.channelPan(*track.sectionPan);
+      out.channelPan(*stream.sectionPan);
     }
     if (track.initialized) {
       return;
@@ -303,85 +306,62 @@ struct Playback : SequencePlayback<TrackState> {
       out.instrument(setbInstrumentIdentity(track.seSet, track.seTimbre));
     } else {
       out.instrument(instrumentIdentity(track.bank, track.program));
-      updateProgramSettings(out);
+      updateProgramSettings();
     }
   }
 
-  Effects note(u8 channel, u8 key, u8 velocity, u32 delta) {
-    if (channel == track.channel) {
-      auto delayed = out.after(delta);
-      if (velocity == 0) {
-        delayed.noteOff(key);
-        releaseNotes(key);
-        capturePortamentoSource(key);
-      } else {
-        const auto note = bendRangeForKey(key);
-        emitCurrentPitchBend(delayed, note);
-        const PerformanceNoteId played = delayed.noteOn(key, velocityGain(velocity));
-        applyPortamento(delayed, played, key);
-        track.activeNotes.push_back(note);
-      }
-    }
-    return Effects::wait(delta);
-  }
-
-  Effects noteOff(u8 channel, u8 key, u32 delta) {
-    if (channel == track.channel) {
-      auto delayed = out.after(delta);
-      delayed.noteOff(key);
+  void note(u8 key, u8 velocity) {
+    if (velocity == 0) {
+      out.noteOff(key);
       releaseNotes(key);
       capturePortamentoSource(key);
+    } else {
+      const auto note = bendRangeForKey(key);
+      emitCurrentPitchBend(note);
+      const PerformanceNoteId played = out.noteOn(key, velocityGain(velocity));
+      applyPortamento(played, key);
+      track.activeNotes.push_back(note);
     }
-    return Effects::wait(delta);
   }
 
-  Effects seNote(u8 set, u8 timbre, u8 key, u8 velocity, bool noteOnOnly, u32 delta) {
-    if (track.seSequence && set == track.seSet && timbre == track.seTimbre && key == track.seKey) {
-      auto delayed = out.after(delta);
-      if (velocity == 0) {
-        delayed.noteOff(key);
-        track.seNote = {};
-      } else {
-        // The 0x9n variant asks the driver not to replace an already sounding
-        // equal-key voice. ActiveNoteState is key-addressed, so this currently
-        // shares ordinary note-on behavior when equal keys overlap.
-        (void)noteOnOnly;
-        track.seNote = delayed.noteOn(key, velocityGain(velocity));
-        track.seTerminalKey = key;
-      }
-    }
-    return Effects::wait(delta);
+  void noteOff(u8 key) {
+    out.noteOff(key);
+    releaseNotes(key);
+    capturePortamentoSource(key);
   }
 
-  Effects sePitch(u8 set, u8 timbre, u8 key, u16 cents, bool negative, u32 time, u32 delta) {
-    if (track.seSequence && set == track.seSet && timbre == track.seTimbre && key == track.seKey &&
-        track.seNote.valid()) {
-      auto delayed = out.after(delta);
-      const double start = delayed.currentPitchTransitionKey(track.seNote).value_or(track.seTerminalKey);
+  void seNote(u8 key, u8 velocity, bool noteOnOnly) {
+    if (velocity == 0) {
+      out.noteOff(key);
+      track.seNote = {};
+    } else {
+      // The 0x9n variant asks the driver not to replace an already sounding
+      // equal-key voice. ActiveNoteState is key-addressed, so this currently
+      // shares ordinary note-on behavior when equal keys overlap.
+      (void)noteOnOnly;
+      track.seNote = out.noteOn(key, velocityGain(velocity));
+      track.seTerminalKey = key;
+    }
+  }
+
+  void sePitch(u16 cents, bool negative, u32 time) {
+    if (track.seNote.valid()) {
+      const double start = out.currentPitchTransitionKey(track.seNote).value_or(track.seTerminalKey);
       const double target = start + (negative ? -cents : cents) / 100.0;
       const u32 duration = std::max<u32>(time, 1);
-      delayed.pitchSlide(track.seNote, start, target, PitchSlideTiming::fixedDuration(duration, duration));
+      out.pitchSlide(track.seNote, start, target, PitchSlideTiming::fixedDuration(duration, duration));
       track.seTerminalKey = target;
     }
-    return Effects::wait(delta);
   }
 
-  Effects programChange(u8 channel, u8 value, u32 delta) {
-    if (channel == track.channel) {
-      track.bank = track.pendingBank;
-      track.program = value;
-      auto delayed = out.after(delta);
-      delayed.instrument(instrumentIdentity(track.bank, track.program));
-      updateProgramSettings(delayed);
-    }
-    return Effects::wait(delta);
+  void programChange(u8 value) {
+    track.bank = track.pendingBank;
+    track.program = value;
+    out.instrument(instrumentIdentity(track.bank, track.program));
+    updateProgramSettings();
   }
 
-  Effects controller(u8 channel, u8 controller, u8 value, u32 delta) {
-    if (channel != track.channel) {
-      return Effects::wait(delta);
-    }
-    auto delayed = out.after(delta);
+  void controller(u8 controller, u8 value) {
     switch (controller) {
       case 0:
         // Like the driver, Bank Select only stages the bank used by the next
@@ -400,9 +380,9 @@ struct Playback : SequencePlayback<TrackState> {
               .amount = linearMidi7(value),
               .pitchDepthSemitones = depth,
           };
-          delayed.modulation(std::move(event));
+          out.modulation(std::move(event));
         } else {
-          delayed.modulation(ModulationPerformanceTarget::VibratoDepth, value / 127.0);
+          out.modulation(ModulationPerformanceTarget::VibratoDepth, value / 127.0);
         }
         break;
       case 2:
@@ -422,29 +402,29 @@ struct Playback : SequencePlayback<TrackState> {
                       .tremoloGainMode = TremoloGainMode::BipolarAroundNominal,
                   },
           };
-          delayed.modulation(std::move(event));
+          out.modulation(std::move(event));
         } else {
-          delayed.modulation(ModulationPerformanceTarget::TremoloDepth, value / 127.0);
+          out.modulation(ModulationPerformanceTarget::TremoloDepth, value / 127.0);
         }
         break;
       case 5:
         track.portamentoMilliseconds = value * 20u;
-        delayed.pitchTransitionSettings(track.portamentoMilliseconds);
+        out.pitchTransitionSettings(track.portamentoMilliseconds);
         break;
       case 7:
-        delayed.level(linearMidi7(value));
+        out.level(linearMidi7(value));
         break;
       case 10:
         // modhsyn stores CC10 as a signed offset from center, then applies it
         // independently to every voice's Program/Split/Sample pan.
-        delayed.channelPan(panPositionFrom7Bit(std::min<u8>(value, 127)));
+        out.channelPan(panPositionFrom7Bit(std::min<u8>(value, 127)));
         break;
       case 11:
-        delayed.expression(linearMidi7(value));
+        out.expression(linearMidi7(value));
         break;
       case 64: {
         const bool sustain = value != 0;
-        delayed.sustainPedal(sustain);
+        out.sustainPedal(sustain);
         if (track.sustain && !sustain) {
           releaseSustainedNotes();
         }
@@ -457,7 +437,7 @@ struct Playback : SequencePlayback<TrackState> {
           track.portamentoSource.reset();
         }
         track.portamentoEnabled = enabled;
-        delayed.portamentoEnable(track.portamentoEnabled);
+        out.portamentoEnable(track.portamentoEnabled);
         break;
       }
       case 84:
@@ -479,11 +459,11 @@ struct Playback : SequencePlayback<TrackState> {
           // SPU2 applies this as a core-global signed effect-return depth.
           // Track-local MIDI reverb send is the nearest portable projection;
           // it cannot retain core selection or wet-only voice routing.
-          delayed.reverb(value / 127.0);
+          out.reverb(value / 127.0);
         } else if (track.nrpnMsb == 0x10 && track.nrpnLsb == 0) {
-          delayed.marker("SonyPS2 mark callback " + std::to_string(value));
+          out.marker("SonyPS2 mark callback " + std::to_string(value));
         } else if (track.nrpnMsb == 0x11) {
-          delayed.marker("SonyPS2 mark MSB callback " + std::to_string(value));
+          out.marker("SonyPS2 mark MSB callback " + std::to_string(value));
         }
         // The remaining reverb NRPNs configure negative-phase sends, the
         // algorithm, delay, and feedback. They remain visible in the source
@@ -495,9 +475,9 @@ struct Playback : SequencePlayback<TrackState> {
         break;
       case 38:
         if (track.dataEntryNrpn == std::pair<u8, u8>{0x10, 1}) {
-          delayed.marker("SonyPS2 mark callback " + std::to_string((track.dataEntryMsb << 7) | value));
+          out.marker("SonyPS2 mark callback " + std::to_string((track.dataEntryMsb << 7) | value));
         } else if (track.dataEntryNrpn && track.dataEntryNrpn->first == 0x12) {
-          delayed.marker("SonyPS2 mark MSB callback " + std::to_string((track.dataEntryMsb << 7) | value));
+          out.marker("SonyPS2 mark MSB callback " + std::to_string((track.dataEntryMsb << 7) | value));
         }
         track.dataEntryNrpn.reset();
         break;
@@ -505,68 +485,58 @@ struct Playback : SequencePlayback<TrackState> {
         // The driver frees hardware voices immediately. Value-core can end
         // every note here, but its target synths will still apply the region's
         // release envelope until an explicit hard-silence event is modeled.
-        delayed.allNotesOff();
+        out.allNotesOff();
         track.activeNotes.clear();
         break;
       case 123:
-        delayed.releaseAllNotes();
+        out.releaseAllNotes();
         releaseAllKeyDownNotes();
         break;
       case 121:
         track.pitchBendValue = 8192;
         track.emittedPitchBendSemitones = 0.0;
-        delayed.sustainPedal(false);
+        out.sustainPedal(false);
         track.sustain = false;
         releaseSustainedNotes();
-        delayed.portamentoEnable(false);
+        out.portamentoEnable(false);
         track.portamentoEnabled = false;
         track.portamentoSource.reset();
-        delayed.vibratoDepth(0.0);
-        delayed.tremoloLinearGainDepth(0.0);
-        delayed.level(1.0);
-        delayed.expression(1.0);
-        delayed.channelPan(0.5);
-        delayed.pitchBend(0.0, kPitchWheelLayer);
+        out.vibratoDepth(0.0);
+        out.tremoloLinearGainDepth(0.0);
+        out.level(1.0);
+        out.expression(1.0);
+        out.channelPan(0.5);
+        out.pitchBend(0.0, kPitchWheelLayer);
         break;
       default:
         break;
     }
-    return Effects::wait(delta);
   }
 
-  Effects pitchBend(u8 channel, u16 value, u32 delta) {
-    if (channel == track.channel) {
-      track.pitchBendValue = std::min<u16>(value, 16383);
-      if (!track.activeNotes.empty()) {
-        auto delayed = out.after(delta);
-        // The original driver updates every live voice with that voice's split
-        // range. A track-wide event is exact while those ranges agree; if they
-        // differ concurrently, prefer the most recently started voice until
-        // value-core can address pitch automation per voice.
-        emitCurrentPitchBend(delayed, track.activeNotes.back());
-      }
+  void pitchBend(u16 value) {
+    track.pitchBendValue = std::min<u16>(value, 16383);
+    if (!track.activeNotes.empty()) {
+      // The original driver updates every live voice with that voice's split
+      // range. A track-wide event is exact while those ranges agree; if they
+      // differ concurrently, prefer the most recently started voice until
+      // value-core can address pitch automation per voice.
+      emitCurrentPitchBend(track.activeNotes.back());
     }
-    return Effects::wait(delta);
   }
 
-  Effects tempo(u32 microseconds, u32 delta) {
+  void tempo(u32 microseconds) {
     if (microseconds != 0) {
-      track.currentTempo = microseconds;
-      if (track.channel == 0) {
-        out.after(delta).tempo(microseconds);
-      }
+      stream.tempo = microseconds;
+      out.tempo(microseconds);
     }
-    return Effects::wait(delta);
   }
 
-  Effects loop(u8 slot, u8 count, Address destination, u32 delta) {
-    Effects effects = Effects::wait(delta);
+  Effects loop(u8 slot, u8 count, Address destination) {
     if (count == 0) {
-      effects.flowOverride = vm.declaredLoop(destination).flowOverride;
+      return vm.declaredLoop(destination);
     } else {
-      effects.flowOverride = vm.countedRepeatUntil(slot & 7, static_cast<u32>(count) + 1, destination).flowOverride;
+      return vm.countedRepeatUntil(slot & 7, static_cast<u32>(count) + 1, destination);
     }
-    return effects;
   }
 };
 
@@ -781,14 +751,15 @@ using Cursor = CompilerCursor<Playback>;
   if (source.malformed) {
     return event.stop();
   }
+  event.delay(source.delta);
   if (family == 0x80) {
     cursor.derived("key", source.data1, SourceValueDisplay::MidiNote);
-    return event.invoke<&Playback::noteOff>({source.channel, source.data1, source.delta});
+    return event.channel(source.channel).invoke<&Playback::noteOff>({source.data1});
   }
   if (family == 0x90) {
     cursor.derived("key", source.data1, SourceValueDisplay::MidiNote);
     cursor.derived("velocity", source.data2);
-    return event.invoke<&Playback::note>({source.channel, source.data1, source.data2, source.delta});
+    return event.channel(source.channel).invoke<&Playback::note>({source.data1, source.data2});
   }
   if (family == 0xb0) {
     cursor.derived("controller", source.data1);
@@ -798,30 +769,30 @@ using Cursor = CompilerCursor<Playback>;
       cursor.derived("loop_id", source.loopId);
       cursor.derived("repeat_count", source.loopCount);
       cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
-      return event.invokeFlow<&Playback::loop>({source.loopId, source.loopCount, destination, source.delta})
+      return event.invokeFlow<&Playback::loop>({source.loopId, source.loopCount, destination})
           .discoverTarget(destination);
     }
-    return event.invoke<&Playback::controller>({source.channel, source.data1, source.data2, source.delta});
+    return event.channel(source.channel).invoke<&Playback::controller>({source.data1, source.data2});
   }
   if (family == 0xc0) {
     cursor.derived("program", source.data1, SemanticOperandRole::InstrumentProgram);
-    return event.invoke<&Playback::programChange>({source.channel, source.data1, source.delta});
+    return event.channel(source.channel).invoke<&Playback::programChange>({source.data1});
   }
   if (family == 0xe0) {
     const u16 value = static_cast<u16>((source.data2 << 7) | source.data1);
     cursor.derived("wheel", value);
-    return event.invoke<&Playback::pitchBend>({source.channel, value, source.delta});
+    return event.channel(source.channel).invoke<&Playback::pitchBend>({value});
   }
   if (source.status == 0xff && source.metaType == 0x51 && source.payload.size() == 3) {
     const u32 tempo =
         (static_cast<u32>(source.payload[0]) << 16) | (static_cast<u32>(source.payload[1]) << 8) | source.payload[2];
     cursor.derived("microseconds_per_quarter", tempo);
-    return event.invoke<&Playback::tempo>({tempo, source.delta});
+    return event.invoke<&Playback::tempo>({tempo});
   }
   if (source.endEvent) {
-    return event.wait(source.delta).end();
+    return event.end();
   }
-  return event.wait(source.delta);
+  return event;
 }
 
 struct SeEvent {
@@ -999,24 +970,29 @@ struct SeEvent {
   if (source.malformed) {
     return event.stop();
   }
+  event.delay(source.delta);
   if (note) {
     cursor.derived("set", source.set, SemanticOperandRole::InstrumentBank);
     cursor.derived("timbre", source.timbre, SemanticOperandRole::InstrumentProgram);
     cursor.derived("key", source.key, SourceValueDisplay::MidiNote);
     cursor.derived("velocity", source.velocity);
-    return event.invoke<&Playback::seNote>(
-        {source.set, source.timbre, source.key, source.velocity, source.noteOnOnly, source.delta});
+    // Voice selectors are seven-bit values; invalid selectors address no voice.
+    if (source.timbre >= 128 || source.key >= 128) {
+      return event;
+    }
+    return event.channel(seTrackNumber(source.set, source.timbre, source.key))
+        .invoke<&Playback::seNote>({source.key, source.velocity, source.noteOnOnly});
   }
   if (source.loopDestination) {
     const Address destination{*source.loopDestination};
     cursor.derived("loop_id", source.loopId);
     cursor.derived("repeat_count", source.loopCount);
     cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
-    return event.invokeFlow<&Playback::loop>({source.loopId, source.loopCount, destination, source.delta})
+    return event.invokeFlow<&Playback::loop>({source.loopId, source.loopCount, destination})
         .discoverTarget(destination);
   }
   if (source.endEvent) {
-    return event.wait(source.delta).end();
+    return event.end();
   }
   cursor.derived("set", source.set, SemanticOperandRole::InstrumentBank);
   cursor.derived("timbre", source.timbre, SemanticOperandRole::InstrumentProgram);
@@ -1026,14 +1002,14 @@ struct SeEvent {
     cursor.derived("time_ms", source.time);
   }
   cursor.derived("value", source.value);
-  if (pitchSlide) {
-    return event.invoke<&Playback::sePitch>({source.set, source.timbre, source.key, static_cast<u16>(source.value),
-                                             source.operation == 0x0f, source.time, source.delta});
+  if (pitchSlide && source.timbre < 128 && source.key < 128) {
+    return event.channel(seTrackNumber(source.set, source.timbre, source.key))
+        .invoke<&Playback::sePitch>({static_cast<u16>(source.value), source.operation == 0x0f, source.time});
   }
   // These commands target one active (set,timbre,note) voice. Emitting a
   // generic MIDI fade or LFO update would still lose driver-specific curve,
   // phase, and retargeting semantics, so retain those commands as source data.
-  return event.wait(source.delta);
+  return event;
 }
 
 }  // namespace
@@ -1093,7 +1069,7 @@ SequenceProgram parseMidiSequence(ByteReader reader, AssetId id, const MidiBlock
     }
     return decodeMidiEvent(reader, layout.dataEnd, *found->second, diagnostics);
   });
-  track.sourceTrackNumbers = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  track.streams = {{.channels = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}}};
   program.tracks.push_back(std::move(track));
   return program;
 }
@@ -1171,7 +1147,7 @@ struct ParsedSongTable {
           .range = reader.range(commandOffset, 3),
           .kind = PlaylistCommandKind::PlaySection,
           .target = Address{midi->dataOffset},
-          .trackStarts = std::vector<std::optional<Address>>(16, Address{midi->dataOffset}),
+          .streamStarts = {Address{midi->dataOffset}},
       });
       continue;
     }
@@ -1215,7 +1191,7 @@ struct ParsedSongTable {
   program.timebase.ppqn = layout.midiBlocks.front().ppqn;
   program.runtime = sequenceRuntime();
   TrackProgram track{
-      .sourceTrackNumbers = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+      .streams = {{.channels = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}}},
       .startAddress = Address{layout.midiBlocks.front().dataOffset},
   };
   for (const auto& block : layout.midiBlocks) {
@@ -1325,7 +1301,7 @@ std::optional<SequenceProgram> parseSeSequence(ByteReader reader, AssetId id, co
     }
     return decodeSeEvent(reader, layout.dataEnd, *found->second, diagnostics);
   });
-  decoded.sourceTrackNumbers = std::move(voices);
+  decoded.streams = {{.channels = std::move(voices)}};
   program.tracks.push_back(std::move(decoded));
   return program;
 }

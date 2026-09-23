@@ -220,8 +220,7 @@ struct ProgramState {
     }
 
     // Saturn stores one physical event stream whose status nibble selects one
-    // of sixteen channels. Each channel executes the shared commands with
-    // independent VM state. The extra track contains
+    // of sixteen channels. The channels share one executor. The extra track contains
     // the independent tempo stream; merge it into channel zero only after both
     // timelines have executed.
     PerformanceTrack tempo = std::move(performance.tracks.front());
@@ -270,22 +269,24 @@ struct ProgramState {
 };
 
 struct TrackState {
-  explicit TrackState(TrackStateContext program) : channel(static_cast<u8>(program.sourceTrackNumber)) {}
-
-  u8 channel = 0;
   u8 bank = 0;
   u8 program = 0;
+};
+
+struct StreamState {
   u32 durationExtension = 0;
   u32 remainingLoopEvents = 0;
   Address countedLoopEnd;
   std::optional<Address> foreverLoopStart;
 };
 
-struct Playback : SequencePlayback<TrackState> {
-  [[nodiscard]] Effects afterEvent(u16 delta) {
-    Effects effects = Effects::wait(delta);
-    if (track.remainingLoopEvents != 0 && --track.remainingLoopEvents == 0) {
-      effects.flowOverride = vm.finiteBranch(track.countedLoopEnd).flowOverride;
+struct Playback : SequencePlayback<TrackState, StreamState> {
+  void extendDuration(u32 ticks) { stream.durationExtension += ticks; }
+
+  [[nodiscard]] Effects afterEvent() {
+    Effects effects;
+    if (stream.remainingLoopEvents != 0 && --stream.remainingLoopEvents == 0) {
+      effects.flowOverride = vm.finiteBranch(stream.countedLoopEnd).flowOverride;
     }
     return effects;
   }
@@ -295,115 +296,108 @@ struct Playback : SequencePlayback<TrackState> {
     return Effects::wait(delta);
   }
 
-  Effects note(u8 channel, u8 key, u8 velocity, u16 duration, u16 delta) {
-    duration = static_cast<u16>(duration + track.durationExtension);
-    track.durationExtension = 0;
-    if (channel == track.channel) {
-      out.after(delta).note(key, LevelScale::linearFromMidi7(velocity), duration);
-    }
-    return afterEvent(delta);
+  Effects note(u8 key, u8 velocity, u16 duration) {
+    duration = static_cast<u16>(duration + stream.durationExtension);
+    stream.durationExtension = 0;
+    out.note(key, LevelScale::linearFromMidi7(velocity), duration);
+    return afterEvent();
   }
 
-  Effects controller(u8 channel, u8 controller, u8 value, u16 delta) {
-    if (channel == track.channel) {
-      auto delayed = out.after(delta);
-      switch (controller) {
-        case 1:
-          delayed.modulation(ModulationPerformanceTarget::VibratoDepth, value / 127.0);
-          break;
-        case 7:
-        case 11: {
-          u8 attenuation = static_cast<u8>(std::max(0, 254 - 2 * value));
-          if (attenuation != 0) {
-            --attenuation;
-          }
-          const double midiAmplitude = std::pow(10.0, -(attenuation * 0.37529) / 40.0);
-          const u8 converted = static_cast<u8>(std::clamp<long>(std::lround(midiAmplitude * 127.0), 0, 127));
-          if (controller == 7) {
-            delayed.level(LevelScale::linearFromMidi7(converted));
-          } else {
-            delayed.expression(LevelScale::linearFromMidi7(converted));
-          }
-          break;
+  Effects controller(u8 controller, u8 value) {
+    switch (controller) {
+      case 1:
+        out.modulation(ModulationPerformanceTarget::VibratoDepth, value / 127.0);
+        break;
+      case 7:
+      case 11: {
+        u8 attenuation = static_cast<u8>(std::max(0, 254 - 2 * value));
+        if (attenuation != 0) {
+          --attenuation;
         }
-        case 10: {
-          const u8 position = value >> 2;
-          const u8 encoded = position < 16 ? static_cast<u8>(31 - position) : static_cast<u8>(position - 16);
-          double attenuatedSide = 0.0;
-          if ((encoded & 0x0f) != 0x0f) {
-            attenuatedSide = std::pow(10.0, -(static_cast<double>(encoded & 0x0f) * 3.0) / 20.0);
-          }
-          if (encoded < 16) {
-            delayed.stereoBalance(attenuatedSide, 1.0);
-          } else {
-            delayed.stereoBalance(1.0, attenuatedSide);
-          }
-        } break;
-        case 32:
-          track.bank = value;
-          // The source command changes one register, but downstream targets
-          // need the complete effective selection. Emitting it atomically also
-          // activates the new bank when the program number itself is unchanged.
-          delayed.instrument(segSatInstrumentIdentity(track.bank, track.program));
-          break;
-        case 91:
-          delayed.reverb(value / 127.0);
-          break;
-        default:
-          // The decoded command remains visible in the source map. The
-          // target-neutral performance model intentionally has no raw,
-          // destination-MIDI controller event for the remaining values.
-          break;
+        const double midiAmplitude = std::pow(10.0, -(attenuation * 0.37529) / 40.0);
+        const u8 converted = static_cast<u8>(std::clamp<long>(std::lround(midiAmplitude * 127.0), 0, 127));
+        if (controller == 7) {
+          out.level(LevelScale::linearFromMidi7(converted));
+        } else {
+          out.expression(LevelScale::linearFromMidi7(converted));
+        }
+        break;
       }
+      case 10: {
+        const u8 position = value >> 2;
+        const u8 encoded = position < 16 ? static_cast<u8>(31 - position) : static_cast<u8>(position - 16);
+        double attenuatedSide = 0.0;
+        if ((encoded & 0x0f) != 0x0f) {
+          attenuatedSide = std::pow(10.0, -(static_cast<double>(encoded & 0x0f) * 3.0) / 20.0);
+        }
+        if (encoded < 16) {
+          out.stereoBalance(attenuatedSide, 1.0);
+        } else {
+          out.stereoBalance(1.0, attenuatedSide);
+        }
+      } break;
+      case 32:
+        track.bank = value;
+        // The source command changes one register, but downstream targets
+        // need the complete effective selection. Emitting it atomically also
+        // activates the new bank when the program number itself is unchanged.
+        out.instrument(segSatInstrumentIdentity(track.bank, track.program));
+        break;
+      case 91:
+        out.reverb(value / 127.0);
+        break;
+      default:
+        // The decoded command remains visible in the source map. The
+        // target-neutral performance model intentionally has no raw,
+        // destination-MIDI controller event for the remaining values.
+        break;
     }
-    return afterEvent(delta);
+    return afterEvent();
   }
 
-  Effects programChange(u8 channel, u8 encodedProgram, u16 delta) {
+  Effects programChange(u8 encodedProgram) {
     // The driver rejects MIDI-like events whose first data byte has bit 7 set
     // (mm8audio.bin reads_from_seq at 0x580e). These bytes occur in real
     // streams and must not change the active instrument.
-    if ((encodedProgram & 0x80) == 0 && channel == track.channel) {
+    if ((encodedProgram & 0x80) == 0) {
       track.program = encodedProgram;
-      out.after(delta).instrument(segSatInstrumentIdentity(track.bank, track.program));
+      out.instrument(segSatInstrumentIdentity(track.bank, track.program));
     }
-    return afterEvent(delta);
+    return afterEvent();
   }
 
-  Effects channelPressure(u8, u16 delta) { return afterEvent(delta); }
-
-  Effects pitchBend(u8 channel, u8 encoded, u16 delta) {
-    if ((encoded & 0x80) == 0 && channel == track.channel) {
+  Effects pitchBend(u8 encoded) {
+    if ((encoded & 0x80) == 0) {
       const s16 bend = static_cast<s16>((static_cast<s32>(encoded) << 7) - 8192);
       const double wheelPosition = bend / 8192.0;
-      out.after(delta).pitchBend(PitchBendPerformanceEvent{
+      out.pitchBend(PitchBendPerformanceEvent{
           .semitones = wheelPosition * 2.0,
           .normalizedWheelPosition = wheelPosition,
       });
     }
-    return afterEvent(delta);
+    return afterEvent();
   }
 
   Effects beginCountedLoop(Address destination, u8 eventCount, Address continuation) {
-    if (track.remainingLoopEvents != 0) {
+    if (stream.remainingLoopEvents != 0) {
       vm.diagnostic(Diagnostic{
           .severity = Severity::Warning,
           .message = "Nested SegSat counted loop stopped playback",
       });
       return vm.end();
     }
-    track.remainingLoopEvents = eventCount;
-    track.countedLoopEnd = continuation;
+    stream.remainingLoopEvents = eventCount;
+    stream.countedLoopEnd = continuation;
     return vm.finiteBranch(destination);
   }
 
-  Effects foreverLoop(u8 delta, Address continuation) {
-    Effects effects = Effects::wait(delta);
-    if (!track.foreverLoopStart) {
-      track.foreverLoopStart = continuation;
+  Effects foreverLoop(Address continuation) {
+    Effects effects;
+    if (!stream.foreverLoopStart) {
+      stream.foreverLoopStart = continuation;
       return effects;
     }
-    effects.flowOverride = vm.declaredLoop(*track.foreverLoopStart).flowOverride;
+    effects.flowOverride = vm.declaredLoop(*stream.foreverLoopStart).flowOverride;
     return effects;
   }
 };
@@ -453,7 +447,7 @@ struct DecodedControllerChange {
     const u8 velocity = cursor.u8("velocity");
     const u16 duration = durationHigh | cursor.u8("duration_low");
     const u16 delta = deltaHigh | cursor.u8("delta_low");
-    return event.invokeFlow<&Playback::note>({channel, key, velocity, duration, delta});
+    return event.channel(channel).delay(delta).invokeFlow<&Playback::note>({key, velocity, duration});
   }
 
   if ((status & 0xf0) == 0xb0) {
@@ -471,7 +465,7 @@ struct DecodedControllerChange {
           .value = value,
       });
     }
-    return event.invokeFlow<&Playback::controller>({channel, controller, value, delta});
+    return event.channel(channel).delay(delta).invokeFlow<&Playback::controller>({controller, value});
   }
 
   if ((status & 0xf0) == 0xc0) {
@@ -480,15 +474,15 @@ struct DecodedControllerChange {
     const u8 encodedProgram = cursor.u8("encoded_program");
     cursor.derived("program", static_cast<u8>(encodedProgram & 0x7f), SemanticOperandRole::InstrumentProgram);
     const u16 delta = cursor.u8("delta");
-    return event.invokeFlow<&Playback::programChange>({channel, encodedProgram, delta});
+    return event.channel(channel).delay(delta).invokeFlow<&Playback::programChange>({encodedProgram});
   }
 
   if ((status & 0xf0) == 0xd0) {
     auto event = cursor.command("Channel Pressure", SequenceSemantic::State);
     cursor.opcodeBits<0, 4>("channel", SemanticOperandRole::Channel);
-    const u8 pressure = cursor.u8("pressure");
+    cursor.u8("pressure");
     const u16 delta = cursor.u8("delta");
-    return event.invokeFlow<&Playback::channelPressure>({pressure, delta});
+    return event.delay(delta).invokeFlow<&Playback::afterEvent>({});
   }
 
   if ((status & 0xf0) == 0xe0) {
@@ -497,7 +491,7 @@ struct DecodedControllerChange {
     const u8 encodedBend = cursor.u8("encoded_bend");
     cursor.derived("bend", static_cast<u8>(encodedBend & 0x7f));
     const u16 delta = cursor.u8("delta");
-    return event.invokeFlow<&Playback::pitchBend>({channel, encodedBend, delta});
+    return event.channel(channel).delay(delta).invokeFlow<&Playback::pitchBend>({encodedBend});
   }
 
   switch (status) {
@@ -514,25 +508,25 @@ struct DecodedControllerChange {
       auto event = cursor.command("Forever Loop", SequenceSemantic::Loop);
       const u8 delta = cursor.u8("delta");
       const Address continuation = cursor.nextAddress();
-      return event.invokeFlow<&Playback::foreverLoop>({delta, continuation});
+      return event.delay(delta).invokeFlow<&Playback::foreverLoop>({continuation});
     }
     case 0x83:
       return cursor.command("End", SequenceSemantic::End).end();
     case 0x87:
       return cursor.command("Extend Duration by 256", SequenceSemantic::State)
-          .add<&TrackState::durationExtension>(256u);
+          .invoke<&Playback::extendDuration>({256u});
     case 0x88:
       return cursor.command("Extend Duration by 512", SequenceSemantic::State)
-          .add<&TrackState::durationExtension>(512u);
+          .invoke<&Playback::extendDuration>({512u});
     case 0x89:
       return cursor.command("Extend Duration by 2048", SequenceSemantic::State)
-          .add<&TrackState::durationExtension>(2048u);
+          .invoke<&Playback::extendDuration>({2048u});
     case 0x8a:
       return cursor.command("Extend Duration by 4096", SequenceSemantic::State)
-          .add<&TrackState::durationExtension>(4096u);
+          .invoke<&Playback::extendDuration>({4096u});
     case 0x8b:
       return cursor.command("Extend Duration by 8192", SequenceSemantic::State)
-          .add<&TrackState::durationExtension>(8192u);
+          .invoke<&Playback::extendDuration>({8192u});
     case 0x8c:
       return cursor.command("Rest 256", SequenceSemantic::Rest).wait(256u);
     case 0x8d:
@@ -690,7 +684,7 @@ SegSatSequenceParse parseSegSatSequence(ByteReader reader, AssetId id, const Seg
   };
   const u32 tempoStart = layout.offset + 8;
   TrackProgram tempo{
-      .sourceTrackNumbers = {0},
+      .streams = {{.channels = {0}}},
       .startAddress = Address{tempoStart},
   };
   if (layout.tempoEventCount != 0) {
@@ -724,7 +718,7 @@ SegSatSequenceParse parseSegSatSequence(ByteReader reader, AssetId id, const Seg
   std::ranges::sort(controllerChanges, {}, &SegSatControllerChange::command);
   const auto duplicate = std::ranges::unique(controllerChanges, {}, &SegSatControllerChange::command);
   controllerChanges.erase(duplicate.begin(), duplicate.end());
-  normal.sourceTrackNumbers = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  normal.streams = {{.channels = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}}};
   program.tracks.push_back(std::move(normal));
   program.runtime = makeCompiledRuntime<Playback, ProgramState>();
 

@@ -1416,9 +1416,9 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, SectionPla
       starts.push_back(Address{address});
     }
     for (const auto& section : playlist.commands) {
-      if (section.kind == PlaylistCommandKind::PlaySection && track < section.trackStarts.size() &&
-          section.trackStarts[track]) {
-        starts.push_back(*section.trackStarts[track]);
+      if (section.kind == PlaylistCommandKind::PlaySection && track < section.streamStarts.size() &&
+          section.streamStarts[track]) {
+        starts.push_back(*section.streamStarts[track]);
       }
     }
     program.tracks.push_back(scope.decode(

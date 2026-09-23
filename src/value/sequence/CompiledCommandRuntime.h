@@ -55,13 +55,21 @@ template <class State, class Context, class Config>
 template <class Playback, class ProgramState = EmptyCompiledProgramState>
 struct CompiledCommandRuntime {
   using TrackState = typename Playback::TrackState;
+  using StreamState = typename Playback::StreamState;
 
   template <class Execute>
   [[nodiscard]] static decltype(auto) withPlayback(std::any& programState, std::any& trackState,
                                                    PerformanceEmitter& out, VmApi& vm, Execute execute) {
     auto& typedProgramState = std::any_cast<ProgramState&>(programState);
     auto& typedTrackState = std::any_cast<TrackState&>(trackState);
-    const SequencePlayback<TrackState> context{typedTrackState, out, vm};
+    const auto context = [&] {
+      if constexpr (std::is_void_v<StreamState>) {
+        return SequencePlayback<TrackState>{typedTrackState, out, vm};
+      } else {
+        return SequencePlayback<TrackState, StreamState>{{typedTrackState, out, vm},
+                                                         std::any_cast<StreamState&>(vm.streamState())};
+      }
+    }();
     // Playback may also borrow song-wide state alongside its execution context.
     if constexpr (requires { Playback{context, typedProgramState}; }) {
       Playback playback{context, typedProgramState};
@@ -77,8 +85,8 @@ struct CompiledCommandRuntime {
   [[nodiscard]] static Effects execute(const SourceCommand& command, std::any& programState, std::any& trackState,
                                        PerformanceEmitter& out, VmApi& vm) {
     return withPlayback(programState, trackState, out, vm, [&](Playback& playback) {
-      // Formats use this optional hook for information that must be emitted
-      // before whichever command happens to be first.
+      // Per-command driver work runs at execution time. beginSection handles
+      // startup output that must precede the first command's delay.
       if constexpr (requires { playback.beforeCommand(); }) {
         playback.beforeCommand();
       }
@@ -102,6 +110,12 @@ struct CompiledCommandRuntime {
   static void installHooks(SequenceRuntime& runtime) {
     runtime.execute = execute;
     runtime.readyDuringWait = readyDuringWait;
+    if constexpr (requires(Playback& playback) { playback.beginSection(); }) {
+      runtime.beginPlaybackSection = [](const SourceCommand&, std::any& programState, std::any& trackState,
+                                        PerformanceEmitter& out, VmApi& vm) {
+        withPlayback(programState, trackState, out, vm, [](Playback& playback) { playback.beginSection(); });
+      };
+    }
     if constexpr (requires(Playback& playback) { playback.tick(); }) {
       // Rebuild the lightweight view so fades use the current emitter and VM position.
       runtime.tick = [](const SourceCommand&, std::any& programState, std::any& trackState, PerformanceEmitter& out,
@@ -115,6 +129,11 @@ struct CompiledCommandRuntime {
     }
     if constexpr (requires(TrackState& state) { state.beginSection(); }) {
       runtime.beginTrackSection = [](std::any& state) { std::any_cast<TrackState&>(state).beginSection(); };
+    }
+    if constexpr (!std::is_void_v<StreamState>) {
+      if constexpr (requires(StreamState& state) { state.beginSection(); }) {
+        runtime.beginStreamSection = [](std::any& state) { std::any_cast<StreamState&>(state).beginSection(); };
+      }
     }
     if constexpr (requires(ProgramState& state, PerformanceSequence& performance) {
                     state.finalizePerformance(performance);
@@ -138,6 +157,11 @@ template <class Playback, class ProgramState = EmptyCompiledProgramState>
   runtime.createTrackState = [](TrackStateContext context) {
     return detail::createCompiledState<typename Playback::TrackState>(context);
   };
+  if constexpr (!std::is_void_v<typename Playback::StreamState>) {
+    runtime.createStreamState = [](TrackStateContext context) {
+      return detail::createCompiledState<typename Playback::StreamState>(context);
+    };
+  }
   Compiled::installHooks(runtime);
   return runtime;
 }
@@ -148,12 +172,15 @@ template <class Playback, class ProgramState = EmptyCompiledProgramState, class 
 [[nodiscard]] SequenceRuntime makeCompiledRuntime(Config config) {
   using Compiled = CompiledCommandRuntime<Playback, ProgramState>;
   using TrackState = typename Playback::TrackState;
+  using StreamState = typename Playback::StreamState;
   constexpr bool programConsumesConfig = std::constructible_from<ProgramState, const SequenceProgram&, const Config&> ||
                                          std::constructible_from<ProgramState, const Config&>;
   constexpr bool trackConsumesConfig = std::constructible_from<TrackState, const TrackStateContext&, const Config&> ||
                                        std::constructible_from<TrackState, const Config&>;
-  static_assert(programConsumesConfig || trackConsumesConfig,
-                "A supplied runtime Config must be consumed by ProgramState or TrackState");
+  constexpr bool streamConsumesConfig = std::constructible_from<StreamState, const TrackStateContext&, const Config&> ||
+                                        std::constructible_from<StreamState, const Config&>;
+  static_assert(programConsumesConfig || trackConsumesConfig || streamConsumesConfig,
+                "A supplied runtime Config must be consumed by program, stream, or channel state");
   SequenceRuntime runtime;
   auto settings = std::make_shared<const Config>(std::move(config));
   runtime.createProgramState = [settings](const SequenceProgram& sequence) {
@@ -162,6 +189,11 @@ template <class Playback, class ProgramState = EmptyCompiledProgramState, class 
   runtime.createTrackState = [settings](TrackStateContext context) {
     return detail::createCompiledState<TrackState>(context, *settings);
   };
+  if constexpr (!std::is_void_v<StreamState>) {
+    runtime.createStreamState = [settings](TrackStateContext context) {
+      return detail::createCompiledState<StreamState>(context, *settings);
+    };
+  }
   Compiled::installHooks(runtime);
   return runtime;
 }

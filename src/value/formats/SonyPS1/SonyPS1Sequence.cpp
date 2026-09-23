@@ -39,7 +39,6 @@ struct TrackState {
   u8 rpnMsb = 127;
   u8 rpnLsb = 127;
   u8 pitchBendRange = 2;
-  bool initialized = false;
 };
 
 struct PanGains {
@@ -60,74 +59,60 @@ struct PanGains {
 struct Playback : SequencePlayback<TrackState> {
   const RuntimeConfig& config;
 
-  void beforeCommand() {
-    if (track.initialized) {
-      return;
-    }
-    track.initialized = true;
+  void beginSection() {
     out.instrument(sonyPs1InstrumentIdentity(track.bank, track.program));
     if (track.channel == 0) {
       out.timeSignature(config.numerator, config.denominator, 24);
     }
   }
 
-  Effects note(u8 channel, u8 key, u8 velocity, u32 delta) {
-    if (channel != track.channel) {
-      return Effects::wait(delta);
-    }
-    auto delayed = out.after(delta);
+  void note(u8 key, u8 velocity) {
     if (velocity == 0) {
-      delayed.noteOff(key);
-      return Effects::wait(delta);
+      out.noteOff(key);
+      return;
     }
-    delayed.noteOn(key, LevelScale::linearFromMidi7(std::min<u8>(velocity, 127)));
-    return Effects::wait(delta);
+    out.noteOn(key, LevelScale::linearFromMidi7(std::min<u8>(velocity, 127)));
   }
 
-  Effects program(u8 channel, u8 value, u32 delta) {
-    if (channel == track.channel && value < 128) {
+  void program(u8 value) {
+    if (value < 128) {
       track.program = value;
-      out.after(delta).instrument(sonyPs1InstrumentIdentity(track.bank, track.program));
+      out.instrument(sonyPs1InstrumentIdentity(track.bank, track.program));
     }
-    return Effects::wait(delta);
   }
 
-  Effects controller(u8 channel, u8 controller, u8 value, u32 delta) {
-    if (channel != track.channel) {
-      return Effects::wait(delta);
-    }
-    auto delayed = out.after(delta);
+  void controller(u8 controller, u8 value) {
     switch (controller) {
       case 0:
         track.bank = value;
-        delayed.instrument(sonyPs1InstrumentIdentity(track.bank, track.program));
+        out.instrument(sonyPs1InstrumentIdentity(track.bank, track.program));
         break;
       case 1:
-        delayed.modulation(ModulationPerformanceTarget::VibratoDepth, value / 127.0);
+        out.modulation(ModulationPerformanceTarget::VibratoDepth, value / 127.0);
         break;
       case 6:
         if (track.rpnMsb == 0 && track.rpnLsb == 0) {
           track.pitchBendRange = value;
-          delayed.pitchBendRange(value);
+          out.pitchBendRange(value);
         }
         break;
       case 7:
-        delayed.level(LevelScale::linearFromMidi7(value));
+        out.level(LevelScale::linearFromMidi7(value));
         break;
       case 10: {
         const PanGains pan = psxPan(value);
-        delayed.stereoBalance(pan.left, pan.right);
+        out.stereoBalance(pan.left, pan.right);
         break;
       }
       case 11:
-        delayed.expression(LevelScale::linearFromMidi7(value));
+        out.expression(LevelScale::linearFromMidi7(value));
         break;
       case 64: {
-        delayed.sustainPedal(value >= 64);
+        out.sustainPedal(value >= 64);
         break;
       }
       case 91:
-        delayed.reverb(value / 127.0);
+        out.reverb(value / 127.0);
         break;
       case 98:
         track.rpnMsb = 127;
@@ -147,48 +132,42 @@ struct Playback : SequencePlayback<TrackState> {
         track.bank = 0;
         track.program = track.channel;
         track.pitchBendRange = 2;
-        delayed.sustainPedal(false);
-        delayed.instrument(sonyPs1InstrumentIdentity(track.bank, track.program));
-        delayed.level(1.0);
-        delayed.expression(1.0);
-        delayed.stereoBalance(1.0, 1.0);
-        delayed.pitchBend(0.0);
-        delayed.pitchBendRange(2);
+        out.sustainPedal(false);
+        out.instrument(sonyPs1InstrumentIdentity(track.bank, track.program));
+        out.level(1.0);
+        out.expression(1.0);
+        out.stereoBalance(1.0, 1.0);
+        out.pitchBend(0.0);
+        out.pitchBendRange(2);
         break;
       default:
         break;
     }
-    return Effects::wait(delta);
   }
 
-  Effects pitchBend(u8 channel, u8 msb, u32 delta) {
-    if (channel == track.channel) {
-      // All three audited libsnd generations discard the MIDI LSB and use the
-      // high seven bits as their signed wheel position.
-      const double wheel = std::clamp((static_cast<int>(msb) - 64) / 64.0, -1.0, 1.0);
-      out.after(delta).pitchBend(PitchBendPerformanceEvent{
-          .semitones = wheel * track.pitchBendRange,
-          .normalizedWheelPosition = wheel,
-      });
+  void pitchBend(u8 msb) {
+    // All three audited libsnd generations discard the MIDI LSB and use the
+    // high seven bits as their signed wheel position.
+    const double wheel = std::clamp((static_cast<int>(msb) - 64) / 64.0, -1.0, 1.0);
+    out.pitchBend(PitchBendPerformanceEvent{
+        .semitones = wheel * track.pitchBendRange,
+        .normalizedWheelPosition = wheel,
+    });
+  }
+
+  void tempo(u32 microsecondsPerQuarter) {
+    if (microsecondsPerQuarter != 0) {
+      out.tempo(microsecondsPerQuarter);
     }
-    return Effects::wait(delta);
   }
 
-  Effects tempo(u32 microsecondsPerQuarter, u32 delta) {
-    if (track.channel == 0 && microsecondsPerQuarter != 0) {
-      out.after(delta).tempo(microsecondsPerQuarter);
-    }
-    return Effects::wait(delta);
-  }
-
-  Effects loopEnd(u8 count, Address destination, u32 delta) {
-    Effects effects = Effects::wait(delta);
+  Effects loopEnd(u8 count, Address destination) {
     if (count == 127) {
-      effects.flowOverride = vm.declaredLoop(destination).flowOverride;
+      return vm.declaredLoop(destination);
     } else if (count > 1) {
-      effects.flowOverride = vm.countedRepeatUntil(0, count, destination).flowOverride;
+      return vm.countedRepeatUntil(0, count, destination);
     }
-    return effects;
+    return {};
   }
 };
 
@@ -198,6 +177,7 @@ using Cursor = CompilerCursor<Playback>;
                                        SequenceSemantic semantic,
                                        CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback) {
   auto event = cursor.command(label, semantic, playback);
+  event.delay(source.delta);
   cursor.opcodeValue("delta_byte_0", cursor.opcode(), SourceValueDisplay::Hex);
   for (u32 i = 1; i < source.deltaSize; ++i) {
     cursor.u8("delta_byte", SourceValueDisplay::Hex);
@@ -225,13 +205,13 @@ using Cursor = CompilerCursor<Playback>;
   const u8 channel = source.status & 0x0f;
   if (family == 0x90) {
     return beginEvent(cursor, source, source.data2 == 0 ? "Note Off" : "Note On", SequenceSemantic::Note)
-        .invoke<&Playback::note>(
-            {channel, cursor.u8("key", SourceValueDisplay::MidiNote), cursor.u8("velocity"), source.delta});
+        .channel(channel)
+        .invoke<&Playback::note>({cursor.u8("key", SourceValueDisplay::MidiNote), cursor.u8("velocity")});
   }
   if (family == 0xc0) {
     return beginEvent(cursor, source, "Program Change", SequenceSemantic::Program)
-        .invoke<&Playback::program>(
-            {channel, cursor.u8("program", SemanticOperandRole::InstrumentProgram), source.delta});
+        .channel(channel)
+        .invoke<&Playback::program>({cursor.u8("program", SemanticOperandRole::InstrumentProgram)});
   }
   if (family == 0xe0) {
     auto event = beginEvent(cursor, source, "Pitch Bend", SequenceSemantic::Pitch);
@@ -239,7 +219,7 @@ using Cursor = CompilerCursor<Playback>;
     const u8 msb = cursor.u8("msb");
     cursor.derived("driver_wheel", static_cast<s16>((static_cast<int>(msb) - 64) * 128),
                    SourceValueDisplay::SignedDecimal);
-    return event.invoke<&Playback::pitchBend>({channel, msb, source.delta});
+    return event.channel(channel).invoke<&Playback::pitchBend>({msb});
   }
   if (family == 0xb0) {
     const bool loopStart = source.data1 == 99 && source.data2 == 20;
@@ -259,10 +239,10 @@ using Cursor = CompilerCursor<Playback>;
       const Address destination{*source.loopDestination};
       cursor.derived("repeat_count", source.loopCount);
       cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
-      event.invoke<&Playback::loopEnd>({source.loopCount, destination, source.delta}).discoverTarget(destination);
+      event.invoke<&Playback::loopEnd>({source.loopCount, destination}).discoverTarget(destination);
       return event;
     }
-    return event.invoke<&Playback::controller>({channel, controller, value, source.delta});
+    return event.channel(channel).invoke<&Playback::controller>({controller, value});
   }
   if (source.status == 0xff && source.data1 == 0x51) {
     auto event = beginEvent(cursor, source, "Tempo", SequenceSemantic::Tempo);
@@ -272,7 +252,7 @@ using Cursor = CompilerCursor<Playback>;
     const u8 low = cursor.u8("tempo_low");
     const u32 tempo = (static_cast<u32>(high) << 16) | (static_cast<u32>(middle) << 8) | low;
     cursor.derived("microseconds_per_quarter", tempo);
-    return event.invoke<&Playback::tempo>({tempo, source.delta});
+    return event.invoke<&Playback::tempo>({tempo});
   }
   if (source.status == 0xff && source.data1 == 0x2f) {
     auto event =
@@ -281,7 +261,7 @@ using Cursor = CompilerCursor<Playback>;
     if (source.dataBytes > 1) {
       cursor.u8("terminator", SourceValueDisplay::Hex);
     }
-    return event.wait(source.delta).end();
+    return event.end();
   }
   return cursor.unsupported("Unsupported Sony PS1 Event").stop();
 }
@@ -368,7 +348,7 @@ SequenceProgram parseSonyPs1Sequence(ByteReader reader, AssetId id, const SonyPs
     }
     return decoded;
   });
-  track.sourceTrackNumbers = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  track.streams = {{.channels = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}}};
   sequence.addTrack(std::move(track));
   return sequence.finish(std::move(runtime));
 }

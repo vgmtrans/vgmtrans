@@ -30,7 +30,7 @@ struct ActiveNoteState {
   bool sustain = false;
 };
 
-class VmTrackExecutor;
+class VmStreamExecutor;
 [[nodiscard]] std::any analyzeSequenceProgram(const SequenceVm& vm, const SequenceProgram& program,
                                               std::vector<Diagnostic>* diagnostics);
 }  // namespace detail
@@ -343,23 +343,38 @@ public:
   void diagnostic(Diagnostic diagnostic);
 
 private:
-  friend class detail::VmTrackExecutor;
+  friend class detail::VmStreamExecutor;
+  template <class, class>
+  friend struct CompiledCommandRuntime;
 
-  VmApi(detail::VmTrackExecutor& executor, const SourceCommand& command);
+  VmApi(detail::VmStreamExecutor& executor, const SourceCommand& command);
+  [[nodiscard]] std::any& streamState() const noexcept;
 
-  detail::VmTrackExecutor& executor_;
+  detail::VmStreamExecutor& executor_;
   const SourceCommand& command_;
 };
 
 // Borrowed context for a format's Playback methods. SequenceVm supplies the
 // current emitter and VM position each time it invokes a command or tick.
+template <class TrackStateType, class StreamStateType = void>
+struct SequencePlayback;
+
 template <class TrackStateType>
-struct SequencePlayback {
+struct SequencePlayback<TrackStateType, void> {
   using TrackState = TrackStateType;
+  using StreamState = void;
 
   TrackState& track;
   PerformanceEmitter& out;
   VmApi& vm;
+};
+
+// Interleaved formats can retain source-wide state independently of the channel
+// selected by a command. Ordinary formats need only the context above.
+template <class TrackStateType, class StreamStateType>
+struct SequencePlayback : SequencePlayback<TrackStateType> {
+  using StreamState = StreamStateType;
+  StreamState& stream;
 };
 
 struct SequenceVmOptions {
@@ -369,7 +384,7 @@ struct SequenceVmOptions {
 };
 
 // SequenceVm turns a parsed source-driver program into target-neutral performance events.
-// Tracks are globally scheduled by (tick, stable track order), which matches
+// Streams are globally scheduled by (tick, stable stream order), which matches
 // multi-channel driver execution and gives them one program-wide runtime state.
 // MIDI or other exporters consume the resulting PerformanceSequence later.
 class SequenceVm {

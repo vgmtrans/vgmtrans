@@ -1453,12 +1453,12 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   for (u8 track = 0; track < layout.trackCount(); ++track) {
     std::vector<Address> starts;
     for (const PlaylistCommand& command : program.sectionPlaylist->commands) {
-      if (command.kind == PlaylistCommandKind::PlaySection && track < command.trackStarts.size() &&
-          command.trackStarts[track] &&
+      if (command.kind == PlaylistCommandKind::PlaySection && track < command.streamStarts.size() &&
+          command.streamStarts[track] &&
           std::ranges::find_if(starts, [&](Address address) {
-            return address.value == command.trackStarts[track]->value;
+            return address.value == command.streamStarts[track]->value;
           }) == starts.end()) {
-        starts.push_back(*command.trackStarts[track]);
+        starts.push_back(*command.streamStarts[track]);
       }
     }
     program.tracks.push_back(decodeTrack(reader, track, starts, context, sequenceId, playlist.annotation, sourceMap));

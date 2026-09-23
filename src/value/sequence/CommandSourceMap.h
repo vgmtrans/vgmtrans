@@ -83,7 +83,7 @@ struct TrackDecodeScope {
   [[nodiscard]] TrackProgram decode(u32 trackIndex, std::span<const Address> startAddresses,
                                     DecodeCommand decodeCommand) const {
     if (startAddresses.empty()) {
-      return TrackProgram{.sourceTrackNumbers = {trackIndex}};
+      return TrackProgram{.streams = {{.channels = {trackIndex}}}};
     }
     auto session = begin(trackIndex, startAddresses.front().value);
     const u64 end = std::min<u64>(reader.size(), bytecodeEnd);

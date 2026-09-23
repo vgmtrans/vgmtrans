@@ -10,7 +10,6 @@
 #include "value/sequence/CompilerCursor.h"
 
 #include <algorithm>
-#include <numeric>
 #include <array>
 #include <cmath>
 #include <limits>
@@ -835,9 +834,11 @@ SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetI
       0, layout.sequenceAddress,
       [&](u32 offset) { return decodeCommand(reader, offset, diagnostics, references); }));
   program.runtime = makeCompiledRuntime<Playback, ProgramState>(DriverData{std::move(source), layout});
-  auto& numbers = program.tracks.front().sourceTrackNumbers;
-  numbers.resize(kTrackCount);
-  std::iota(numbers.begin(), numbers.end(), 0u);
+  auto& streams = program.tracks.front().streams;
+  streams.resize(kTrackCount);
+  for (u32 number = 0; number < kTrackCount; ++number) {
+    streams[number].channels = {number};
+  }
   return SequenceParse{
       .program = std::move(program),
       .srcns = std::move(references.srcns),

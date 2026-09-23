@@ -1232,7 +1232,7 @@ SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetI
         return static_cast<SfxPlayback*>(playback)->play();
       };
       program.tracks.push_back(TrackProgram{
-          .sourceTrackNumbers = {index},
+          .streams = {{.channels = {index}}},
           .startAddress = commandAddress,
           .annotation = trackAnnotation,
           .commands = {std::move(command)},

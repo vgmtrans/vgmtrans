@@ -223,7 +223,8 @@ TrackProgram decodeTestTrack(ByteReader reader, u32 sequenceOffset, u32 sequence
   const SequenceProgramAsset asset =
       decodeTestProgram(reader, sequenceOffset, sequenceEnd, recoverMalformedSdatRange, sourceMap, diagnostics);
   const auto track = std::ranges::find_if(asset.program.tracks, [&](const TrackProgram& candidate) {
-    return candidate.sourceTrackNumbers == std::vector<u32>{trackIndex} && candidate.startAddress.value == startOffset;
+    return candidate.streams.size() == 1 && candidate.streams.front().channels == std::vector<u32>{trackIndex} &&
+           candidate.startAddress.value == startOffset;
   });
   if (track == asset.program.tracks.end()) {
     throw std::runtime_error("NDS test sequence did not contain the requested track");
@@ -1068,7 +1069,8 @@ void ndsSequenceDiscoversSecondaryTrackAddresses() {
          "NDS SSEQ bootstrap should discover both track starts without becoming part of the primary track");
   const TrackProgram& secondary = asset.program.tracks[1];
   const SourceMap annotations = sourceMap.finish();
-  expect(secondary.sourceTrackNumbers == std::vector<u32>{1} && secondary.commands.size() == 2,
+  expect(secondary.streams.size() == 1 && secondary.streams.front().channels == std::vector<u32>{1} &&
+             secondary.commands.size() == 2,
          "NDS secondary track should decode independently from the primary bootstrap");
   expect(commandKind(annotations, secondary.commands[0]) == "nds.rest",
          "NDS secondary track should preserve decoded source commands");

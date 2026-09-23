@@ -214,9 +214,11 @@ void assets(Context& context, Args args) {
     context.out << "  PPQN: " << sequence->program.timebase.ppqn << '\n';
     for (size_t i = 0; i < sequence->program.tracks.size(); ++i) {
       const auto& track = sequence->program.tracks[i];
-      context.out << fmt::format("  track {} | source tracks {} | 0x{:x} | {} commands | {}\n", i,
-                                 fmt::join(track.sourceTrackNumbers, ","), track.startAddress.value,
+      context.out << fmt::format("  track {} | 0x{:x} | {} commands | {}\n", i, track.startAddress.value,
                                  track.commands.size(), track.name);
+      for (size_t j = 0; j < track.streams.size(); ++j) {
+        context.out << fmt::format("    stream {} | channels {}\n", j, fmt::join(track.streams[j].channels, ","));
+      }
     }
   } else if (const auto* bank = std::get_if<SoundBankAsset>(&value)) {
     context.out << fmt::format("  {} instruments, {} local samples\n", bank->instruments.size(),

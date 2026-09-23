@@ -5208,7 +5208,7 @@ int smokeRareSnesDirectExports(const std::filesystem::path& path) {
         ++auditedCommands;
         if (command.semantic == SequenceSemantic::Unsupported) {
           std::cout << "RareSnes unsupported command in '" << collection.name
-                    << "': track=" << track.sourceTrackNumbers.front() << " address=0x" << std::hex
+                    << "': track=" << track.streams.front().channels.front() << " address=0x" << std::hex
                     << command.address.value << " opcode=0x" << static_cast<u32>(command.opcode) << std::dec << "\n";
           return 1;
         }

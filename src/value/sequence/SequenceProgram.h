@@ -39,6 +39,10 @@ enum class PitchTransitionRenderingHint {
 struct SequenceRuntime {
   std::function<std::any(const SequenceProgram&)> createProgramState;
   std::function<std::any(TrackStateContext)> createTrackState;
+  std::function<std::any(TrackStateContext)> createStreamState;
+  // Runs for each channel at stream/section entry, before its first command delay.
+  void (*beginPlaybackSection)(const SourceCommand&, std::any& programState, std::any& trackState,
+                               PerformanceEmitter& out, VmApi& vm) = nullptr;
   // The typed executor identifies the Playback/ProgramState family even when
   // state factories capture different immutable settings.
   Effects (*execute)(const SourceCommand&, std::any& programState, std::any& trackState,
@@ -49,6 +53,7 @@ struct SequenceRuntime {
                 PerformanceEmitter& out, VmApi& vm) = nullptr;
   void (*finishPrepass)(std::any& programState) = nullptr;
   void (*beginTrackSection)(std::any& trackState) = nullptr;
+  void (*beginStreamSection)(std::any& streamState) = nullptr;
   void (*finalizePerformance)(std::any& programState, PerformanceSequence& performance) = nullptr;
 
   [[nodiscard]] bool valid() const noexcept { return execute != nullptr; }
@@ -154,6 +159,10 @@ struct CommandExecution {
   // Cursor helpers compose their operations while decoding. The durable source
   // command retains only the resulting body, not an inspectable micro-program.
   CommandBody body;
+  // Musical destination, independent of a command's source annotation. Empty
+  // selects the stream's first channel for global commands and ordinary tracks.
+  // An undeclared channel skips the body, retaining the command's delay and flow.
+  std::optional<u32> channel;
   // Some drivers poll the next command while the current wait is still active.
   // The predicate reads Playback state; SequenceVm provides the polling timing.
   bool (*duringWait)(void* playback) = nullptr;
@@ -190,10 +199,15 @@ struct SourceCommandRef {
   friend bool operator==(SourceCommandRef, SourceCommandRef) noexcept = default;
 };
 
+struct SequenceStream {
+  // One instruction position, clock, and call/loop state serve these channels.
+  std::vector<u32> channels{0};
+};
+
 struct TrackProgram {
-  // Each number runs these commands with independent VM and format state.
-  // Most streams belong to one track; interleaved streams can serve many.
-  std::vector<u32> sourceTrackNumbers{0};
+  // Most decoded programs have one stream. Independent voices may execute the
+  // same commands separately; an interleaved stream instead lists all its channels.
+  std::vector<SequenceStream> streams{{}};
   std::string name;
   Address startAddress;
   SourceAnnotationId annotation;
@@ -232,8 +246,8 @@ struct PlaylistCommand {
   // carries its normalized entries directly. A repeat command targets another
   // playlist command.
   Address target;
-  // Entries follow playback order: each stream, then each of its track numbers.
-  std::vector<std::optional<Address>> trackStarts;
+  // One entry per execution stream, in decoded-program and stream order.
+  std::vector<std::optional<Address>> streamStarts;
   // Repeat only: zero denotes an infinite repeat; positive values are the
   // number of additional jumps after the first pass through the destination.
   u32 additionalPlays = 0;
@@ -304,6 +318,7 @@ struct SequenceProgram {
 
   [[nodiscard]] const SourceCommand* command(SourceCommandRef source) const;
   [[nodiscard]] size_t playbackTrackCount() const;
+  [[nodiscard]] size_t streamCount() const;
 };
 
 [[nodiscard]] bool trackUsesSemantic(const TrackProgram& track, SequenceSemantic semantic);

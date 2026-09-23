@@ -22,9 +22,9 @@ namespace {
   u64 last = first + (layout.questSfx ? layout.trackCount() * 2 : 2);
   if (program.sectionPlaylist) {
     for (const PlaylistCommand& command : program.sectionPlaylist->commands) {
-      if (command.kind == PlaylistCommandKind::PlaySection && !command.trackStarts.empty()) {
+      if (command.kind == PlaylistCommandKind::PlaySection && !command.streamStarts.empty()) {
         first = std::min(first, command.target.value);
-        last = std::max(last, command.target.value + command.trackStarts.size() * 2);
+        last = std::max(last, command.target.value + command.streamStarts.size() * 2);
       }
       if (!command.range.valid()) {
         continue;

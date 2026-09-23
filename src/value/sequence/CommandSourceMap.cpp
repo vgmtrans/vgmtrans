@@ -129,7 +129,7 @@ const DecodedBytecodeCommand& TrackDecodeSession::findOrAppend(DecodedBytecodeCo
 
 TrackProgram TrackDecodeSession::finish() {
   TrackProgram track{
-      .sourceTrackNumbers = {trackIndex_},
+      .streams = {{.channels = {trackIndex_}}},
       .startAddress = Address{startOffset_},
       .annotation = annotation_.value_or(SourceAnnotationId{}),
   };

@@ -97,7 +97,7 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
   test::SessionSnapshotBuilder builder;
   for (u32 index = 0; index < 2; ++index) {
     const SequenceProgramConfig& config = index == 0 ? config48 : config96;
-    TrackProgram track{.sourceTrackNumbers = {index}, .startAddress = Address{0}};
+    TrackProgram track{.streams = {{.channels = {index}}}, .startAddress = Address{0}};
     const std::array<u8, 3> note{0x90, static_cast<u8>(0x3c + index), 0x04};
     const std::array<u8, 1> end{0xff};
     addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(index * 4, note.size()), note);

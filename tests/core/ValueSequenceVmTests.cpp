@@ -13,7 +13,7 @@ namespace {
 void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
   const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
-      .sourceTrackNumbers = {7},
+      .streams = {{.channels = {7}}},
       .startAddress = Address{0},
   };
 
@@ -86,6 +86,57 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
                  {.annotation = SourceAnnotationId{11}, .beginTick = 0, .endTick = 12},
              },
          "source timeline should preserve point and note durations while trimming the final loop boundary");
+}
+
+void sequenceVmRoutesOneStreamAcrossIndependentChannels() {
+  struct ChannelState {
+    int key = 60;
+  };
+  struct StreamState {
+    u32 notes = 0;
+  };
+  struct Playback : SequencePlayback<ChannelState, StreamState> {
+    void beginSection() { out.instrument(0, 7); }
+    void note() {
+      out.noteOn(track.key++, 1.0);
+      ++stream.notes;
+    }
+    void release() { out.noteOff(track.key - 1); }
+    void tempo() { out.tempo(500000 + stream.notes); }
+  };
+  TrackProgram track{.streams = {{.channels = {4, 9}}}, .startAddress = Address{0}};
+  auto add = [&](std::optional<u32> channel, u32 delay, void (Playback::*method)()) {
+    const auto index = static_cast<u32>(track.commands.size());
+    appendTestCommand(track, Address{index}, 0, {}, 9u, CommandFlow::fallthroughTo(Address{index + 1}),
+                      SourceAnnotationId{index});
+    track.commands.back().execution = {
+        .body = detail::makeCommandBody<Playback>(method), .channel = channel, .delayTicks = delay};
+  };
+  add(9, 5, &Playback::note);
+  add(4, 0, &Playback::note);
+  add(99, 2, &Playback::note);  // An absent channel still consumes its source delta.
+  add(9, 4, &Playback::release);
+  add(4, 3, &Playback::release);
+  add({}, 0, &Playback::tempo);  // Source channel metadata must not route global commands.
+  track.commands.back().flow = CommandFlow::end(Address{6});
+  const SequenceProgram program{.runtime = makeCompiledRuntime<Playback>(), .tracks = {track}};
+  expect(program.streamCount() == 1 && program.playbackTrackCount() == 2 && validateSequenceProgram(program).empty(),
+         "one execution stream should declare two independent output channels");
+  const auto performance = SequenceVm().render(program);
+  expect(performance.diagnostics.empty() && performance.tracks.size() == 2 && performance.sourceSpans.size() == 6,
+         "routed commands should execute and receive source spans once per stream");
+  for (size_t i = 0; i < 2; ++i) {
+    const auto& output = performance.tracks[i];
+    const auto& initial = std::get<InstrumentPerformanceEvent>(output.events[0]);
+    const auto& note = std::get<NotePerformanceEvent>(output.events[1]);
+    expect(initial.header.tick == 0 && note.header.tick == 5 && note.key == 60 &&
+               note.durationTicks == (i == 0 ? 9 : 6) && output.endTick == 14,
+           "channels should initialize before the first delay and keep note state and releases independent");
+    expect(program.command(note.header.sourceCommand) == &program.tracks[0].commands[i == 0 ? 1 : 0],
+           "channel output should retain its shared stream's source command");
+  }
+  expect(std::get<TempoPerformanceEvent>(performance.tracks[0].events.back()).microsecondsPerQuarter == 500002,
+         "global commands should observe shared stream state and run once on the default channel");
 }
 
 void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
@@ -216,36 +267,40 @@ void sequenceVmStopsDeclaredLoopBeforeTargetReplay() {
          "declared-loop should replay the target only while loop budget remains");
 }
 
-void sequenceVmPreservesDeclaredLoopAsPerformanceMarkers() {
+void sequenceVmPreservesLoopsWithCommandDelays() {
   const SequenceProgramConfig config = probeSequenceConfig();
-  TrackProgram track{
-      .startAddress = Address{0},
-  };
-
-  const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
-  const std::array<u8, 3> loopBytes{0xfb, 0x00, 0x00};
-  const CommandId noteCommand =
-      addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  const CommandId loopCommand =
-      addProbeCommand<ProbeDeclaredLoopCommand>(track, config, Address{3}, probeRange(3, loopBytes.size()), loopBytes);
-
-  const SequenceProgram program{
-      .runtime = probeSequenceRuntime(),
-      .timebase = config.timebase,
-      .behavior = config.behavior,
-      .tracks = {track},
-  };
-
-  const PerformanceSequence performance = SequenceVm(LoopPolicy::Preserve).render(program);
-  expect(performance.diagnostics.empty(), "preserved declared-loop fixture should not report diagnostics");
-  expect(performance.tracks[0].endTick == 12, "preserved declared-loop should stop after the first pass");
-
-  const MarkerPerformanceEvent* loopStart = probeMarkerAt(performance.tracks[0], "Loop Start", 0);
-  const MarkerPerformanceEvent* loopEnd = probeMarkerAt(performance.tracks[0], "Loop End", 12);
-  expect(loopStart != nullptr && loopStart->header.sourceCommand.id == noteCommand,
-         "preserved declared-loop should mark the declared loop target as loop start");
-  expect(loopEnd != nullptr && loopEnd->header.sourceCommand.id == loopCommand,
-         "preserved declared-loop should mark the explicit loop command as loop end");
+  for (const auto semantics : {JumpSemantics::DeclaredLoop, JumpSemantics::LoopCandidate, JumpSemantics::Normal}) {
+    TrackProgram track{.streams = {{.channels = {7, 9}}}, .startAddress = Address{0}};
+    const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
+    const std::array<u8, 3> loopBytes{0xfb, 0x00, 0x00};
+    const CommandId noteCommand =
+        addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+    track.commands.back().execution.channel = 9;
+    track.commands.back().execution.delayTicks = 3;
+    const CommandId loopCommand = addProbeCommand<ProbeDeclaredLoopCommand>(track, config, Address{3},
+                                                                            probeRange(3, loopBytes.size()), loopBytes);
+    track.commands.back().execution.delayTicks = 5;
+    track.commands.back().flow.defaultTransition.jumpSemantics = semantics;
+    const SequenceProgram program{
+        .runtime = probeSequenceRuntime(),
+        .timebase = config.timebase,
+        .behavior = config.behavior,
+        .tracks = {track},
+    };
+    const auto preserved = SequenceVm(LoopPolicy::Preserve).render(program);
+    expect(preserved.diagnostics.empty(), "preserved loop with command delays should not report diagnostics");
+    for (const auto& channel : preserved.tracks) {
+      const auto* start = probeMarkerAt(channel, "Loop Start", 0);
+      const auto* end = probeMarkerAt(channel, "Loop End", 20);
+      expect(channel.endTick == 20 && start && start->header.sourceCommand.id == noteCommand && end &&
+                 end->header.sourceCommand.id == loopCommand,
+             "every channel should preserve the whole loop, including delays before its first and last commands");
+    }
+    const auto repeated = SequenceVm({.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = 1}).render(program);
+    expect(repeated.diagnostics.empty() && repeated.tracks[0].endTick == 40 && repeated.tracks[1].endTick == 40 &&
+               countProbeNotesAt(repeated.tracks[1], 3) == 1 && countProbeNotesAt(repeated.tracks[1], 23) == 1,
+           "repeating a shared stream should consume each command delay once per pass");
+  }
 }
 
 void sequenceVmLoopCandidateRequiresVisitedDestination() {
@@ -352,7 +407,7 @@ void sequenceVmPreservesLoopCandidateAsPerformanceMarkers() {
 void sequenceVmPreservesLoopsAsPerformanceMarkers() {
   const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
-      .sourceTrackNumbers = {7},
+      .streams = {{.channels = {7}}},
       .startAddress = Address{0},
   };
 
@@ -468,7 +523,7 @@ void sequenceVmUsesInitialTempoAndGlobalEventOrder() {
   const SequenceProgramConfig orderConfig = probeSequenceConfig();
   const auto makeTrack = [&](u32 trackNumber, u32 address, u8 program) {
     TrackProgram track{
-        .sourceTrackNumbers = {trackNumber},
+        .streams = {{.channels = {trackNumber}}},
         .startAddress = Address{address},
     };
     const std::array<u8, 2> bytes{0x80, program};
@@ -500,7 +555,7 @@ void sequenceVmEmitsProgramInitialChannelState() {
       },
       StereoBalance{0.25, 0.75});
   TrackProgram track{
-      .sourceTrackNumbers = {4},
+      .streams = {{.channels = {4}}},
       .startAddress = Address{0},
   };
 
@@ -562,7 +617,7 @@ void sequenceVmEmitsInitialMasterLevelOnce() {
       .initialPitchBendRangeSemitones = 255,
   });
   const auto makeTrack = [&](u32 id) {
-    TrackProgram track{.sourceTrackNumbers = {id}, .startAddress = Address{0}};
+    TrackProgram track{.streams = {{.channels = {id}}}, .startAddress = Address{0}};
     const std::array<u8, 1> endBytes{0xff};
     addProbeCommand<ProbeEndCommand>(track, config, Address{0}, probeRange(id, endBytes.size()), endBytes);
     return track;
@@ -1160,7 +1215,7 @@ void sequenceVmSchedulesSemanticTracksAgainstOneProgramState() {
   appendTestCommand(track0, Address{2}, 9, {}, {}, CommandFlow::fallthroughTo(Address{3}));
   appendTestCommand(track0, Address{3}, 0, {}, {}, CommandFlow::end(Address{4}));
 
-  TrackProgram track1{.sourceTrackNumbers = {1}, .startAddress = Address{10}};
+  TrackProgram track1{.streams = {{.channels = {1}}}, .startAddress = Address{10}};
   appendTestCommand(track1, Address{10}, 2, {}, {}, CommandFlow::fallthroughTo(Address{11}));
   appendTestCommand(track1, Address{11}, 0, {}, {}, CommandFlow::fallthroughTo(Address{12}));
   appendTestCommand(track1, Address{12}, 0, {}, {}, CommandFlow::end(Address{13}));
@@ -1289,7 +1344,7 @@ void beginPlaylistProbeSection(std::any& trackState) {
 
 TrackProgram playlistProbeTrack(u32 trackId, std::initializer_list<std::pair<u32, u8>> sections) {
   TrackProgram track{
-      .sourceTrackNumbers = {trackId},
+      .streams = {{.channels = {trackId}}},
       .startAddress = Address{sections.begin()->first},
   };
   for (const auto [address, duration] : sections) {
@@ -1317,7 +1372,7 @@ SequenceRuntime playlistProbeRuntime() {
 void sequenceVmSwitchesParallelSectionsAtTheFirstChannelEnd() {
   const SequenceProgramConfig config = playlistProbeConfig();
   TrackProgram shared = playlistProbeTrack(0, {{0, 8}, {100, 12}, {110, 4}});
-  shared.sourceTrackNumbers = {0, 1};
+  shared.streams = {{.channels = {0}}, {.channels = {1}}};
   const SequenceProgram program{
       .runtime = playlistProbeRuntime(),
       .timebase = config.timebase,
@@ -1333,14 +1388,14 @@ void sequenceVmSwitchesParallelSectionsAtTheFirstChannelEnd() {
                           .fallthrough = Address{1002},
                           .kind = PlaylistCommandKind::PlaySection,
                           .target = Address{500},
-                          .trackStarts = {Address{0}, Address{100}},
+                          .streamStarts = {Address{0}, Address{100}},
                       },
                       PlaylistCommand{
                           .address = Address{1002},
                           .fallthrough = Address{1004},
                           .kind = PlaylistCommandKind::PlaySection,
                           .target = Address{600},
-                          .trackStarts = {std::nullopt, Address{110}},
+                          .streamStarts = {std::nullopt, Address{110}},
                       },
                       PlaylistCommand{.address = Address{1004}},
                   },
@@ -1382,7 +1437,7 @@ void sequenceVmExecutesFiniteAndInfiniteSectionPlaylistRepeats() {
                             .fallthrough = Address{1002},
                             .kind = PlaylistCommandKind::PlaySection,
                             .target = Address{500},
-                            .trackStarts = {Address{0}},
+                            .streamStarts = {Address{0}},
                         },
                         PlaylistCommand{
                             .address = Address{1002},
@@ -1549,11 +1604,12 @@ void sequenceVmClosesActiveNotesAtLoopCutoff() {
 
 void runValueSequenceVmTests() {
   sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop();
+  sequenceVmRoutesOneStreamAcrossIndependentChannels();
   sequenceVmTimesCommandsThatEmitNoPerformanceEvents();
   sequenceVmPreservesPitchMotionThroughNoteRelease();
   sequenceVmReplaysInfiniteLoopsWhenRequested();
   sequenceVmStopsDeclaredLoopBeforeTargetReplay();
-  sequenceVmPreservesDeclaredLoopAsPerformanceMarkers();
+  sequenceVmPreservesLoopsWithCommandDelays();
   sequenceVmLoopCandidateRequiresVisitedDestination();
   sequenceVmLoopCandidateIgnoresRepeatState();
   sequenceVmPreservesLoopCandidateAsPerformanceMarkers();

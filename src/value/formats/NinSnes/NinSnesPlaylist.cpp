@@ -107,7 +107,7 @@ using namespace core;
         }
       }
       if (section != sections.end()) {
-        command.trackStarts = section->second;
+        command.streamStarts = section->second;
       }
       queue(address + 2);
     }
@@ -191,7 +191,7 @@ bool isValidPlaylist(ByteReader reader, const Layout& layout) {
   const SectionPlaylist& playlist = decodePlaylist(reader, layout, AssetId{}, nullptr, nullptr).playlist;
   if (playlist.commands.empty() ||
       std::ranges::none_of(playlist.commands, [](const PlaylistCommand& command) {
-        return command.kind == PlaylistCommandKind::PlaySection && !command.trackStarts.empty();
+        return command.kind == PlaylistCommandKind::PlaySection && !command.streamStarts.empty();
       })) {
     return false;
   }
@@ -206,7 +206,7 @@ bool isValidPlaylist(ByteReader reader, const Layout& layout) {
 
   for (const PlaylistCommand& command : playlist.commands) {
     if (command.kind == PlaylistCommandKind::PlaySection) {
-      if (command.trackStarts.size() != trackCount || !commandAddresses.contains(command.fallthrough.value)) {
+      if (command.streamStarts.size() != trackCount || !commandAddresses.contains(command.fallthrough.value)) {
         return false;
       }
     } else if (command.kind == PlaylistCommandKind::Repeat) {

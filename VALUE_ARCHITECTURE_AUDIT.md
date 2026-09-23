@@ -3680,6 +3680,67 @@ endpoints, and Konami's step-based intent. Temporary probes also checked all
 three motion modes with delayed, linked output points. No new permanent test
 files were added.
 
+## Execution streams and musical channels
+
+SequenceVM now schedules execution streams. Each stream owns its instruction
+position, waits, call stack, repeat counters, and optional typed format state.
+Each of its channels owns instrument/controller state, active notes, and a
+performance track. Ordinary formats retain one stream per channel without
+changing their Playback methods.
+
+SonyPS1, SegSat, and SonyPS2 now execute interleaved commands once. Decoders route
+musical commands with `event.channel(number)` and express leading time with
+`event.delay(ticks)`. Playback methods use the selected channel and current
+emitter directly; they no longer filter channels, pass deltas through musical
+handlers, or construct delayed emitters. SegSat's duration extension and counted
+phrase state, and SonyPS2's tempo and section state, belong to the stream.
+SonyPS2 MIDI, SE voice streams, and song playlists all use this model. Playlist
+commands now declare one `streamStarts` entry per executor, rather than repeating
+the same entry for each output channel.
+
+Source-channel annotations remain independent of routing: a channel-tagged loop
+still controls the whole stream. Source references retain their decoded command
+identity, while source playback spans are recorded once per execution. An
+undeclared destination skips the musical body but consumes the leading delay.
+Global commands use the stream's first output channel. Tick hooks still run for
+each channel during waits. Entry output runs once per channel before the first
+delay, including at playlist section boundaries.
+
+Loop detection records arrival before a command's leading delay. This keeps the
+complete loop interval, including silence before its first event. The migration
+also exposes a prior value-core timing error: declaring a loop while scheduling
+its delay afterward could stop playback before consuming that delay. The new
+interleaved readers execute that boundary at its event time; SegSat's legacy
+reader also advances time before processing the loop. Export comparisons must
+therefore distinguish this correction from unintended changes.
+
+This checkpoint deliberately retains HeartBeatPS1 and NamcoSnes as independent
+streams sharing decoded command storage. It does not introduce a second VM or
+change the performance/export interfaces. The three migrated format files lose
+50 lines and their handlers have fewer responsibilities, but total production
+code grows by 119 lines because stream/channel ownership and lifecycle are now
+explicit. Test code grows by 59 lines, with no new permanent test files. Treat
+this as a readability and execution-model improvement, not yet a large reduction
+in total code.
+
+Validation: warning-free macOS Debug build and all 22 CTest targets passed.
+One compact VM test covers shared execution, independent channel state, source
+attribution, absent destinations, and initialization before delays. The existing
+loop fixture now covers delayed commands across two channels for declared,
+candidate, and inferred loops, including one additional playback repetition.
+
+Temporary before/after export comparisons covered 47 generated input files,
+48 sequences, and 93 MIDI/SF2/DLS artifacts. Eighty-eight artifacts matched byte
+for byte. The five changed MIDIs belong to three infinite-loop fixtures with
+nonzero loop-end delays: SonyPS1 and SonyPS2 retain the previously truncated
+trailing time; SegSat also retains notes previously discarded at that cutoff.
+All SF2/DLS outputs matched. Finite repeats, SegSat counted-event phrases and
+duration extensions, SonyPS2 section resets and SE voice routing, and interleaved
+same-tick events were included.
+
+The music corpus was unavailable, so real-archive parity remains unverified
+for this checkpoint.
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage
@@ -3729,11 +3790,11 @@ files were added.
   command into a vector of operations would reintroduce an intermediate
   instruction list and add allocation to simple commands. Most commands need
   only one body; remove forwarding helpers without adding that representation.
-- Keep source-driver initialization rules explicit for now. Several apparent
-  startup guards initialize a whole song, others initialize one track, and
-  Sony PS2 also resets section state. Per-command hooks also perform real
-  driver work. A new lifecycle hook needs a stronger benefit than removing a
-  few boolean guards.
+- Keep source-driver initialization rules explicit. Stream entry now has a
+  dedicated hook because initialization must precede an interleaved stream's
+  first delay, including SonyPS2 section changes. Per-command hooks still perform
+  real driver work in other formats; do not turn every such hook into startup
+  code merely to remove boolean guards.
 - Keep explicit draft types and scanner finalization validation. A generic
   draft framework would complicate four small author-facing types. The first
   finalization pass checks all required programs/payloads before consuming any

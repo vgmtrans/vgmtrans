@@ -179,6 +179,13 @@ public:
       return *this;
     }
 
+    // Route only this command's musical effects. Channel-tagged loop commands
+    // can keep their source annotation without changing the execution destination.
+    Event& channel(u32 number) {
+      execution_.channel = number;
+      return *this;
+    }
+
     Event& synchronizedLoopStart() {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       execution_.coordinatorSignal = SequenceCoordinatorSignal::SynchronizedLoopStart;

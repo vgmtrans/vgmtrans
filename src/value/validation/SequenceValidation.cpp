@@ -18,6 +18,17 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
   ValidationReport report;
 
   for (const auto& track : program.tracks) {
+    for (const auto& stream : track.streams) {
+      std::unordered_set<u32> channels;
+      if (stream.channels.empty()) {
+        report.error("sequence.stream.no-channels", "Sequence stream had no output channels");
+      }
+      for (const u32 channel : stream.channels) {
+        if (!channels.insert(channel).second) {
+          report.error("sequence.stream.duplicate-channel", "Sequence stream contained a duplicate channel");
+        }
+      }
+    }
     for (size_t i = 1; i < track.commands.size(); ++i) {
       const SourceCommand& previous = track.commands[i - 1];
       const SourceCommand& command = track.commands[i];
@@ -54,17 +65,17 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
 
     for (const auto& command : playlist.commands) {
       if (command.kind == PlaylistCommandKind::PlaySection) {
-        if (command.trackStarts.empty()) {
+        if (command.streamStarts.empty()) {
           report.error("sequence.playlist.missing-section",
                        "Sequence playlist referenced a section that was not decoded", command.range);
-        } else if (command.trackStarts.size() != program.playbackTrackCount()) {
+        } else if (command.streamStarts.size() != program.streamCount()) {
           report.error("sequence.playlist.track-count",
-                       "Sequence play command track entries did not match the program track count", command.range);
+                       "Sequence play command entries did not match the execution stream count", command.range);
         } else {
           size_t playbackIndex = 0;
           for (const auto& track : program.tracks) {
-            for (size_t i = 0; i < track.sourceTrackNumbers.size(); ++i) {
-              const auto start = command.trackStarts[playbackIndex++];
+            for (size_t i = 0; i < track.streams.size(); ++i) {
+              const auto start = command.streamStarts[playbackIndex++];
               if (start && !track.commandIndex(*start)) {
                 report.error("sequence.playlist.missing-track-start",
                              "Sequence play command referenced a track start that was not decoded", command.range);
