@@ -25,7 +25,6 @@
 namespace vgmtrans::formats::nds {
 
 using namespace core;
-using namespace command;
 
 namespace {
 
@@ -304,12 +303,12 @@ struct SequenceDecodeContext {
 
 // Reads a three-byte relative address and records both that value and the final
 // destination it points to.
-[[nodiscard]] Address targetAddress(const SequenceDecodeContext& context, NdsCompilerCursor::Event& event,
+[[nodiscard]] Address targetAddress(const SequenceDecodeContext& context, NdsCompilerCursor& cursor,
                                     SemanticOperandRole role = SemanticOperandRole::Value) {
-  const u32 relative = event.u24le("relative", SourceValueDisplay::Address);
+  const u32 relative = cursor.u24le("relative", SourceValueDisplay::Address);
   const Address destination{context.dataBase() + relative};
-  return event.derived("destination", destination, SourceValueDisplay::Address,
-                       destination.value < context.range.sequenceEnd ? role : SemanticOperandRole::Value);
+  return cursor.derived("destination", destination, SourceValueDisplay::Address,
+                        destination.value < context.range.sequenceEnd ? role : SemanticOperandRole::Value);
 }
 
 // One source opcode is read and compiled in one block. Event operations append
@@ -323,28 +322,26 @@ struct SequenceDecodeContext {
 
   if (cursor.opcode() <= 0x7f) {
     auto event = cursor.command("Note", SequenceSemantic::Note);
-    const u8 key = event.opcodeValue("key", cursor.opcode(), SourceValueDisplay::MidiNote);
-    const u8 velocity = event.u8("velocity");
-    const u32 duration = event.varLen("duration");
-    return event.invoke<&Playback::note>(key, velocity, duration);
+    const u8 key = cursor.opcodeValue("key", cursor.opcode(), SourceValueDisplay::MidiNote);
+    const u8 velocity = cursor.u8("velocity");
+    const u32 duration = cursor.varLen("duration");
+    return event.invoke<&Playback::note>({key, velocity, duration});
   }
 
   switch (cursor.opcode()) {
-    case 0x80: {
-      auto event = cursor.command("Rest", SequenceSemantic::Rest);
-      return event.wait(event.varLen("duration"));
-    }
+    case 0x80:
+      return cursor.command("Rest", SequenceSemantic::Rest).wait(cursor.varLen("duration"));
     case 0x81: {
       auto event = cursor.command("Program", SequenceSemantic::Program);
-      const u32 raw = event.varLen("raw");
-      const u32 bank = event.derived("bank", raw >> 7, SemanticOperandRole::InstrumentBank);
-      const u32 program = event.derived("program", raw & 0x7f, SemanticOperandRole::InstrumentProgram);
+      const u32 raw = cursor.varLen("raw");
+      const u32 bank = cursor.derived("bank", raw >> 7, SemanticOperandRole::InstrumentBank);
+      const u32 program = cursor.derived("program", raw & 0x7f, SemanticOperandRole::InstrumentProgram);
       return event.emitInstrument(bank, program, InstrumentEnvelopeMode::PreserveDynamicOverride);
     }
     case 0x93: {
       auto event = cursor.sourceOnly("Open Track");
-      event.u8("track");
-      static_cast<void>(targetAddress(context, event));
+      cursor.u8("track");
+      static_cast<void>(targetAddress(context, cursor));
       return event;
     }
     case 0x94:
@@ -352,19 +349,19 @@ struct SequenceDecodeContext {
       const bool isCall = cursor.opcode() == 0x95;
       auto event = cursor.command(isCall ? "Call" : "Jump", isCall ? SequenceSemantic::Call : SequenceSemantic::Jump);
       const Address destination =
-          targetAddress(context, event, isCall ? SemanticOperandRole::CallTarget : SemanticOperandRole::JumpTarget);
-      if (!event.ok()) {
+          targetAddress(context, cursor, isCall ? SemanticOperandRole::CallTarget : SemanticOperandRole::JumpTarget);
+      if (!cursor.ok()) {
         return event.stop();
       }
       if (destination.value >= context.range.sequenceEnd) {
-        event.warning(isCall ? "Call target outside sequence data" : "Jump target outside sequence data");
+        cursor.warning(isCall ? "Call target outside sequence data" : "Jump target outside sequence data");
         return event.stop();
       }
       return isCall ? event.call(destination) : event.jump(destination);
     }
     case 0x96: {
       auto event = cursor.unsupported("Unsupported Command");
-      event.warning("Unsupported NDS SSEQ command stopped playback");
+      cursor.warning("Unsupported NDS SSEQ command stopped playback");
       return event.stop();
     }
     case 0xa0:
@@ -401,120 +398,117 @@ struct SequenceDecodeContext {
       return cursor.ignored("If Variable !=", 3, "if-variable-not-equal");
     case 0xc0: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      const double position = std::clamp((event.u8("pan") / 63.5) - 1.0, -1.0, 1.0);
+      const double position = std::clamp((cursor.u8("pan") / 63.5) - 1.0, -1.0, 1.0);
       return event.emitPan(position);
     }
-    case 0xc1: {
-      auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.emitLevel(LevelScale::linearFromMidi7(event.u8("volume")));
-    }
+    case 0xc1:
+      return cursor.command("Volume", SequenceSemantic::Level)
+          .emitLevel(LevelScale::linearFromMidi7(cursor.u8("volume")));
     case 0xc2:
       return cursor.ignored("Master Volume", 1);
     case 0xc3:
-      return cursor.command("Transpose", SequenceSemantic::State).set<&TrackState::transpose>(SignedByte{"semitones"});
+      return cursor.command("Transpose", SequenceSemantic::State).set<&TrackState::transpose>(cursor.s8("semitones"));
     case 0xc4:
-      return cursor.command("Pitch Bend", SequenceSemantic::Pitch).invoke<&Playback::pitchBend>(SignedByte{"bend"});
+      return cursor.command("Pitch Bend", SequenceSemantic::Pitch).invoke<&Playback::pitchBend>({cursor.s8("bend")});
     case 0xc5: {
       auto event = cursor.command("Pitch Bend Range", SequenceSemantic::Pitch);
-      const u8 semitones = event.u8("semitones");
+      const u8 semitones = cursor.u8("semitones");
       return event.set<&TrackState::pitchBendRangeSemitones>(semitones).emitPitchBendRange(semitones);
     }
     case 0xc6:
       return cursor.ignored("Priority", 1);
     case 0xc7:
-      return cursor.command("Note Wait", SequenceSemantic::State).set<&TrackState::noteWait>(Byte{"enabled"});
-    case 0xc8: {
-      auto event = cursor.command("Tie", SequenceSemantic::State);
-      return event.invoke<&Playback::tie>(event.u8("enabled") != 0);
-    }
+      return cursor.command("Note Wait", SequenceSemantic::State).set<&TrackState::noteWait>(cursor.u8("enabled") != 0);
+    case 0xc8:
+      return cursor.command("Tie", SequenceSemantic::State).invoke<&Playback::tie>({cursor.u8("enabled") != 0});
     case 0xc9:
       return cursor.command("Portamento Control", SequenceSemantic::Portamento)
-          .invoke<&Playback::portamentoControl>(Byte{"key", SourceValueDisplay::MidiNote});
+          .invoke<&Playback::portamentoControl>({cursor.u8("key", SourceValueDisplay::MidiNote)});
     case 0xca:
       return cursor.command("Modulation Depth", SequenceSemantic::Modulation)
-          .invoke<&Playback::modulationDepth>(Byte{"depth"});
+          .invoke<&Playback::modulationDepth>({cursor.u8("depth")});
     case 0xcb:
       return cursor.command("Modulation Speed", SequenceSemantic::Modulation)
-          .invoke<&Playback::modulationSpeed>(Byte{"speed"});
+          .invoke<&Playback::modulationSpeed>({cursor.u8("speed")});
     case 0xcc:
       return cursor.command("Modulation Type", SequenceSemantic::Modulation)
-          .invoke<&Playback::modulationTarget>(Byte{"type"});
+          .invoke<&Playback::modulationTarget>({cursor.u8("type")});
     case 0xcd:
       return cursor.command("Modulation Range", SequenceSemantic::Modulation)
-          .invoke<&Playback::modulationRange>(Byte{"range"});
+          .invoke<&Playback::modulationRange>({cursor.u8("range")});
     case 0xce:
-      return cursor.command("Portamento", SequenceSemantic::Portamento).set<&TrackState::portamento>(Byte{"enabled"});
+      return cursor.command("Portamento", SequenceSemantic::Portamento)
+          .set<&TrackState::portamento>(cursor.u8("enabled") != 0);
     case 0xcf:
       return cursor.command("Portamento Time", SequenceSemantic::Portamento)
-          .set<&TrackState::portamentoTime>(Byte{"time"});
+          .set<&TrackState::portamentoTime>(cursor.u8("time"));
     case 0xd0: {
       auto event = cursor.command("Attack Rate", SequenceSemantic::Envelope);
-      const auto seconds = ndsAttackSeconds(event.u8("attack"));
+      const auto seconds = ndsAttackSeconds(cursor.u8("attack"));
       if (!seconds) {
-        event.warning("NDS attack rate was outside the supported 0-127 range");
+        cursor.warning("NDS attack rate was outside the supported 0-127 range");
         return event.ignore();
       }
       return event.emitEnvelopeField<EnvelopeFields::Attack>(*seconds);
     }
     case 0xd1: {
       auto event = cursor.command("Decay Rate", SequenceSemantic::Envelope);
-      const auto seconds = ndsDecaySeconds(event.u8("decay"));
+      const auto seconds = ndsDecaySeconds(cursor.u8("decay"));
       if (!seconds) {
-        event.warning("NDS decay rate was outside the supported 0-127 range");
+        cursor.warning("NDS decay rate was outside the supported 0-127 range");
         return event.ignore();
       }
       return event.emitEnvelopeField<EnvelopeFields::Decay>(*seconds);
     }
     case 0xd2: {
       auto event = cursor.command("Sustain Level", SequenceSemantic::Envelope);
-      const auto amplitude = ndsSustainAmplitude(event.u8("sustain"));
+      const auto amplitude = ndsSustainAmplitude(cursor.u8("sustain"));
       if (!amplitude) {
-        event.warning("NDS sustain level was outside the supported 0-127 range");
+        cursor.warning("NDS sustain level was outside the supported 0-127 range");
         return event.ignore();
       }
       return event.emitEnvelopeField<EnvelopeFields::Sustain>(*amplitude);
     }
     case 0xd3: {
       auto event = cursor.command("Release Rate", SequenceSemantic::Envelope);
-      const auto seconds = ndsReleaseSeconds(event.u8("release"));
+      const auto seconds = ndsReleaseSeconds(cursor.u8("release"));
       if (!seconds) {
-        event.warning("NDS release rate was outside the supported 0-127 range");
+        cursor.warning("NDS release rate was outside the supported 0-127 range");
         return event.ignore();
       }
       return event.emitEnvelopeField<EnvelopeFields::Release>(*seconds);
     }
     case 0xd4:
       return cursor.ignored("Loop Start", 1);
-    case 0xd5: {
-      auto event = cursor.command("Expression", SequenceSemantic::Level);
-      return event.emitExpression(LevelScale::linearFromMidi7(event.u8("expression")));
-    }
+    case 0xd5:
+      return cursor.command("Expression", SequenceSemantic::Level)
+          .emitExpression(LevelScale::linearFromMidi7(cursor.u8("expression")));
     case 0xd6:
       return cursor.ignored("Print Variable", 1);
     case 0xe0:
       return cursor.command("Modulation Delay", SequenceSemantic::Modulation)
-          .invoke<&Playback::modulationDelay>(WordLE{"delay"});
+          .invoke<&Playback::modulationDelay>({cursor.u16le("delay")});
     case 0xe1: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-      const u16 bpm = event.u16le("tempo", SourceValueDisplay::BeatsPerMinute);
-      return bpm == 0 ? event.ignore() : event.invoke<&Playback::tempo>(bpm);
+      const u16 bpm = cursor.u16le("tempo", SourceValueDisplay::BeatsPerMinute);
+      return bpm == 0 ? event.ignore() : event.invoke<&Playback::tempo>({bpm});
     }
     case 0xe3:
-      return cursor.command("Sweep Pitch", SequenceSemantic::Pitch).set<&TrackState::sweepPitch>(SignedWordLE{"pitch"});
+      return cursor.command("Sweep Pitch", SequenceSemantic::Pitch).set<&TrackState::sweepPitch>(cursor.s16le("pitch"));
     case 0xfc:
       return cursor.ignored("Loop End", 0);
     case 0xfd:
       return cursor.command("Return", SequenceSemantic::Return).return_();
     case 0xfe: {
       auto event = cursor.sourceOnly("Allocate Track");
-      event.u16le("track_mask");
+      cursor.u16le("track_mask");
       return event;
     }
     case 0xff:
       return cursor.command("End", SequenceSemantic::End).end();
     default: {
       auto event = cursor.unsupported("Unknown Opcode", "unknown");
-      event.warning("Unknown NDS SSEQ opcode stopped playback");
+      cursor.warning("Unknown NDS SSEQ opcode stopped playback");
       return event.stop();
     }
   }

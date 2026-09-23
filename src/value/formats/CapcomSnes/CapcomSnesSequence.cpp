@@ -22,7 +22,6 @@
 namespace vgmtrans::formats::capcom_snes {
 
 using namespace core;
-using namespace command;
 
 namespace {
 
@@ -351,21 +350,20 @@ using CapcomCursor = CompilerCursor<Playback>;
   if (cursor.opcode() >= 0x20) {
     const u8 keyIndex = cursor.opcode() & 0x1f;
     if (keyIndex == 0) {
-      auto event = cursor.command("Rest", SequenceSemantic::Rest);
-      return event.invoke<&Playback::rest>(event.opcodeBits<5, 3>("duration_index"));
+      return cursor.command("Rest", SequenceSemantic::Rest)
+          .invoke<&Playback::rest>({cursor.opcodeBits<5, 3>("duration_index")});
     }
     auto event = cursor.command("Note", SequenceSemantic::Note);
-    const u8 durationIndex = event.opcodeBits<5, 3>("duration_index");
-    event.opcodeValue("key_index", keyIndex);
-    return event.invoke<&Playback::note>(durationIndex, keyIndex);
+    const u8 durationIndex = cursor.opcodeBits<5, 3>("duration_index");
+    cursor.opcodeValue("key_index", keyIndex);
+    return event.invoke<&Playback::note>({durationIndex, keyIndex});
   }
 
   switch (cursor.opcode()) {
     case 0x00:
       return cursor.command("Toggle Triplet", SequenceSemantic::State).toggle<&TrackState::noteTriplet>();
     case 0x01: {
-      auto event = cursor.command("Toggle Slur", SequenceSemantic::State);
-      return event.invoke([](Playback& playback) {
+      return cursor.command("Toggle Slur", SequenceSemantic::State).invoke([](Playback& playback) {
         playback.track.noteSlurred = !playback.track.noteSlurred;
         playback.out.legatoPedal(playback.track.noteSlurred);
       });
@@ -376,51 +374,49 @@ using CapcomCursor = CompilerCursor<Playback>;
       return cursor.command("Toggle Octave Up", SequenceSemantic::State).toggle<&TrackState::noteOctaveUp>();
     case 0x04:
       return cursor.command("Note Attributes", SequenceSemantic::State)
-          .invoke<&Playback::applyAttributes>(Byte{"attributes", SourceValueDisplay::Hex});
+          .invoke<&Playback::applyAttributes>({cursor.u8("attributes", SourceValueDisplay::Hex)});
     case 0x05: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-      const auto raw = event.rawU16be("raw");
+      const auto raw = cursor.rawU16be("raw");
       const u32 tempo = raw.valid ? math::tempoMicrosecondsPerQuarter(raw.value) : 0;
-      event.resolvedValue("tempo", raw, tempoBeatsPerMinute(tempo), SourceValueDisplay::BeatsPerMinute);
-      return event.invoke<&Playback::tempo>(tempo);
+      cursor.resolvedValue("tempo", raw, tempoBeatsPerMinute(tempo), SourceValueDisplay::BeatsPerMinute);
+      return event.invoke<&Playback::tempo>({tempo});
     }
     case 0x06:
       return cursor.command("Duration Rate", SequenceSemantic::State)
-          .set<&TrackState::durationRate256ths>(Byte{"rate"});
+          .set<&TrackState::durationRate256ths>(cursor.u8("rate"));
     case 0x07: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
-      const auto raw = event.rawU8("raw");
-      const double gain = event.resolvedValue("linear_gain", raw, math::volumeGain(version, raw.value));
+      const auto raw = cursor.rawU8("raw");
+      const double gain = cursor.resolvedValue("linear_gain", raw, math::volumeGain(version, raw.value));
       return event.emitLevel(gain, ValueQuantization{.levels = 256});
     }
     case 0x08: {
       auto event = cursor.command("Instrument", SequenceSemantic::Instrument);
-      const u8 instrument = event.u8("instrument", SemanticOperandRole::Instrument);
+      const u8 instrument = cursor.u8("instrument", SemanticOperandRole::Instrument);
       // The driver loads SRCN/ADSR/GAIN from the instrument table, but keeps
       // its separate per-voice release GAIN byte intact for the next key-off.
       return event.emitInstrument(kCapcomSnesInstrumentDomain, instrument,
                                   InstrumentEnvelopeMode::PreserveDynamicOverride);
     }
     case 0x09:
-      return cursor.command("Octave", SequenceSemantic::State).set<&TrackState::noteOctave>(Byte{"octave"});
-    case 0x0a: {
-      auto event = cursor.command("Global Transpose", SequenceSemantic::Pitch);
-      return event.emitGlobalTranspose(event.s8("semitones"));
-    }
+      return cursor.command("Octave", SequenceSemantic::State).set<&TrackState::noteOctave>(cursor.u8("octave"));
+    case 0x0a:
+      return cursor.command("Global Transpose", SequenceSemantic::Pitch).emitGlobalTranspose(cursor.s8("semitones"));
     case 0x0b:
       return cursor.command("Transpose", SequenceSemantic::Pitch)
-          .set<&TrackState::transposeSemitones>(SignedByte{"semitones"});
+          .set<&TrackState::transposeSemitones>(cursor.s8("semitones"));
     case 0x0c: {
       auto event = cursor.command("Tuning", SequenceSemantic::Pitch);
-      const auto tuning = event.rawS8("tuning");
+      const auto tuning = cursor.rawS8("tuning");
       const double cents =
-          event.resolvedValue("cents", tuning, tuning.value * (100.0 / 256.0), SourceValueDisplay::Cents);
+          cursor.resolvedValue("cents", tuning, tuning.value * (100.0 / 256.0), SourceValueDisplay::Cents);
       return event.emitTuning(cents);
     }
     case 0x0d: {
       auto event = cursor.command("Portamento Time", SequenceSemantic::Portamento);
       const double millisecondsPerSemitone =
-          event.resolved("milliseconds_per_semitone", event.rawU8("time"), math::portamentoMillisecondsPerSemitone);
+          cursor.resolved("milliseconds_per_semitone", cursor.rawU8("time"), math::portamentoMillisecondsPerSemitone);
       return event.set<&TrackState::portamentoMillisecondsPerSemitone>(millisecondsPerSemitone);
     }
     case 0x0e:
@@ -430,9 +426,9 @@ using CapcomCursor = CompilerCursor<Playback>;
       auto event = cursor.command("Repeat Until", SequenceSemantic::Repeat);
       // Four opcodes select independent counters. A nonzero source count is
       // one less than the total VM visit count; zero declares a loop.
-      const u8 slot = event.derived("slot", static_cast<u8>(cursor.opcode() - 0x0e + 1));
-      const u8 count = event.u8("count");
-      const Address destination = event.address("destination", SemanticOperandRole::RepeatTarget);
+      const u8 slot = cursor.derived("slot", static_cast<u8>(cursor.opcode() - 0x0e + 1));
+      const u8 count = cursor.u8("count");
+      const Address destination = cursor.address("destination", SemanticOperandRole::RepeatTarget);
       return count == 0 ? event.declaredLoop(destination) : event.repeatUntil(slot - 1, count + 1, destination);
     }
     case 0x12:
@@ -440,91 +436,91 @@ using CapcomCursor = CompilerCursor<Playback>;
     case 0x14:
     case 0x15: {
       auto event = cursor.command("Repeat Break", SequenceSemantic::RepeatBreak);
-      const u8 slot = event.derived("slot", static_cast<u8>(cursor.opcode() - 0x12 + 1));
-      const u8 attributes = event.u8("attributes", SourceValueDisplay::Hex);
-      const Address destination = event.address("destination", SemanticOperandRole::RepeatTarget);
+      const u8 slot = cursor.derived("slot", static_cast<u8>(cursor.opcode() - 0x12 + 1));
+      const u8 attributes = cursor.u8("attributes", SourceValueDisplay::Hex);
+      const Address destination = cursor.address("destination", SemanticOperandRole::RepeatTarget);
       event.discoverTarget(destination);
-      return event.invoke<&Playback::repeatBreak>(slot - 1, attributes, destination);
+      return event.invoke<&Playback::repeatBreak>({slot - 1, attributes, destination});
     }
     case 0x16: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
-      const Address destination = event.address("destination", SemanticOperandRole::JumpTarget);
+      const Address destination = cursor.address("destination", SemanticOperandRole::JumpTarget);
       return event.loopCandidate(destination);
     }
     case 0x17:
       return cursor.command("End", SequenceSemantic::End).end();
     case 0x18: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      const auto raw = event.rawU8("raw");
+      const auto raw = cursor.rawU8("raw");
       const auto balance = math::stereoBalance(version, raw.value);
-      const double leftGain = event.resolvedValue("left_gain", raw, balance.leftGain);
-      const double rightGain = event.derived("right_gain", balance.rightGain);
+      const double leftGain = cursor.resolvedValue("left_gain", raw, balance.leftGain);
+      const double rightGain = cursor.derived("right_gain", balance.rightGain);
       return event.emitStereoBalance(leftGain, rightGain);
     }
     case 0x19: {
       auto event = cursor.command("Master Volume", SequenceSemantic::Level);
-      const auto raw = event.rawU8("raw");
-      const double gain = event.resolvedValue("linear_gain", raw, math::volumeGain(version, raw.value));
+      const auto raw = cursor.rawU8("raw");
+      const double gain = cursor.resolvedValue("linear_gain", raw, math::volumeGain(version, raw.value));
       return event.emitMasterLevel(gain);
     }
     case 0x1a: {
       auto event = cursor.command("LFO", SequenceSemantic::Modulation);
-      switch (static_cast<LfoParameter>(event.u8("type"))) {
+      switch (static_cast<LfoParameter>(cursor.u8("type"))) {
         case LfoParameter::VibratoDepth: {
-          const auto raw = event.rawU8("value", SourceValueDisplay::Hex);
+          const auto raw = cursor.rawU8("value", SourceValueDisplay::Hex);
           const u8 depth = raw.value & 0x7f;
           // The driver applies 128 depth steps across a +/- one-octave pitch range.
-          const double semitones = event.resolvedValue("pitch_depth_semitones", raw, depth * (12.0 / 128.0));
-          return event.invoke<&Playback::vibratoDepth>(semitones);
+          const double semitones = cursor.resolvedValue("pitch_depth_semitones", raw, depth * (12.0 / 128.0));
+          return event.invoke<&Playback::vibratoDepth>({semitones});
         }
         case LfoParameter::TremoloDepth: {
-          const auto raw = event.rawU8("value", SourceValueDisplay::Hex);
+          const auto raw = cursor.rawU8("value", SourceValueDisplay::Hex);
           const double decibels =
-              event.resolvedValue("depth_decibels", raw, math::tremoloDepthDecibels(version, raw.value));
-          return event.invoke<&Playback::tremoloDepth>(decibels);
+              cursor.resolvedValue("depth_decibels", raw, math::tremoloDepthDecibels(version, raw.value));
+          return event.invoke<&Playback::tremoloDepth>({decibels});
         }
         case LfoParameter::Rate: {
-          const auto raw = event.rawU8("value", SourceValueDisplay::Hex);
+          const auto raw = cursor.rawU8("value", SourceValueDisplay::Hex);
           [[maybe_unused]] const bool phaseAdvancing =
-              event.resolvedValue("phase_advancing", raw, raw.value != 0, SourceValueDisplay::Boolean);
-          const double hertz = event.derived("frequency_hz", raw.value * kCapcomSnesLfoStepHertz);
-          const double tremoloHertz = event.derived("tremolo_frequency_hz", 2.0 * hertz);
+              cursor.resolvedValue("phase_advancing", raw, raw.value != 0, SourceValueDisplay::Boolean);
+          const double hertz = cursor.derived("frequency_hz", raw.value * kCapcomSnesLfoStepHertz);
+          const double tremoloHertz = cursor.derived("tremolo_frequency_hz", 2.0 * hertz);
 
           // A zero speed freezes the shared oscillator at its current phase;
           // it does not disable either depth.
-          return event.invoke<&Playback::lfoRates>(hertz, tremoloHertz);
+          return event.invoke<&Playback::lfoRates>({hertz, tremoloHertz});
         }
         case LfoParameter::ResetPhaseOnNote: {
-          const auto raw = event.rawU8("value", SourceValueDisplay::Hex);
+          const auto raw = cursor.rawU8("value", SourceValueDisplay::Hex);
           const bool enabled =
-              event.resolvedValue("reset_phase_on_note", raw, (raw.value & 1) != 0, SourceValueDisplay::Boolean);
+              cursor.resolvedValue("reset_phase_on_note", raw, (raw.value & 1) != 0, SourceValueDisplay::Boolean);
           return event.set<&TrackState::resetLfoPhaseOnNote>(enabled);
         }
         default:
-          event.u8("value", SourceValueDisplay::Hex);
+          cursor.u8("value", SourceValueDisplay::Hex);
           return event.ignore();
       }
     }
     case 0x1b: {
       auto event = cursor.sourceOnly("Echo Param");
-      event.u8("argument", SourceValueDisplay::Hex);
-      event.u8("preset", SourceValueDisplay::Hex);
+      cursor.u8("argument", SourceValueDisplay::Hex);
+      cursor.u8("preset", SourceValueDisplay::Hex);
       return event;
     }
     case 0x1c: {
       auto event = cursor.command("Echo On/Off", SequenceSemantic::Meta);
-      const auto raw = event.rawU8("raw");
-      const bool enabled = event.resolvedValue("enabled", raw, (raw.value & 1) != 0, SourceValueDisplay::Boolean);
+      const auto raw = cursor.rawU8("raw");
+      const bool enabled = cursor.resolvedValue("enabled", raw, (raw.value & 1) != 0, SourceValueDisplay::Boolean);
       return event.emitReverb(enabled ? 40.0 / 127.0 : 0.0);
     }
     case 0x1d: {
       auto event = cursor.command("Release Rate", SequenceSemantic::Envelope);
-      const auto raw = event.rawU8("raw");
-      const u8 gain = event.derived("gain", static_cast<u8>(raw.value | 0xa0), SourceValueDisplay::Hex);
+      const auto raw = cursor.rawU8("raw");
+      const u8 gain = cursor.derived("gain", static_cast<u8>(raw.value | 0xa0), SourceValueDisplay::Hex);
       // Normalize the GAIN rate from full ENVX so the same sticky override can
       // be applied to any instrument selected later on this track.
       const double releaseSeconds =
-          event.resolvedValue("release_seconds", raw, snesDspGainEnvelopeSeconds(gain, 0x7ff, 0));
+          cursor.resolvedValue("release_seconds", raw, snesDspGainEnvelopeSeconds(gain, 0x7ff, 0));
       return event.emitEnvelopeField<EnvelopeFields::Release>(releaseSeconds,
                                                               VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
     }

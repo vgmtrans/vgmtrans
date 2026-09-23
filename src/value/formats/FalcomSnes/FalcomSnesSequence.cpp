@@ -21,7 +21,6 @@
 namespace vgmtrans::formats::falcom_snes {
 
 using namespace core;
-using namespace command;
 
 namespace {
 
@@ -503,52 +502,51 @@ using Cursor = CompilerCursor<Playback>;
     const u8 lengthIndex = opcode & 7;
     auto event = cursor.command((opcode >> 4) == 12 ? "Rest" : "Note",
                                 (opcode >> 4) == 12 ? SequenceSemantic::Rest : SequenceSemantic::Note);
-    const u8 rawKey = event.opcodeValue("key", static_cast<u8>(opcode >> 4));
-    const bool slurred = event.opcodeValue("slurred", (opcode & 8) != 0);
-    const u8 length = lengthIndex == 0 ? event.u8("length") : event.derived("length", durations[lengthIndex - 1]);
-    return event.invoke<&Playback::note>(rawKey, length, slurred, rawKey == 12);
+    const u8 rawKey = cursor.opcodeValue("key", static_cast<u8>(opcode >> 4));
+    const bool slurred = cursor.opcodeValue("slurred", (opcode & 8) != 0);
+    const u8 length = lengthIndex == 0 ? cursor.u8("length") : cursor.derived("length", durations[lengthIndex - 1]);
+    return event.invoke<&Playback::note>({rawKey, length, slurred, rawKey == 12});
   }
   if (opcode <= 0xd6) {
     auto event = cursor.command("Octave", SequenceSemantic::Pitch);
-    const u8 octave = event.opcodeValue("octave", static_cast<u8>(opcode - 0xd0));
+    const u8 octave = cursor.opcodeValue("octave", static_cast<u8>(opcode - 0xd0));
     return event.set<&TrackState::octave>(octave);
   }
 
   switch (opcode) {
-    case 0xd7: {
-      auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-      return event.emitTempo(math::tempoMicroseconds(event.u8("tempo")));
-    }
+    case 0xd7:
+      return cursor.command("Tempo", SequenceSemantic::Tempo).emitTempo(math::tempoMicroseconds(cursor.u8("tempo")));
     case 0xd8: {
       auto event = cursor.command("Program Change", SequenceSemantic::Program);
-      const u8 value = event.u8("program", SemanticOperandRole::InstrumentProgram);
+      const u8 value = cursor.u8("program", SemanticOperandRole::InstrumentProgram);
       if (programs != nullptr) {
         programs->insert(value);
       }
-      return event.invoke<&Playback::programChange>(value);
+      return event.invoke<&Playback::programChange>({value});
     }
     case 0xd9:
       return cursor.command("Vibrato", SequenceSemantic::Modulation)
-          .invoke<&Playback::vibrato>(Byte{"delay"}, Byte{"depth"}, SignedByte{"rate"});
+          .invoke<&Playback::vibrato>({cursor.u8("delay"), cursor.u8("depth"), cursor.s8("rate")});
     case 0xda:
       return cursor.command("Vibrato On/Off", SequenceSemantic::Modulation)
-          .invoke<&Playback::vibratoEnabled>(Byte{"enabled"});
+          .invoke<&Playback::vibratoEnabled>({cursor.u8("enabled") != 0});
     case 0xdb:
       return cursor.ignored("No Operation", 3, "nop");
     case 0xdc:
       return cursor.ignored("No Operation", 1, "nop");
     case 0xdd:
-      return cursor.command("Quantize", SequenceSemantic::State).set<&TrackState::quantize>(Byte{"keyoff_remainder"});
+      return cursor.command("Quantize", SequenceSemantic::State)
+          .set<&TrackState::quantize>(cursor.u8("keyoff_remainder"));
     case 0xde:
-      return cursor.command("Volume", SequenceSemantic::Level).set<&TrackState::volume>(Byte{"volume"});
+      return cursor.command("Volume", SequenceSemantic::Level).set<&TrackState::volume>(cursor.u8("volume"));
     case 0xdf:
     case 0xe0:
     case 0xe1:
     case 0xe2: {
       constexpr std::array<int, 4> amounts{-8, -1, -2, -4};
       auto event = cursor.command("Volume Decrease", SequenceSemantic::Level);
-      const int amount = event.derived("delta", amounts[opcode - 0xdf]);
-      return event.invoke<&Playback::adjustVolume>(amount);
+      const int amount = cursor.derived("delta", amounts[opcode - 0xdf]);
+      return event.invoke<&Playback::adjustVolume>({amount});
     }
     case 0xe3:
     case 0xe4:
@@ -556,110 +554,111 @@ using Cursor = CompilerCursor<Playback>;
     case 0xe6: {
       constexpr std::array<int, 4> amounts{8, 1, 2, 4};
       auto event = cursor.command("Volume Increase", SequenceSemantic::Level);
-      const int amount = event.derived("delta", amounts[opcode - 0xe3]);
-      return event.invoke<&Playback::adjustVolume>(amount);
+      const int amount = cursor.derived("delta", amounts[opcode - 0xe3]);
+      return event.invoke<&Playback::adjustVolume>({amount});
     }
     case 0xe7:
-      return cursor.command("Pan", SequenceSemantic::Pan).invoke<&Playback::setPan>(Byte{"pan"});
+      return cursor.command("Pan", SequenceSemantic::Pan).invoke<&Playback::setPan>({cursor.u8("pan")});
     case 0xe8:
-      return cursor.command("Pan Decrease", SequenceSemantic::Pan).invoke<&Playback::adjustPan>(-8);
+      return cursor.command("Pan Decrease", SequenceSemantic::Pan).invoke<&Playback::adjustPan>({-8});
     case 0xe9:
-      return cursor.command("Pan Increase", SequenceSemantic::Pan).invoke<&Playback::adjustPan>(8);
+      return cursor.command("Pan Increase", SequenceSemantic::Pan).invoke<&Playback::adjustPan>({8});
     case 0xea:
       return cursor.command("Pan LFO", SequenceSemantic::Modulation)
-          .invoke<&Playback::configurePanLfo>(Byte{"target"}, Byte{"step"}, Byte{"interval"});
+          .invoke<&Playback::configurePanLfo>({cursor.u8("target"), cursor.u8("step"), cursor.u8("interval")});
     case 0xeb:
       return cursor.command("Pan LFO On/Off", SequenceSemantic::Modulation)
-          .invoke<&Playback::panLfoEnabled>(Byte{"enabled"});
+          .invoke<&Playback::panLfoEnabled>({cursor.u8("enabled") != 0});
     case 0xec:
       return cursor.command("DSP Pitch Offset", SequenceSemantic::Pitch)
-          .set<&TrackState::tuning>(SignedByte{"pitch_register_delta"});
+          .set<&TrackState::tuning>(cursor.s8("pitch_register_delta"));
     case 0xed: {
       auto event = cursor.command("Repeat Start", SequenceSemantic::Loop);
-      const u8 count = event.u8("count");
-      const Address cell = event.nextAddress();
-      event.derived("counter", cell, SourceValueDisplay::Address);
-      event.u8("counter_initial");
-      return event.invoke<&Playback::repeatStart>(cell, count);
+      const u8 count = cursor.u8("count");
+      const Address cell = cursor.nextAddress();
+      cursor.derived("counter", cell, SourceValueDisplay::Address);
+      cursor.u8("counter_initial");
+      return event.invoke<&Playback::repeatStart>({cell, count});
     }
     case 0xee: {
       auto event = cursor.command("Repeat Break", SequenceSemantic::RepeatBreak);
-      const s16 relative = event.s16le("relative", SourceValueDisplay::SignedDecimal, SemanticOperandRole::JumpTarget);
+      const s16 relative = cursor.s16le("relative", SourceValueDisplay::SignedDecimal, SemanticOperandRole::JumpTarget);
       const Address destination = relativeTarget(begin + 3, relative);
       Address cell{};
       if (destination.value >= 2 && reader.has(destination.value - 2, 2)) {
         cell = relativeTarget(destination.value, static_cast<s16>(reader.le16(destination.value - 2)));
       }
-      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-      event.derived("counter", cell, SourceValueDisplay::Address);
-      return event.invoke<&Playback::repeatBreak>(cell, destination).discoverTarget(destination);
+      cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
+      cursor.derived("counter", cell, SourceValueDisplay::Address);
+      return event.invoke<&Playback::repeatBreak>({cell, destination}).discoverTarget(destination);
     }
     case 0xef: {
       auto event = cursor.command("Repeat End", SequenceSemantic::Repeat);
       const s16 relative =
-          event.s16le("relative", SourceValueDisplay::SignedDecimal, SemanticOperandRole::RepeatTarget);
+          cursor.s16le("relative", SourceValueDisplay::SignedDecimal, SemanticOperandRole::RepeatTarget);
       const Address cell = relativeTarget(begin + 3, relative);
       const Address destination{static_cast<u16>(cell.value + 1)};
-      event.derived("counter", cell, SourceValueDisplay::Address);
-      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-      return event.invoke<&Playback::repeatEnd>(cell, destination).discoverTarget(destination);
+      cursor.derived("counter", cell, SourceValueDisplay::Address);
+      cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
+      return event.invoke<&Playback::repeatEnd>({cell, destination}).discoverTarget(destination);
     }
     case 0xf0:
       return cursor.command("Pitch Envelope", SequenceSemantic::Pitch)
-          .invoke<&Playback::pitchEnvelope>(Byte{"delay"}, Byte{"step"}, SignedByte{"interval"});
+          .invoke<&Playback::pitchEnvelope>({cursor.u8("delay"), cursor.u8("step"), cursor.s8("interval")});
     case 0xf1:
       return cursor.command("Pitch Envelope On/Off", SequenceSemantic::Pitch)
-          .invoke<&Playback::pitchEnvelopeEnabled>(Byte{"enabled"});
+          .invoke<&Playback::pitchEnvelopeEnabled>({cursor.u8("enabled") != 0});
     case 0xf2:
       return cursor.command("ADSR", SequenceSemantic::Envelope)
-          .invoke<&Playback::adsr>(Byte{"adsr1", SourceValueDisplay::Hex}, Byte{"adsr2", SourceValueDisplay::Hex});
+          .invoke<&Playback::adsr>(
+              {cursor.u8("adsr1", SourceValueDisplay::Hex), cursor.u8("adsr2", SourceValueDisplay::Hex)});
     case 0xf3:
       return cursor.command("Broken GAIN", SequenceSemantic::Envelope)
-          .invoke<&Playback::brokenGain>(Byte{"gain", SourceValueDisplay::Hex});
+          .invoke<&Playback::brokenGain>({cursor.u8("gain", SourceValueDisplay::Hex)});
     case 0xf4: {
       auto event = cursor.sourceOnly("DSP FLG / Noise", "noise");
-      event.u8("flg", SourceValueDisplay::Hex);
+      cursor.u8("flg", SourceValueDisplay::Hex);
       return event;
     }
     case 0xf5: {
       auto event = cursor.sourceOnly("DSP Pitch Modulation", "pitch-modulation");
-      event.u8("enabled");
+      cursor.u8("enabled");
       return event;
     }
     case 0xf6:
       return cursor.command("Echo Voice On/Off", SequenceSemantic::State)
-          .set<&TrackState::echoEnabled>(Byte{"enabled"});
+          .set<&TrackState::echoEnabled>(cursor.u8("enabled") != 0);
     case 0xf7:
       return cursor.command("Echo Parameters", SequenceSemantic::State)
-          .invoke<&Playback::echoParameters>(Byte{"delay"}, SignedByte{"feedback"}, Byte{"fir_preset"});
+          .invoke<&Playback::echoParameters>({cursor.u8("delay"), cursor.s8("feedback"), cursor.u8("fir_preset")});
     case 0xf8:
       return cursor.command("Echo Volume On/Off", SequenceSemantic::State)
-          .invoke<&Playback::echoVolumeEnabled>(Byte{"enabled"});
+          .invoke<&Playback::echoVolumeEnabled>({cursor.u8("enabled") != 0});
     case 0xf9:
       return cursor.command("Echo Volume", SequenceSemantic::State)
-          .invoke<&Playback::echoVolume>(SignedByte{"left"}, SignedByte{"right"});
+          .invoke<&Playback::echoVolume>({cursor.s8("left"), cursor.s8("right")});
     case 0xfa: {
       constexpr std::array<std::string_view, 8> names{
           "coefficient_0", "coefficient_1", "coefficient_2", "coefficient_3",
           "coefficient_4", "coefficient_5", "coefficient_6", "coefficient_7",
       };
       auto event = cursor.command("Overwrite FIR Preset", SequenceSemantic::State);
-      const u8 preset = event.u8("preset");
+      const u8 preset = cursor.u8("preset");
       for (u32 coefficient = 0; coefficient < 8; ++coefficient) {
-        event.s8(names[coefficient]);
+        cursor.s8(names[coefficient]);
       }
-      return event.invoke<&Playback::overwriteFirPreset>(preset);
+      return event.invoke<&Playback::overwriteFirPreset>({preset});
     }
     case 0xfb:
       return cursor.ignored("No Operation", 1, "nop");
     case 0xfc: {
       auto event = cursor.command("Goto / End", SequenceSemantic::Jump);
-      const s16 relative = event.s16le("relative", SourceValueDisplay::SignedDecimal, SemanticOperandRole::JumpTarget);
+      const s16 relative = cursor.s16le("relative", SourceValueDisplay::SignedDecimal, SemanticOperandRole::JumpTarget);
       if (relative == 0) {
         return event.label("End").end();
       }
       const Address destination = relativeTarget(begin + 3, relative);
-      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
+      cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
       return destination.value < begin ? event.loopCandidate(destination) : event.jump(destination);
     }
     default:

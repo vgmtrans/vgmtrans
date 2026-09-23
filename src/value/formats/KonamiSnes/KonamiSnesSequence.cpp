@@ -29,7 +29,6 @@
 namespace vgmtrans::formats::konami_snes {
 
 using namespace core;
-using namespace command;
 
 namespace {
 
@@ -1137,36 +1136,35 @@ using KonamiCursor = CompilerCursor<Playback>;
 
 // Pitch slides can be standalone commands or an immediate suffix of a note or
 // rest. This reads the version-specific suffix once into the containing event.
-[[nodiscard]] DecodedPitchSlide readPitchSlide(KonamiCursor::Event& event, KonamiSnesVersion version) {
+[[nodiscard]] DecodedPitchSlide readPitchSlide(KonamiCursor& cursor, KonamiSnesVersion version) {
   DecodedPitchSlide slide{
       .kind = pitchSlideKind(version),
-      .delay = event.u8("slide_delay"),
-      .length = event.u8("slide_length"),
-      .targetNote = event.u8("target_note", SourceValueDisplay::MidiNote),
+      .delay = cursor.u8("slide_delay"),
+      .length = cursor.u8("slide_length"),
+      .targetNote = cursor.u8("target_note", SourceValueDisplay::MidiNote),
   };
   // The driver carries a precalculated delta in later layouts. Playback derives
   // the same motion from target and length, but the original field is still
   // read and annotated so source inspection remains complete.
   if (slide.kind == PitchSlideKind::V2 && slide.length != 0) {
-    event.u8("reserved", SourceValueDisplay::Hex);
-    event.s16le("delta", SourceValueDisplay::SignedDecimal);
+    cursor.u8("reserved", SourceValueDisplay::Hex);
+    cursor.s16le("delta", SourceValueDisplay::SignedDecimal);
   } else if (slide.kind == PitchSlideKind::V3) {
-    event.s16le("delta", SourceValueDisplay::SignedDecimal);
+    cursor.s16le("delta", SourceValueDisplay::SignedDecimal);
   }
   return slide;
 }
 
-[[nodiscard]] std::optional<DecodedPitchSlide> readInlinePitchSlide(KonamiCursor::Event& event,
-                                                                    KonamiSnesVersion version) {
-  if (event.peekU8() != 0xf3) {
+[[nodiscard]] std::optional<DecodedPitchSlide> readInlinePitchSlide(KonamiCursor& cursor, KonamiSnesVersion version) {
+  if (cursor.peekU8() != 0xf3) {
     return std::nullopt;
   }
-  event.u8("pitch_slide_opcode", SourceValueDisplay::Hex);
-  return readPitchSlide(event, version);
+  cursor.u8("pitch_slide_opcode", SourceValueDisplay::Hex);
+  return readPitchSlide(cursor, version);
 }
 
 void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide) {
-  event.invoke<&Playback::beginPitchSlide>(slide.kind, slide.delay, slide.length, slide.targetNote);
+  event.invoke<&Playback::beginPitchSlide>({slide.kind, slide.delay, slide.length, slide.targetNote});
 }
 
 [[nodiscard]] DecodedBytecodeCommand unknownCommand(KonamiCursor& cursor, u8 argumentCount) {
@@ -1174,7 +1172,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
   // correct byte length without guessing at behavior that is not understood.
   auto event = cursor.sourceOnly("Unknown Event", "unknown");
   for (u8 index = 0; index < argumentCount; ++index) {
-    event.u8(fmt::format("arg{}", index + 1), SourceValueDisplay::Hex);
+    cursor.u8(fmt::format("arg{}", index + 1), SourceValueDisplay::Hex);
   }
   return event;
 }
@@ -1191,21 +1189,21 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
   // length byte; opcodes 0x80-0xdf reuse the previous length with bit 7 set.
   if (opcode <= 0x5f || (opcode >= 0x80 && opcode <= 0xdf)) {
     auto event = cursor.command("Note", SequenceSemantic::Note);
-    const u8 key = event.opcodeValue("key", static_cast<u8>(opcode & 0x7f), SourceValueDisplay::MidiNote);
+    const u8 key = cursor.opcodeValue("key", static_cast<u8>(opcode & 0x7f), SourceValueDisplay::MidiNote);
     if ((opcode & 0x80) == 0) {
-      event.set<&TrackState::noteLength>(event.u8("length"));
+      event.set<&TrackState::noteLength>(cursor.u8("length"));
     }
-    u8 velocity = event.u8("velocity_or_duration");
+    u8 velocity = cursor.u8("velocity_or_duration");
     // A clear high bit means this byte is a new duration rate and another byte
     // follows for velocity. A set high bit means it is velocity by itself.
     if ((velocity & 0x80) == 0) {
-      const u8 rate = event.derived("duration_rate", velocity);
+      const u8 rate = cursor.derived("duration_rate", velocity);
       event.set<&TrackState::noteDurationRate>(rate);
-      velocity = event.u8("velocity");
+      velocity = cursor.u8("velocity");
     }
     velocity &= 0x7f;
-    event.invoke<&Playback::note>(key, velocity);
-    if (const auto slide = readInlinePitchSlide(event, version)) {
+    event.invoke<&Playback::note>({key, velocity});
+    if (const auto slide = readInlinePitchSlide(cursor, version)) {
       event.label("Note with Pitch Slide");
       appendPitchSlide(event, *slide);
     }
@@ -1220,8 +1218,8 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     if (tuning >= 8) {
       tuning -= 16;
     }
-    event.opcodeValue("tuning", tuning);
-    return event.invoke<&Playback::tuning>(tuning);
+    cursor.opcodeValue("tuning", tuning);
+    return event.invoke<&Playback::tuning>({tuning});
   }
 
   if (isTerminalLowOpcode(version, opcode)) {
@@ -1236,38 +1234,36 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     case 0x62:
       if (version == KONAMISNES_V5 || version == KONAMISNES_V6) {
         auto event = cursor.command("Release Rate", SequenceSemantic::Envelope);
-        const u8 amount = event.u8("amount");
+        const u8 amount = cursor.u8("amount");
         if (amount >= 100) {
-          event.derived("dsp_release_gain", releaseGain(amount), SourceValueDisplay::Hex);
+          cursor.derived("dsp_release_gain", releaseGain(amount), SourceValueDisplay::Hex);
         } else {
-          event.derived("normal_key_off", true);
+          cursor.derived("normal_key_off", true);
         }
-        return event.invoke<&Playback::setRelease>(amount);
+        return event.invoke<&Playback::setRelease>({amount});
       }
       if (version == KONAMISNES_V1) {
-        auto event = cursor.command("Default Duration", SequenceSemantic::State);
-        return event.set<&TrackState::noteDurationRate>(event.u8("duration_rate"));
+        return cursor.command("Default Duration", SequenceSemantic::State)
+            .set<&TrackState::noteDurationRate>(cursor.u8("duration_rate"));
       }
       return unknownCommand(cursor, 0);
     case 0x63: {
       if (version == KONAMISNES_V1) {
-        auto event = cursor.command("Default Note Volume", SequenceSemantic::State);
-        return event.set<&TrackState::defaultNoteVolume>(static_cast<u8>(event.u8("volume") & 0x7f));
+        return cursor.command("Default Note Volume", SequenceSemantic::State)
+            .set<&TrackState::defaultNoteVolume>(static_cast<u8>(cursor.u8("volume") & 0x7f));
       }
       if (version == KONAMISNES_V6) {
-        return cursor.command("Echo Voice On", SequenceSemantic::State).invoke<&Playback::setEchoVoice>(true);
+        return cursor.command("Echo Voice On", SequenceSemantic::State).invoke<&Playback::setEchoVoice>({true});
       }
       return unknownCommand(cursor, 0);
     }
     case 0x64: {
       if (version == KONAMISNES_V1) {
-        auto event = cursor.command("Default Duration And Note Volume", SequenceSemantic::State);
-        const u8 rate = event.u8("duration_rate");
-        const u8 volume = event.u8("volume");
-        return event.invoke<&Playback::setDefaults>(rate, volume);
+        return cursor.command("Default Duration And Note Volume", SequenceSemantic::State)
+            .invoke<&Playback::setDefaults>({cursor.u8("duration_rate"), cursor.u8("volume")});
       }
       if (version == KONAMISNES_V6) {
-        return cursor.command("Echo Voice Off", SequenceSemantic::State).invoke<&Playback::setEchoVoice>(false);
+        return cursor.command("Echo Voice Off", SequenceSemantic::State).invoke<&Playback::setEchoVoice>({false});
       }
       return unknownCommand(cursor, 0);
     }
@@ -1301,8 +1297,8 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       return unknownCommand(cursor, 0);
     case 0xe0: {
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
-      event.set<&TrackState::noteLength>(event.u8("length"));
-      if (const auto slide = readInlinePitchSlide(event, version)) {
+      event.set<&TrackState::noteLength>(cursor.u8("length"));
+      if (const auto slide = readInlinePitchSlide(cursor, version)) {
         appendPitchSlide(event, *slide);
       }
       event.invoke<&Playback::rest>();
@@ -1310,77 +1306,77 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     }
     case 0xe1: {
       auto event = cursor.command("Tie", SequenceSemantic::Note);
-      event.set<&TrackState::noteLength>(event.u8("length"));
-      const u8 rate = event.u8("duration_rate");
+      event.set<&TrackState::noteLength>(cursor.u8("length"));
+      const u8 rate = cursor.u8("duration_rate");
       event.set<&TrackState::noteDurationRate>(rate);
       event.invoke<&Playback::tie>();
       return event.wait<&TrackState::noteLength>();
     }
     case 0xe2: {
       auto event = cursor.command("Program", SequenceSemantic::Program);
-      const u8 program = event.u8("raw");
-      event.derived("bank", program >> 7, SemanticOperandRole::InstrumentBank);
-      event.derived("program", program & 0x7f, SemanticOperandRole::InstrumentProgram);
-      return event.invoke<&Playback::programChange>(program);
+      const u8 program = cursor.u8("raw");
+      cursor.derived("bank", program >> 7, SemanticOperandRole::InstrumentBank);
+      cursor.derived("program", program & 0x7f, SemanticOperandRole::InstrumentProgram);
+      return event.invoke<&Playback::programChange>({program});
     }
     case 0xe3: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      const u8 raw = event.u8("pan");
+      const u8 raw = cursor.u8("pan");
       const bool instrumentPanOff = version <= KONAMISNES_V2 ? raw == 0x15 : raw == 0x2a;
       const bool instrumentPanOn = version <= KONAMISNES_V2 ? raw == 0x16 : raw == 0x2c;
       // The two values immediately beyond the normal pan range toggle an
       // internal instrument-pan feature; they are not audible pan positions.
-      event.derived("instrument_pan_off", instrumentPanOff);
-      event.derived("instrument_pan_on", instrumentPanOn);
+      cursor.derived("instrument_pan_off", instrumentPanOff);
+      cursor.derived("instrument_pan_on", instrumentPanOn);
       if (instrumentPanOff || instrumentPanOn) {
         return event.set<&TrackState::instrumentPanEnabled>(instrumentPanOn);
       }
-      return event.invoke<&Playback::pan>(raw);
+      return event.invoke<&Playback::pan>({raw});
     }
     case 0xe4: {
       auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
-      const u8 arg1 = event.u8("delay_or_fade");
-      const u8 rate = event.u8("rate");
-      const u8 depth = event.u8("depth");
-      const u8 delay = event.derived("delay", vibrato::delayFromArg1(version, arg1));
-      const u8 fade = event.derived("built_in_fade", vibrato::inlineFadeLength(version, arg1));
-      return event.invoke<&Playback::configureVibrato>(delay, rate, depth, fade);
+      const u8 arg1 = cursor.u8("delay_or_fade");
+      const u8 rate = cursor.u8("rate");
+      const u8 depth = cursor.u8("depth");
+      const u8 delay = cursor.derived("delay", vibrato::delayFromArg1(version, arg1));
+      const u8 fade = cursor.derived("built_in_fade", vibrato::inlineFadeLength(version, arg1));
+      return event.invoke<&Playback::configureVibrato>({delay, rate, depth, fade});
     }
     case 0xe5: {
       auto event = cursor.sourceOnly("Random Pitch");
-      event.u8("rate");
-      event.u16be("pitch_mask", SourceValueDisplay::Hex);
+      cursor.u8("rate");
+      cursor.u16be("pitch_mask", SourceValueDisplay::Hex);
       return event;
     }
     case 0xe6: {
       auto event = cursor.command("Loop Start", SequenceSemantic::Loop);
       // Loop start has no operand. Its return address is simply the byte after
       // this opcode, recorded now so loop end can jump back during playback.
-      const Address destination = event.derived("loop_start", event.nextAddress(), SourceValueDisplay::Address,
-                                                SemanticOperandRole::LoopTarget);
+      const Address destination = cursor.derived("loop_start", cursor.nextAddress(), SourceValueDisplay::Address,
+                                                 SemanticOperandRole::LoopTarget);
       return event.set<&TrackState::loopReturnAddress>(destination);
     }
     case 0xe7:
     case 0xe9: {
       auto event = cursor.command(opcode == 0xe7 ? "Loop End" : "Loop End #2", SequenceSemantic::Repeat);
-      const u8 slot = event.derived("slot", static_cast<u8>(opcode == 0xe7 ? 0 : 1));
-      const u8 times = event.u8("times");
-      const s8 volumeDelta = event.s8("volume_delta", SourceValueDisplay::SignedDecimal);
-      const s8 pitchDelta = event.s8("pitch_delta", SourceValueDisplay::SignedDecimal);
-      return event.invokeFlow<&Playback::loopEnd>(slot, times, volumeDelta, pitchDelta);
+      const u8 slot = cursor.derived("slot", static_cast<u8>(opcode == 0xe7 ? 0 : 1));
+      const u8 times = cursor.u8("times");
+      const s8 volumeDelta = cursor.s8("volume_delta", SourceValueDisplay::SignedDecimal);
+      const s8 pitchDelta = cursor.s8("pitch_delta", SourceValueDisplay::SignedDecimal);
+      return event.invokeFlow<&Playback::loopEnd>({slot, times, volumeDelta, pitchDelta});
     }
     case 0xe8: {
       auto event = cursor.command("Loop Start #2", SequenceSemantic::Loop);
-      const Address destination = event.derived("loop_start", event.nextAddress(), SourceValueDisplay::Address,
-                                                SemanticOperandRole::LoopTarget);
+      const Address destination = cursor.derived("loop_start", cursor.nextAddress(), SourceValueDisplay::Address,
+                                                 SemanticOperandRole::LoopTarget);
       return event.set<&TrackState::loopReturnAddress2>(destination);
     }
     case 0xea: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-      const u8 tempo = event.u8("raw");
-      event.derived("tempo", tempoBeatsPerMinute(tempoMicrosecondsPerQuarter(version, tempo)),
-                    SourceValueDisplay::BeatsPerMinute);
-      return event.invoke<&Playback::tempo>(tempo);
+      const u8 tempo = cursor.u8("raw");
+      cursor.derived("tempo", tempoBeatsPerMinute(tempoMicrosecondsPerQuarter(version, tempo)),
+                     SourceValueDisplay::BeatsPerMinute);
+      return event.invoke<&Playback::tempo>({tempo});
     }
     case 0xeb:
     case 0xef:
@@ -1394,106 +1390,103 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       // The command stays two operands long in every version, but their meaning
       // changes from duration/target to target/signed-step in versions 5-6.
       if (isLateVersion(version)) {
-        const u8 destination = event.u8("target");
-        const s8 step = event.s8("step");
-        return event.invoke<&Playback::beginFade>(target, true, destination, u8{0}, step);
+        return event.invoke<&Playback::beginFade>({target, true, cursor.u8("target"), u8{0}, cursor.s8("step")});
       }
-      const u8 ticks = event.u8("length");
-      const u8 destination = event.u8("target");
-      return event.invoke<&Playback::beginFade>(target, false, destination, ticks, s8{0});
+      const u8 ticks = cursor.u8("length");
+      const u8 destination = cursor.u8("target");
+      return event.invoke<&Playback::beginFade>({target, false, destination, ticks, s8{0}});
     }
     case 0xec:
       return cursor.command("Transpose", SequenceSemantic::Pitch)
-          .set<&TrackState::transpose>(SignedByte{"semitones", SourceValueDisplay::SignedDecimal});
+          .set<&TrackState::transpose>(cursor.s8("semitones", SourceValueDisplay::SignedDecimal));
     case 0xed:
       if (isLateVersion(version)) {
-        auto event = cursor.command("ADSR(1)", SequenceSemantic::Envelope);
-        return event.invoke<&Playback::setAdsr1>(event.u8("adsr1", SourceValueDisplay::Hex));
+        return cursor.command("ADSR(1)", SequenceSemantic::Envelope)
+            .invoke<&Playback::setAdsr1>({cursor.u8("adsr1", SourceValueDisplay::Hex)});
       }
       return unknownCommand(cursor, 3);
     case 0xee:
-      return cursor.command("Volume", SequenceSemantic::Level).invoke<&Playback::volume>(Byte{"volume"});
+      return cursor.command("Volume", SequenceSemantic::Level).invoke<&Playback::volume>({cursor.u8("volume")});
     case 0xf0:
       return cursor.command("Portamento", SequenceSemantic::Pitch)
-          .invoke<&Playback::configurePortamento>(Byte{"speed"});
+          .invoke<&Playback::configurePortamento>({cursor.u8("speed")});
     case 0xf1: {
       auto event = cursor.command("Pitch Envelope", SequenceSemantic::Pitch);
-      const u8 delay = event.u8("delay");
+      const u8 delay = cursor.u8("delay");
       if (isLateVersion(version)) {
-        const u8 length = event.u8("length");
-        const s8 offset = event.s8("offset", SourceValueDisplay::SignedDecimal);
+        const u8 length = cursor.u8("length");
+        const s8 offset = cursor.s8("offset", SourceValueDisplay::SignedDecimal);
         // This shapes the exact late curve; fixed-duration playback currently
         // retains its endpoints and timing while that curve remains deferred.
-        event.s16le("delta", SourceValueDisplay::SignedDecimal);
-        return event.invoke<&Playback::configurePitchEnvelope>(delay, length, static_cast<s16>(offset));
+        cursor.s16le("delta", SourceValueDisplay::SignedDecimal);
+        return event.invoke<&Playback::configurePitchEnvelope>({delay, length, static_cast<s16>(offset)});
       }
-      const u8 speed = event.u8("speed");
-      const u8 depth = event.u8("depth");
-      return event.invoke<&Playback::configurePitchEnvelope>(delay, speed, static_cast<s16>(depth));
+      const u8 speed = cursor.u8("speed");
+      const u8 depth = cursor.u8("depth");
+      return event.invoke<&Playback::configurePitchEnvelope>({delay, speed, static_cast<s16>(depth)});
     }
     case 0xf2:
       return cursor.command("Tuning", SequenceSemantic::Pitch)
-          .invoke<&Playback::tuning>(SignedByte{"tuning", SourceValueDisplay::SignedDecimal});
+          .invoke<&Playback::tuning>({cursor.s8("tuning", SourceValueDisplay::SignedDecimal)});
     case 0xf3: {
       auto event = cursor.command("Pitch Slide", SequenceSemantic::Pitch);
-      appendPitchSlide(event, readPitchSlide(event, version));
+      appendPitchSlide(event, readPitchSlide(cursor, version));
       return event;
     }
     case 0xf4:
       return cursor.command("Echo", SequenceSemantic::State)
-          .invoke<&Playback::echo>(Byte{"channels", SourceValueDisplay::Hex}, Byte{"volume_left"},
-                                   Byte{"volume_right"});
+          .invoke<&Playback::echo>(
+              {cursor.u8("channels", SourceValueDisplay::Hex), cursor.u8("volume_left"), cursor.u8("volume_right")});
     case 0xf5:
       return cursor.command("Echo Parameters", SequenceSemantic::State)
-          .invoke<&Playback::echoParameters>(Byte{"delay"}, Byte{"feedback"},
-                                             Byte{"filter_or_ignored", SourceValueDisplay::Hex});
+          .invoke<&Playback::echoParameters>(
+              {cursor.u8("delay"), cursor.u8("feedback"), cursor.u8("filter_or_ignored", SourceValueDisplay::Hex)});
     case 0xf6: {
       auto event = cursor.command("Loop With Volta Start", SequenceSemantic::Repeat);
-      const Address start = event.derived("loop_start", event.nextAddress(), SourceValueDisplay::Address,
-                                          SemanticOperandRole::RepeatTarget);
-      return event.invoke<&Playback::beginVoltaLoop>(start);
+      const Address start = cursor.derived("loop_start", cursor.nextAddress(), SourceValueDisplay::Address,
+                                           SemanticOperandRole::RepeatTarget);
+      return event.invoke<&Playback::beginVoltaLoop>({start});
     }
-    case 0xf7: {
-      auto event = cursor.command("Loop With Volta End", SequenceSemantic::Repeat);
-      return event.invokeFlow<&Playback::voltaEnd>(event.nextAddress());
-    }
+    case 0xf7:
+      return cursor.command("Loop With Volta End", SequenceSemantic::Repeat)
+          .invokeFlow<&Playback::voltaEnd>({cursor.nextAddress()});
     case 0xf9:
       return cursor.command("Vibrato Fade", SequenceSemantic::Modulation)
-          .invoke<&Playback::setVibratoFade>(Byte{"length"});
+          .invoke<&Playback::setVibratoFade>({cursor.u8("length")});
     case 0xfa: {
       auto event = cursor.command("ADSR / GAIN", SequenceSemantic::Envelope);
-      const u8 arg1 = event.u8(usesEncodedEnvelopeParameters(version) ? "attack_decay_parameter" : "adsr1",
-                               SourceValueDisplay::Hex);
-      const u8 arg2 = event.u8(usesEncodedEnvelopeParameters(version) ? "sustain_parameter" : "adsr2_or_gain",
-                               SourceValueDisplay::Hex);
-      const u8 releaseAmount = event.u8("release_amount");
+      const u8 arg1 = cursor.u8(usesEncodedEnvelopeParameters(version) ? "attack_decay_parameter" : "adsr1",
+                                SourceValueDisplay::Hex);
+      const u8 arg2 = cursor.u8(usesEncodedEnvelopeParameters(version) ? "sustain_parameter" : "adsr2_or_gain",
+                                SourceValueDisplay::Hex);
+      const u8 releaseAmount = cursor.u8("release_amount");
       const u8 adsr1 = usesEncodedEnvelopeParameters(version) ? snesDspKonamiAdsr1(arg1) : arg1;
       const u8 adsr2OrGain =
           usesEncodedEnvelopeParameters(version) && (adsr1 & 0x80) != 0 ? snesDspKonamiAdsr2(arg2) : arg2;
-      event.derived("dsp_adsr1", adsr1, SourceValueDisplay::Hex);
+      cursor.derived("dsp_adsr1", adsr1, SourceValueDisplay::Hex);
       if ((adsr1 & 0x80) != 0) {
-        event.derived("dsp_adsr2", adsr2OrGain, SourceValueDisplay::Hex);
+        cursor.derived("dsp_adsr2", adsr2OrGain, SourceValueDisplay::Hex);
       } else {
-        event.derived("dsp_gain", adsr2OrGain, SourceValueDisplay::Hex);
+        cursor.derived("dsp_gain", adsr2OrGain, SourceValueDisplay::Hex);
       }
       if (version >= KONAMISNES_V3 && releaseAmount >= 100) {
-        event.derived("dsp_release_gain", releaseGain(releaseAmount), SourceValueDisplay::Hex);
+        cursor.derived("dsp_release_gain", releaseGain(releaseAmount), SourceValueDisplay::Hex);
       }
-      return event.invoke<&Playback::setEnvelope>(adsr1, adsr2OrGain, releaseAmount);
+      return event.invoke<&Playback::setEnvelope>({adsr1, adsr2OrGain, releaseAmount});
     }
     case 0xfb:
       if (isLateVersion(version)) {
-        auto event = cursor.command("ADSR(2)", SequenceSemantic::Envelope);
-        return event.invoke<&Playback::setAdsr2>(event.u8("adsr2", SourceValueDisplay::Hex));
+        return cursor.command("ADSR(2)", SequenceSemantic::Envelope)
+            .invoke<&Playback::setAdsr2>({cursor.u8("adsr2", SourceValueDisplay::Hex)});
       }
       if (version == KONAMISNES_V4) {
         auto event = cursor.sourceOnly("Linear Pitch Envelope");
-        event.u8("delta_fraction");
-        event.s8("delta_integer", SourceValueDisplay::SignedDecimal);
+        cursor.u8("delta_fraction");
+        cursor.s8("delta_integer", SourceValueDisplay::SignedDecimal);
         return event;
       } else {
         auto event = cursor.sourceOnly("Pitch Modulation");
-        event.u8("voice_mask", SourceValueDisplay::Hex);
+        cursor.u8("voice_mask", SourceValueDisplay::Hex);
         return event;
       }
     case 0xfc:
@@ -1501,35 +1494,35 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       // others so its changing operand length and behavior are easy to compare.
       if (version == KONAMISNES_V1) {
         auto event = cursor.command("Conditional Jump", SequenceSemantic::Jump);
-        const Address destination = event.addressLe("destination", SemanticOperandRole::JumpTarget);
-        const Address alternate = event.addressLe("alternate_destination", SemanticOperandRole::JumpTarget);
+        const Address destination = cursor.addressLe("destination", SemanticOperandRole::JumpTarget);
+        const Address alternate = cursor.addressLe("alternate_destination", SemanticOperandRole::JumpTarget);
         event.loopCandidate(destination);
         return event.discoverTarget(alternate);
       }
       if (version >= KONAMISNES_V2 && version <= KONAMISNES_V4) {
         auto event = cursor.sourceOnly("Linear Pitch Envelope");
-        event.u8("delta_fraction");
-        event.s8("delta_integer", SourceValueDisplay::SignedDecimal);
+        cursor.u8("delta_fraction");
+        cursor.s8("delta_integer", SourceValueDisplay::SignedDecimal);
         return event;
       }
       if (version >= KONAMISNES_V5) {
         auto event = cursor.command("Program And Volume", SequenceSemantic::Program);
-        const u8 volume = event.u8("volume");
-        const u8 program = event.u8("raw");
-        event.derived("bank", program >> 7, SemanticOperandRole::InstrumentBank);
-        event.derived("program", program & 0x7f, SemanticOperandRole::InstrumentProgram);
-        return event.invoke<&Playback::programChangeAndVolume>(volume, program);
+        const u8 volume = cursor.u8("volume");
+        const u8 program = cursor.u8("raw");
+        cursor.derived("bank", program >> 7, SemanticOperandRole::InstrumentBank);
+        cursor.derived("program", program & 0x7f, SemanticOperandRole::InstrumentProgram);
+        return event.invoke<&Playback::programChangeAndVolume>({volume, program});
       }
       return unknownCommand(cursor, 2);
     case 0xfd: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
       // Backward jumps normally form the song loop. The shared VM decides
       // whether to preserve, replay, or stop when it reaches that loop.
-      return event.loopCandidate(event.addressLe("destination", SemanticOperandRole::LoopTarget));
+      return event.loopCandidate(cursor.addressLe("destination", SemanticOperandRole::LoopTarget));
     }
     case 0xfe: {
       auto event = cursor.command("Pattern Play", SequenceSemantic::Call);
-      const Address destination = event.addressLe("destination", SemanticOperandRole::CallTarget);
+      const Address destination = cursor.addressLe("destination", SemanticOperandRole::CallTarget);
       // The format uses the same 0xff opcode for return and track end, so retain
       // enough history to choose the right meaning when 0xff executes.
       event.set<&TrackState::inSubroutine>(true);

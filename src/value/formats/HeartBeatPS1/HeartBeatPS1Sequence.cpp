@@ -536,60 +536,61 @@ using Cursor = CompilerCursor<Playback>;
 
   auto event = cursor.command(label, semantic, playback);
   if (source.end > source.offset + 1) {
-    event.rawBytes("encoded_bytes", source.end - source.offset - 1);
+    cursor.rawBytes("encoded_bytes", source.end - source.offset - 1);
   }
-  event.derived("delta", source.delta);
-  event.derived("status", source.status, SourceValueDisplay::Hex);
+  cursor.derived("delta", source.delta);
+  cursor.derived("status", source.status, SourceValueDisplay::Hex);
   if (source.status < 0xf0) {
-    event.derived("channel", channel, SemanticOperandRole::Channel);
+    cursor.derived("channel", channel, SemanticOperandRole::Channel);
   }
   if (family == 0x80) {
-    event.derived("key", source.data1, SourceValueDisplay::MidiNote);
-    event.derived("velocity", source.data2);
-    return event.invoke<&Playback::noteOff>(channel, source.data1, source.delta);
+    cursor.derived("key", source.data1, SourceValueDisplay::MidiNote);
+    cursor.derived("velocity", source.data2);
+    return event.invoke<&Playback::noteOff>({channel, source.data1, source.delta});
   }
   if (family == 0x90) {
-    event.derived("key", source.data1, SourceValueDisplay::MidiNote);
-    event.derived("velocity", source.data2);
-    return event.invoke<&Playback::noteOn>(channel, source.data1, source.data2, source.delta);
+    cursor.derived("key", source.data1, SourceValueDisplay::MidiNote);
+    cursor.derived("velocity", source.data2);
+    return event.invoke<&Playback::noteOn>({channel, source.data1, source.data2, source.delta});
   }
   if (family == 0xa0 || family == 0xd0) {
-    return event.invoke<&Playback::sourceOnly>(source.delta);
+    return event.invoke<&Playback::sourceOnly>({source.delta});
   }
   if (family == 0xb0) {
-    event.derived("controller", source.data1);
-    event.derived("value", source.data2,
-                  source.data1 == 32 ? SemanticOperandRole::InstrumentBank : SemanticOperandRole::Value);
+    cursor.derived("controller", source.data1);
+    cursor.derived("value", source.data2,
+                   source.data1 == 32 ? SemanticOperandRole::InstrumentBank : SemanticOperandRole::Value);
     if (source.loopDestination) {
       const Address destination{*source.loopDestination};
-      event.derived("repeat_count", source.loopCount);
-      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
-      return event.invoke<&Playback::loopEnd>(source.loopCount, destination, source.delta).discoverTarget(destination);
+      cursor.derived("repeat_count", source.loopCount);
+      cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
+      return event.invoke<&Playback::loopEnd>({source.loopCount, destination, source.delta})
+          .discoverTarget(destination);
     }
     if (source.data1 == 99 && source.data2 == 20) {
-      event.derived("loop_start", Address{source.end}, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
+      cursor.derived("loop_start", Address{source.end}, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
     }
-    return event.invoke<&Playback::controller>(channel, source.data1, source.data2, source.delta);
+    return event.invoke<&Playback::controller>({channel, source.data1, source.data2, source.delta});
   }
   if (family == 0xc0) {
-    event.derived("program", source.data1, SemanticOperandRole::InstrumentProgram);
-    return event.invoke<&Playback::program>(channel, source.data1, source.delta);
+    cursor.derived("program", source.data1, SemanticOperandRole::InstrumentProgram);
+    return event.invoke<&Playback::program>({channel, source.data1, source.delta});
   }
   if (family == 0xe0) {
     const u16 value = static_cast<u16>((source.data2 << 7) | source.data1);
-    event.derived("wheel", value);
-    return event.invoke<&Playback::pitchBend>(channel, value, source.delta);
+    cursor.derived("wheel", value);
+    return event.invoke<&Playback::pitchBend>({channel, value, source.delta});
   }
   if (source.status == 0xff && source.data1 == 0x51 && source.payloadSize == 3) {
     const u32 payload = source.end - 3;
     const u32 tempo = reader.be24(payload);
-    event.derived("microseconds_per_quarter", tempo);
-    return event.invoke<&Playback::tempo>(tempo, source.delta);
+    cursor.derived("microseconds_per_quarter", tempo);
+    return event.invoke<&Playback::tempo>({tempo, source.delta});
   }
   if (source.status == 0xff && source.data1 == 0x2f) {
     return event.end();
   }
-  return event.invoke<&Playback::sourceOnly>(source.delta);
+  return event.invoke<&Playback::sourceOnly>({source.delta});
 }
 
 }  // namespace

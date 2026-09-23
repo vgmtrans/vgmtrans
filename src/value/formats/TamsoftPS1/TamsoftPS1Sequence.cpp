@@ -23,7 +23,6 @@
 namespace vgmtrans::formats::tamsoft_ps1 {
 
 using namespace core;
-using namespace command;
 
 namespace {
 
@@ -252,75 +251,77 @@ using Cursor = CompilerCursor<Playback>;
   const u8 opcode = cursor.opcode();
   if (opcode <= 0x7f) {
     auto event = cursor.command("Wait", SequenceSemantic::Rest);
-    event.derived("ticks", delayTicks(opcode));
+    cursor.derived("ticks", delayTicks(opcode));
     return event.wait(delayTicks(opcode));
   }
   if (opcode <= 0xdf) {
     auto event = cursor.command("Note", SequenceSemantic::Note);
     const u8 key = opcode & 0x7f;
-    event.derived("key", key, SourceValueDisplay::MidiNote);
-    return event.invoke<&Playback::keyOn>(key);
+    cursor.derived("key", key, SourceValueDisplay::MidiNote);
+    return event.invoke<&Playback::keyOn>({key});
   }
 
   switch (opcode) {
     case 0xe0:
-      return cursor.command("Volume", SequenceSemantic::Level).invoke<&Playback::setVolume>(Byte{"volume"});
+      return cursor.command("Volume", SequenceSemantic::Level).invoke<&Playback::setVolume>({cursor.u8("volume")});
     case 0xe1:
       return cursor.command("Stereo Balance", SequenceSemantic::Pan)
-          .invoke<&Playback::setStereoBalance>(Byte{"left"}, Byte{"right"});
+          .invoke<&Playback::setStereoBalance>({cursor.u8("left"), cursor.u8("right")});
     case 0xe2:
       return cursor.command("Instrument", SequenceSemantic::Instrument)
-          .invoke<&Playback::setInstrument>(Byte{"program", SemanticOperandRole::InstrumentProgram});
+          .invoke<&Playback::setInstrument>({cursor.u8("program", SemanticOperandRole::InstrumentProgram)});
     case 0xe3: {
       auto event = cursor.noOp("Reserved Tempo Word");
-      event.u16le("value", SourceValueDisplay::Hex);
+      cursor.u16le("value", SourceValueDisplay::Hex);
       return event;
     }
     case 0xe4:
       return cursor.command("Pitch", SequenceSemantic::Pitch)
-          .invoke<&Playback::changePitch>(WordLE{"spu_pitch", SourceValueDisplay::Hex});
+          .invoke<&Playback::changePitch>({cursor.u16le("spu_pitch", SourceValueDisplay::Hex)});
     case 0xe5:
       return cursor.command("Key On By Pitch", SequenceSemantic::Note)
-          .invoke<&Playback::keyOnByPitch>(WordLE{"spu_pitch", SourceValueDisplay::Hex});
+          .invoke<&Playback::keyOnByPitch>({cursor.u16le("spu_pitch", SourceValueDisplay::Hex)});
     case 0xe6:
-      return cursor.command("Reverb Mode", SequenceSemantic::State).invoke<&Playback::setReverbMode>(Byte{"mode"});
+      return cursor.command("Reverb Mode", SequenceSemantic::State)
+          .invoke<&Playback::setReverbMode>({cursor.u8("mode")});
     case 0xe7:
-      return cursor.command("Reverb Depth", SequenceSemantic::State).invoke<&Playback::setReverbDepth>(Byte{"depth"});
+      return cursor.command("Reverb Depth", SequenceSemantic::State)
+          .invoke<&Playback::setReverbDepth>({cursor.u8("depth")});
     case 0xe8:
-      return cursor.command("Reverb Send On", SequenceSemantic::State).invoke<&Playback::setReverbSend>(true);
+      return cursor.command("Reverb Send On", SequenceSemantic::State).invoke<&Playback::setReverbSend>({true});
     case 0xe9:
-      return cursor.command("Reverb Send Off", SequenceSemantic::State).invoke<&Playback::setReverbSend>(false);
+      return cursor.command("Reverb Send Off", SequenceSemantic::State).invoke<&Playback::setReverbSend>({false});
     case 0xea:
       return cursor.command("Pitch Scale", SequenceSemantic::Pitch)
-          .invoke<&Playback::setPitchScale>(WordLE{"scale", SourceValueDisplay::Hex});
+          .invoke<&Playback::setPitchScale>({cursor.u16le("scale", SourceValueDisplay::Hex)});
     case 0xf0:
       return cursor.command("Key Off", SequenceSemantic::Note).invoke<&Playback::keyOff>();
     case 0xf1: {
       auto event = cursor.command("Priority", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly);
-      event.u8("priority");
+      cursor.u8("priority");
       return event;
     }
     case 0xf8: {
       auto event = cursor.command("Jump", SequenceSemantic::Loop);
-      const s16 relative = event.s16le("relative", SourceValueDisplay::SignedDecimal);
+      const s16 relative = cursor.s16le("relative", SourceValueDisplay::SignedDecimal);
       const auto target = relativeTarget(reader, offset, relative);
       if (!target) {
-        event.warning("Tamsoft jump target is outside the TSQ file");
+        cursor.warning("Tamsoft jump target is outside the TSQ file");
         return event.end();
       }
-      event.derived("destination", *target, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
+      cursor.derived("destination", *target, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
       return event.declaredLoop(*target);
     }
     case 0xf9: {
       auto event = cursor.command("External Channel", SequenceSemantic::State,
                                   CommandPlaybackStatus::AffectsControlFlow);
-      const s16 relative = event.s16le("relative", SourceValueDisplay::SignedDecimal);
+      const s16 relative = cursor.s16le("relative", SourceValueDisplay::SignedDecimal);
       const auto target = relativeTarget(reader, offset, relative);
       if (!target) {
-        event.warning("Tamsoft external-channel target is outside the TSQ file");
+        cursor.warning("Tamsoft external-channel target is outside the TSQ file");
         return event;
       }
-      event.derived("destination", *target, SourceValueDisplay::Address, SemanticOperandRole::CallTarget);
+      cursor.derived("destination", *target, SourceValueDisplay::Address, SemanticOperandRole::CallTarget);
       // Layout analysis materializes this cloned driver voice as its own track.
       return event.discoverTarget(*target);
     }

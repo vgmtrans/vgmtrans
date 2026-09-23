@@ -7,7 +7,7 @@
 #pragma once
 
 #include "value/base/RecordReader.h"
-#include "value/sequence/CommandOperands.h"
+#include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CompiledCommandRuntime.h"
 
 #include <algorithm>
@@ -46,6 +46,20 @@ template <class T>
     return std::remove_cvref_t<T>(std::move(value));
   }
 }
+
+// Playback methods supply the types for a braced list of already decoded values.
+// References are copied; makeCommandBody also owns string_view arguments.
+template <class Result, class Owner, class... Arguments>
+auto commandArguments(Result (Owner::*)(Arguments...)) -> std::tuple<std::decay_t<Arguments>...>;
+
+template <class Result, class Owner, class... Arguments>
+auto commandArguments(Result (Owner::*)(Arguments...) const) -> std::tuple<std::decay_t<Arguments>...>;
+
+template <class Playback, class... Arguments>
+auto handlerArguments(std::tuple<Playback, Arguments...>) -> std::tuple<Arguments...>;
+
+template <class Handler>
+using HandlerArguments = decltype(handlerArguments(commandArguments(&Handler::operator())));
 
 template <class Playback, class Callable, class... Arguments>
 using CommandResult = std::invoke_result_t<
@@ -104,185 +118,11 @@ public:
 
   class Event {
   public:
-    // For invoke/invokeFlow/set/add, named operands such as command::Byte{"key"}
-    // read and annotate fields in argument order. They can accompany ordinary
-    // values. Direct reads below consume bytes immediately: use locals when a
-    // field needs decoding logic, and never mix direct reads with named operands
-    // in one call or rely on the evaluation order of multiple direct reads.
-    [[nodiscard]] bool ok() const noexcept { return cursor_.record_.ok(); }
-
-    ::u8 u8(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
-            SemanticOperandRole role = SemanticOperandRole::Value) {
-      return cursor_.decoded(cursor_.record_.u8(name, display), name, display, role);
-    }
-
-    ::u8 u8(std::string_view name, SemanticOperandRole role) { return u8(name, SourceValueDisplay::Default, role); }
-
-    [[nodiscard]] EncodedSemanticField<::u8> rawU8(std::string_view name,
-                                                   SourceValueDisplay display = SourceValueDisplay::Default) {
-      return {cursor_.record_.u8(name, display), name, display};
-    }
-
-    ::s8 s8(std::string_view name, SourceValueDisplay display = SourceValueDisplay::SignedDecimal,
-            SemanticOperandRole role = SemanticOperandRole::Value) {
-      return cursor_.decoded(cursor_.record_.s8(name, display), name, display, role);
-    }
-
-    ::s8 s8(std::string_view name, SemanticOperandRole role) {
-      return s8(name, SourceValueDisplay::SignedDecimal, role);
-    }
-
-    [[nodiscard]] EncodedSemanticField<::s8> rawS8(std::string_view name,
-                                                   SourceValueDisplay display = SourceValueDisplay::SignedDecimal) {
-      return {cursor_.record_.s8(name, display), name, display};
-    }
-
-    u16 u16be(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
-              SemanticOperandRole role = SemanticOperandRole::Value) {
-      return cursor_.decoded(cursor_.record_.u16be(name, display), name, display, role);
-    }
-
-    [[nodiscard]] EncodedSemanticField<u16> rawU16be(std::string_view name,
-                                                     SourceValueDisplay display = SourceValueDisplay::Default) {
-      return {cursor_.record_.u16be(name, display), name, display};
-    }
-
-    u16 u16le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
-              SemanticOperandRole role = SemanticOperandRole::Value) {
-      return cursor_.decoded(cursor_.record_.u16le(name, display), name, display, role);
-    }
-
-    [[nodiscard]] EncodedSemanticField<u16> rawU16le(std::string_view name,
-                                                     SourceValueDisplay display = SourceValueDisplay::Default) {
-      return {cursor_.record_.u16le(name, display), name, display};
-    }
-
-    s16 s16le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::SignedDecimal,
-              SemanticOperandRole role = SemanticOperandRole::Value) {
-      return cursor_.decoded(cursor_.record_.s16le(name, display), name, display, role);
-    }
-
-    u32 u24le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
-              SemanticOperandRole role = SemanticOperandRole::Value) {
-      return cursor_.decoded(cursor_.record_.u24le(name, display), name, display, role);
-    }
-
-    u32 u32be(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
-              SemanticOperandRole role = SemanticOperandRole::Value) {
-      return cursor_.decoded(cursor_.record_.u32be(name, display), name, display, role);
-    }
-
-    [[nodiscard]] EncodedSemanticField<u32> rawU32be(std::string_view name,
-                                                     SourceValueDisplay display = SourceValueDisplay::Default) {
-      return {cursor_.record_.u32be(name, display), name, display};
-    }
-
-    u32 u32le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
-              SemanticOperandRole role = SemanticOperandRole::Value) {
-      return cursor_.decoded(cursor_.record_.u32le(name, display), name, display, role);
-    }
-
-    [[nodiscard]] EncodedSemanticField<u32> rawU32le(std::string_view name,
-                                                     SourceValueDisplay display = SourceValueDisplay::Default) {
-      return {cursor_.record_.u32le(name, display), name, display};
-    }
-
-    u32 varLen(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
-               SemanticOperandRole role = SemanticOperandRole::Value) {
-      return cursor_.decoded(cursor_.record_.varLen(name, display), name, display, role);
-    }
-
-    u32 varLen(std::string_view name, SemanticOperandRole role) {
-      return varLen(name, SourceValueDisplay::Default, role);
-    }
-
-    std::string rawBytes(std::string_view name, u32 size) {
-      return cursor_.decoded(cursor_.record_.rawBytes(name, size), name, SourceValueDisplay::Hex,
-                             SemanticOperandRole::Value);
-    }
-
-    // Look ahead without consuming or annotating the byte. This is useful when
-    // a command may have an optional suffix identified by its own opcode.
-    [[nodiscard]] std::optional<::u8> peekU8() const { return cursor_.record_.peekU8(); }
-
     // Changes the label for the decoded command.
     Event& label(std::string_view label) {
       presentation_.label = label;
       return *this;
     }
-
-    // Some commands implicitly refer to the byte immediately after themselves,
-    // such as a loop start with no encoded destination.
-    [[nodiscard]] Address nextAddress() const { return Address{cursor_.record_.position()}; }
-
-    [[nodiscard]] Address address(std::string_view name, SemanticOperandRole role = SemanticOperandRole::Value) {
-      return Address{u16be(name, SourceValueDisplay::Address, role)};
-    }
-
-    [[nodiscard]] Address addressLe(std::string_view name, SemanticOperandRole role = SemanticOperandRole::Value) {
-      return Address{u16le(name, SourceValueDisplay::Address, role)};
-    }
-
-    template <::u8 Shift, ::u8 Width>
-    ::u8 opcodeBits(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
-                    SemanticOperandRole role = SemanticOperandRole::Value) {
-      static_assert(Width > 0 && Width <= 8 && Shift + Width <= 8);
-      constexpr u16 mask = (u16{1} << Width) - 1;
-      const auto result = static_cast<::u8>((cursor_.opcode_ >> Shift) & mask);
-      opcodeValue(name, result, display, role);
-      return result;
-    }
-
-    template <::u8 Shift, ::u8 Width>
-    ::u8 opcodeBits(std::string_view name, SemanticOperandRole role) {
-      return opcodeBits<Shift, Width>(name, SourceValueDisplay::Default, role);
-    }
-
-    template <class T>
-    T opcodeValue(std::string_view name, T value, SourceValueDisplay display = SourceValueDisplay::Default,
-                  SemanticOperandRole role = SemanticOperandRole::Value) {
-      cursor_.add(name, detail::semanticValue(value), cursor_.opcodeRange_, display, role);
-      return value;
-    }
-
-    template <class T>
-    T derived(std::string_view name, T value, SourceValueDisplay display = SourceValueDisplay::Default,
-              SemanticOperandRole role = SemanticOperandRole::Value) {
-      if (cursor_.record_.ok()) {
-        cursor_.add(name, detail::semanticValue(value), {}, display, role);
-      }
-      return value;
-    }
-
-    template <class T>
-    T derived(std::string_view name, T value, SemanticOperandRole role) {
-      return derived(name, std::move(value), SourceValueDisplay::Default, role);
-    }
-
-    template <class T, class Convert>
-    [[nodiscard]] auto resolved(std::string_view name, const EncodedSemanticField<T>& source, Convert convert,
-                                SourceValueDisplay display = SourceValueDisplay::Default,
-                                SemanticOperandRole role = SemanticOperandRole::Value)
-        -> std::invoke_result_t<Convert, T> {
-      using Resolved = std::invoke_result_t<Convert, T>;
-      return source.valid ? resolvedValue(name, source, std::invoke(convert, source.value), display, role) : Resolved{};
-    }
-
-    template <class T, class Resolved>
-    Resolved resolvedValue(std::string_view name, const EncodedSemanticField<T>& source, Resolved resolved,
-                           SourceValueDisplay display = SourceValueDisplay::Default,
-                           SemanticOperandRole role = SemanticOperandRole::Value) {
-      if (source.valid) {
-        if (!name.empty() && source.range.valid()) {
-          cursor_.add(source.name.empty() ? name : source.name, detail::semanticValue(source.value), source.range,
-                      source.display, SemanticOperandRole::Value);
-        }
-        cursor_.add(name, detail::semanticValue(resolved), {}, display, role);
-      }
-      return resolved;
-    }
-
-    void warning(std::string message) { cursor_.warning(std::move(message)); }
 
     // Operations accumulate in source order and return the same builder. A
     // return statement converts the final Event expression into the decoded
@@ -379,7 +219,7 @@ public:
     }
 
     template <EnvelopeFields Field>
-    Event& emitEnvelopeField(auto value, VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks) {
+    Event& emitEnvelopeField(double value, VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks) {
       return appendCallable(&detail::emitEnvelopeField<Playback, Field>, std::move(value), scope);
     }
 
@@ -432,32 +272,49 @@ public:
       });
     }
 
-    template <auto Method, class... Arguments>
-    Event& invoke(Arguments... arguments) {
-      return appendCallable(Method, std::move(arguments)...);
+    // Braces sequence source reads before binding. There is deliberately no
+    // loose argument-pack overload: invoke({read1(), read2()}) preserves order.
+    template <auto Method>
+    Event& invoke(decltype(detail::commandArguments(Method)) arguments) {
+      return appendInvocation<false>(Method, std::move(arguments));
     }
 
-    // Keep short, one-off runtime behavior beside the opcode that defines it.
-    // The callable and explicit arguments are owned by the command body;
-    // captures must own anything that needs to outlive decoding.
-    template <class Handler, class... Arguments>
-    Event& invoke(Handler handler, Arguments... arguments) {
-      return appendCallable(std::move(handler), std::move(arguments)...);
+    template <auto Method>
+    Event& invoke() {
+      return appendCallable(Method);
     }
 
-    // Invoke behavior that may choose the command's runtime path. The decoded
-    // default still applies when the handler returns no flow override.
-    template <auto Method, class... Arguments>
-    Event& invokeFlow(Arguments... arguments) {
-      return invokeFlow(Method, std::move(arguments)...);
+    // Captures must own anything that needs to outlive decoding. Explicit
+    // arguments are copied into the command body using the same rules as methods.
+    template <class Handler>
+    Event& invoke(Handler handler, detail::HandlerArguments<Handler> arguments) {
+      return appendInvocation<false>(std::move(handler), std::move(arguments));
     }
 
-    template <class Handler, class... Arguments>
-    Event& invokeFlow(Handler handler, Arguments... arguments) {
-      using Result = detail::CommandResult<Playback, Handler, decltype(readArgument(std::move(arguments)))...>;
-      static_assert(std::is_same_v<Result, Effects>, "A runtime control-flow handler must return Effects");
-      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      return appendCallable(std::move(handler), std::move(arguments)...);
+    template <class Handler>
+    Event& invoke(Handler handler) {
+      return appendCallable(std::move(handler));
+    }
+
+    // Runtime control flow may override the command's decoded default path.
+    template <auto Method>
+    Event& invokeFlow(decltype(detail::commandArguments(Method)) arguments) {
+      return appendInvocation<true>(Method, std::move(arguments));
+    }
+
+    template <auto Method>
+    Event& invokeFlow() {
+      return appendInvocation<true>(Method, std::tuple<>{});
+    }
+
+    template <class Handler>
+    Event& invokeFlow(Handler handler, detail::HandlerArguments<Handler> arguments) {
+      return appendInvocation<true>(std::move(handler), std::move(arguments));
+    }
+
+    template <class Handler>
+    Event& invokeFlow(Handler handler) {
+      return appendInvocation<true>(std::move(handler), std::tuple<>{});
     }
 
     // The VM may execute this command while the preceding command's wait is
@@ -544,14 +401,16 @@ public:
     Event(CompilerCursor& cursor, DecodedCommandPresentation presentation)
         : cursor_(cursor), presentation_(std::move(presentation)), initialPlayback_(presentation_.playback) {}
 
-    template <class Argument>
-    auto readArgument(Argument argument) {
-      return argument;
-    }
-
-    template <command::Encoding encoding>
-    auto readArgument(command::Operand<encoding> operand) {
-      return operand.read(*this);
+    template <bool ControlFlow, class Callable, class... Arguments>
+    Event& appendInvocation(Callable callable, std::tuple<Arguments...> arguments) {
+      if constexpr (ControlFlow) {
+        static_assert(std::is_same_v<detail::CommandResult<Playback, Callable, Arguments...>, Effects>,
+                      "A runtime control-flow handler must return Effects");
+        presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
+      }
+      return std::apply(
+          [&](auto... values) -> Event& { return appendCallable(std::move(callable), std::move(values)...); },
+          std::move(arguments));
     }
 
     template <class Callable, class... Arguments>
@@ -560,12 +419,7 @@ public:
           presentation_.playback == CommandPlaybackStatus::NoOp) {
         presentation_.playback = CommandPlaybackStatus::AffectsPlayback;
       }
-      // Braced initialization reads named operands in source order. Ordinary
-      // values pass through; only decoded values enter the compiled body.
-      std::tuple<decltype(readArgument(std::move(arguments)))...> values{readArgument(std::move(arguments))...};
-      CommandBody next = std::apply(
-          [&](auto... values) { return detail::makeCommandBody<Playback>(std::move(callable), std::move(values)...); },
-          std::move(values));
+      CommandBody next = detail::makeCommandBody<Playback>(std::move(callable), std::move(arguments)...);
       if (!execution_.body) {
         execution_.body = std::move(next);
         return *this;
@@ -624,6 +478,180 @@ public:
   [[nodiscard]] bool ok() const noexcept { return record_.ok(); }
   [[nodiscard]] ::u8 opcode() const noexcept { return opcode_; }
 
+  // Reads consume bytes and record source metadata immediately. Keep dependent
+  // reads in separate statements; braced invoke arguments are read left to right.
+  ::u8 u8(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
+          SemanticOperandRole role = SemanticOperandRole::Value) {
+    return decoded(record_.u8(name, display), name, display, role);
+  }
+
+  ::u8 u8(std::string_view name, SemanticOperandRole role) { return u8(name, SourceValueDisplay::Default, role); }
+
+  [[nodiscard]] EncodedSemanticField<::u8> rawU8(std::string_view name,
+                                                 SourceValueDisplay display = SourceValueDisplay::Default) {
+    return {record_.u8(name, display), name, display};
+  }
+
+  ::s8 s8(std::string_view name, SourceValueDisplay display = SourceValueDisplay::SignedDecimal,
+          SemanticOperandRole role = SemanticOperandRole::Value) {
+    return decoded(record_.s8(name, display), name, display, role);
+  }
+
+  ::s8 s8(std::string_view name, SemanticOperandRole role) { return s8(name, SourceValueDisplay::SignedDecimal, role); }
+
+  [[nodiscard]] EncodedSemanticField<::s8> rawS8(std::string_view name,
+                                                 SourceValueDisplay display = SourceValueDisplay::SignedDecimal) {
+    return {record_.s8(name, display), name, display};
+  }
+
+  u16 u16be(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
+            SemanticOperandRole role = SemanticOperandRole::Value) {
+    return decoded(record_.u16be(name, display), name, display, role);
+  }
+
+  [[nodiscard]] EncodedSemanticField<u16> rawU16be(std::string_view name,
+                                                   SourceValueDisplay display = SourceValueDisplay::Default) {
+    return {record_.u16be(name, display), name, display};
+  }
+
+  u16 u16le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
+            SemanticOperandRole role = SemanticOperandRole::Value) {
+    return decoded(record_.u16le(name, display), name, display, role);
+  }
+
+  [[nodiscard]] EncodedSemanticField<u16> rawU16le(std::string_view name,
+                                                   SourceValueDisplay display = SourceValueDisplay::Default) {
+    return {record_.u16le(name, display), name, display};
+  }
+
+  s16 s16le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::SignedDecimal,
+            SemanticOperandRole role = SemanticOperandRole::Value) {
+    return decoded(record_.s16le(name, display), name, display, role);
+  }
+
+  u32 u24le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
+            SemanticOperandRole role = SemanticOperandRole::Value) {
+    return decoded(record_.u24le(name, display), name, display, role);
+  }
+
+  u32 u32be(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
+            SemanticOperandRole role = SemanticOperandRole::Value) {
+    return decoded(record_.u32be(name, display), name, display, role);
+  }
+
+  [[nodiscard]] EncodedSemanticField<u32> rawU32be(std::string_view name,
+                                                   SourceValueDisplay display = SourceValueDisplay::Default) {
+    return {record_.u32be(name, display), name, display};
+  }
+
+  u32 u32le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
+            SemanticOperandRole role = SemanticOperandRole::Value) {
+    return decoded(record_.u32le(name, display), name, display, role);
+  }
+
+  [[nodiscard]] EncodedSemanticField<u32> rawU32le(std::string_view name,
+                                                   SourceValueDisplay display = SourceValueDisplay::Default) {
+    return {record_.u32le(name, display), name, display};
+  }
+
+  u32 varLen(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
+             SemanticOperandRole role = SemanticOperandRole::Value) {
+    return decoded(record_.varLen(name, display), name, display, role);
+  }
+
+  u32 varLen(std::string_view name, SemanticOperandRole role) {
+    return varLen(name, SourceValueDisplay::Default, role);
+  }
+
+  std::string rawBytes(std::string_view name, u32 size) {
+    return decoded(record_.rawBytes(name, size), name, SourceValueDisplay::Hex, SemanticOperandRole::Value);
+  }
+
+  // Look ahead without consuming or annotating the byte. This is useful when
+  // a command may have an optional suffix identified by its own opcode.
+  [[nodiscard]] std::optional<::u8> peekU8() const { return record_.peekU8(); }
+
+  // Some commands implicitly refer to the byte immediately after themselves,
+  // such as a loop start with no encoded destination.
+  [[nodiscard]] Address nextAddress() const { return Address{record_.position()}; }
+
+  [[nodiscard]] Address address(std::string_view name, SemanticOperandRole role = SemanticOperandRole::Value) {
+    return Address{u16be(name, SourceValueDisplay::Address, role)};
+  }
+
+  [[nodiscard]] Address addressLe(std::string_view name, SemanticOperandRole role = SemanticOperandRole::Value) {
+    return Address{u16le(name, SourceValueDisplay::Address, role)};
+  }
+
+  template <::u8 Shift, ::u8 Width>
+  ::u8 opcodeBits(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
+                  SemanticOperandRole role = SemanticOperandRole::Value) {
+    static_assert(Width > 0 && Width <= 8 && Shift + Width <= 8);
+    constexpr u16 mask = (u16{1} << Width) - 1;
+    const auto result = static_cast<::u8>((opcode_ >> Shift) & mask);
+    opcodeValue(name, result, display, role);
+    return result;
+  }
+
+  template <::u8 Shift, ::u8 Width>
+  ::u8 opcodeBits(std::string_view name, SemanticOperandRole role) {
+    return opcodeBits<Shift, Width>(name, SourceValueDisplay::Default, role);
+  }
+
+  template <class T>
+  T opcodeValue(std::string_view name, T value, SourceValueDisplay display = SourceValueDisplay::Default,
+                SemanticOperandRole role = SemanticOperandRole::Value) {
+    add(name, detail::semanticValue(value), opcodeRange_, display, role);
+    return value;
+  }
+
+  template <class T>
+  T derived(std::string_view name, T value, SourceValueDisplay display = SourceValueDisplay::Default,
+            SemanticOperandRole role = SemanticOperandRole::Value) {
+    if (record_.ok()) {
+      add(name, detail::semanticValue(value), {}, display, role);
+    }
+    return value;
+  }
+
+  template <class T>
+  T derived(std::string_view name, T value, SemanticOperandRole role) {
+    return derived(name, std::move(value), SourceValueDisplay::Default, role);
+  }
+
+  template <class T, class Convert>
+  [[nodiscard]] auto resolved(std::string_view name, const EncodedSemanticField<T>& source, Convert convert,
+                              SourceValueDisplay display = SourceValueDisplay::Default,
+                              SemanticOperandRole role = SemanticOperandRole::Value)
+      -> std::invoke_result_t<Convert, T> {
+    using Resolved = std::invoke_result_t<Convert, T>;
+    return source.valid ? resolvedValue(name, source, std::invoke(convert, source.value), display, role) : Resolved{};
+  }
+
+  template <class T, class Resolved>
+  Resolved resolvedValue(std::string_view name, const EncodedSemanticField<T>& source, Resolved resolved,
+                         SourceValueDisplay display = SourceValueDisplay::Default,
+                         SemanticOperandRole role = SemanticOperandRole::Value) {
+    if (source.valid) {
+      if (!name.empty() && source.range.valid()) {
+        add(source.name.empty() ? name : source.name, detail::semanticValue(source.value), source.range, source.display,
+            SemanticOperandRole::Value);
+      }
+      add(name, detail::semanticValue(resolved), {}, display, role);
+    }
+    return resolved;
+  }
+
+  void warning(std::string message) {
+    if (diagnostics_ != nullptr) {
+      diagnostics_->push_back(Diagnostic{
+          .severity = Severity::Warning,
+          .message = std::move(message),
+          .range = record_.range(),
+      });
+    }
+  }
+
   [[nodiscard]] Event command(std::string_view label, SequenceSemantic semantic,
                               CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback,
                               std::string_view category = {}) {
@@ -653,7 +681,7 @@ public:
   [[nodiscard]] DecodedBytecodeCommand ignored(std::string_view label, u32 operandBytes,
                                                std::string_view category = {}) {
     auto event = sourceOnly(label, category);
-    event.rawBytes("bytes", operandBytes);
+    rawBytes("bytes", operandBytes);
     return event;
   }
 
@@ -687,15 +715,6 @@ private:
     }
   }
 
-  void warning(std::string message) {
-    if (diagnostics_ != nullptr) {
-      diagnostics_->push_back(Diagnostic{
-          .severity = Severity::Warning,
-          .message = std::move(message),
-          .range = record_.range(),
-      });
-    }
-  }
 
   [[nodiscard]] DecodedCommandPresentation truncatedPresentation() const {
     return DecodedCommandPresentation{

@@ -21,7 +21,6 @@
 namespace vgmtrans::formats::neverland_snes {
 
 using namespace core;
-using namespace command;
 
 namespace {
 
@@ -615,15 +614,15 @@ using Cursor = CompilerCursor<Playback>;
   if ((opcode & 0x80) != 0) {
     auto event = cursor.command("Section Transpose", SequenceSemantic::Pitch);
     const u8 semitones = opcode & 0x7f;
-    event.opcodeValue("semitones", semitones);
-    return event.invoke<&Playback::transpose>(semitones);
+    cursor.opcodeValue("semitones", semitones);
+    return event.invoke<&Playback::transpose>({semitones});
   }
   auto event = cursor.command("Section", SequenceSemantic::Call);
-  const u16 encoded = static_cast<u16>((opcode << 8) | event.u8("offset_low", SourceValueDisplay::Hex));
-  event.opcodeValue("offset_high", opcode, SourceValueDisplay::Hex);
+  const u16 encoded = static_cast<u16>((opcode << 8) | cursor.u8("offset_low", SourceValueDisplay::Hex));
+  cursor.opcodeValue("offset_high", opcode, SourceValueDisplay::Hex);
   const Address destination = sectionAddress(layout, encoded);
-  event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::CallTarget);
-  return event.invoke<&Playback::enterSection>(static_cast<u16>(begin))
+  cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::CallTarget);
+  return event.invoke<&Playback::enterSection>({static_cast<u16>(begin)})
       .jump(destination)
       .discoverTarget(Address{static_cast<u16>(begin + 2)});
 }
@@ -632,24 +631,24 @@ template <auto Handler, class... Args>
 [[nodiscard]] DecodedBytecodeCommand valueSubcommand(Cursor& cursor, std::string_view label,
                                                      SequenceSemantic semantic, Args... args) {
   auto event = cursor.command(label, semantic);
-  event.u8("command", SourceValueDisplay::Hex);
-  return event.invoke<Handler>(event.u8("value", SourceValueDisplay::Hex), args...);
+  cursor.u8("command", SourceValueDisplay::Hex);
+  return event.invoke<Handler>({cursor.u8("value", SourceValueDisplay::Hex), args...});
 }
 
 template <auto Handler, class... Args>
 [[nodiscard]] DecodedBytecodeCommand fixedSubcommand(Cursor& cursor, std::string_view label,
                                                      SequenceSemantic semantic, Args... args) {
   auto event = cursor.command(label, semantic);
-  event.u8("command", SourceValueDisplay::Hex);
-  event.u8("value", SourceValueDisplay::Hex);
-  return event.invoke<Handler>(args...);
+  cursor.u8("command", SourceValueDisplay::Hex);
+  cursor.u8("value", SourceValueDisplay::Hex);
+  return event.invoke<Handler>({args...});
 }
 
 [[nodiscard]] DecodedBytecodeCommand sourceSubcommand(Cursor& cursor, std::string_view label,
                                                       SequenceSemantic semantic, std::string_view category) {
   auto event = cursor.command(label, semantic, CommandPlaybackStatus::SourceOnly, category);
-  event.u8("command", SourceValueDisplay::Hex);
-  event.u8("value", SourceValueDisplay::Hex);
+  cursor.u8("command", SourceValueDisplay::Hex);
+  cursor.u8("value", SourceValueDisplay::Hex);
   return event;
 }
 
@@ -759,11 +758,11 @@ template <auto Handler, class... Args>
     auto event = cursor.command("Note", SequenceSemantic::Note);
     const bool save = opcode < 0x80;
     const u8 key = opcode & 0x7f;
-    event.opcodeValue("key", key, SourceValueDisplay::MidiNote);
-    const u8 wait = save ? event.u8("wait") : 0;
-    const u8 duration = save ? event.u8("duration") : 0;
-    const u8 velocity = save ? event.u8("volume") : 0;
-    return event.invokeFlow<&Playback::note>(key, wait, duration, velocity, save);
+    cursor.opcodeValue("key", key, SourceValueDisplay::MidiNote);
+    const u8 wait = save ? cursor.u8("wait") : 0;
+    const u8 duration = save ? cursor.u8("duration") : 0;
+    const u8 velocity = save ? cursor.u8("volume") : 0;
+    return event.invokeFlow<&Playback::note>({key, wait, duration, velocity, save});
   }
 
   switch (opcode) {
@@ -771,27 +770,26 @@ template <auto Handler, class... Args>
       auto event = cursor.command(layout.version == Version::Modern ? "Modulation" : "Reserved Wait",
                                   layout.version == Version::Modern ? SequenceSemantic::Modulation
                                                                     : SequenceSemantic::Rest);
-      const u8 wait = event.u8("wait");
-      const u8 value = event.u8(layout.version == Version::Modern ? "strength" : "unused");
-      return layout.version == Version::Modern ? event.invokeFlow<&Playback::modulation>(wait, value)
-                                               : event.invokeFlow<&Playback::delay>(wait);
+      const u8 wait = cursor.u8("wait");
+      const u8 value = cursor.u8(layout.version == Version::Modern ? "strength" : "unused");
+      return layout.version == Version::Modern ? event.invokeFlow<&Playback::modulation>({wait, value})
+                                               : event.invokeFlow<&Playback::delay>({wait});
     }
     case 0xf1:
       return cursor.command("Volume", SequenceSemantic::Level)
-          .invokeFlow<&Playback::volume>(Byte{"wait"}, Byte{"volume"});
+          .invokeFlow<&Playback::volume>({cursor.u8("wait"), cursor.u8("volume")});
     case 0xf2:
-      return cursor.command("Pan", SequenceSemantic::Pan).invokeFlow<&Playback::pan>(Byte{"wait"}, Byte{"pan"});
+      return cursor.command("Pan", SequenceSemantic::Pan)
+          .invokeFlow<&Playback::pan>({cursor.u8("wait"), cursor.u8("pan")});
     case 0xf3:
       if (layout.version == Version::Modern) {
-        auto event = cursor.command("Delay", SequenceSemantic::Rest);
-        return event.invokeFlow<&Playback::delay>(event.u8("wait"));
+        return cursor.command("Delay", SequenceSemantic::Rest).invokeFlow<&Playback::delay>({cursor.u8("wait")});
       }
       return cursor.ignored("Reserved", 1, "reserved");
     case 0xf4:
       if (layout.version == Version::Modern) {
-        auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-        const u8 wait = event.u8("wait");
-        return event.invokeFlow<&Playback::tempo>(wait, event.u8("timer_target"));
+        return cursor.command("Tempo", SequenceSemantic::Tempo)
+            .invokeFlow<&Playback::tempo>({cursor.u8("wait"), cursor.u8("timer_target")});
       }
       return cursor.ignored("Reserved", 1, "reserved");
     case 0xf5:
@@ -801,27 +799,28 @@ template <auto Handler, class... Args>
       return cursor.ignored("Reserved", layout.version == Version::Original ? 1 : 0, "reserved");
     case 0xf6: {
       auto event = cursor.command("Pitch Scale", SequenceSemantic::Pitch);
-      const u8 wait = event.u8("wait");
-      const u8 scale = event.u8("scale");
+      const u8 wait = cursor.u8("wait");
+      const u8 scale = cursor.u8("scale");
       if (layout.version == Version::Original) {
-        event.u8("unused");
+        cursor.u8("unused");
       }
-      return event.invokeFlow<&Playback::tuning>(wait, scale);
+      return event.invokeFlow<&Playback::tuning>({wait, scale});
     }
     case 0xf7: {
       auto event = cursor.command("Program Change", SequenceSemantic::Program);
-      const u8 wait = event.u8("wait");
-      const u8 program = event.u8("program", SemanticOperandRole::InstrumentProgram);
+      const u8 wait = cursor.u8("wait");
+      const u8 program = cursor.u8("program", SemanticOperandRole::InstrumentProgram);
       if (references != nullptr) {
         references->insert(program);
       }
-      return event.invokeFlow<&Playback::programChange>(wait, program);
+      return event.invokeFlow<&Playback::programChange>({wait, program});
     }
     case 0xfb:
       return cursor.command("Repeat Start", SequenceSemantic::Repeat)
-          .invokeFlow<&Playback::repeatStart>(Address{static_cast<u16>(begin + 1)});
+          .invokeFlow<&Playback::repeatStart>({Address{static_cast<u16>(begin + 1)}});
     case 0xfc:
-      return cursor.command("Repeat End", SequenceSemantic::Repeat).invokeFlow<&Playback::repeatEnd>(Byte{"count"});
+      return cursor.command("Repeat End", SequenceSemantic::Repeat)
+          .invokeFlow<&Playback::repeatEnd>({cursor.u8("count")});
     case 0xfd:
       return cursor.command("Section End", SequenceSemantic::Return)
           .invoke<&Playback::sectionEnd>()

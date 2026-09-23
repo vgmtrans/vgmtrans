@@ -356,18 +356,18 @@ using Cursor = CompilerCursor<Playback>;
   if (!cursor.hasOpcode()) return cursor.truncated();
   const u8 status = cursor.opcode();
 
-  auto readVariable = [](auto& event, std::string_view name) -> u16 {
-    const u8 first = event.u8(name, SourceValueDisplay::Hex);
+  auto readVariable = [&](std::string_view name) -> u16 {
+    const u8 first = cursor.u8(name, SourceValueDisplay::Hex);
     if ((first & 0x80) == 0)
       return first;
-    return static_cast<u16>(((first & 0x7f) << 7) | (event.u8("value_low", SourceValueDisplay::Hex) & 0x7f));
+    return static_cast<u16>(((first & 0x7f) << 7) | (cursor.u8("value_low", SourceValueDisplay::Hex) & 0x7f));
   };
-  auto readTiming = [&](auto& event) -> u16 {
+  auto readTiming = [&]() -> u16 {
     if ((status & 0x60) == 0x40) {
-      return readVariable(event, "delta");
+      return readVariable("delta");
     }
     if ((status & 0x60) == 0x60) {
-      const u8 index = event.u8("delta_index", SourceValueDisplay::Hex) & 0x1f;
+      const u8 index = cursor.u8("delta_index", SourceValueDisplay::Hex) & 0x1f;
       return config.durations[index];
     }
     return kReuseTiming;
@@ -375,20 +375,19 @@ using Cursor = CompilerCursor<Playback>;
 
   if (status < 0x80) {
     auto event = cursor.command("Note", SequenceSemantic::Note);
-    const u8 encodedNote = event.u8("note", SourceValueDisplay::Hex);
-    const u16 delta = readTiming(event);
+    const u8 encodedNote = cursor.u8("note", SourceValueDisplay::Hex);
+    const u16 delta = readTiming();
     const u8 durationIndex = status & 0x1f;
-    const u16 duration = durationIndex == 0x1f ? readVariable(event, "duration") : config.durations[durationIndex];
-    const u8 velocity = (encodedNote & 0x80) != 0 ? event.u8("velocity") : kReuseVelocity;
-    return event.invoke<&Playback::note>(encodedNote & 0x7f, duration, delta, (status & 0x60) == 0x20,
-                                         velocity);
+    const u16 duration = durationIndex == 0x1f ? readVariable("duration") : config.durations[durationIndex];
+    const u8 velocity = (encodedNote & 0x80) != 0 ? cursor.u8("velocity") : kReuseVelocity;
+    return event.invoke<&Playback::note>({encodedNote & 0x7f, duration, delta, (status & 0x60) == 0x20, velocity});
   }
   if ((status & 0x60) == 0x20) {
     auto event = cursor.command("Relative Note", SequenceSemantic::Note);
     const bool ascending = (status & 0x10) != 0;
-    event.derived("direction", std::string(ascending ? "up" : "down"));
-    event.derived("distance", status & 0x0f);
-    return event.invoke<&Playback::relativeNote>(ascending, status & 0x0f);
+    cursor.derived("direction", std::string(ascending ? "up" : "down"));
+    cursor.derived("distance", status & 0x0f);
+    return event.invoke<&Playback::relativeNote>({ascending, status & 0x0f});
   }
 
   const u8 command = status & 0x1f;
@@ -396,72 +395,69 @@ using Cursor = CompilerCursor<Playback>;
   switch (command) {
     case 1: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-      const u8 value = event.u8("bpm");
-      event.derived("tempo", value, SourceValueDisplay::BeatsPerMinute);
-      return event.invoke<&Playback::tempo>(value).invoke<&Playback::controlWait>(readTiming(event));
+      const u8 value = cursor.u8("bpm");
+      cursor.derived("tempo", value, SourceValueDisplay::BeatsPerMinute);
+      return event.invoke<&Playback::tempo>({value}).invoke<&Playback::controlWait>({readTiming()});
     }
     case 2: {
       auto event = cursor.command("Time Signature", SequenceSemantic::Meta);
-      const u8 value = event.u8("packed", SourceValueDisplay::Hex);
-      event.derived("numerator", static_cast<u8>((value >> 4) + 1));
-      event.derived("denominator", static_cast<u8>((value & 0x0f) + 1));
-      return event.invoke<&Playback::timeSignature>(value).invoke<&Playback::controlWait>(readTiming(event));
+      const u8 value = cursor.u8("packed", SourceValueDisplay::Hex);
+      cursor.derived("numerator", static_cast<u8>((value >> 4) + 1));
+      cursor.derived("denominator", static_cast<u8>((value & 0x0f) + 1));
+      return event.invoke<&Playback::timeSignature>({value}).invoke<&Playback::controlWait>({readTiming()});
     }
-    case 3: {
-      auto event = cursor.command("Program Change", SequenceSemantic::Program);
-      return event.invoke<&Playback::programChange>(event.u8("program", SemanticOperandRole::InstrumentProgram))
-          .invoke<&Playback::controlWait>(readTiming(event));
-    }
-    case 4: {
-      auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(event.u8("volume")).invoke<&Playback::controlWait>(readTiming(event));
-    }
-    case 5: {
-      auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      return event.invoke<&Playback::pan>(event.u8("pan")).invoke<&Playback::controlWait>(readTiming(event));
-    }
-    case 6: {
-      auto event = cursor.command("Expression", SequenceSemantic::Level);
-      return event.invoke<&Playback::expression>(event.u8("expression"))
-          .invoke<&Playback::controlWait>(readTiming(event));
-    }
+    case 3:
+      return cursor.command("Program Change", SequenceSemantic::Program)
+          .invoke<&Playback::programChange>({cursor.u8("program", SemanticOperandRole::InstrumentProgram)})
+          .invoke<&Playback::controlWait>({readTiming()});
+    case 4:
+      return cursor.command("Volume", SequenceSemantic::Level)
+          .invoke<&Playback::volume>({cursor.u8("volume")})
+          .invoke<&Playback::controlWait>({readTiming()});
+    case 5:
+      return cursor.command("Pan", SequenceSemantic::Pan)
+          .invoke<&Playback::pan>({cursor.u8("pan")})
+          .invoke<&Playback::controlWait>({readTiming()});
+    case 6:
+      return cursor.command("Expression", SequenceSemantic::Level)
+          .invoke<&Playback::expression>({cursor.u8("expression")})
+          .invoke<&Playback::controlWait>({readTiming()});
     case 7: {
       auto event = cursor.command("Auto Pan", SequenceSemantic::Modulation);
-      const u8 depth = event.u8("depth");
-      const u8 period = event.u8("half_period");
-      return event.invoke<&Playback::autoPan>(depth, period).invoke<&Playback::controlWait>(readTiming(event));
+      const u8 depth = cursor.u8("depth");
+      const u8 period = cursor.u8("half_period");
+      return event.invoke<&Playback::autoPan>({depth, period}).invoke<&Playback::controlWait>({readTiming()});
     }
     case 8: {
       auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
-      const u8 depth = event.u8("depth", SourceValueDisplay::Hex);
-      const u8 rate = event.u8("rate");
-      const u8 waveform = event.u8("waveform", SourceValueDisplay::Hex);
-      const u8 delay = event.u8("delay");
-      return event.invoke<&Playback::vibrato>(depth, rate, waveform, delay)
-          .invoke<&Playback::controlWait>(readTiming(event));
+      const u8 depth = cursor.u8("depth", SourceValueDisplay::Hex);
+      const u8 rate = cursor.u8("rate");
+      const u8 waveform = cursor.u8("waveform", SourceValueDisplay::Hex);
+      const u8 delay = cursor.u8("delay");
+      return event.invoke<&Playback::vibrato>({depth, rate, waveform, delay})
+          .invoke<&Playback::controlWait>({readTiming()});
     }
     case 9: {
       auto event = cursor.command("Sequence Loop", SequenceSemantic::Loop);
-      const u8 mode = event.u8("mode");
+      const u8 mode = cursor.u8("mode");
       if (mode != 0) return event.invoke<&Playback::restoreLoop>().synchronizedLoopEnd();
-      const u16 wait = readTiming(event);
-      return event.invoke<&Playback::controlWait>(wait).invoke<&Playback::saveLoop>().synchronizedLoopStart();
+      const u16 wait = readTiming();
+      return event.invoke<&Playback::controlWait>({wait}).invoke<&Playback::saveLoop>().synchronizedLoopStart();
     }
     case 10: {
       auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
-      const u8 low = event.u8("low", SourceValueDisplay::Hex);
-      const u8 high = event.u8("high", SourceValueDisplay::Hex);
-      return event.invoke<&Playback::pitchBend>(low, high).invoke<&Playback::controlWait>(readTiming(event));
+      const u8 low = cursor.u8("low", SourceValueDisplay::Hex);
+      const u8 high = cursor.u8("high", SourceValueDisplay::Hex);
+      return event.invoke<&Playback::pitchBend>({low, high}).invoke<&Playback::controlWait>({readTiming()});
     }
-    case 14: {
-      auto event = cursor.command("Portamento On", SequenceSemantic::Portamento);
-      return event.invoke<&Playback::portamentoOn>(event.u8("duration"))
-          .invoke<&Playback::controlWait>(readTiming(event));
-    }
-    case 15: {
-      auto event = cursor.command("Portamento Off", SequenceSemantic::Portamento);
-      return event.invoke<&Playback::portamentoOff>().invoke<&Playback::controlWait>(readTiming(event));
-    }
+    case 14:
+      return cursor.command("Portamento On", SequenceSemantic::Portamento)
+          .invoke<&Playback::portamentoOn>({cursor.u8("duration")})
+          .invoke<&Playback::controlWait>({readTiming()});
+    case 15:
+      return cursor.command("Portamento Off", SequenceSemantic::Portamento)
+          .invoke<&Playback::portamentoOff>()
+          .invoke<&Playback::controlWait>({readTiming()});
     case 16:
     case 17:
     case 18:
@@ -470,22 +466,22 @@ using Cursor = CompilerCursor<Playback>;
       static constexpr std::array labels{"Attack Rate", "Decay Rate", "Sustain Rate", "Sustain Level",
                                           "Release Rate"};
       auto event = cursor.command(labels[command - 16], SequenceSemantic::Envelope);
-      const u8 value = event.u8("value");
-      return event.invoke<&Playback::adsr>(command - 16, value).invoke<&Playback::controlWait>(readTiming(event));
+      const u8 value = cursor.u8("value");
+      return event.invoke<&Playback::adsr>({command - 16, value}).invoke<&Playback::controlWait>({readTiming()});
     }
     case 21: {
       auto event = cursor.command("Voice Allocation Class", SequenceSemantic::State,
                                   CommandPlaybackStatus::SourceOnly);
-      event.u8("class");
-      return event.invoke<&Playback::controlWait>(readTiming(event));
+      cursor.u8("class");
+      return event.invoke<&Playback::controlWait>({readTiming()});
     }
     default: {
       auto event = cursor.command(command == 13 ? "Driver Parameter" : "Driver No-op", SequenceSemantic::Meta,
                                   CommandPlaybackStatus::NoOp);
       for (u8 i = 0; i < bytecode::kControlParameterBytes[command]; ++i) {
-        event.u8("parameter", SourceValueDisplay::Hex);
+        cursor.u8("parameter", SourceValueDisplay::Hex);
       }
-      return event.invoke<&Playback::controlWait>(readTiming(event));
+      return event.invoke<&Playback::controlWait>({readTiming()});
     }
   }
 }

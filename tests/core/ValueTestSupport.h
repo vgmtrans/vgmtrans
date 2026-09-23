@@ -709,33 +709,33 @@ using ProbeCompilerCursor = CompilerCursor<ProbePlayback>;
   switch (cursor.opcode()) {
     case 0x80: {
       auto event = cursor.command(ProbeProgramCommand::name, SequenceSemantic::Program, {}, "program");
-      return event.invoke<&ProbePlayback::programChange>(event.u8("program"));
+      return event.invoke<&ProbePlayback::programChange>({cursor.u8("program")});
     }
     case 0x90: {
       auto event = cursor.command(ProbeNoteCommand::name, SequenceSemantic::Note, {}, "note");
-      const u8 key = event.u8("key");
-      const u8 duration = event.u8("duration");
-      return event.invoke<&ProbePlayback::note>(key, duration);
+      const u8 key = cursor.u8("key");
+      const u8 duration = cursor.u8("duration");
+      return event.invoke<&ProbePlayback::note>({key, duration});
     }
     case 0xfe: {
       auto event =
           cursor.command(ProbeJumpCommand::name, SequenceSemantic::Jump, ProbeJumpCommand::playbackStatus, "jump");
-      return event.jump(event.addressLe("destination", SemanticOperandRole::JumpTarget));
+      return event.jump(cursor.addressLe("destination", SemanticOperandRole::JumpTarget));
     }
     case 0xfb: {
       auto event = cursor.command(ProbeDeclaredLoopCommand::name, SequenceSemantic::Loop,
                                   ProbeDeclaredLoopCommand::playbackStatus, "declared-loop");
-      return event.declaredLoop(event.addressLe("destination", SemanticOperandRole::LoopTarget));
+      return event.declaredLoop(cursor.addressLe("destination", SemanticOperandRole::LoopTarget));
     }
     case 0xfc: {
       auto event = cursor.command(ProbeLoopCandidateCommand::name, SequenceSemantic::Loop,
                                   ProbeLoopCandidateCommand::playbackStatus, "loop-candidate");
-      return event.loopCandidate(event.addressLe("destination", SemanticOperandRole::LoopTarget));
+      return event.loopCandidate(cursor.addressLe("destination", SemanticOperandRole::LoopTarget));
     }
     case 0xc0: {
       auto event =
           cursor.command(ProbeCallCommand::name, SequenceSemantic::Call, ProbeCallCommand::playbackStatus, "call");
-      return event.call(event.addressLe("destination", SemanticOperandRole::CallTarget));
+      return event.call(cursor.addressLe("destination", SemanticOperandRole::CallTarget));
     }
     case 0xfd:
       return cursor
@@ -744,17 +744,17 @@ using ProbeCompilerCursor = CompilerCursor<ProbePlayback>;
     case 0xf0: {
       auto event = cursor.command(ProbeRepeatCommand::name, SequenceSemantic::Loop, ProbeRepeatCommand::playbackStatus,
                                   "repeat");
-      const u8 slot = event.u8("slot");
-      const u8 count = event.u8("count");
-      const Address destination = event.addressLe("destination", SemanticOperandRole::RepeatTarget);
+      const u8 slot = cursor.u8("slot");
+      const u8 count = cursor.u8("count");
+      const Address destination = cursor.addressLe("destination", SemanticOperandRole::RepeatTarget);
       return event.repeatUntil(slot, count, destination);
     }
     case 0xf1: {
       auto event = cursor.command(ProbeRepeatBreakCommand::name, SequenceSemantic::Loop,
                                   ProbeRepeatBreakCommand::playbackStatus, "repeat-break");
-      const u8 slot = event.u8("slot");
-      const Address destination = event.addressLe("destination", SemanticOperandRole::RepeatTarget);
-      return event.invoke<&ProbePlayback::repeatBreak>(slot, destination).discoverTarget(destination);
+      const u8 slot = cursor.u8("slot");
+      const Address destination = cursor.addressLe("destination", SemanticOperandRole::RepeatTarget);
+      return event.invoke<&ProbePlayback::repeatBreak>({slot, destination}).discoverTarget(destination);
     }
     case 0xff:
       return cursor.command(ProbeEndCommand::name, SequenceSemantic::End, ProbeEndCommand::playbackStatus, "end").end();

@@ -25,7 +25,6 @@
 namespace vgmtrans::formats::mp2k {
 
 using namespace core;
-using namespace command;
 
 namespace {
 
@@ -551,34 +550,33 @@ struct DecodeContext {
   std::vector<Diagnostic>* diagnostics = nullptr;
 };
 
-[[nodiscard]] std::optional<Address> pointer(Mp2kCursor::Event& event, ByteReader reader, std::string_view name,
+[[nodiscard]] std::optional<Address> pointer(Mp2kCursor& cursor, ByteReader reader, std::string_view name,
                                              SemanticOperandRole role) {
-  const auto encoded = event.rawU32le("encoded_pointer", SourceValueDisplay::Address);
+  const auto encoded = cursor.rawU32le("encoded_pointer", SourceValueDisplay::Address);
   if (!encoded.valid) {
     return std::nullopt;
   }
   const auto offset = romOffset(encoded.value, reader);
   if (!offset) {
-    event.warning("Invalid MP2k command pointer");
+    cursor.warning("Invalid MP2k command pointer");
     return std::nullopt;
   }
-  return event.resolvedValue(name, encoded, Address{*offset}, SourceValueDisplay::Address, role);
+  return cursor.resolvedValue(name, encoded, Address{*offset}, SourceValueDisplay::Address, role);
 }
 
-[[nodiscard]] u8 parameter(Mp2kCursor& cursor, Mp2kCursor::Event& event, bool running, std::string_view name,
+[[nodiscard]] u8 parameter(Mp2kCursor& cursor, bool running, std::string_view name,
                            SourceValueDisplay display = SourceValueDisplay::Default,
                            SemanticOperandRole role = SemanticOperandRole::Value) {
-  return running ? event.opcodeValue(name, cursor.opcode(), display, role) : event.u8(name, display, role);
+  return running ? cursor.opcodeValue(name, cursor.opcode(), display, role) : cursor.u8(name, display, role);
 }
 
-[[nodiscard]] u8 optionalParameter(Mp2kCursor& cursor, Mp2kCursor::Event& event, bool running, u8 previous,
-                                   std::string_view name, SourceValueDisplay display,
-                                   SemanticOperandRole role = SemanticOperandRole::Value) {
+[[nodiscard]] u8 optionalParameter(Mp2kCursor& cursor, bool running, u8 previous, std::string_view name,
+                                   SourceValueDisplay display, SemanticOperandRole role = SemanticOperandRole::Value) {
   if (running) {
-    return parameter(cursor, event, true, name, display, role);
+    return parameter(cursor, true, name, display, role);
   }
-  const auto next = event.peekU8();
-  return next && *next < 0x80 ? event.u8(name, display, role) : previous;
+  const auto next = cursor.peekU8();
+  return next && *next < 0x80 ? cursor.u8(name, display, role) : previous;
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeStatus(const DecodeContext& context, u32 begin, DecodeState& state,
@@ -589,113 +587,104 @@ struct DecodeContext {
     const bool tie = status == 0xcf;
     auto event = cursor.command(tie ? "Tie" : "Note", SequenceSemantic::Note);
     const u32 duration = tie ? 0 : kClockTable[status - 0xcf];
-    const u8 key = optionalParameter(cursor, event, running, state.key, "key", SourceValueDisplay::MidiNote);
+    const u8 key = optionalParameter(cursor, running, state.key, "key", SourceValueDisplay::MidiNote);
     u8 velocity = state.velocity;
     u32 gate = duration;
-    if (event.peekU8() && *event.peekU8() < 0x80) {
-      velocity = event.u8("velocity");
-      if (event.peekU8() && *event.peekU8() < 0x80) {
-        gate += event.u8("gate_extension");
+    if (cursor.peekU8() && *cursor.peekU8() < 0x80) {
+      velocity = cursor.u8("velocity");
+      if (cursor.peekU8() && *cursor.peekU8() < 0x80) {
+        gate += cursor.u8("gate_extension");
       }
     }
     state.key = key;
     state.velocity = velocity;
-    return event.invoke<&Playback::note>(key, velocity, gate, tie);
+    return event.invoke<&Playback::note>({key, velocity, gate, tie});
   }
 
   switch (status) {
-    case 0xbd: {
-      auto event = cursor.command("Program", SequenceSemantic::Program);
-      return event.invoke<&Playback::program>(parameter(cursor, event, running, "program", SourceValueDisplay::Default,
-                                                        SemanticOperandRole::InstrumentProgram));
-    }
-    case 0xbe: {
-      auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(parameter(cursor, event, running, "volume"));
-    }
-    case 0xbf: {
-      auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      return event.invoke<&Playback::pan>(parameter(cursor, event, running, "pan"));
-    }
-    case 0xc0: {
-      auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::pitchBend>(parameter(cursor, event, running, "bend"));
-    }
+    case 0xbd:
+      return cursor.command("Program", SequenceSemantic::Program)
+          .invoke<&Playback::program>({parameter(cursor, running, "program", SourceValueDisplay::Default,
+                                                 SemanticOperandRole::InstrumentProgram)});
+    case 0xbe:
+      return cursor.command("Volume", SequenceSemantic::Level)
+          .invoke<&Playback::volume>({parameter(cursor, running, "volume")});
+    case 0xbf:
+      return cursor.command("Pan", SequenceSemantic::Pan).invoke<&Playback::pan>({parameter(cursor, running, "pan")});
+    case 0xc0:
+      return cursor.command("Pitch Bend", SequenceSemantic::Pitch)
+          .invoke<&Playback::pitchBend>({parameter(cursor, running, "bend")});
     case 0xc1: {
       auto event = cursor.command("Pitch Bend Range", SequenceSemantic::Pitch);
-      const u8 range = parameter(cursor, event, running, "semitones");
+      const u8 range = parameter(cursor, running, "semitones");
       return event.set<&TrackState::bendRange>(range).emitPitchBendRange(range);
     }
-    case 0xc2: {
-      auto event = cursor.command("LFO Speed", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::lfoSpeed>(parameter(cursor, event, running, "speed"));
-    }
-    case 0xc3: {
-      auto event = cursor.command("LFO Delay", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::lfoDelay>(parameter(cursor, event, running, "ticks"));
-    }
-    case 0xc4: {
-      auto event = cursor.command("Modulation Depth", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::modulationDepth>(parameter(cursor, event, running, "depth"));
-    }
-    case 0xc5: {
-      auto event = cursor.command("Modulation Type", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::modulationType>(parameter(cursor, event, running, "type"));
-    }
+    case 0xc2:
+      return cursor.command("LFO Speed", SequenceSemantic::Modulation)
+          .invoke<&Playback::lfoSpeed>({parameter(cursor, running, "speed")});
+    case 0xc3:
+      return cursor.command("LFO Delay", SequenceSemantic::Modulation)
+          .invoke<&Playback::lfoDelay>({parameter(cursor, running, "ticks")});
+    case 0xc4:
+      return cursor.command("Modulation Depth", SequenceSemantic::Modulation)
+          .invoke<&Playback::modulationDepth>({parameter(cursor, running, "depth")});
+    case 0xc5:
+      return cursor.command("Modulation Type", SequenceSemantic::Modulation)
+          .invoke<&Playback::modulationType>({parameter(cursor, running, "type")});
     case 0xc8: {
       auto event = cursor.command("Tune", SequenceSemantic::Pitch);
-      const u8 raw = parameter(cursor, event, running, "tune");
+      const u8 raw = parameter(cursor, running, "tune");
       return event.emitTuning((static_cast<s32>(raw) - 64) * 100.0 / 64.0);
     }
     case 0xcd: {
       auto event = cursor.command("Extended Command", SequenceSemantic::State);
-      const u8 sub = parameter(cursor, event, running, "subcommand", SourceValueDisplay::Hex);
+      const u8 sub = parameter(cursor, running, "subcommand", SourceValueDisplay::Hex);
       switch (sub) {
         case 0:
         case 3:
           return event.invoke<&Playback::finish>().end();
         case 1:
-          return event.invoke<&Playback::toneWave>(event.u32le("wave", SourceValueDisplay::Address));
+          return event.invoke<&Playback::toneWave>({cursor.u32le("wave", SourceValueDisplay::Address)});
         case 2:
-          return event.invoke<&Playback::toneType>(event.u8("type", SourceValueDisplay::Hex));
+          return event.invoke<&Playback::toneType>({cursor.u8("type", SourceValueDisplay::Hex)});
         case 4:
-          return event.invoke<&Playback::attack>(event.u8("attack"));
+          return event.invoke<&Playback::attack>({cursor.u8("attack")});
         case 5:
-          return event.invoke<&Playback::decay>(event.u8("decay"));
+          return event.invoke<&Playback::decay>({cursor.u8("decay")});
         case 6:
-          return event.invoke<&Playback::sustain>(event.u8("sustain"));
+          return event.invoke<&Playback::sustain>({cursor.u8("sustain")});
         case 7:
-          return event.invoke<&Playback::release>(event.u8("release"));
+          return event.invoke<&Playback::release>({cursor.u8("release")});
         case 8:
-          event.u8("pseudo_echo_volume");
+          cursor.u8("pseudo_echo_volume");
           return event;
         case 9:
-          event.u8("pseudo_echo_length");
+          cursor.u8("pseudo_echo_length");
           return event;
         case 10:
-          return event.invoke<&Playback::toneLength>(event.u8("length"));
+          return event.invoke<&Playback::toneLength>({cursor.u8("length")});
         case 11:
-          return event.invoke<&Playback::tonePanSweep>(event.u8("pan_sweep", SourceValueDisplay::Hex));
+          return event.invoke<&Playback::tonePanSweep>({cursor.u8("pan_sweep", SourceValueDisplay::Hex)});
         case 12:
-          return event.wait(event.u16le("ticks"));
+          return event.wait(cursor.u16le("ticks"));
         case 13:
-          event.u32le("sample_start");
+          cursor.u32le("sample_start");
           return event;
         default:
-          event.warning("Unknown MP2k extended command stopped playback");
+          cursor.warning("Unknown MP2k extended command stopped playback");
           return event.stop();
       }
     }
     case 0xcc: {
       auto event = cursor.command("Sound Register Write", SequenceSemantic::State);
-      static_cast<void>(parameter(cursor, event, running, "register_offset", SourceValueDisplay::Hex));
-      event.u8("value", SourceValueDisplay::Hex);
+      static_cast<void>(parameter(cursor, running, "register_offset", SourceValueDisplay::Hex));
+      cursor.u8("value", SourceValueDisplay::Hex);
       return event;
     }
     case 0xce: {
       auto event = cursor.command("End Tie", SequenceSemantic::Note);
-      const u8 key = optionalParameter(cursor, event, running, state.key, "key", SourceValueDisplay::MidiNote);
-      return event.invoke<&Playback::endTie>(key);
+      const u8 key = optionalParameter(cursor, running, state.key, "key", SourceValueDisplay::MidiNote);
+      return event.invoke<&Playback::endTie>({key});
     }
     default:
       return cursor.command("Undefined MP2k Command", SequenceSemantic::End).invoke<&Playback::finish>().end();
@@ -722,54 +711,54 @@ struct DecodeContext {
       return cursor.command("End", SequenceSemantic::End).invoke<&Playback::finish>().end();
     case 0xb2: {
       auto event = cursor.command("Goto", SequenceSemantic::Jump);
-      const auto destination = pointer(event, context.reader, "destination", SemanticOperandRole::JumpTarget);
+      const auto destination = pointer(cursor, context.reader, "destination", SemanticOperandRole::JumpTarget);
       return destination ? event.loopCandidate(*destination) : event.stop();
     }
     case 0xb3: {
       auto event = cursor.command("Pattern", SequenceSemantic::Call);
-      const auto destination = pointer(event, context.reader, "destination", SemanticOperandRole::CallTarget);
-      return destination ? event.invoke<&Playback::pattern>(*destination).discoverTarget(*destination) : event.stop();
+      const auto destination = pointer(cursor, context.reader, "destination", SemanticOperandRole::CallTarget);
+      return destination ? event.invoke<&Playback::pattern>({*destination}).discoverTarget(*destination) : event.stop();
     }
     case 0xb4: {
       auto event = cursor.command("Pattern End", SequenceSemantic::Return);
       event.invoke<&Playback::patternEnd>();
       // The driver ignores PEND outside a pattern, so discovery must retain
       // both the physical continuation and a caller's return address.
-      event.discoverTarget(event.nextAddress());
+      event.discoverTarget(cursor.nextAddress());
       return event.return_();
     }
     case 0xb5: {
       auto event = cursor.command("Repeat", SequenceSemantic::Repeat);
-      const u8 count = event.u8("count");
-      const auto destination = pointer(event, context.reader, "destination", SemanticOperandRole::JumpTarget);
-      return destination ? event.invoke<&Playback::repeat>(count, *destination).discoverTarget(*destination)
+      const u8 count = cursor.u8("count");
+      const auto destination = pointer(cursor, context.reader, "destination", SemanticOperandRole::JumpTarget);
+      return destination ? event.invoke<&Playback::repeat>({count, *destination}).discoverTarget(*destination)
                          : event.stop();
     }
     case 0xb9: {
       auto event = cursor.command("Memory Access", SequenceSemantic::State);
-      const u8 operation = event.u8("operation");
-      const u8 address = event.u8("address");
-      const u8 data = event.u8("data");
+      const u8 operation = cursor.u8("operation");
+      const u8 address = cursor.u8("address");
+      const u8 data = cursor.u8("data");
       Address destination{};
       if (operation >= 6 && operation <= 17) {
-        const auto parsed = pointer(event, context.reader, "destination", SemanticOperandRole::JumpTarget);
+        const auto parsed = pointer(cursor, context.reader, "destination", SemanticOperandRole::JumpTarget);
         if (!parsed) {
           return event.stop();
         }
         destination = *parsed;
         event.discoverTarget(destination);
       }
-      return event.invoke<&Playback::memAccess>(operation, address, data, destination);
+      return event.invoke<&Playback::memAccess>({operation, address, data, destination});
     }
     case 0xba: {
       auto event = cursor.sourceOnly("Priority");
-      event.u8("priority");
+      cursor.u8("priority");
       return event;
     }
     case 0xbb:
-      return cursor.command("Tempo", SequenceSemantic::Tempo).invoke<&Playback::tempo>(Byte{"tempo"});
+      return cursor.command("Tempo", SequenceSemantic::Tempo).invoke<&Playback::tempo>({cursor.u8("tempo")});
     case 0xbc:
-      return cursor.command("Transpose", SequenceSemantic::State).set<&TrackState::transpose>(SignedByte{"semitones"});
+      return cursor.command("Transpose", SequenceSemantic::State).set<&TrackState::transpose>(cursor.s8("semitones"));
     default:
       return cursor.command("Undefined MP2k Command", SequenceSemantic::End).invoke<&Playback::finish>().end();
   }

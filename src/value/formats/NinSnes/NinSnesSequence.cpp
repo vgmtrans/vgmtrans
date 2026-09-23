@@ -1074,46 +1074,46 @@ void Playback::adsr(u8 adsr1, u8 adsr2) {
 [[nodiscard]] DecodedBytecodeCommand unknownCommand(Cursor& cursor, u8 arguments) {
   auto event = cursor.sourceOnly("Unknown Event", "unknown");
   for (u8 index = 0; index < arguments; ++index) {
-    event.u8(fmt::format("arg{}", index + 1), SourceValueDisplay::Hex);
+    cursor.u8(fmt::format("arg{}", index + 1), SourceValueDisplay::Hex);
   }
   return event;
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeNoteParameters(Cursor& cursor, const DecodeContext& context, EventType type) {
   auto event = cursor.command("Note Parameters", SequenceSemantic::State);
-  const u8 duration = event.opcodeValue("duration", cursor.opcode(), SourceValueDisplay::Decimal);
+  const u8 duration = cursor.opcodeValue("duration", cursor.opcode(), SourceValueDisplay::Decimal);
 
   if (type == EventType::LemmingsNoteParameter) {
     bool hasDuration = false;
     bool hasVelocity = false;
     u8 durationRate = 0;
     u8 velocity = 0;
-    if (event.peekU8() <= 0x7f) {
+    if (cursor.peekU8() <= 0x7f) {
       hasDuration = true;
-      const u8 raw = event.u8("duration_rate");
+      const u8 raw = cursor.u8("duration_rate");
       durationRate = static_cast<u8>((raw << 1) + (raw >> 1) + (raw & 1));
-      event.derived("resolved_duration_rate", durationRate);
-      if (event.peekU8() <= 0x7f) {
+      cursor.derived("resolved_duration_rate", durationRate);
+      if (cursor.peekU8() <= 0x7f) {
         hasVelocity = true;
-        velocity = static_cast<u8>(event.u8("velocity") << 1);
-        event.derived("resolved_velocity", velocity);
+        velocity = static_cast<u8>(cursor.u8("velocity") << 1);
+        cursor.derived("resolved_velocity", velocity);
       }
     }
-    return event.invoke<&Playback::lemmingsParameters>(duration, hasDuration, durationRate, hasVelocity, velocity);
+    return event.invoke<&Playback::lemmingsParameters>({duration, hasDuration, durationRate, hasVelocity, velocity});
   }
 
   bool present = false;
   u8 durationRate = 0;
   u8 velocity = 0;
-  if (event.peekU8() <= 0x7f) {
+  if (cursor.peekU8() <= 0x7f) {
     present = true;
-    const u8 packed = event.u8("quantize_velocity", SourceValueDisplay::Hex);
+    const u8 packed = cursor.u8("quantize_velocity", SourceValueDisplay::Hex);
     durationRate = context.definition.duration[(packed >> 4) & 7];
     velocity = context.definition.volume[packed & 15];
-    event.derived("duration_rate", durationRate);
-    event.derived("velocity", velocity);
+    cursor.derived("duration_rate", durationRate);
+    cursor.derived("velocity", velocity);
   }
-  return event.invoke<&Playback::standardParameters>(duration, present, durationRate, velocity);
+  return event.invoke<&Playback::standardParameters>({duration, present, durationRate, velocity});
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(const DecodeContext& context, u32 begin) {
@@ -1144,9 +1144,9 @@ void Playback::adsr(u8 adsr1, u8 adsr2) {
     }
     case EventType::Note: {
       auto event = cursor.command("Note", SequenceSemantic::Note);
-      const u8 key = event.opcodeValue("key", static_cast<u8>(opcode - context.definition.status.noteMin),
-                                       SourceValueDisplay::MidiNote);
-      return event.invoke<&Playback::note>(key);
+      const u8 key = cursor.opcodeValue("key", static_cast<u8>(opcode - context.definition.status.noteMin),
+                                        SourceValueDisplay::MidiNote);
+      return event.invoke<&Playback::note>({key});
     }
     case EventType::Tie:
       return cursor.command("Tie", SequenceSemantic::Note).invoke<&Playback::tie>();
@@ -1154,8 +1154,8 @@ void Playback::adsr(u8 adsr1, u8 adsr2) {
       return cursor.command("Rest", SequenceSemantic::Rest).invoke<&Playback::rest>();
     case EventType::Percussion: {
       auto event = cursor.command("Percussion Note", SequenceSemantic::Note);
-      const u8 slot = event.opcodeValue("slot", static_cast<u8>(opcode - context.definition.status.percussionMin),
-                                        SourceValueDisplay::Decimal);
+      const u8 slot = cursor.opcodeValue("slot", static_cast<u8>(opcode - context.definition.status.percussionMin),
+                                         SourceValueDisplay::Decimal);
       const bool intelli = context.selected.intelli != IntelliMode::None && slot < kIntelliDrumSlots;
       u16 sourceNote = kNoPercussionSourceNote;
       if (context.layout.percussionTableAddress) {
@@ -1169,166 +1169,124 @@ void Playback::adsr(u8 adsr1, u8 adsr2) {
           sourceNote = context.reader.u8At(address + 2);
         }
       }
-      return event.invoke<&Playback::percussion>(slot, context.definition.status.percussionMin, intelli, sourceNote);
+      return event.invoke<&Playback::percussion>({slot, context.definition.status.percussionMin, intelli, sourceNote});
     }
     case EventType::Program:
     case EventType::Rd2ProgramAndAdsr: {
       auto event =
           cursor.command(type == EventType::Program ? "Program" : "Program And ADSR", SequenceSemantic::Program);
-      const u8 program = event.u8("program", SemanticOperandRole::Instrument);
+      const u8 program = cursor.u8("program", SemanticOperandRole::Instrument);
       if (type == EventType::Rd2ProgramAndAdsr) {
-        event.u8("adsr1", SourceValueDisplay::Hex);
-        event.u8("adsr2", SourceValueDisplay::Hex);
+        cursor.u8("adsr1", SourceValueDisplay::Hex);
+        cursor.u8("adsr2", SourceValueDisplay::Hex);
       }
-      return event.invoke<&Playback::melodicProgram>(program, context.definition.status.percussionMin);
+      return event.invoke<&Playback::melodicProgram>({program, context.definition.status.percussionMin});
     }
     case EventType::Call: {
       auto event = cursor.command("Pattern Play", SequenceSemantic::Call);
-      const u16 stored = event.u16le("stored_destination", SourceValueDisplay::Address);
+      const u16 stored = cursor.u16le("stored_destination", SourceValueDisplay::Address);
       const Address destination = context.address(stored);
-      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::CallTarget);
-      const u8 times = event.u8("times");
-      event.invoke<&Playback::beginPattern>(times, destination);
+      cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::CallTarget);
+      const u8 times = cursor.u8("times");
+      event.invoke<&Playback::beginPattern>({times, destination});
       return event.call(destination);
     }
-    case EventType::Pan: {
-      auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      return event.invoke<&Playback::pan>(event.u8("pan"));
-    }
-    case EventType::PanFade: {
-      auto event = cursor.command("Pan Fade", SequenceSemantic::Pan);
-      const u8 length = event.u8("length");
-      const u8 pan = event.u8("pan");
-      return event.invoke<&Playback::panFade>(length, pan);
-    }
-    case EventType::VibratoOn: {
-      auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
-      const u8 delay = event.u8("delay");
-      const u8 rate = event.u8("rate");
-      const u8 depth = event.u8("depth");
-      return event.invoke<&Playback::vibratoOn>(delay, rate, depth);
-    }
+    case EventType::Pan:
+      return cursor.command("Pan", SequenceSemantic::Pan).invoke<&Playback::pan>({cursor.u8("pan")});
+    case EventType::PanFade:
+      return cursor.command("Pan Fade", SequenceSemantic::Pan)
+          .invoke<&Playback::panFade>({cursor.u8("length"), cursor.u8("pan")});
+    case EventType::VibratoOn:
+      return cursor.command("Vibrato", SequenceSemantic::Modulation)
+          .invoke<&Playback::vibratoOn>({cursor.u8("delay"), cursor.u8("rate"), cursor.u8("depth")});
     case EventType::VibratoOff:
       return cursor.command("Vibrato Off", SequenceSemantic::Modulation).invoke<&Playback::vibratoOff>();
-    case EventType::MasterVolume: {
-      auto event = cursor.command("Master Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::masterVolume>(event.u8("volume"));
-    }
-    case EventType::VolumeMultiplier: {
-      auto event = cursor.command("Volume Multiplier", SequenceSemantic::Level);
-      return event.invoke<&Playback::volumeMultiplier>(event.u8("volume"));
-    }
-    case EventType::MasterVolumeFade: {
-      auto event = cursor.command("Master Volume Fade", SequenceSemantic::Level);
-      const u8 length = event.u8("length");
-      const u8 volume = event.u8("volume");
-      return event.invoke<&Playback::masterVolumeFade>(length, volume);
-    }
-    case EventType::Tempo: {
-      auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-      return event.invoke<&Playback::tempo>(event.u8("tempo"));
-    }
-    case EventType::TempoFade: {
-      auto event = cursor.command("Tempo Fade", SequenceSemantic::Tempo);
-      const u8 length = event.u8("length");
-      const u8 tempo = event.u8("tempo");
-      return event.invoke<&Playback::tempoFade>(length, tempo);
-    }
-    case EventType::GlobalTranspose: {
-      auto event = cursor.command("Global Transpose", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::globalTranspose>(event.s8("semitones", SourceValueDisplay::SignedDecimal));
-    }
-    case EventType::Transpose: {
-      auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.set<&TrackState::transpose>(event.s8("semitones", SourceValueDisplay::SignedDecimal));
-    }
-    case EventType::TremoloOn: {
-      auto event = cursor.command("Tremolo On", SequenceSemantic::Modulation);
-      const u8 delay = event.u8("delay");
-      const u8 rate = event.u8("rate");
-      const u8 depth = event.u8("depth");
-      return event.invoke<&Playback::tremoloOn>(delay, rate, depth);
-    }
+    case EventType::MasterVolume:
+      return cursor.command("Master Volume", SequenceSemantic::Level)
+          .invoke<&Playback::masterVolume>({cursor.u8("volume")});
+    case EventType::VolumeMultiplier:
+      return cursor.command("Volume Multiplier", SequenceSemantic::Level)
+          .invoke<&Playback::volumeMultiplier>({cursor.u8("volume")});
+    case EventType::MasterVolumeFade:
+      return cursor.command("Master Volume Fade", SequenceSemantic::Level)
+          .invoke<&Playback::masterVolumeFade>({cursor.u8("length"), cursor.u8("volume")});
+    case EventType::Tempo:
+      return cursor.command("Tempo", SequenceSemantic::Tempo).invoke<&Playback::tempo>({cursor.u8("tempo")});
+    case EventType::TempoFade:
+      return cursor.command("Tempo Fade", SequenceSemantic::Tempo)
+          .invoke<&Playback::tempoFade>({cursor.u8("length"), cursor.u8("tempo")});
+    case EventType::GlobalTranspose:
+      return cursor.command("Global Transpose", SequenceSemantic::Pitch)
+          .invoke<&Playback::globalTranspose>({cursor.s8("semitones", SourceValueDisplay::SignedDecimal)});
+    case EventType::Transpose:
+      return cursor.command("Transpose", SequenceSemantic::Pitch)
+          .set<&TrackState::transpose>(cursor.s8("semitones", SourceValueDisplay::SignedDecimal));
+    case EventType::TremoloOn:
+      return cursor.command("Tremolo On", SequenceSemantic::Modulation)
+          .invoke<&Playback::tremoloOn>({cursor.u8("delay"), cursor.u8("rate"), cursor.u8("depth")});
     case EventType::TremoloOff:
       return cursor.command("Tremolo Off", SequenceSemantic::Modulation).invoke<&Playback::tremoloOff>();
-    case EventType::Volume: {
-      auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(event.u8("volume"));
-    }
-    case EventType::VolumeFade: {
-      auto event = cursor.command("Volume Fade", SequenceSemantic::Level);
-      const u8 length = event.u8("length");
-      const u8 volume = event.u8("volume");
-      return event.invoke<&Playback::volumeFade>(length, volume);
-    }
-    case EventType::VibratoFade: {
-      auto event = cursor.command("Vibrato Fade", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::vibratoFade>(event.u8("length"));
-    }
+    case EventType::Volume:
+      return cursor.command("Volume", SequenceSemantic::Level).invoke<&Playback::volume>({cursor.u8("volume")});
+    case EventType::VolumeFade:
+      return cursor.command("Volume Fade", SequenceSemantic::Level)
+          .invoke<&Playback::volumeFade>({cursor.u8("length"), cursor.u8("volume")});
+    case EventType::VibratoFade:
+      return cursor.command("Vibrato Fade", SequenceSemantic::Modulation)
+          .invoke<&Playback::vibratoFade>({cursor.u8("length")});
     case EventType::PitchEnvelopeTo:
     case EventType::PitchEnvelopeFrom: {
       auto event = cursor.command(type == EventType::PitchEnvelopeTo ? "Pitch Envelope To" : "Pitch Envelope From",
                                   SequenceSemantic::Pitch);
-      const u8 delay = event.u8("delay");
-      const u8 length = event.u8("length");
-      const s8 semitones = event.s8("semitones", SourceValueDisplay::SignedDecimal);
+      const u8 delay = cursor.u8("delay");
+      const u8 length = cursor.u8("length");
+      const s8 semitones = cursor.s8("semitones", SourceValueDisplay::SignedDecimal);
       return event.invoke<&Playback::pitchEnvelope>(
-          type == EventType::PitchEnvelopeTo ? PitchEnvelope::Mode::To : PitchEnvelope::Mode::From, delay, length,
-          semitones);
+          {type == EventType::PitchEnvelopeTo ? PitchEnvelope::Mode::To : PitchEnvelope::Mode::From, delay, length,
+           semitones});
     }
     case EventType::PitchEnvelopeOff:
       return cursor.command("Pitch Envelope Off", SequenceSemantic::Pitch)
           .set<&TrackState::pitchEnvelope>(PitchEnvelope{});
     case EventType::Tuning: {
       auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
-      const u8 tuning = event.u8("tuning");
+      const u8 tuning = cursor.u8("tuning");
       return event.emitTuning((tuning / 256.0) * 100.0);
     }
-    case EventType::EchoOn: {
-      auto event = cursor.command("Echo", SequenceSemantic::State);
-      const u8 channels = event.u8("channels", SourceValueDisplay::Hex);
-      const u8 volumeLeft = event.u8("volume_left");
-      const u8 volumeRight = event.u8("volume_right");
-      return event.invoke<&Playback::echo>(channels, volumeLeft, volumeRight);
-    }
+    case EventType::EchoOn:
+      return cursor.command("Echo", SequenceSemantic::State)
+          .invoke<&Playback::echo>(
+              {cursor.u8("channels", SourceValueDisplay::Hex), cursor.u8("volume_left"), cursor.u8("volume_right")});
     case EventType::EchoOff:
       return cursor.command("Echo Off", SequenceSemantic::State).invoke<&Playback::echoOff>();
-    case EventType::EchoParameter: {
-      auto event = cursor.command("Echo Parameters", SequenceSemantic::State);
-      const u8 delay = event.u8("delay");
-      const s8 feedback = event.s8("feedback", SourceValueDisplay::SignedDecimal);
-      const u8 filter = event.u8("fir");
-      return event.invoke<&Playback::echoParameters>(delay, feedback, filter);
-    }
-    case EventType::EchoVolumeFade: {
-      auto event = cursor.command("Echo Volume Fade", SequenceSemantic::State);
-      const u8 length = event.u8("length");
-      const u8 volumeLeft = event.u8("volume_left");
-      const u8 volumeRight = event.u8("volume_right");
-      return event.invoke<&Playback::echoVolumeFade>(length, volumeLeft, volumeRight);
-    }
+    case EventType::EchoParameter:
+      return cursor.command("Echo Parameters", SequenceSemantic::State)
+          .invoke<&Playback::echoParameters>(
+              {cursor.u8("delay"), cursor.s8("feedback", SourceValueDisplay::SignedDecimal), cursor.u8("fir")});
+    case EventType::EchoVolumeFade:
+      return cursor.command("Echo Volume Fade", SequenceSemantic::State)
+          .invoke<&Playback::echoVolumeFade>(
+              {cursor.u8("length"), cursor.u8("volume_left"), cursor.u8("volume_right")});
     case EventType::PitchSlide: {
       auto event = cursor.command("Pitch Slide", SequenceSemantic::Pitch);
-      const u8 delay = event.u8("delay");
-      const u8 length = event.u8("length");
-      const u8 target = event.u8("target_note", SourceValueDisplay::MidiNote);
+      const u8 delay = cursor.u8("delay");
+      const u8 length = cursor.u8("length");
+      const u8 target = cursor.u8("target_note", SourceValueDisplay::MidiNote);
       // During a preceding wait, execute F9 early only after the current pitch change ends.
-      return event.invoke<&Playback::pitchSlide>(delay, length, target).duringWaitWhen<&Playback::pitchMotionIdle>();
+      return event.invoke<&Playback::pitchSlide>({delay, length, target}).duringWaitWhen<&Playback::pitchMotionIdle>();
     }
-    case EventType::PercussionBase: {
-      auto event = cursor.command("Percussion Base", SequenceSemantic::State);
-      return event.invoke<&Playback::percussionBase>(event.u8("program", SemanticOperandRole::InstrumentProgram));
-    }
-    case EventType::KonamiLoopStart: {
-      auto event = cursor.command("Loop Start", SequenceSemantic::Loop);
-      return event.invoke<&Playback::beginKonamiLoop>(event.derived(
-          "destination", event.nextAddress(), SourceValueDisplay::Address, SemanticOperandRole::LoopTarget));
-    }
+    case EventType::PercussionBase:
+      return cursor.command("Percussion Base", SequenceSemantic::State)
+          .invoke<&Playback::percussionBase>({cursor.u8("program", SemanticOperandRole::InstrumentProgram)});
+    case EventType::KonamiLoopStart:
+      return cursor.command("Loop Start", SequenceSemantic::Loop)
+          .invoke<&Playback::beginKonamiLoop>({cursor.derived(
+              "destination", cursor.nextAddress(), SourceValueDisplay::Address, SemanticOperandRole::LoopTarget)});
     case EventType::KonamiLoopEnd: {
       auto event = cursor.command("Loop End", SequenceSemantic::Repeat);
-      const u8 times = event.u8("times");
-      const s8 volumeDelta = event.s8("volume_delta", SourceValueDisplay::SignedDecimal);
-      const s8 pitchDelta = event.s8("pitch_delta", SourceValueDisplay::SignedDecimal);
+      const u8 times = cursor.u8("times");
+      const s8 volumeDelta = cursor.s8("volume_delta", SourceValueDisplay::SignedDecimal);
+      const s8 pitchDelta = cursor.s8("pitch_delta", SourceValueDisplay::SignedDecimal);
       event.invokeFlow([times, volumeDelta, pitchDelta](Playback& playback) {
         return playback.konamiLoop(times, volumeDelta, pitchDelta, playback.track.konamiLoop.start);
       });
@@ -1336,43 +1294,41 @@ void Playback::adsr(u8 adsr1, u8 adsr2) {
     }
     case EventType::KonamiAdsrGain: {
       auto event = cursor.command("ADSR / GAIN", SequenceSemantic::Envelope);
-      const u8 attackDecay = event.u8("attack_decay_parameter", SourceValueDisplay::Hex);
-      const u8 sustain = event.u8("sustain_parameter", SourceValueDisplay::Hex);
-      const u8 gain = event.u8("gain", SourceValueDisplay::Hex);
-      const u8 adsr1 = event.derived("dsp_adsr1", snesDspKonamiAdsr1(attackDecay), SourceValueDisplay::Hex);
-      const u8 adsr2 = event.derived("dsp_adsr2", snesDspKonamiAdsr2(sustain), SourceValueDisplay::Hex);
-      return event.invoke<&Playback::konamiEnvelope>(adsr1, adsr2, gain);
+      const u8 attackDecay = cursor.u8("attack_decay_parameter", SourceValueDisplay::Hex);
+      const u8 sustain = cursor.u8("sustain_parameter", SourceValueDisplay::Hex);
+      const u8 gain = cursor.u8("gain", SourceValueDisplay::Hex);
+      const u8 adsr1 = cursor.derived("dsp_adsr1", snesDspKonamiAdsr1(attackDecay), SourceValueDisplay::Hex);
+      const u8 adsr2 = cursor.derived("dsp_adsr2", snesDspKonamiAdsr2(sustain), SourceValueDisplay::Hex);
+      return event.invoke<&Playback::konamiEnvelope>({adsr1, adsr2, gain});
     }
     case EventType::QuintetTuning: {
       auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
-      const u8 tuning = event.u8("tuning");
+      const u8 tuning = cursor.u8("tuning");
       return event.emitTuning((tuning / 256.0) * 61.8);
     }
     case EventType::QuintetAdsr: {
       auto event = cursor.sourceOnly("ADSR");
-      event.u8("adsr1", SourceValueDisplay::Hex);
-      event.u8("sustain_rate");
-      event.u8("sustain_level");
+      cursor.u8("adsr1", SourceValueDisplay::Hex);
+      cursor.u8("sustain_rate");
+      cursor.u8("sustain_level");
       return event;
     }
     case EventType::ChannelEchoOn:
-      return cursor.command("Echo On", SequenceSemantic::State).invoke<&Playback::channelEcho>(true);
+      return cursor.command("Echo On", SequenceSemantic::State).invoke<&Playback::channelEcho>({true});
     case EventType::ChannelEchoOff:
-      return cursor.command("Echo Off", SequenceSemantic::State).invoke<&Playback::channelEcho>(false);
-    case EventType::Adsr: {
-      auto event = cursor.command("ADSR", SequenceSemantic::State);
-      const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
-      const u8 adsr2 = event.u8("adsr2", SourceValueDisplay::Hex);
-      return event.invoke<&Playback::adsr>(adsr1, adsr2);
-    }
+      return cursor.command("Echo Off", SequenceSemantic::State).invoke<&Playback::channelEcho>({false});
+    case EventType::Adsr:
+      return cursor.command("ADSR", SequenceSemantic::State)
+          .invoke<&Playback::adsr>(
+              {cursor.u8("adsr1", SourceValueDisplay::Hex), cursor.u8("adsr2", SourceValueDisplay::Hex)});
     case EventType::Nop:
       return cursor.sourceOnly("NOP");
     case EventType::Nop1:
     case EventType::Nop2: {
       auto event = cursor.sourceOnly("NOP");
-      event.u8("argument", SourceValueDisplay::Hex);
+      cursor.u8("argument", SourceValueDisplay::Hex);
       if (type == EventType::Nop2) {
-        event.u8("argument_2", SourceValueDisplay::Hex);
+        cursor.u8("argument_2", SourceValueDisplay::Hex);
       }
       return event;
     }

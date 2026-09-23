@@ -21,7 +21,6 @@
 namespace vgmtrans::formats::sculpt_soft_snes {
 
 using namespace core;
-using namespace command;
 
 namespace {
 
@@ -156,61 +155,60 @@ using Cursor = CompilerCursor<Playback>;
   Cursor cursor(reader, offset, "sculpt-soft-snes", diagnostics);
   const u8 opcode = cursor.opcode();
   if (opcode < 0xf0) {
-    auto event = cursor.command((opcode & 0x20) ? "Note" : "Pitch / Tie", SequenceSemantic::Note);
-    return event.invokeFlow<&Playback::timed>(opcode, u16{0}, event.u8("duration"));
+    return cursor.command((opcode & 0x20) ? "Note" : "Pitch / Tie", SequenceSemantic::Note)
+        .invokeFlow<&Playback::timed>({opcode, u16{0}, cursor.u8("duration")});
   }
   switch (opcode) {
     case 0xf0:
       return cursor.command("End", SequenceSemantic::End).invokeFlow<&Playback::end>().end();
     case 0xf1:
       return cursor.command("Scale Volume", SequenceSemantic::Level)
-          .invoke<&Playback::scaleVolume>(WordLE{"multiplier (8.8)"});
+          .invoke<&Playback::scaleVolume>({cursor.u16le("multiplier (8.8)")});
     case 0xf2:
-      return cursor.command("Volume", SequenceSemantic::Level).invoke<&Playback::volume>(Byte{"volume"});
+      return cursor.command("Volume", SequenceSemantic::Level).invoke<&Playback::volume>({cursor.u8("volume")});
     case 0xf3:
-    case 0xf4: {
-      auto event = cursor.command(opcode == 0xf3 ? "Rest" : "Wait", SequenceSemantic::Rest);
-      return event.invokeFlow<&Playback::timed>(opcode, u16{0}, event.u8("duration"));
-    }
+    case 0xf4:
+      return cursor.command(opcode == 0xf3 ? "Rest" : "Wait", SequenceSemantic::Rest)
+          .invokeFlow<&Playback::timed>({opcode, u16{0}, cursor.u8("duration")});
     case 0xf5: {
       auto event = cursor.command("Instrument", SequenceSemantic::Instrument);
-      const u8 instrument = event.u8("instrument", SemanticOperandRole::Instrument);
+      const u8 instrument = cursor.u8("instrument", SemanticOperandRole::Instrument);
       if (referencedPrograms) {
         referencedPrograms->insert(instrument);
       }
-      return event.invoke<&Playback::instrument>(instrument);
+      return event.invoke<&Playback::instrument>({instrument});
     }
     case 0xf6: {
       auto event = cursor.command("Phrase", SequenceSemantic::Call);
-      Phrase phrase = readPhrase(event, referencedPrograms);
-      if (!event.ok() || phrase.start.value < 0x200 || phrase.start.value >= phrase.end.value ||
+      Phrase phrase = readPhrase(cursor, referencedPrograms);
+      if (!cursor.ok() || phrase.start.value < 0x200 || phrase.start.value >= phrase.end.value ||
           phrase.end.value >= kAramSize) {
         return event.label("Invalid Phrase").stop();
       }
       phrases.push_back(phrase);
-      return event.invokeFlow<&Playback::call>(phrase).call(phrase.start);
+      return event.invokeFlow<&Playback::call>({phrase}).call(phrase.start);
     }
     case 0xf7:
     case 0xf8:
       return cursor.command(opcode == 0xf7 ? "Absolute Note" : "Absolute Pitch / Tie", SequenceSemantic::Note)
-          .invokeFlow<&Playback::timed>(opcode, WordLE{"pitch (1/20 semitone)"}, Byte{"duration"});
+          .invokeFlow<&Playback::timed>({opcode, cursor.u16le("pitch (1/20 semitone)"), cursor.u8("duration")});
     case 0xf9:
       return cursor.command("Restart Track", SequenceSemantic::Loop)
-          .invokeFlow<&Playback::restart>(start)
+          .invokeFlow<&Playback::restart>({start})
           .loopCandidate(start);
     case 0xfa:
       return cursor.command("Tempo / Articulation", SequenceSemantic::Tempo)
-          .invoke<&Playback::tempo>(Byte{"tempo accumulator step"}, WordLE{"gate multiplier (8.8)"});
+          .invoke<&Playback::tempo>({cursor.u8("tempo accumulator step"), cursor.u16le("gate multiplier (8.8)")});
     case 0xfb:
       if (revision == Revision::Extended) {
         auto event = cursor.command("Envelope Gate", SequenceSemantic::Envelope);
         u16 duration = 0;
         u8 part;
         do {
-          part = event.u8("duration (255 = continue)");
+          part = cursor.u8("duration (255 = continue)");
           duration = static_cast<u16>(duration + part);
-        } while (part == 255 && event.ok());
-        return event.invoke<&Playback::gate>(duration);
+        } while (part == 255 && cursor.ok());
+        return event.invoke<&Playback::gate>({duration});
       }
       break;
     case 0xfc:

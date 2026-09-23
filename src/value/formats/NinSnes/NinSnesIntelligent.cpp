@@ -323,14 +323,14 @@ Effects Playback::intelliConditionalJump(Address destination) {
 
 DecodedBytecodeCommand decodeIntelligentNoteParameters(Cursor& cursor, const DecodeContext& context, u32 begin) {
   auto event = cursor.command("Note Parameters", SequenceSemantic::State);
-  const u8 duration = event.opcodeValue("duration", cursor.opcode(), SourceValueDisplay::Decimal);
+  const u8 duration = cursor.opcodeValue("duration", cursor.opcode(), SourceValueDisplay::Decimal);
   event.set<&TrackState::noteLength>(duration);
   std::vector<std::pair<u8, u8>> parameters;
-  while (event.peekU8() <= 0x7f && parameters.size() < 0x80) {
-    const u8 raw = event.u8(fmt::format("parameter_{}", parameters.size() + 1), SourceValueDisplay::Hex);
+  while (cursor.peekU8() <= 0x7f && parameters.size() < 0x80) {
+    const u8 raw = cursor.u8(fmt::format("parameter_{}", parameters.size() + 1), SourceValueDisplay::Hex);
     const auto& table = raw < 0x40 ? context.definition.intelliDuration : context.definition.intelliVolume;
     const u8 resolved = table[raw & 0x3f];
-    event.derived(fmt::format("resolved_{}", parameters.size() + 1), resolved);
+    cursor.derived(fmt::format("resolved_{}", parameters.size() + 1), resolved);
     parameters.emplace_back(raw, resolved);
     // A velocity byte terminates the parameter list. Only duration bytes
     // loop back to read another parameter in both FE3 and FE4.
@@ -341,7 +341,7 @@ DecodedBytecodeCommand decodeIntelligentNoteParameters(Cursor& cursor, const Dec
 
   if (context.selected.intelli != IntelliMode::Fe3) {
     for (const auto& [raw, resolved] : parameters) {
-      event.invoke<&Playback::intelliParameter>(raw, resolved);
+      event.invoke<&Playback::intelliParameter>({raw, resolved});
     }
     return event;
   }
@@ -353,16 +353,16 @@ DecodedBytecodeCommand decodeIntelligentNoteParameters(Cursor& cursor, const Dec
   const u8 packed = hasPacked ? parameters.front().first : 0;
   const u8 standardDuration = hasPacked ? context.definition.duration[(packed >> 4) & 7] : 0;
   const u8 standardVelocity = hasPacked ? context.definition.volume[packed & 15] : 0;
-  event.invoke<&Playback::fe3StandardParameter>(hasPacked, standardDuration, standardVelocity);
+  event.invoke<&Playback::fe3StandardParameter>({hasPacked, standardDuration, standardVelocity});
   for (const auto& [raw, resolved] : parameters) {
-    event.invoke<&Playback::fe3CustomParameter>(raw, resolved);
+    event.invoke<&Playback::fe3CustomParameter>({raw, resolved});
   }
   const Address standardDestination{begin + 1 + (hasPacked ? 1u : 0u)};
-  const Address customDestination = event.nextAddress();
-  event.derived("standard_destination", standardDestination, SourceValueDisplay::Address,
-                SemanticOperandRole::JumpTarget);
-  event.derived("custom_destination", customDestination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-  event.invoke<&Playback::fe3ParameterFlow>(standardDestination, customDestination);
+  const Address customDestination = cursor.nextAddress();
+  cursor.derived("standard_destination", standardDestination, SourceValueDisplay::Address,
+                 SemanticOperandRole::JumpTarget);
+  cursor.derived("custom_destination", customDestination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
+  event.invoke<&Playback::fe3ParameterFlow>({standardDestination, customDestination});
   return event.discoverTarget(standardDestination);
 }
 
@@ -370,30 +370,29 @@ std::optional<DecodedBytecodeCommand> decodeIntelligentCommand(Cursor& cursor, c
                                                               EventType type) {
   switch (type) {
     case EventType::IntelliLegatoOn:
-      return cursor.command("Legato On", SequenceSemantic::State).invoke<&Playback::legato>(true);
+      return cursor.command("Legato On", SequenceSemantic::State).invoke<&Playback::legato>({true});
     case EventType::IntelliLegatoOff:
-      return cursor.command("Legato Off", SequenceSemantic::State).invoke<&Playback::legato>(false);
+      return cursor.command("Legato Off", SequenceSemantic::State).invoke<&Playback::legato>({false});
     case EventType::IntelliConditionalJump: {
       auto event = cursor.command("Conditional Short Jump", SequenceSemantic::Jump);
-      const u8 distance = event.u8("distance");
-      const Address destination{event.nextAddress().value + distance};
-      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-      return event.invoke<&Playback::intelliConditionalJump>(destination).discoverTarget(destination);
+      const u8 distance = cursor.u8("distance");
+      const Address destination{cursor.nextAddress().value + distance};
+      cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
+      return event.invoke<&Playback::intelliConditionalJump>({destination}).discoverTarget(destination);
     }
     case EventType::IntelliJump: {
       auto event = cursor.command("Short Jump", SequenceSemantic::Jump);
-      const u8 distance = event.u8("distance");
-      const Address destination{event.nextAddress().value + distance};
-      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
+      const u8 distance = cursor.u8("distance");
+      const Address destination{cursor.nextAddress().value + distance};
+      cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
       return event.jump(destination);
     }
-    case EventType::IntelliFe3F5: {
-      auto event = cursor.command("FE3 Flags / Port Wait", SequenceSemantic::State);
-      return event.invoke<&Playback::fe3Flags>(event.u8("parameter", SourceValueDisplay::Hex));
-    }
+    case EventType::IntelliFe3F5:
+      return cursor.command("FE3 Flags / Port Wait", SequenceSemantic::State)
+          .invoke<&Playback::fe3Flags>({cursor.u8("parameter", SourceValueDisplay::Hex)});
     case EventType::IntelliWritePort: {
       auto event = cursor.sourceOnly("Write APU Port");
-      event.u8("value");
+      cursor.u8("value");
       return event;
     }
     case EventType::IntelliFe3Percussion: {
@@ -401,29 +400,29 @@ std::optional<DecodedBytecodeCommand> decodeIntelligentCommand(Cursor& cursor, c
       std::array<u8, 12> patches{};
       std::array<u8, 12> notes{};
       for (u8 slot = 0; slot < 12; ++slot) {
-        patches[slot] = event.u8(fmt::format("patch_{}", slot), SourceValueDisplay::Hex);
+        patches[slot] = cursor.u8(fmt::format("patch_{}", slot), SourceValueDisplay::Hex);
       }
       for (u8 slot = 0; slot < 12; ++slot) {
-        notes[slot] = event.u8(fmt::format("note_{}", slot), SourceValueDisplay::Hex);
+        notes[slot] = cursor.u8(fmt::format("note_{}", slot), SourceValueDisplay::Hex);
       }
       for (u8 slot = 0; slot < 12; ++slot) {
-        const u8 pan = event.u8(fmt::format("pan_{}", slot), SourceValueDisplay::Hex);
-        event.invoke<&Playback::percussionEntry>(slot, patches[slot], notes[slot], pan);
+        const u8 pan = cursor.u8(fmt::format("pan_{}", slot), SourceValueDisplay::Hex);
+        event.invoke<&Playback::percussionEntry>({slot, patches[slot], notes[slot], pan});
       }
       return event;  // F5 selects the mode; F9 only copies the three arrays.
     }
     case EventType::IntelliDefineVoice: {
       auto event = cursor.command("Voice Parameter Definition", SequenceSemantic::Program);
-      const s8 parameter = event.s8("count_or_instrument", SourceValueDisplay::SignedDecimal);
+      const s8 parameter = cursor.s8("count_or_instrument", SourceValueDisplay::SignedDecimal);
       if (parameter >= 0 || !context.layout.intelliInstrumentOverwrite) {
         const u8 count = static_cast<u8>(parameter) & 0x3f;
-        event.invoke<&Playback::defineVoiceTable>(count);
+        event.invoke<&Playback::defineVoiceTable>({count});
         for (u8 index = 0; index < count; ++index) {
-          const u8 instrument = event.u8(fmt::format("instrument_{}", index), SemanticOperandRole::Instrument);
-          const u8 volume = event.u8(fmt::format("volume_{}", index));
-          const u8 pan = event.u8(fmt::format("pan_{}", index));
-          const u8 tuningTranspose = event.u8(fmt::format("tuning_transpose_{}", index));
-          event.invoke<&Playback::defineVoice>(index, instrument, volume, pan, tuningTranspose);
+          const u8 instrument = cursor.u8(fmt::format("instrument_{}", index), SemanticOperandRole::Instrument);
+          const u8 volume = cursor.u8(fmt::format("volume_{}", index));
+          const u8 pan = cursor.u8(fmt::format("pan_{}", index));
+          const u8 tuningTranspose = cursor.u8(fmt::format("tuning_transpose_{}", index));
+          event.invoke<&Playback::defineVoice>({index, instrument, volume, pan, tuningTranspose});
         }
         return event;
       }
@@ -431,79 +430,74 @@ std::optional<DecodedBytecodeCommand> decodeIntelligentCommand(Cursor& cursor, c
         return event.ignore();
       }
       const u8 logical = static_cast<u8>(parameter) & 0x3f;
-      const u8 srcn = event.u8("srcn", SourceValueDisplay::Hex);
-      const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
-      const u8 adsr2 = event.u8("adsr2", SourceValueDisplay::Hex);
-      const u8 gain = event.u8("gain", SourceValueDisplay::Hex);
-      const u8 pitchHigh = event.u8("pitch_high", SourceValueDisplay::Hex);
-      const u8 pitchLow = event.u8("pitch_low", SourceValueDisplay::Hex);
-      return event.invoke<&Playback::overwriteInstrument>(logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow);
+      return event.invoke<&Playback::overwriteInstrument>(
+          {logical, cursor.u8("srcn", SourceValueDisplay::Hex), cursor.u8("adsr1", SourceValueDisplay::Hex),
+           cursor.u8("adsr2", SourceValueDisplay::Hex), cursor.u8("gain", SourceValueDisplay::Hex),
+           cursor.u8("pitch_high", SourceValueDisplay::Hex), cursor.u8("pitch_low", SourceValueDisplay::Hex)});
     }
     case EventType::IntelliLoadVoice: {
       auto event = cursor.command("Load Voice Parameters", SequenceSemantic::Program);
-      const u8 index = event.u8("index");
-      return event.invoke<&Playback::loadVoice>(index, context.definition.status.percussionMin,
-                                                context.selected.intelli);
+      const u8 index = cursor.u8("index");
+      return event.invoke<&Playback::loadVoice>(
+          {index, context.definition.status.percussionMin, context.selected.intelli});
     }
     case EventType::IntelliGainDurationRate: {
       auto event = cursor.command("GAIN Duration Rate", SequenceSemantic::State);
-      event.u8("duration_rate");
-      const u8 gain = event.u8("gain", SourceValueDisplay::Hex);
-      event.invoke<&Playback::intelliGain>(gain);
+      cursor.u8("duration_rate");
+      const u8 gain = cursor.u8("gain", SourceValueDisplay::Hex);
+      event.invoke<&Playback::intelliGain>({gain});
       // This is the independent counter for switching ADSR to GAIN,
       // not the note's key-off duration rate.
       return event;
     }
     case EventType::IntelliGainDuration: {
       auto event = cursor.command("GAIN Duration", SequenceSemantic::State);
-      event.u8("duration_rate");
+      cursor.u8("duration_rate");
       return event.ignore();
     }
     case EventType::IntelliReleaseGainOff:
       // FE4's zero-length F9 enters the release-GAIN store with A=0.
       return cursor.sourceOnly("Clear Release GAIN");
-    case EventType::IntelliGain: {
-      auto event = cursor.command("GAIN", SequenceSemantic::State);
-      return event.invoke<&Playback::intelliGain>(event.u8("gain", SourceValueDisplay::Hex));
-    }
+    case EventType::IntelliGain:
+      return cursor.command("GAIN", SequenceSemantic::State)
+          .invoke<&Playback::intelliGain>({cursor.u8("gain", SourceValueDisplay::Hex)});
     case EventType::IntelliCustomPercussion: {
       auto event = cursor.command("Custom Percussion Table", SequenceSemantic::State);
-      const u8 packedCount = event.u8("packed_count", SourceValueDisplay::Hex);
+      const u8 packedCount = cursor.u8("packed_count", SourceValueDisplay::Hex);
       const u8 count = static_cast<u8>((packedCount & 0x0f) + 1);
-      event.derived("count", count);
+      cursor.derived("count", count);
       // MUL leaves the high byte as the first slot; shorter writes keep the rest.
       const u8 firstSlot = static_cast<u8>((packedCount * 3) >> 8);
-      event.derived("first_slot", firstSlot);
+      cursor.derived("first_slot", firstSlot);
       for (u8 slot = 0; slot < count; ++slot) {
         const u8 patch =
-            event.u8(fmt::format("patch_{}", slot), SourceValueDisplay::Hex, SemanticOperandRole::Instrument);
-        const u8 note = event.u8(fmt::format("note_{}", slot), SourceValueDisplay::MidiNote);
-        const u8 pan = event.u8(fmt::format("pan_{}", slot));
-        event.invoke<&Playback::percussionEntry>(static_cast<u8>(firstSlot + slot), patch, note, pan);
+            cursor.u8(fmt::format("patch_{}", slot), SourceValueDisplay::Hex, SemanticOperandRole::Instrument);
+        const u8 note = cursor.u8(fmt::format("note_{}", slot), SourceValueDisplay::MidiNote);
+        const u8 pan = cursor.u8(fmt::format("pan_{}", slot));
+        event.invoke<&Playback::percussionEntry>({static_cast<u8>(firstSlot + slot), patch, note, pan});
       }
       return event.invoke<&Playback::enableCustomPercussion>();
     }
     case EventType::IntelliTaSubevent:
     case EventType::IntelliFe4Subevent: {
       auto event = cursor.command("Intelligent Systems Subevent", SequenceSemantic::State);
-      const u8 subtype = event.u8("subtype", SourceValueDisplay::Hex);
+      const u8 subtype = cursor.u8("subtype", SourceValueDisplay::Hex);
       if (type == EventType::IntelliTaSubevent && subtype == 0) {
-        event.u16le("request_value", SourceValueDisplay::Hex);
-        event.u8("request_type", SourceValueDisplay::Hex);
+        cursor.u16le("request_value", SourceValueDisplay::Hex);
+        cursor.u8("request_type", SourceValueDisplay::Hex);
         return event.ignore();
       }
       if (subtype == 1 || subtype == 2) {
-        const u8 mask = event.u8("mask", SourceValueDisplay::Hex);
-        return event.invoke<&Playback::intelliFlags>(mask, subtype == 1);
+        return event.invoke<&Playback::intelliFlags>({cursor.u8("mask", SourceValueDisplay::Hex), subtype == 1});
       }
       if (type == EventType::IntelliTaSubevent && subtype == 3) {
-        return event.invoke<&Playback::legato>(true);
+        return event.invoke<&Playback::legato>({true});
       }
       if (type == EventType::IntelliTaSubevent && subtype == 4) {
-        return event.invoke<&Playback::legato>(false);
+        return event.invoke<&Playback::legato>({false});
       }
       if (type == EventType::IntelliTaSubevent && subtype == 5) {
-        event.u8("global_byte", SourceValueDisplay::Hex);
+        cursor.u8("global_byte", SourceValueDisplay::Hex);
       }
       return event.ignore();
     }

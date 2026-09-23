@@ -23,7 +23,6 @@
 namespace vgmtrans::formats::konami_arcade {
 
 using namespace core;
-using namespace command;
 
 namespace {
 
@@ -779,27 +778,28 @@ struct Playback : SequencePlayback<TrackState> {
 
 using KonamiArcadeCursor = CompilerCursor<Playback>;
 
-[[nodiscard]] Address readDestination(KonamiArcadeCursor::Event& event, const KonamiArcadeLayout& layout,
+[[nodiscard]] Address readDestination(KonamiArcadeCursor& cursor, const KonamiArcadeLayout& layout,
                                       const KonamiArcadeSequenceLayout& sequence, SemanticOperandRole role,
                                       std::optional<u64> loopBoundary = std::nullopt) {
   if (layout.version == KonamiArcadeVersion::MysticWarrior) {
-    const auto encoded = event.rawU16le("encoded_destination", SourceValueDisplay::Address);
+    const auto encoded = cursor.rawU16le("encoded_destination", SourceValueDisplay::Address);
     const u64 destination = encoded.value >= sequence.memoryBase
                                 ? static_cast<u64>(sequence.offset) + encoded.value - sequence.memoryBase
                                 : 0;
     const auto resolvedRole = loopBoundary && destination < *loopBoundary ? SemanticOperandRole::LoopTarget : role;
-    return event.resolvedValue("destination", encoded, Address{destination}, SourceValueDisplay::Address, resolvedRole);
+    return cursor.resolvedValue("destination", encoded, Address{destination}, SourceValueDisplay::Address,
+                                resolvedRole);
   }
-  const auto encoded = event.rawU32be("encoded_destination", SourceValueDisplay::Address);
+  const auto encoded = cursor.rawU32be("encoded_destination", SourceValueDisplay::Address);
   const u64 destination = static_cast<u64>(layout.code.offset) + encoded.value;
   const auto resolvedRole = loopBoundary && destination < *loopBoundary ? SemanticOperandRole::LoopTarget : role;
-  return event.resolvedValue("destination", encoded, Address{destination}, SourceValueDisplay::Address, resolvedRole);
+  return cursor.resolvedValue("destination", encoded, Address{destination}, SourceValueDisplay::Address, resolvedRole);
 }
 
 [[nodiscard]] DecodedBytecodeCommand ignored(KonamiArcadeCursor& cursor, std::string_view label, u8 bytes) {
   auto event = cursor.sourceOnly(label);
   for (u8 index = 0; index < bytes; ++index) {
-    event.u8("data_" + std::to_string(index + 1), SourceValueDisplay::Hex);
+    cursor.u8("data_" + std::to_string(index + 1), SourceValueDisplay::Hex);
   }
   return event;
 }
@@ -820,7 +820,7 @@ using KonamiArcadeCursor = CompilerCursor<Playback>;
   if (opcode == 0x60 || opcode == 0x61) {
     const bool enabled = opcode == 0x60;
     return cursor.command(enabled ? "Percussion On" : "Percussion Off", SequenceSemantic::Instrument)
-        .invoke<&Playback::setPercussion>(u8{0}, enabled);
+        .invoke<&Playback::setPercussion>({u8{0}, enabled});
   }
 
   if (opcode < 0xc0) {
@@ -828,28 +828,28 @@ using KonamiArcadeCursor = CompilerCursor<Playback>;
     u8 key = 0;
     u8 delta = 0;
     if (opcode < 0x60) {
-      key = event.opcodeValue("key", opcode, SourceValueDisplay::MidiNote);
-      delta = event.u8("delta");
+      key = cursor.opcodeValue("key", opcode, SourceValueDisplay::MidiNote);
+      delta = cursor.u8("delta");
       event.set<&TrackState::previousDelta>(delta);
     } else {
-      key = event.opcodeValue("key", static_cast<u8>(opcode - 0x62), SourceValueDisplay::MidiNote);
+      key = cursor.opcodeValue("key", static_cast<u8>(opcode - 0x62), SourceValueDisplay::MidiNote);
     }
-    const u8 durationOrVelocity = event.u8("duration_or_velocity");
+    const u8 durationOrVelocity = cursor.u8("duration_or_velocity");
     const bool durationSpecified = durationOrVelocity < 0x80;
     u8 durationParameter = 0;
     u8 velocity = durationOrVelocity;
     if (durationSpecified) {
       durationParameter = durationOrVelocity;
       event.set<&TrackState::previousDurationParameter>(durationParameter);
-      velocity = event.u8("velocity");
+      velocity = cursor.u8("velocity");
     } else {
       velocity = durationOrVelocity - 0x80;
     }
 
     const KonamiArcadeDrum& drum = layout.drums[key];
     return event.invoke<&Playback::noteWithPreviousTiming>(
-        key, durationSpecified, velocity, sequence.initialAttenuation, sequence.initialTranspose, drum.defaultDuration,
-        drum.pan, konamiArcadeDrumPitch(layout.version, drum));
+        {key, durationSpecified, velocity, sequence.initialAttenuation, sequence.initialTranspose, drum.defaultDuration,
+         drum.pan, konamiArcadeDrumPitch(layout.version, drum)});
   }
 
   switch (opcode) {
@@ -884,10 +884,10 @@ using KonamiArcadeCursor = CompilerCursor<Playback>;
       return ignored(cursor, "Unknown Driver State", 2);
     case 0xd2: {
       auto event = cursor.command("Reverb Volume", SequenceSemantic::Level);
-      const u8 first = event.u8("first_nibble");
-      const u8 second = event.u8("second_nibble");
-      event.derived("linear_gain", reverbGain(first, second, gx));
-      return event.invoke<&Playback::reverb>(first, second);
+      const u8 first = cursor.u8("first_nibble");
+      const u8 second = cursor.u8("second_nibble");
+      cursor.derived("linear_gain", reverbGain(first, second, gx));
+      return event.invoke<&Playback::reverb>({first, second});
     }
     case 0xd7:
     case 0xd9:
@@ -901,56 +901,55 @@ using KonamiArcadeCursor = CompilerCursor<Playback>;
       if (mystic) {
         return ignored(cursor, "Unknown Driver State", 0);
       }
-      auto event = cursor.command("Sample Loop Program", SequenceSemantic::State);
-      return event.set<&TrackState::program>(event.u8("program", SemanticOperandRole::InstrumentProgram));
+      return cursor.command("Sample Loop Program", SequenceSemantic::State)
+          .set<&TrackState::program>(cursor.u8("program", SemanticOperandRole::InstrumentProgram));
     }
     case 0xdd:
       return ignored(cursor, "Unknown Driver State", 0);
-    case 0xde: {
-      auto event = cursor.command("Percussion State", SequenceSemantic::Instrument);
-      return event.invoke<&Playback::setPercussion>(u8{1}, event.u8("enabled") != 0);
-    }
+    case 0xde:
+      return cursor.command("Percussion State", SequenceSemantic::Instrument)
+          .invoke<&Playback::setPercussion>({u8{1}, cursor.u8("enabled") != 0});
     case 0xdf: {
       auto event = cursor.command("Continuous Vibrato", SequenceSemantic::Modulation);
-      const u8 rawDelay = event.u8("delay");
-      const u8 rawRate = event.u8("rate");
-      const u8 depth = event.u8("depth");
+      const u8 rawDelay = cursor.u8("delay");
+      const u8 rawRate = cursor.u8("rate");
+      const u8 depth = cursor.u8("depth");
       const u8 delay = mystic && rawDelay == 0 ? 1 : rawDelay;
       const u8 rate = mystic ? static_cast<u8>(rawRate >> 1) : rawRate;
-      event.derived("effective_delay", delay);
-      event.derived("effective_rate", rate);
-      return event.invoke<&Playback::configureVibrato>(delay, rate, depth, true);
+      cursor.derived("effective_delay", delay);
+      cursor.derived("effective_rate", rate);
+      return event.invoke<&Playback::configureVibrato>({delay, rate, depth, true});
     }
     case 0xe0: {
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
-      const u8 delta = event.u8("delta");
+      const u8 delta = cursor.u8("delta");
       event.set<&TrackState::previousDelta>(delta);
-      event.invoke<&Playback::rest>(delta);
+      event.invoke<&Playback::rest>({delta});
       return event.wait(delta);
     }
     case 0xe1: {
       auto event = cursor.command("Hold", SequenceSemantic::Note);
-      const u8 delta = event.u8("delta");
-      const u8 rate = event.u8("duration_rate");
+      const u8 delta = cursor.u8("delta");
+      const u8 rate = cursor.u8("duration_rate");
       event.set<&TrackState::previousDelta>(delta);
-      event.invoke<&Playback::hold>(delta, rate);
+      event.invoke<&Playback::hold>({delta, rate});
       return event.wait(delta);
     }
     case 0xe2:
       return cursor.command("Program", SequenceSemantic::Program)
-          .invoke<&Playback::programChange>(Byte{"program", SemanticOperandRole::InstrumentProgram});
+          .invoke<&Playback::programChange>({cursor.u8("program", SemanticOperandRole::InstrumentProgram)});
     case 0xe3:
-      return cursor.command("Pan", SequenceSemantic::Pan).invoke<&Playback::pan>(Byte{"pan"});
+      return cursor.command("Pan", SequenceSemantic::Pan).invoke<&Playback::pan>({cursor.u8("pan")});
     case 0xe4: {
       auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
-      const u8 rawDelay = event.u8("delay");
-      const u8 rawRate = event.u8("rate");
-      const u8 depth = event.u8("depth");
+      const u8 rawDelay = cursor.u8("delay");
+      const u8 rawRate = cursor.u8("rate");
+      const u8 depth = cursor.u8("depth");
       const u8 delay = mystic && rawDelay == 0 ? 1 : rawDelay;
       const u8 rate = mystic && rawRate == 0 ? 1 : rawRate;
-      event.derived("effective_delay", delay);
-      event.derived("effective_rate", rate);
-      return event.invoke<&Playback::configureVibrato>(delay, rate, depth, false);
+      cursor.derived("effective_delay", delay);
+      cursor.derived("effective_rate", rate);
+      return event.invoke<&Playback::configureVibrato>({delay, rate, depth, false});
     }
     case 0xe5: {
       // The driver adds rate to an 8-bit accumulator on every K054539 update.
@@ -959,130 +958,122 @@ using KonamiArcadeCursor = CompilerCursor<Playback>;
       // has no faithful sequence-tick/MIDI representation yet, but retain its
       // decoded parameters instead of presenting it as unknown.
       auto event = cursor.sourceOnly("Random Pitch Spikes");
-      event.u8("rate");
-      const u8 maskHigh = event.u8("mask_high", SourceValueDisplay::Hex);
-      const u8 maskLow = event.u8("mask_low", SourceValueDisplay::Hex);
+      cursor.u8("rate");
+      const u8 maskHigh = cursor.u8("mask_high", SourceValueDisplay::Hex);
+      const u8 maskLow = cursor.u8("mask_low", SourceValueDisplay::Hex);
       const u16 mask = static_cast<u16>((static_cast<u16>(maskHigh) << 8) | maskLow);
-      event.derived("maximum_offset_semitones", mask / 256.0);
+      cursor.derived("maximum_offset_semitones", mask / 256.0);
       return event;
     }
     case 0xe6:
     case 0xe8: {
       auto event = cursor.command(opcode == 0xe6 ? "Loop Start" : "Loop Start #2", SequenceSemantic::Loop);
-      const u8 slot = event.derived("slot", static_cast<u8>(opcode == 0xe6 ? 0 : 1));
-      const Address start = event.derived("loop_start", event.nextAddress(), SourceValueDisplay::Address,
-                                          SemanticOperandRole::LoopTarget);
+      const u8 slot = cursor.derived("slot", static_cast<u8>(opcode == 0xe6 ? 0 : 1));
+      const Address start = cursor.derived("loop_start", cursor.nextAddress(), SourceValueDisplay::Address,
+                                           SemanticOperandRole::LoopTarget);
       discoveredLoops[slot] = start;
       return event.invoke([](Playback& playback, u8 runtimeSlot,
                              Address destination) { playback.track.loopStart[runtimeSlot] = destination; },
-                          slot, start);
+                          {slot, start});
     }
     case 0xe7:
     case 0xe9: {
       auto event = cursor.command(opcode == 0xe7 ? "Loop End" : "Loop End #2", SequenceSemantic::Repeat);
-      const u8 slot = event.derived("slot", static_cast<u8>(opcode == 0xe7 ? 0 : 1));
-      const u8 count = event.u8("count");
-      const s8 loudnessDelta = event.s8("loudness_delta", SourceValueDisplay::SignedDecimal);
+      const u8 slot = cursor.derived("slot", static_cast<u8>(opcode == 0xe7 ? 0 : 1));
+      const u8 count = cursor.u8("count");
+      const s8 loudnessDelta = cursor.s8("loudness_delta", SourceValueDisplay::SignedDecimal);
       // The driver adds this signed byte to loudness. Convert it to the
       // attenuation-domain state used by the performance model.
       const s16 attenuation = -static_cast<s16>(loudnessDelta);
-      const s8 transpose = event.s8("transpose_delta", SourceValueDisplay::SignedDecimal);
+      const s8 transpose = cursor.s8("transpose_delta", SourceValueDisplay::SignedDecimal);
       if (discoveredLoops[slot].value != 0) {
-        event.derived("destination", discoveredLoops[slot], SourceValueDisplay::Address,
-                      SemanticOperandRole::RepeatTarget);
+        cursor.derived("destination", discoveredLoops[slot], SourceValueDisplay::Address,
+                       SemanticOperandRole::RepeatTarget);
         event.discoverTarget(discoveredLoops[slot]);
       }
-      return event.invokeFlow<&Playback::loopEnd>(slot, count, attenuation, transpose);
+      return event.invokeFlow<&Playback::loopEnd>({slot, count, attenuation, transpose});
     }
     case 0xea: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-      const u8 raw = event.u8("tempo");
+      const u8 raw = cursor.u8("tempo");
       const u8 effective = effectiveTempo(raw, sequence.tempoOffset, layout.version);
-      event.derived("effective_tempo", effective);
-      event.derived("microseconds_per_quarter", tempoMicrosecondsPerQuarter(layout.nmiRateHertz, effective));
-      return event.invoke<&Playback::tempo>(effective, layout.nmiRateHertz);
+      cursor.derived("effective_tempo", effective);
+      cursor.derived("microseconds_per_quarter", tempoMicrosecondsPerQuarter(layout.nmiRateHertz, effective));
+      return event.invoke<&Playback::tempo>({effective, layout.nmiRateHertz});
     }
     case 0xeb: {
       auto event = cursor.command("Tempo Slide", SequenceSemantic::Tempo);
-      const u8 duration = event.u8("duration");
-      const u8 rawTarget = event.u8("target");
+      const u8 duration = cursor.u8("duration");
+      const u8 rawTarget = cursor.u8("target");
       // GX applies the sequence tempo offset to both EA and EB. The Z80
       // driver applies it only to an immediate EA tempo command.
       const u8 target = gx ? effectiveTempo(rawTarget, sequence.tempoOffset, layout.version) : rawTarget;
-      event.derived("effective_target", target);
-      return event.invoke<&Playback::beginSlide>(u8{0}, duration, target, layout.nmiRateHertz);
+      cursor.derived("effective_target", target);
+      return event.invoke<&Playback::beginSlide>({u8{0}, duration, target, layout.nmiRateHertz});
     }
     case 0xec:
       return cursor.command("Transpose", SequenceSemantic::Pitch)
-          .set<&TrackState::transpose>(SignedByte{"semitones", SourceValueDisplay::SignedDecimal});
+          .set<&TrackState::transpose>(cursor.s8("semitones", SourceValueDisplay::SignedDecimal));
     case 0xed: {
       auto event = cursor.command("Tremolo", SequenceSemantic::Modulation);
-      const u8 rawDelay = event.u8("delay");
-      const u8 rate = event.u8("rate");
-      const u8 depth = event.u8("depth");
+      const u8 rawDelay = cursor.u8("delay");
+      const u8 rate = cursor.u8("rate");
+      const u8 depth = cursor.u8("depth");
       const u8 delay = mystic && rawDelay == 0 ? 1 : rawDelay;
-      event.derived("effective_delay", delay);
-      event.derived("peak_attenuation_steps", static_cast<u8>(depth >> 1));
-      return event.invoke<&Playback::configureTremolo>(delay, rate, depth);
+      cursor.derived("effective_delay", delay);
+      cursor.derived("peak_attenuation_steps", static_cast<u8>(depth >> 1));
+      return event.invoke<&Playback::configureTremolo>({delay, rate, depth});
     }
     case 0xee:
-      return cursor.command("Volume", SequenceSemantic::Level).invoke<&Playback::volume>(Byte{"volume"});
-    case 0xef: {
-      auto event = cursor.command("Volume Slide", SequenceSemantic::Level);
-      const u8 duration = event.u8("duration");
-      const u8 target = event.u8("target");
-      return event.invoke<&Playback::beginSlide>(u8{1}, duration, target, 0.0);
-    }
+      return cursor.command("Volume", SequenceSemantic::Level).invoke<&Playback::volume>({cursor.u8("volume")});
+    case 0xef:
+      return cursor.command("Volume Slide", SequenceSemantic::Level)
+          .invoke<&Playback::beginSlide>({u8{1}, cursor.u8("duration"), cursor.u8("target"), 0.0});
     case 0xf0:
-      return cursor.command("Portamento", SequenceSemantic::Portamento).invoke<&Playback::portamento>(Byte{"time"});
+      return cursor.command("Portamento", SequenceSemantic::Portamento)
+          .invoke<&Playback::portamento>({cursor.u8("time")});
     case 0xf1:
       return cursor.command("Slide Mode", SequenceSemantic::Portamento)
-          .invoke<&Playback::slideMode>(Byte{"delay"}, Byte{"duration"},
-                                        SignedByte{"depth", SourceValueDisplay::SignedDecimal});
+          .invoke<&Playback::slideMode>(
+              {cursor.u8("delay"), cursor.u8("duration"), cursor.s8("depth", SourceValueDisplay::SignedDecimal)});
     case 0xf2:
       return cursor.command("Pitch Bend", SequenceSemantic::Pitch)
-          .invoke<&Playback::pitchBend>(SignedByte{"bend", SourceValueDisplay::SignedDecimal});
-    case 0xf3: {
-      auto event = cursor.command("Pitch Slide", SequenceSemantic::Portamento);
-      const u8 delay = event.u8("delay");
-      const u8 duration = event.u8("duration");
-      const u8 target = event.u8("target_note", SourceValueDisplay::MidiNote);
-      return event.invoke<&Playback::pitchSlide>(delay, duration, target, sequence.initialTranspose);
-    }
+          .invoke<&Playback::pitchBend>({cursor.s8("bend", SourceValueDisplay::SignedDecimal)});
+    case 0xf3:
+      return cursor.command("Pitch Slide", SequenceSemantic::Portamento)
+          .invoke<&Playback::pitchSlide>({cursor.u8("delay"), cursor.u8("duration"),
+                                          cursor.u8("target_note", SourceValueDisplay::MidiNote),
+                                          sequence.initialTranspose});
     case 0xf4:
     case 0xf5:
       return ignored(cursor, "Unknown Driver State", mystic ? 3 : 0);
     case 0xf6: {
       auto event = cursor.command("Subroutine Definition", SequenceSemantic::State);
-      discoveredSubroutine = event.nextAddress();
-      return event.invoke<&Playback::beginSubroutine>(discoveredSubroutine);
+      discoveredSubroutine = cursor.nextAddress();
+      return event.invoke<&Playback::beginSubroutine>({discoveredSubroutine});
     }
     case 0xf7: {
       auto event = cursor.command("Subroutine Boundary", SequenceSemantic::Call);
       if (discoveredSubroutine.value != 0) {
-        event.derived("destination", discoveredSubroutine, SourceValueDisplay::Address,
-                      SemanticOperandRole::CallTarget);
+        cursor.derived("destination", discoveredSubroutine, SourceValueDisplay::Address,
+                       SemanticOperandRole::CallTarget);
         event.discoverTarget(discoveredSubroutine);
       }
-      return event.invokeFlow<&Playback::subroutineBoundary>(event.nextAddress());
+      return event.invokeFlow<&Playback::subroutineBoundary>({cursor.nextAddress()});
     }
-    case 0xf8: {
-      auto event = cursor.command("Pan Slide", SequenceSemantic::Pan);
-      const u8 duration = event.u8("duration");
-      const u8 target = event.u8("target");
-      return event.invoke<&Playback::beginSlide>(u8{2}, duration, target, 0.0);
-    }
+    case 0xf8:
+      return cursor.command("Pan Slide", SequenceSemantic::Pan)
+          .invoke<&Playback::beginSlide>({u8{2}, cursor.u8("duration"), cursor.u8("target"), 0.0});
     case 0xf9: {
       auto event = cursor.command("Vibrato Fade", SequenceSemantic::Modulation);
-      const u8 rawLength = event.u8("length");
+      const u8 rawLength = cursor.u8("length");
       const u8 length = mystic && rawLength == 0 ? 1 : rawLength;
-      event.derived("effective_length", length);
-      return event.invoke<&Playback::setVibratoFade>(length);
+      cursor.derived("effective_length", length);
+      return event.invoke<&Playback::setVibratoFade>({length});
     }
-    case 0xfa: {
-      auto event = cursor.command("Release Rate", SequenceSemantic::Envelope);
-      return event.invoke<&Playback::setReleaseRate>(event.u8("rate"), layout.nmiRateHertz);
-    }
+    case 0xfa:
+      return cursor.command("Release Rate", SequenceSemantic::Envelope)
+          .invoke<&Playback::setReleaseRate>({cursor.u8("rate"), layout.nmiRateHertz});
     case 0xfb: {
       if (gx) {
         return ignored(cursor, "Unknown Driver State", 0);
@@ -1091,23 +1082,23 @@ using KonamiArcadeCursor = CompilerCursor<Playback>;
         return cursor.unsupported("Indexed Note Table Is Missing").stop();
       }
       auto event = cursor.command("Indexed Note Jump", SequenceSemantic::Jump);
-      const u8 index = event.u8("index");
+      const u8 index = cursor.u8("index");
       const Address destination{
           static_cast<u64>(sequence.indexedNoteTableOffset) + static_cast<u64>(index) * 4,
       };
-      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
+      cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
       return event.jump(destination);
     }
     case 0xfc:
       return ignored(cursor, "Unknown Driver State", 0);
     case 0xfd: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
-      const Address destination = readDestination(event, layout, sequence, SemanticOperandRole::JumpTarget, begin);
+      const Address destination = readDestination(cursor, layout, sequence, SemanticOperandRole::JumpTarget, begin);
       return destination.value < begin ? event.loopCandidate(destination) : event.jump(destination);
     }
     case 0xfe: {
       auto event = cursor.command("Call", SequenceSemantic::Call);
-      const Address destination = readDestination(event, layout, sequence, SemanticOperandRole::CallTarget);
+      const Address destination = readDestination(cursor, layout, sequence, SemanticOperandRole::CallTarget);
       return event.call(destination);
     }
     case 0xff: {

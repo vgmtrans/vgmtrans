@@ -423,14 +423,14 @@ struct DecodedControllerChange {
     return cursor.truncated();
   }
   auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-  const u8 deltaHigh = event.opcodeValue("delta_high", cursor.opcode());
-  const u8 deltaMidHigh = event.u8("delta_mid_high");
-  const u8 deltaMidLow = event.u8("delta_mid_low");
-  const u8 deltaLow = event.u8("delta_low");
+  const u8 deltaHigh = cursor.opcodeValue("delta_high", cursor.opcode());
+  const u8 deltaMidHigh = cursor.u8("delta_mid_high");
+  const u8 deltaMidLow = cursor.u8("delta_mid_low");
+  const u8 deltaLow = cursor.u8("delta_low");
   const u32 delta = (static_cast<u32>(deltaHigh) << 24) | (static_cast<u32>(deltaMidHigh) << 16) |
                     (static_cast<u32>(deltaMidLow) << 8) | deltaLow;
-  const u32 tempo = event.u32be("microseconds_per_quarter");
-  event.invoke<&Playback::tempo>(tempo, delta);
+  const u32 tempo = cursor.u32be("microseconds_per_quarter");
+  event.invoke<&Playback::tempo>({tempo, delta});
   return final ? event.stop() : static_cast<DecodedBytecodeCommand>(event);
 }
 
@@ -445,25 +445,25 @@ struct DecodedControllerChange {
   const u8 status = cursor.opcode();
   if (status <= 0x7f) {
     auto event = cursor.command("Note", SequenceSemantic::Note);
-    const u8 channel = event.opcodeBits<0, 4>("channel", SemanticOperandRole::Channel);
-    const u16 durationHigh = static_cast<u16>(event.opcodeBits<6, 1>("duration_high")) << 8;
-    const u16 deltaHigh = static_cast<u16>(event.opcodeBits<5, 1>("delta_high")) << 8;
-    event.opcodeBits<4, 1>("unknown_bit", SourceValueDisplay::Hex);
-    const u8 key = event.u8("key", SourceValueDisplay::MidiNote);
-    const u8 velocity = event.u8("velocity");
-    const u16 duration = durationHigh | event.u8("duration_low");
-    const u16 delta = deltaHigh | event.u8("delta_low");
-    return event.invokeFlow<&Playback::note>(channel, key, velocity, duration, delta);
+    const u8 channel = cursor.opcodeBits<0, 4>("channel", SemanticOperandRole::Channel);
+    const u16 durationHigh = static_cast<u16>(cursor.opcodeBits<6, 1>("duration_high")) << 8;
+    const u16 deltaHigh = static_cast<u16>(cursor.opcodeBits<5, 1>("delta_high")) << 8;
+    cursor.opcodeBits<4, 1>("unknown_bit", SourceValueDisplay::Hex);
+    const u8 key = cursor.u8("key", SourceValueDisplay::MidiNote);
+    const u8 velocity = cursor.u8("velocity");
+    const u16 duration = durationHigh | cursor.u8("duration_low");
+    const u16 delta = deltaHigh | cursor.u8("delta_low");
+    return event.invokeFlow<&Playback::note>({channel, key, velocity, duration, delta});
   }
 
   if ((status & 0xf0) == 0xb0) {
     auto event = cursor.command("Controller", SequenceSemantic::State);
-    const u8 channel = event.opcodeBits<0, 4>("channel", SemanticOperandRole::Channel);
-    const u8 controller = event.u8("controller");
-    const u8 encoded = event.u8("encoded_value");
+    const u8 channel = cursor.opcodeBits<0, 4>("channel", SemanticOperandRole::Channel);
+    const u8 controller = cursor.u8("controller");
+    const u8 encoded = cursor.u8("encoded_value");
     const auto valueRole = controller == 32 ? SemanticOperandRole::InstrumentBank : SemanticOperandRole::Value;
-    const u8 value = event.derived("value", static_cast<u8>(encoded & 0x7f), valueRole);
-    const u16 delta = event.u8("delta");
+    const u8 value = cursor.derived("value", static_cast<u8>(encoded & 0x7f), valueRole);
+    const u16 delta = cursor.u8("delta");
     if (controller == 7 || controller == 11) {
       controllerChanges.push_back(DecodedControllerChange{
           .address = Address{begin},
@@ -471,50 +471,50 @@ struct DecodedControllerChange {
           .value = value,
       });
     }
-    return event.invokeFlow<&Playback::controller>(channel, controller, value, delta);
+    return event.invokeFlow<&Playback::controller>({channel, controller, value, delta});
   }
 
   if ((status & 0xf0) == 0xc0) {
     auto event = cursor.command("Program", SequenceSemantic::Program);
-    const u8 channel = event.opcodeBits<0, 4>("channel", SemanticOperandRole::Channel);
-    const u8 encodedProgram = event.u8("encoded_program");
-    event.derived("program", static_cast<u8>(encodedProgram & 0x7f), SemanticOperandRole::InstrumentProgram);
-    const u16 delta = event.u8("delta");
-    return event.invokeFlow<&Playback::programChange>(channel, encodedProgram, delta);
+    const u8 channel = cursor.opcodeBits<0, 4>("channel", SemanticOperandRole::Channel);
+    const u8 encodedProgram = cursor.u8("encoded_program");
+    cursor.derived("program", static_cast<u8>(encodedProgram & 0x7f), SemanticOperandRole::InstrumentProgram);
+    const u16 delta = cursor.u8("delta");
+    return event.invokeFlow<&Playback::programChange>({channel, encodedProgram, delta});
   }
 
   if ((status & 0xf0) == 0xd0) {
     auto event = cursor.command("Channel Pressure", SequenceSemantic::State);
-    event.opcodeBits<0, 4>("channel", SemanticOperandRole::Channel);
-    const u8 pressure = event.u8("pressure");
-    const u16 delta = event.u8("delta");
-    return event.invokeFlow<&Playback::channelPressure>(pressure, delta);
+    cursor.opcodeBits<0, 4>("channel", SemanticOperandRole::Channel);
+    const u8 pressure = cursor.u8("pressure");
+    const u16 delta = cursor.u8("delta");
+    return event.invokeFlow<&Playback::channelPressure>({pressure, delta});
   }
 
   if ((status & 0xf0) == 0xe0) {
     auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
-    const u8 channel = event.opcodeBits<0, 4>("channel", SemanticOperandRole::Channel);
-    const u8 encodedBend = event.u8("encoded_bend");
-    event.derived("bend", static_cast<u8>(encodedBend & 0x7f));
-    const u16 delta = event.u8("delta");
-    return event.invokeFlow<&Playback::pitchBend>(channel, encodedBend, delta);
+    const u8 channel = cursor.opcodeBits<0, 4>("channel", SemanticOperandRole::Channel);
+    const u8 encodedBend = cursor.u8("encoded_bend");
+    cursor.derived("bend", static_cast<u8>(encodedBend & 0x7f));
+    const u16 delta = cursor.u8("delta");
+    return event.invokeFlow<&Playback::pitchBend>({channel, encodedBend, delta});
   }
 
   switch (status) {
     case 0x81: {
       auto event = cursor.command("Counted Event Loop", SequenceSemantic::Repeat);
-      const u16 relative = event.u16be("relative", SourceValueDisplay::Address);
-      const Address destination = event.derived("destination", Address{normalStart + relative},
-                                                SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-      const u8 count = event.u8("event_count");
-      const Address continuation = event.nextAddress();
-      return event.invoke<&Playback::beginCountedLoop>(destination, count, continuation).discoverTarget(destination);
+      const u16 relative = cursor.u16be("relative", SourceValueDisplay::Address);
+      const Address destination = cursor.derived("destination", Address{normalStart + relative},
+                                                 SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
+      const u8 count = cursor.u8("event_count");
+      const Address continuation = cursor.nextAddress();
+      return event.invoke<&Playback::beginCountedLoop>({destination, count, continuation}).discoverTarget(destination);
     }
     case 0x82: {
       auto event = cursor.command("Forever Loop", SequenceSemantic::Loop);
-      const u8 delta = event.u8("delta");
-      const Address continuation = event.nextAddress();
-      return event.invokeFlow<&Playback::foreverLoop>(delta, continuation);
+      const u8 delta = cursor.u8("delta");
+      const Address continuation = cursor.nextAddress();
+      return event.invokeFlow<&Playback::foreverLoop>({delta, continuation});
     }
     case 0x83:
       return cursor.command("End", SequenceSemantic::End).end();

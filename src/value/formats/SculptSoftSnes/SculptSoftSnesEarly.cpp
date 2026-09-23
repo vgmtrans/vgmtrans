@@ -153,9 +153,9 @@ struct Decoder {
 
   [[nodiscard]] DecodedBytecodeCommand call(Cursor& cursor, u32 offset, u8 table, Layer layer, std::string_view name) {
     auto event = cursor.command(name, SequenceSemantic::Call);
-    const u8 index = event.u8("index");
+    const u8 index = cursor.u8("index");
     const auto target = readTablePointer(reader, layout, table, index);
-    if (!event.ok() || !target) {
+    if (!cursor.ok() || !target) {
       return invalid(cursor, offset, "Invalid SculptSoftSnes pattern pointer");
     }
     pending.push_back(Block{*target, layer});
@@ -167,21 +167,21 @@ struct Decoder {
     const u8 opcode = cursor.opcode();
     if (layer == Layer::Pattern) {
       auto event = cursor.command("Initial Pattern Pitch", SequenceSemantic::Pitch);
-      const u16 pitch = opcode | (event.u8("high pitch byte") << 8);
-      return event.invoke<&Playback::initialPitch>(pitch);
+      const u16 pitch = opcode | (cursor.u8("high pitch byte") << 8);
+      return event.invoke<&Playback::initialPitch>({pitch});
     }
     if (layer == Layer::Notes) {
       if (opcode < 0xf0 || opcode == 0xf3 || opcode == 0xf4) {
         const auto label = opcode == 0xf3 ? "Rest" : opcode == 0xf4 ? "Wait" : (opcode & 0x20) ? "Note" : "Pitch / Tie";
-        auto event = cursor.command(label, opcode < 0xf0 ? SequenceSemantic::Note : SequenceSemantic::Rest);
-        return event.invokeFlow<&Playback::timed>(opcode, event.u8("duration"));
+        return cursor.command(label, opcode < 0xf0 ? SequenceSemantic::Note : SequenceSemantic::Rest)
+            .invokeFlow<&Playback::timed>({opcode, cursor.u8("duration")});
       }
       if (opcode == 0xf0) {
         return cursor.command("End Pattern", SequenceSemantic::Return).return_();
       }
       if (opcode == 0xf1 || opcode == 0xf2) {
-        auto event = cursor.command(opcode == 0xf1 ? "Add Note Volume" : "Note Volume", SequenceSemantic::Level);
-        return event.invoke<&Playback::volume>(event.u8("volume"), opcode == 0xf1, false);
+        return cursor.command(opcode == 0xf1 ? "Add Note Volume" : "Note Volume", SequenceSemantic::Level)
+            .invoke<&Playback::volume>({cursor.u8("volume"), opcode == 0xf1, false});
       }
     } else if (layer == Layer::Track) {
       switch (opcode) {
@@ -190,20 +190,20 @@ struct Decoder {
         case 0x02:
           return cursor.command("Restart Track", SequenceSemantic::Loop).loopCandidate(start);
         case 0x04: {
-          auto event = cursor.command("Track Tick Divisor", SequenceSemantic::Tempo);
-          return event.invoke<&Playback::divisor>(event.u8("frames per tick"));
+          return cursor.command("Track Tick Divisor", SequenceSemantic::Tempo)
+              .invoke<&Playback::divisor>({cursor.u8("frames per tick")});
         }
         case 0x06: {
-          auto event = cursor.command("Track Transpose", SequenceSemantic::Pitch);
-          return event.invoke<&Playback::transpose>(event.u16le("pitch offset (1/20 semitone)"), false);
+          return cursor.command("Track Transpose", SequenceSemantic::Pitch)
+              .invoke<&Playback::transpose>({cursor.u16le("pitch offset (1/20 semitone)"), false});
         }
         case 0x08:
           return call(cursor, offset, 0x16, Layer::List, "Pattern List");
         case 0x0a: {
           auto event = cursor.command("Voice Assignment", SequenceSemantic::Unknown);
-          const u8 voice = event.u8("voice (255 = allocate)");
-          const u8 mask = voice == 0xff ? event.u8("allowed voices") : 0;
-          return event.invokeFlow<&Playback::assignVoice>(voice, mask);
+          const u8 voice = cursor.u8("voice (255 = allocate)");
+          const u8 mask = voice == 0xff ? cursor.u8("allowed voices") : 0;
+          return event.invokeFlow<&Playback::assignVoice>({voice, mask});
         }
       }
     } else if (layer == Layer::List) {
@@ -219,30 +219,30 @@ struct Decoder {
           // sequence bytes alone do not determine which pattern to compile.
           return invalid(cursor, offset, "SculptSoftSnes randomized patterns are not supported");
         case 0x06: {
-          auto event = cursor.command("Pattern Transpose", SequenceSemantic::Pitch);
-          return event.invoke<&Playback::transpose>(event.u16le("pitch offset (1/20 semitone)"), true);
+          return cursor.command("Pattern Transpose", SequenceSemantic::Pitch)
+              .invoke<&Playback::transpose>({cursor.u16le("pitch offset (1/20 semitone)"), true});
         }
         case 0x08:
         case 0x0a: {
           auto event = cursor.command(opcode == 0x08 ? "Primary Instrument" : "Secondary Instrument",
                                       SequenceSemantic::Instrument);
-          const u8 patch = event.u8("instrument", SemanticOperandRole::Instrument);
+          const u8 patch = cursor.u8("instrument", SemanticOperandRole::Instrument);
           if (referencedPrograms) {
             referencedPrograms->insert(patch);
           }
-          return event.invoke<&Playback::instrument>(patch, opcode == 0x0a);
+          return event.invoke<&Playback::instrument>({patch, opcode == 0x0a});
         }
         case 0x0c:
           return cursor.command("Enable Pitched Notes", SequenceSemantic::Pitch)
-              .invoke<&Playback::pitchMode>(true, u16{0});
+              .invoke<&Playback::pitchMode>({true, u16{0}});
         case 0x0e: {
-          auto event = cursor.command("Fixed Pitch", SequenceSemantic::Pitch);
-          return event.invoke<&Playback::pitchMode>(false, event.u16le("pitch (1/20 semitone)"));
+          return cursor.command("Fixed Pitch", SequenceSemantic::Pitch)
+              .invoke<&Playback::pitchMode>({false, cursor.u16le("pitch (1/20 semitone)")});
         }
         case 0x10:
         case 0x12: {
-          auto event = cursor.command(opcode == 0x10 ? "Add Base Volume" : "Base Volume", SequenceSemantic::Level);
-          return event.invoke<&Playback::volume>(event.u8("volume"), opcode == 0x10, true);
+          return cursor.command(opcode == 0x10 ? "Add Base Volume" : "Base Volume", SequenceSemantic::Level)
+              .invoke<&Playback::volume>({cursor.u8("volume"), opcode == 0x10, true});
         }
       }
     }

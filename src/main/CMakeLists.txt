@@ -183,7 +183,6 @@ target_sources(vgmtransvaluecore
     FILES
       ${PROJECT_SOURCE_DIR}/src/value/sequence/BytecodeDecode.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/CommandSourceMap.h
-      ${PROJECT_SOURCE_DIR}/src/value/sequence/CommandOperands.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/CompiledCommandRuntime.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/CompilerCursor.h
       ${PROJECT_SOURCE_DIR}/src/value/base/CoreTypes.h

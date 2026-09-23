@@ -687,51 +687,51 @@ struct ControllerInfo {
 
   auto event = cursor.command(label, semantic, playback);
   if (source.end > source.offset + 1) {
-    event.rawBytes("encoded_bytes", source.end - source.offset - 1);
+    cursor.rawBytes("encoded_bytes", source.end - source.offset - 1);
   }
-  event.derived("delta", source.delta);
-  event.derived("chained", source.chained, SourceValueDisplay::Boolean);
+  cursor.derived("delta", source.delta);
+  cursor.derived("chained", source.chained, SourceValueDisplay::Boolean);
   event.delay(source.delta);
 
   switch (source.kind) {
     case EventKind::Note:
-      event.derived("key", source.command, SourceValueDisplay::MidiNote);
-      event.derived("velocity", source.value);
-      return event.invoke<&Playback::note>(source.command, source.value);
+      cursor.derived("key", source.command, SourceValueDisplay::MidiNote);
+      cursor.derived("velocity", source.value);
+      return event.invoke<&Playback::note>({source.command, source.value});
     case EventKind::SetChannel:
-      event.derived("channel", source.value, SemanticOperandRole::Channel);
+      cursor.derived("channel", source.value, SemanticOperandRole::Channel);
       return event;
     case EventKind::Tempo: {
-      event.derived("encoded_tempo", source.value);
+      cursor.derived("encoded_tempo", source.value);
       const u16 step = DriverTiming::tempoStep(source.value);
-      event.derived("accumulator_step", step);
-      event.derived("beats_per_minute", timing.tempoBpm(step), SourceValueDisplay::BeatsPerMinute);
-      return event.invoke<&Playback::tempo>(source.value);
+      cursor.derived("accumulator_step", step);
+      cursor.derived("beats_per_minute", timing.tempoBpm(step), SourceValueDisplay::BeatsPerMinute);
+      return event.invoke<&Playback::tempo>({source.value});
     }
     case EventKind::PitchBend:
-      event.derived("wheel_msb", source.value);
-      return event.invoke<&Playback::pitchBend>(source.value);
+      cursor.derived("wheel_msb", source.value);
+      return event.invoke<&Playback::pitchBend>({source.value});
     case EventKind::Program:
-      event.derived("program", source.value, SemanticOperandRole::InstrumentProgram);
-      return event.invoke<&Playback::setProgram>(source.value);
+      cursor.derived("program", source.value, SemanticOperandRole::InstrumentProgram);
+      return event.invoke<&Playback::setProgram>({source.value});
     case EventKind::NoteOff:
       return event.invoke<&Playback::noteOff>();
     case EventKind::End:
       return event.end();
     case EventKind::Controller:
-      event.derived("controller", source.command);
-      event.derived("value", source.value,
-                    source.command == 0 ? SemanticOperandRole::InstrumentBank : SemanticOperandRole::Value);
+      cursor.derived("controller", source.command);
+      cursor.derived("value", source.value,
+                     source.command == 0 ? SemanticOperandRole::InstrumentBank : SemanticOperandRole::Value);
       if (source.loopDestination) {
         const Address destination{*source.loopDestination};
-        event.derived("repeat_count", source.loopCount);
-        event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
-        return event.invokeFlow<&Playback::loopEnd>(source.loopCount, destination).discoverTarget(destination);
+        cursor.derived("repeat_count", source.loopCount);
+        cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
+        return event.invokeFlow<&Playback::loopEnd>({source.loopCount, destination}).discoverTarget(destination);
       }
       if (source.command == 99 && source.value == 20) {
-        event.derived("loop_start", Address{source.end}, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
+        cursor.derived("loop_start", Address{source.end}, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
       }
-      return event.invoke<&Playback::controller>(source.command, source.value);
+      return event.invoke<&Playback::controller>({source.command, source.value});
   }
   return event.stop();
 }

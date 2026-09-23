@@ -3582,6 +3582,60 @@ pass, including VM scheduling, prepass, and MIDI serialization regressions.
   checks, not assertions of legacy/value parity or full game coverage.
 - Temporary probe sources, objects, binaries, and export payloads were removed.
 
+## Immediate cursor reads replace named operands
+
+The named-operand experiment reduced forwarding code but introduced a second
+reading convention: `event.u8(...)` consumed bytes immediately, while `Byte{...}`
+consumed them inside a binding operation. Mixing them could silently change source
+order. This iteration removes that distinction and deletes `CommandOperands.h`.
+
+`CompilerCursor` now exposes all source reads, annotations, lookahead, and source
+diagnostics directly. Its `Event` builds playback behavior and presentation.
+`invoke` and `invokeFlow` accept a braced tuple whose types come from the playback
+method or typed lambda. C++ evaluates those initializers in written order; the
+binding operation receives only decoded values. Zero-argument bindings remain
+ordinary calls. SequenceVM, command bodies, and exporters retain their existing
+architecture.
+
+```cpp
+return cursor.command("Vibrato", SequenceSemantic::Modulation)
+    .invoke<&Playback::vibrato>({cursor.u8("delay"), cursor.u8("depth"), cursor.s8("rate")});
+```
+
+The same immediate reader works inside arithmetic, conversions, and direct output
+operations. Local variables remain for dependent fields, validation, reordered
+playback parameters, reused values, and snapshots of the cursor position.
+Reader-only helpers take the cursor; helpers that also build behavior receive the
+event as needed. Multiple loose playback arguments are no longer accepted. Other
+multi-input event helpers were inspected: no current call supplies multiple direct
+source reads as separate arguments.
+
+The migration covers 38 format families. Relative to `4003a7763`, format code is
+341 lines smaller and shared production C++ is 39 lines smaller: 380 fewer lines.
+Relative to pre-table `f6c4aedbd`, production C++ is 752 lines smaller (789 fewer
+format lines and 37 additional shared lines). Existing tests grow by 13 net lines;
+there are no new permanent test files or harnesses.
+
+Validation:
+
+- Warning-free macOS Debug build; all 22 CTest targets passed. The core target
+  passed again after extending its existing ownership fixture to cover both
+  direct output and a bound `string_view`. Existing fixtures exercise field
+  order, compound arguments, truncation, control flow, and source-free playback.
+  One compile-time assertion rejects loose multi-argument binding.
+- A textual audit found identical normalized source-read/annotation expressions
+  and lexical order for all 2,120 calls in the changed format files.
+- Before/after shell comparisons used 35 corpus inputs and detected 1,357
+  sequences across 30 formats. All 1,357 MIDI, 60 SF2, and 60 DLS artifacts were
+  byte-identical, with no empty artifacts. Inventory, diagnostics, and inspection
+  output (source trees for up to two sequences per input) also matched.
+- Existing failures remain visible: Super Metroid fails NinSnes scanning,
+  the selected MP2k GSF reports missing sample references during export, and
+  the previously noted Chocobo PSF yields no sequences. Star Fox supplies
+  successful NinSnes coverage. These comparisons establish preservation against the previous value
+  implementation, not exhaustive format coverage or legacy/value parity.
+- Temporary executables and comparison scripts were removed after validation.
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage

@@ -998,18 +998,18 @@ struct SfxPlayback : SequencePlayback<SfxTrackState> {
   }
 }
 
-void consumeTiming(Cursor::Event& event, u8 first, const InspectedEvent& inspected) {
+void consumeTiming(Cursor& cursor, u8 first, const InspectedEvent& inspected) {
   if (!inspected.timing.delay) {
     return;
   }
-  event.opcodeValue("delta", first);
+  cursor.opcodeValue("delta", first);
   if (inspected.timing.duration) {
-    event.u8("duration");
+    cursor.u8("duration");
   }
   if (inspected.timing.velocity) {
-    event.u8("velocity");
+    cursor.u8("velocity");
   }
-  event.u8("status", SourceValueDisplay::Hex);
+  cursor.u8("status", SourceValueDisplay::Hex);
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, const Layout& layout, u32 begin,
@@ -1025,16 +1025,16 @@ void consumeTiming(Cursor::Event& event, u8 first, const InspectedEvent& inspect
   const u8 status = inspected.status;
   const Version version = layout.traits.version;
   auto event = cursor.command(commandLabel(version, status), commandSemantic(version, status));
-  consumeTiming(event, cursor.opcode(), inspected);
+  consumeTiming(cursor, cursor.opcode(), inspected);
 
   if (status < 0xc0) {
     const u8 note = status & 0x1f;
-    event.derived("note_index", note);
+    cursor.derived("note_index", note);
     std::optional<u8> parameter;
     if (status >= 0xa0) {
-      parameter = event.u8("note_parameter", SourceValueDisplay::Hex);
+      parameter = cursor.u8("note_parameter", SourceValueDisplay::Hex);
     }
-    return event.invoke<&Playback::note>(inspected.timing, note, parameter);
+    return event.invoke<&Playback::note>({inspected.timing, note, parameter});
   }
 
   if (!isCommand(version, status)) {
@@ -1043,116 +1043,114 @@ void consumeTiming(Cursor::Event& event, u8 first, const InspectedEvent& inspect
   const std::optional<u8> command = canonicalCommand(version, status);
   if (!command) {
     if (commandSize(version, status) != 0) {
-      event.u8("value", SourceValueDisplay::Hex);
+      cursor.u8("value", SourceValueDisplay::Hex);
     }
-    return event.invoke<&Playback::wait>(inspected.timing);
+    return event.invoke<&Playback::wait>({inspected.timing});
   }
 
   switch (*command) {
     case 0xc0: {
-      const s16 relative = event.s16le("relative", SourceValueDisplay::SignedDecimal,
-                                      SemanticOperandRole::InstrumentTablePointer);
-      const Address descriptor{relativeTarget(static_cast<u16>(event.nextAddress().value), relative)};
-      event.derived("descriptor", descriptor, SourceValueDisplay::Address, SemanticOperandRole::Instrument);
-      return event.invoke<&Playback::instrument>(inspected.timing, descriptor);
+      const s16 relative =
+          cursor.s16le("relative", SourceValueDisplay::SignedDecimal, SemanticOperandRole::InstrumentTablePointer);
+      const Address descriptor{relativeTarget(static_cast<u16>(cursor.nextAddress().value), relative)};
+      cursor.derived("descriptor", descriptor, SourceValueDisplay::Address, SemanticOperandRole::Instrument);
+      return event.invoke<&Playback::instrument>({inspected.timing, descriptor});
     }
     case 0xc1:
-      return event.invoke<&Playback::pan>(inspected.timing, event.u8("pan"));
+      return event.invoke<&Playback::pan>({inspected.timing, cursor.u8("pan")});
     case 0xc2:
-      return event.invoke<&Playback::masterVolume>(inspected.timing, event.u8("volume"));
+      return event.invoke<&Playback::masterVolume>({inspected.timing, cursor.u8("volume")});
     case 0xc3:
-      return event.invoke<&Playback::tempo>(inspected.timing, event.u8("tempo"));
+      return event.invoke<&Playback::tempo>({inspected.timing, cursor.u8("tempo")});
     case 0xc4:
-      return event.invoke<&Playback::transpose>(inspected.timing, event.s8("semitones"));
+      return event.invoke<&Playback::transpose>({inspected.timing, cursor.s8("semitones")});
     case 0xc5:
-      return event.invoke<&Playback::volume>(inspected.timing, event.u8("volume"));
+      return event.invoke<&Playback::volume>({inspected.timing, cursor.u8("volume")});
     case 0xc6:
-      return event.invoke<&Playback::priority>(inspected.timing, event.u8("priority"));
+      return event.invoke<&Playback::priority>({inspected.timing, cursor.u8("priority")});
     case 0xc7:
-      return event.invoke<&Playback::fineTuning>(inspected.timing, event.u8("fraction"));
+      return event.invoke<&Playback::fineTuning>({inspected.timing, cursor.u8("fraction")});
     case 0xc8:
     case 0xc9:
-      return event.invoke<&Playback::echoEnabled>(inspected.timing, *command == 0xc8);
+      return event.invoke<&Playback::echoEnabled>({inspected.timing, *command == 0xc8});
     case 0xca: {
-      const u8 delay = event.u8("delay");
-      const s8 volume = event.s8("volume");
-      const s8 feedback = event.s8("feedback");
-      return event.invoke<&Playback::echoParameters>(inspected.timing, delay, volume, feedback,
-                                                     event.u8("fir_preset"));
+      const u8 delay = cursor.u8("delay");
+      const s8 volume = cursor.s8("volume");
+      const s8 feedback = cursor.s8("feedback");
+      return event.invoke<&Playback::echoParameters>(
+          {inspected.timing, delay, volume, feedback, cursor.u8("fir_preset")});
     }
     case 0xcb:
     case 0xcc: {
-      const s16 relative = event.s16le("relative", SourceValueDisplay::SignedDecimal,
-                                      *command == 0xcb ? SemanticOperandRole::JumpTarget
-                                                       : SemanticOperandRole::CallTarget);
-      const Address destination{relativeTarget(static_cast<u16>(event.nextAddress().value), relative)};
-      event.derived("destination", destination, SourceValueDisplay::Address,
-                    *command == 0xcb ? SemanticOperandRole::JumpTarget : SemanticOperandRole::CallTarget);
-      event.invoke<&Playback::wait>(inspected.timing);
+      const s16 relative =
+          cursor.s16le("relative", SourceValueDisplay::SignedDecimal,
+                       *command == 0xcb ? SemanticOperandRole::JumpTarget : SemanticOperandRole::CallTarget);
+      const Address destination{relativeTarget(static_cast<u16>(cursor.nextAddress().value), relative)};
+      cursor.derived("destination", destination, SourceValueDisplay::Address,
+                     *command == 0xcb ? SemanticOperandRole::JumpTarget : SemanticOperandRole::CallTarget);
+      event.invoke<&Playback::wait>({inspected.timing});
       if (*command == 0xcc) {
         return event.call(destination);
       }
       return destination.value < begin ? event.loopCandidate(destination) : event.jump(destination);
     }
     case 0xcd:
-      return event.invoke<&Playback::wait>(inspected.timing).return_();
-    case 0xce: {
-      const u8 count = event.u8("count");
-      return event.invokeFlow<&Playback::repeatStart>(inspected.timing, count, event.nextAddress());
-    }
+      return event.invoke<&Playback::wait>({inspected.timing}).return_();
+    case 0xce:
+      return event.invokeFlow<&Playback::repeatStart>({inspected.timing, cursor.u8("count"), cursor.nextAddress()});
     case 0xcf:
-      return event.invokeFlow<&Playback::repeatEnd>(inspected.timing);
+      return event.invokeFlow<&Playback::repeatEnd>({inspected.timing});
     case 0xd0:
       return event.end();
     case 0xd1:
-      return event.invoke<&Playback::noteBase>(inspected.timing, event.u8("note", SourceValueDisplay::MidiNote));
+      return event.invoke<&Playback::noteBase>({inspected.timing, cursor.u8("note", SourceValueDisplay::MidiNote)});
     case 0xd2:
-      return event.invoke<&Playback::changeOctave>(inspected.timing, s8{12});
+      return event.invoke<&Playback::changeOctave>({inspected.timing, s8{12}});
     case 0xd3:
-      return event.invoke<&Playback::changeOctave>(inspected.timing, s8{-12});
+      return event.invoke<&Playback::changeOctave>({inspected.timing, s8{-12}});
     case 0xd4:
-      return event.invoke<&Playback::persistentWait>(inspected.timing);
+      return event.invoke<&Playback::persistentWait>({inspected.timing});
     case 0xd5:
-      return event.invoke<&Playback::mode>(inspected.timing, event.u8("flags", SourceValueDisplay::Hex));
+      return event.invoke<&Playback::mode>({inspected.timing, cursor.u8("flags", SourceValueDisplay::Hex)});
     case 0xd6:
-      return event.invoke<&Playback::bendRange>(inspected.timing, event.u8("eighth_semitones"));
+      return event.invoke<&Playback::bendRange>({inspected.timing, cursor.u8("eighth_semitones")});
     case 0xd7:
-      return event.invoke<&Playback::transpose>(inspected.timing, event.s8("semitones"));
+      return event.invoke<&Playback::transpose>({inspected.timing, cursor.s8("semitones")});
     case 0xd8:
-      return event.invoke<&Playback::transposeAdd>(inspected.timing, event.s8("semitones"));
+      return event.invoke<&Playback::transposeAdd>({inspected.timing, cursor.s8("semitones")});
     case 0xd9:
-      return event.invoke<&Playback::fineTuningAdd>(inspected.timing, event.s8("fraction"));
+      return event.invoke<&Playback::fineTuningAdd>({inspected.timing, cursor.s8("fraction")});
     case 0xda:
     case 0xdb:
       // These handlers manipulate the current hardware-voice mask. The source
       // track pass has no voice mask selected, so both are inert in song data.
-      return event.invoke<&Playback::wait>(inspected.timing);
+      return event.invoke<&Playback::wait>({inspected.timing});
     case 0xdc:
-      return event.invoke<&Playback::relativeVolume>(inspected.timing, event.s8("delta"));
+      return event.invoke<&Playback::relativeVolume>({inspected.timing, cursor.s8("delta")});
     case 0xdd:
-      return event.invoke<&Playback::pitchBend>(inspected.timing, event.s8("position"));
+      return event.invoke<&Playback::pitchBend>({inspected.timing, cursor.s8("position")});
     case 0xde: {
-      const s16 relative = event.s16le("relative", SourceValueDisplay::SignedDecimal,
-                                      SemanticOperandRole::InstrumentTablePointer);
-      const Address address{relativeTarget(static_cast<u16>(event.nextAddress().value), relative)};
-      event.derived("script", address, SourceValueDisplay::Address, SemanticOperandRole::Instrument);
-      return event.invoke<&Playback::voiceScript>(inspected.timing, address);
+      const s16 relative =
+          cursor.s16le("relative", SourceValueDisplay::SignedDecimal, SemanticOperandRole::InstrumentTablePointer);
+      const Address address{relativeTarget(static_cast<u16>(cursor.nextAddress().value), relative)};
+      cursor.derived("script", address, SourceValueDisplay::Address, SemanticOperandRole::Instrument);
+      return event.invoke<&Playback::voiceScript>({inspected.timing, address});
     }
     case 0xdf:
-      return event.invoke<&Playback::group>(inspected.timing, event.u8("group"));
+      return event.invoke<&Playback::group>({inspected.timing, cursor.u8("group")});
     case 0xe0:
     case 0xe1:
-      return event.invoke<&Playback::noise>(inspected.timing, event.u8("noise_clock"), *command == 0xe1);
+      return event.invoke<&Playback::noise>({inspected.timing, cursor.u8("noise_clock"), *command == 0xe1});
     case 0xe2:
-      return event.invoke<&Playback::presetPitch>(inspected.timing, event.u8("preset"));
+      return event.invoke<&Playback::presetPitch>({inspected.timing, cursor.u8("preset")});
     case 0xe3:
-      return event.invoke<&Playback::presetVolume>(inspected.timing, event.u8("preset"));
+      return event.invoke<&Playback::presetVolume>({inspected.timing, cursor.u8("preset")});
     case 0xe4:
-      return event.invoke<&Playback::presetPan>(inspected.timing, event.u8("preset"));
+      return event.invoke<&Playback::presetPan>({inspected.timing, cursor.u8("preset")});
     case 0xe5:
-      return event.invoke<&Playback::presetWait>(inspected.timing, event.u8("preset"));
+      return event.invoke<&Playback::presetWait>({inspected.timing, cursor.u8("preset")});
     case 0xe6:
-      return event.invoke<&Playback::timebase>(inspected.timing, event.u8("flags", SourceValueDisplay::Hex));
+      return event.invoke<&Playback::timebase>({inspected.timing, cursor.u8("flags", SourceValueDisplay::Hex)});
     default:
       return event.stop();
   }

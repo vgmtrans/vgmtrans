@@ -27,7 +27,6 @@
 namespace vgmtrans::formats::konami_tmnt2 {
 
 using namespace core;
-using namespace command;
 
 double driverTickRate(u8 clkb, u8 skipInterval) {
   const double base = kChipClock / (1024.0 * (256.0 - clkb));
@@ -600,16 +599,16 @@ struct Playback : SequencePlayback<TrackState> {
 
 using Cursor = CompilerCursor<Playback>;
 
-[[nodiscard]] Address destination(Cursor::Event& event, u32 programOffset, SemanticOperandRole role) {
-  const auto encoded = event.rawU16le("encoded_destination", SourceValueDisplay::Address);
-  return event.resolvedValue("destination", encoded, Address{programOffset + encoded.value},
-                             SourceValueDisplay::Address, role);
+[[nodiscard]] Address destination(Cursor& cursor, u32 programOffset, SemanticOperandRole role) {
+  const auto encoded = cursor.rawU16le("encoded_destination", SourceValueDisplay::Address);
+  return cursor.resolvedValue("destination", encoded, Address{programOffset + encoded.value},
+                              SourceValueDisplay::Address, role);
 }
 
 [[nodiscard]] DecodedBytecodeCommand ignored(Cursor& cursor, std::string_view label, u8 bytes = 0) {
   auto event = cursor.sourceOnly(label);
   for (u8 index = 0; index < bytes; ++index) {
-    event.u8("data_" + std::to_string(index + 1), SourceValueDisplay::Hex);
+    cursor.u8("data_" + std::to_string(index + 1), SourceValueDisplay::Hex);
   }
   return event;
 }
@@ -640,42 +639,41 @@ struct DecodeState {
     return cursor
         .command((opcode & 0xf0) == 0 ? "Rest" : "Note",
                  (opcode & 0xf0) == 0 ? SequenceSemantic::Rest : SequenceSemantic::Note)
-        .invokeFlow<&Playback::note>(opcode);
+        .invokeFlow<&Playback::note>({opcode});
   }
   if (opcode <= 0xd7) {
     return cursor.command("Attenuation Step", SequenceSemantic::Level)
-        .invoke<&Playback::attenuationStep>(static_cast<u8>(opcode & 7));
+        .invoke<&Playback::attenuationStep>({static_cast<u8>(opcode & 7)});
   }
 
   switch (opcode) {
     case 0xd8:
       return cursor.command("Attenuation Multiplier", SequenceSemantic::Level)
-          .invoke<&Playback::attenuationMultiplier>(Byte{"multiplier"});
+          .invoke<&Playback::attenuationMultiplier>({cursor.u8("multiplier")});
     case 0xd9:
       return cursor.command("Extend Next Duration", SequenceSemantic::State).invoke<&Playback::extendDuration>();
     case 0xda:
-      return cursor.command("Pan", SequenceSemantic::Pan).invoke<&Playback::setPan>(Byte{"pan"});
+      return cursor.command("Pan", SequenceSemantic::Pan).invoke<&Playback::setPan>({cursor.u8("pan")});
     case 0xdb:
-      return cursor.command("Gate Time", SequenceSemantic::Envelope).set<&TrackState::gate>(Byte{"fraction"});
+      return cursor.command("Gate Time", SequenceSemantic::Envelope).set<&TrackState::gate>(cursor.u8("fraction"));
     case 0xdc: {
       if (vendetta) {
         return ignored(cursor, "Unused");
       }
       if (fm) {
         if (layout.version == Version::Tmnt2) {
-          auto event = cursor.command("Operator Release Rate", SequenceSemantic::Envelope);
-          return event.invoke<&Playback::ymReleaseUniform>(event.u8("rate"));
+          return cursor.command("Operator Release Rate", SequenceSemantic::Envelope)
+              .invoke<&Playback::ymReleaseUniform>({cursor.u8("rate")});
         }
-        auto event = cursor.command("Operator Release Rates", SequenceSemantic::Envelope);
-        const u8 first = event.u8("operators_1_2", SourceValueDisplay::Hex);
-        const u8 second = event.u8("operators_3_4", SourceValueDisplay::Hex);
-        return event.invoke<&Playback::ymRelease>(first, second);
+        return cursor.command("Operator Release Rates", SequenceSemantic::Envelope)
+            .invoke<&Playback::ymRelease>({cursor.u8("operators_1_2", SourceValueDisplay::Hex),
+                                           cursor.u8("operators_3_4", SourceValueDisplay::Hex)});
       }
       auto event = cursor.command("Sample Release", SequenceSemantic::Envelope);
-      const u8 packed = event.u8("delay_and_rate", SourceValueDisplay::Hex);
-      event.derived("delay", static_cast<u8>(packed >> 4));
-      event.derived("attenuation_step", static_cast<u8>(packed & 0x0f));
-      return event.invoke<&Playback::sampledRelease>(packed);
+      const u8 packed = cursor.u8("delay_and_rate", SourceValueDisplay::Hex);
+      cursor.derived("delay", static_cast<u8>(packed >> 4));
+      cursor.derived("attenuation_step", static_cast<u8>(packed & 0x0f));
+      return event.invoke<&Playback::sampledRelease>({packed});
     }
     case 0xdd:
       return cursor.command("Duration Multiplier Toggle", SequenceSemantic::State)
@@ -694,121 +692,115 @@ struct DecodeState {
       return cursor.command("Half Duration Toggle", SequenceSemantic::State).invoke<&Playback::toggleHalfDuration>();
     case 0xe0: {
       auto event = cursor.command("Initialize Channel", SequenceSemantic::State);
-      u8 base = event.u8("base_duration");
+      u8 base = cursor.u8("base_duration");
       if (base == 0) {
-        const u8 skip = event.u8("tick_skip_interval");
-        event.invoke<&Playback::tempo>(skip);
-        base = event.u8("effective_base_duration");
+        const u8 skip = cursor.u8("tick_skip_interval");
+        event.invoke<&Playback::tempo>({skip});
+        base = cursor.u8("effective_base_duration");
       }
       if (!fm && (base & 0xf0) != 0) {
-        const u8 attenuation = event.u8("attenuation");
-        return event.invoke<&Playback::initializeDrums>(base, attenuation);
+        return event.invoke<&Playback::initializeDrums>({base, cursor.u8("attenuation")});
       }
-      const u8 instrument = event.u8("program", SemanticOperandRole::InstrumentProgram);
-      const u8 attenuation = event.u8("attenuation");
-      const u8 gate = event.u8("gate_fraction");
-      return event.invoke<&Playback::initialize>(base, instrument, attenuation, gate);
+      return event.invoke<&Playback::initialize>({base, cursor.u8("program", SemanticOperandRole::InstrumentProgram),
+                                                  cursor.u8("attenuation"), cursor.u8("gate_fraction")});
     }
     case 0xe1: {
       if (fm) {
         auto event = cursor.command("Channel State", SequenceSemantic::State);
-        event.u8("value");
+        cursor.u8("value");
         return event;
       }
-      auto event = cursor.command("Percussion Bank", SequenceSemantic::Instrument);
-      return event.invoke<&Playback::setPercussion>(event.u8("value"));
+      return cursor.command("Percussion Bank", SequenceSemantic::Instrument)
+          .invoke<&Playback::setPercussion>({cursor.u8("value")});
     }
     case 0xe2:
-      return cursor.command("Base Duration", SequenceSemantic::State).invoke<&Playback::setBaseDuration>(Byte{"ticks"});
+      return cursor.command("Base Duration", SequenceSemantic::State)
+          .invoke<&Playback::setBaseDuration>({cursor.u8("ticks")});
     case 0xe3:
       return cursor.command("Program", SequenceSemantic::Program)
-          .invoke<&Playback::setProgram>(Byte{"program", SemanticOperandRole::InstrumentProgram});
+          .invoke<&Playback::setProgram>({cursor.u8("program", SemanticOperandRole::InstrumentProgram)});
     case 0xe4:
       return cursor.command("Attenuation", SequenceSemantic::Level)
-          .invoke<&Playback::setAttenuation>(Byte{"attenuation"});
+          .invoke<&Playback::setAttenuation>({cursor.u8("attenuation")});
     case 0xe5: {
       if (vendetta) {
         return ignored(cursor, "Unused");
       }
       auto event = cursor.command("Software Vibrato", SequenceSemantic::Modulation);
-      const u8 selector = event.u8("waveform");
-      const u8 packed = selector == 0 ? 0 : event.u8("delay_and_depth", SourceValueDisplay::Hex);
-      return event.invoke<&Playback::softwareVibrato>(selector, packed);
+      const u8 selector = cursor.u8("waveform");
+      const u8 packed = selector == 0 ? 0 : cursor.u8("delay_and_depth", SourceValueDisplay::Hex);
+      return event.invoke<&Playback::softwareVibrato>({selector, packed});
     }
     case 0xe6: {
       if (!fm || vendetta || layout.version != Version::SunsetRiders) {
         return ignored(cursor, "Unused");
       }
-      auto event = cursor.command("Tick Interval Add", SequenceSemantic::Tempo);
-      return event.invoke<&Playback::addTempoInterval>(event.s8("delta", SourceValueDisplay::SignedDecimal));
+      return cursor.command("Tick Interval Add", SequenceSemantic::Tempo)
+          .invoke<&Playback::addTempoInterval>({cursor.s8("delta", SourceValueDisplay::SignedDecimal)});
     }
     case 0xe7: {
       if (vendetta) {
         return ignored(cursor, "Unused");
       }
       if (!fm) {
-        auto event = cursor.command("Volume Envelope", SequenceSemantic::Modulation);
-        return event.invoke<&Playback::volumeEnvelope>(event.u8("selector"));
+        return cursor.command("Volume Envelope", SequenceSemantic::Modulation)
+            .invoke<&Playback::volumeEnvelope>({cursor.u8("selector")});
       }
       return ignored(cursor, "Unused");
     }
-    case 0xe8: {
+    case 0xe8:
       return ignored(cursor, "Unused");
-    }
     case 0xe9: {
       if (!fm && !vendetta) {
         return ignored(cursor, "Unused");
       }
       auto event = cursor.command("YM2151 Native LFO", SequenceSemantic::Modulation);
-      const u8 frequency = event.u8("frequency");
+      const u8 frequency = cursor.u8("frequency");
       if (frequency == 0) {
-        return event.invoke<&Playback::nativeLfo>(frequency, u8{0}, u8{0}, u8{0}, u8{0});
+        return event.invoke<&Playback::nativeLfo>({frequency, u8{0}, u8{0}, u8{0}, u8{0}});
       }
-      const u8 pmd = event.u8("pitch_depth");
-      const u8 amd = event.u8("amplitude_depth");
-      const u8 waveform = event.u8("waveform_and_ramp", SourceValueDisplay::Hex);
-      const u8 delay = event.u8("delay_or_ramp");
-      return event.invoke<&Playback::nativeLfo>(frequency, pmd, amd, waveform, delay);
+      return event.invoke<&Playback::nativeLfo>({frequency, cursor.u8("pitch_depth"), cursor.u8("amplitude_depth"),
+                                                 cursor.u8("waveform_and_ramp", SourceValueDisplay::Hex),
+                                                 cursor.u8("delay_or_ramp")});
     }
     case 0xea: {
       if (!fm && !vendetta) {
         return ignored(cursor, "Unused");
       }
-      auto event = cursor.command(vendetta ? "LFO Ramp Interval" : "LFO Delay", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::nativeLfoTiming>(event.u8("ticks"));
+      return cursor.command(vendetta ? "LFO Ramp Interval" : "LFO Delay", SequenceSemantic::Modulation)
+          .invoke<&Playback::nativeLfoTiming>({cursor.u8("ticks")});
     }
     case 0xeb: {
       if (!fm && layout.version == Version::SunsetRiders) {
         return ignored(cursor, "Unused");
       }
-      auto event = cursor.command("Portamento", SequenceSemantic::Portamento);
-      return event.invoke<&Playback::setPortamento>(event.u8("rate"));
+      return cursor.command("Portamento", SequenceSemantic::Portamento)
+          .invoke<&Playback::setPortamento>({cursor.u8("rate")});
     }
     case 0xec:
       return cursor.command("Transpose", SequenceSemantic::Pitch)
-          .invoke<&Playback::transpose>(Byte{"packed_semitones", SourceValueDisplay::Hex});
+          .invoke<&Playback::transpose>({cursor.u8("packed_semitones", SourceValueDisplay::Hex)});
     case 0xed:
       return cursor.command("Pitch Bend", SequenceSemantic::Pitch)
-          .invoke<&Playback::pitchBend>(Byte{"bend", SourceValueDisplay::Hex});
+          .invoke<&Playback::pitchBend>({cursor.u8("bend", SourceValueDisplay::Hex)});
     case 0xee: {
       if (vendetta) {
         return ignored(cursor, "Unused");
       }
       auto event = cursor.command("Stepped Pitch / Volume Modulation", SequenceSemantic::Modulation);
-      const u8 count = event.u8("steps");
-      const u8 pitch = event.u8("pitch_step", SourceValueDisplay::Hex);
-      const u8 volume = event.u8("volume_step_and_interval", SourceValueDisplay::Hex);
-      event.invoke<&Playback::steppedModulation>(count, pitch, volume);
+      const u8 count = cursor.u8("steps");
+      const u8 pitch = cursor.u8("pitch_step", SourceValueDisplay::Hex);
+      const u8 volume = cursor.u8("volume_step_and_interval", SourceValueDisplay::Hex);
+      event.invoke<&Playback::steppedModulation>({count, pitch, volume});
       return event.wait(count == 0 ? 256 : count);
     }
     case 0xef: {
       if (vendetta || (!fm && layout.version == Version::Tmnt2)) {
         return ignored(cursor, "Unused");
       }
-      auto event = cursor.command("Master Attenuation", SequenceSemantic::Level);
-      const u8 ym = event.u8("ym2151", SourceValueDisplay::Hex);
-      const u8 sampled = event.u8("k053260", SourceValueDisplay::Hex);
-      return event.invoke<&Playback::masterAdjust>(ym, sampled);
+      return cursor.command("Master Attenuation", SequenceSemantic::Level)
+          .invoke<&Playback::masterAdjust>(
+              {cursor.u8("ym2151", SourceValueDisplay::Hex), cursor.u8("k053260", SourceValueDisplay::Hex)});
     }
     case 0xf0:
     case 0xf1:
@@ -818,14 +810,14 @@ struct DecodeState {
     case 0xf5:
     case 0xf6:
     case 0xf7:
-      return cursor.command("Octave / Drum Bank", SequenceSemantic::Pitch).invoke<&Playback::setOctave>(opcode);
+      return cursor.command("Octave / Drum Bank", SequenceSemantic::Pitch).invoke<&Playback::setOctave>({opcode});
     case 0xf8:
       return fm || vendetta ? cursor.command("Key Off", SequenceSemantic::Note).invoke<&Playback::keyOff>()
                             : ignored(cursor, "Unused");
     case 0xf9: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
       const Address target =
-          destination(event, static_cast<u32>(layout.program.offset), SemanticOperandRole::JumpTarget);
+          destination(cursor, static_cast<u32>(layout.program.offset), SemanticOperandRole::JumpTarget);
       return target.value < begin ? event.loopCandidate(target) : event.jump(target);
     }
     case 0xfa:
@@ -843,15 +835,15 @@ struct DecodeState {
       auto event =
           cursor.command(isEnd ? "Loop End" : "Loop Start", isEnd ? SequenceSemantic::Repeat : SequenceSemantic::Loop);
       if (!isEnd) {
-        state.loops[slot] = event.nextAddress();
+        state.loops[slot] = cursor.nextAddress();
         return event;
       }
-      const u8 rawCount = event.u8("plays");
+      const u8 rawCount = cursor.u8("plays");
       const u16 plays = rawCount == 0 ? 256 : rawCount == 0xff ? 0xffff : rawCount;
-      event.derived("destination", target, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
+      cursor.derived("destination", target, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
       event.discoverTarget(target);
       state.loops[slot] = {};
-      return event.invokeFlow<&Playback::loopEnd>(slot, plays, target);
+      return event.invokeFlow<&Playback::loopEnd>({slot, plays, target});
     }
     case 0xfc:
     case 0xfd: {
@@ -866,7 +858,7 @@ struct DecodeState {
       }
       auto event = cursor.command("Call", SequenceSemantic::Call);
       const Address target =
-          destination(event, static_cast<u32>(layout.program.offset), SemanticOperandRole::CallTarget);
+          destination(cursor, static_cast<u32>(layout.program.offset), SemanticOperandRole::CallTarget);
       state.calls[slot] = true;
       return event.call(target);
     }
@@ -876,8 +868,8 @@ struct DecodeState {
       } else {
         auto event = cursor.command("Warp", SequenceSemantic::Repeat);
         const bool followedByWarp =
-            reader.has(event.nextAddress().value, 1) && reader.u8At(event.nextAddress().value) == 0xfe;
-        return event.invokeFlow<&Playback::warp>(event.nextAddress(), followedByWarp);
+            reader.has(cursor.nextAddress().value, 1) && reader.u8At(cursor.nextAddress().value) == 0xfe;
+        return event.invokeFlow<&Playback::warp>({cursor.nextAddress(), followedByWarp});
       }
     case 0xff:
       return cursor.command("End", SequenceSemantic::End).end();

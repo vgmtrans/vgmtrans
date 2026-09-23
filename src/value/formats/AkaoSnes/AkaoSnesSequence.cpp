@@ -1563,16 +1563,16 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
 
   const u8 opcode = cursor.opcode();
   const EventType type = eventType(profile.version, profile.minorVersion, opcode);
-  const auto relocated = [&](auto& event, SemanticOperandRole role = SemanticOperandRole::Value) {
-    const auto stored = event.rawU16le("stored_destination", SourceValueDisplay::Address);
-    return event.resolved(
+  const auto relocated = [&](SemanticOperandRole role = SemanticOperandRole::Value) {
+    const auto stored = cursor.rawU16le("stored_destination", SourceValueDisplay::Address);
+    return cursor.resolved(
         "destination", stored,
         [&](u16 address) { return Address{relocatedAddress(address, romRelocBase, apuRelocBase)}; },
         SourceValueDisplay::Address, role);
   };
   const auto ignored = [&](u8 operandCount) -> DecodedBytecodeCommand {
     auto event = cursor.unsupported("Unknown Event", "unknown");
-    event.rawBytes("arguments", operandCount);
+    cursor.rawBytes("arguments", operandCount);
     return event.ignore();
   };
 
@@ -1590,46 +1590,42 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
       const u8 noteIndex = opcode / tableSize;
       const bool rest = noteIndex >= 12 && noteIndex != akaoSnesStatusNoteIndexTie(profile.version);
       auto event = cursor.command(rest ? "Rest" : "Note", rest ? SequenceSemantic::Rest : SequenceSemantic::Note);
-      event.opcodeValue("duration_index", durationIndex);
-      event.opcodeValue("note_index", noteIndex);
-      return event.invoke<&Playback::note>(durationIndex, noteIndex, event.nextAddress());
+      cursor.opcodeValue("duration_index", durationIndex);
+      cursor.opcodeValue("note_index", noteIndex);
+      return event.invoke<&Playback::note>({durationIndex, noteIndex, cursor.nextAddress()});
     }
 
     case EventType::Nop:
       return cursor.noOp("NOP");
     case EventType::Nop1: {
       auto event = cursor.noOp("NOP");
-      event.u8("arg1");
+      cursor.u8("arg1");
       return event;
     }
 
-    case EventType::Volume: {
-      auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(event.u8("volume"));
-    }
+    case EventType::Volume:
+      return cursor.command("Volume", SequenceSemantic::Level).invoke<&Playback::volume>({cursor.u8("volume")});
     case EventType::VolumeFade: {
       auto event = cursor.command("Volume Fade", SequenceSemantic::Level);
-      const u16 length = profile.version == AKAOSNES_V1 ? event.u16le("length") : event.u8("length");
-      const u8 target = event.u8("volume");
-      return length == 0 ? event.invoke<&Playback::volume>(target)
+      const u16 length = profile.version == AKAOSNES_V1 ? cursor.u16le("length") : cursor.u8("length");
+      const u8 target = cursor.u8("volume");
+      return length == 0 ? event.invoke<&Playback::volume>({target})
                          : event.invoke(
                                [](Playback& playback, u16 ticks, u8 volume) {
                                  playback.track.volume.begin(
                                      playback.out.fade(PerformanceAutomationTarget::Level, channelLevel(volume), ticks),
                                      playback.track.volume.toRawTarget(volume, ticks));
                                },
-                               length, target);
+                               {length, target});
     }
-    case EventType::Pan: {
-      auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      return event.invoke<&Playback::pan>(event.u8("pan"));
-    }
+    case EventType::Pan:
+      return cursor.command("Pan", SequenceSemantic::Pan).invoke<&Playback::pan>({cursor.u8("pan")});
     case EventType::PanFade: {
       auto event = cursor.command("Pan Fade", SequenceSemantic::Pan);
-      const u16 length = profile.version == AKAOSNES_V1 ? event.u16le("length") : event.u8("length");
-      const u8 target = event.u8("pan");
+      const u16 length = profile.version == AKAOSNES_V1 ? cursor.u16le("length") : cursor.u8("length");
+      const u8 target = cursor.u8("pan");
       return length == 0
-                 ? event.invoke<&Playback::pan>(target)
+                 ? event.invoke<&Playback::pan>({target})
                  : event.invoke(
                        [](Playback& playback, u16 ticks, u8 rawPan) {
                          const u8 pan = static_cast<u8>(rawPan << (playback.track.pan8Bit ? 0 : 1));
@@ -1638,7 +1634,7 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
                              playback.out.fade(PerformanceAutomationTarget::Pan, (rightGain * 2.0) - 1.0, ticks),
                              playback.track.pan.toRawTarget(pan, ticks));
                        },
-                       length, target);
+                       {length, target});
     }
 
     case EventType::PitchEnvelopeOn: {
@@ -1647,13 +1643,13 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
       u8 delay = 0;
       u8 length = 0;
       if (profile.version == AKAOSNES_V1) {
-        delay = static_cast<u8>(event.u8("delay") + 1);
-        length = event.u8("length");
-        semitones = event.s8("semitones");
+        delay = static_cast<u8>(cursor.u8("delay") + 1);
+        length = cursor.u8("length");
+        semitones = cursor.s8("semitones");
       } else {
-        semitones = event.s8("semitones");
-        delay = event.u8("delay");
-        length = event.u8("length");
+        semitones = cursor.s8("semitones");
+        delay = cursor.u8("delay");
+        length = cursor.u8("length");
       }
       return event.invoke(
           [](Playback& playback, s8 pitch, u8 wait, u8 duration) {
@@ -1671,18 +1667,17 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
             playback.track.pitchEnvelopeAutomation = playback.out.noteEnvelope(
                 PerformanceAutomationTarget::Pitch, static_cast<double>(pitch), duration, wait);
           },
-          semitones, delay, length);
+          {semitones, delay, length});
     }
     case EventType::PitchEnvelopeOff: {
-      auto event = cursor.command("Pitch Envelope Off", SequenceSemantic::Pitch);
-      return event.invoke([](Playback& playback) {
+      return cursor.command("Pitch Envelope Off", SequenceSemantic::Pitch).invoke([](Playback& playback) {
         playback.track.pitchEnvelope = {};
         playback.track.pitchEnvelopeAutomation.clear();
       });
     }
     case EventType::PitchSlide: {
       auto event = cursor.command("Pitch Slide", SequenceSemantic::Pitch);
-      const u16 steps = static_cast<u16>(event.u8("time")) + 1;
+      const u16 steps = static_cast<u16>(cursor.u8("time")) + 1;
       return event.invoke(
           [](Playback& playback, u16 duration, s8 pitch) {
             playback.track.pendingPitchSlideSteps = duration;
@@ -1691,7 +1686,7 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
               playback.track.clearPendingPitchSlide();
             }
           },
-          steps, event.s8("semitones"));
+          {steps, cursor.s8("semitones")});
     }
 
     case EventType::VibratoOn:
@@ -1702,33 +1697,33 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
       u8 rate = 0;
       u8 depth = 0;
       if (profile.version == AKAOSNES_V2) {
-        depth = event.u8("depth");
-        delay = event.u8("delay");
-        rate = event.u8("rate");
+        depth = cursor.u8("depth");
+        delay = cursor.u8("delay");
+        rate = cursor.u8("rate");
       } else {
-        delay = event.u8("delay");
-        rate = event.u8("rate");
-        depth = event.u8("depth");
+        delay = cursor.u8("delay");
+        rate = cursor.u8("rate");
+        depth = cursor.u8("depth");
       }
-      return event.invoke<&Playback::setLfo>(target, delay, rate, depth);
+      return event.invoke<&Playback::setLfo>({target, delay, rate, depth});
     }
     case EventType::VibratoOff:
       return cursor.command("Vibrato Off", SequenceSemantic::Modulation)
-          .invoke<&Playback::clearLfo>(LfoTarget::Vibrato);
+          .invoke<&Playback::clearLfo>({LfoTarget::Vibrato});
     case EventType::TremoloOff:
       return cursor.command("Tremolo Off", SequenceSemantic::Modulation)
-          .invoke<&Playback::clearLfo>(LfoTarget::Tremolo);
+          .invoke<&Playback::clearLfo>({LfoTarget::Tremolo});
     case EventType::PanLfoOn: {
       auto event = cursor.command("Pan LFO", SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
-      event.u8("depth");
-      event.u8("rate");
+      cursor.u8("depth");
+      cursor.u8("rate");
       return event;
     }
     case EventType::PanLfoOnWithDelay: {
       auto event = cursor.command("Pan LFO", SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
-      event.u8("delay");
-      event.u8("rate");
-      event.u8("depth");
+      cursor.u8("delay");
+      cursor.u8("rate");
+      cursor.u8("depth");
       return event;
     }
 
@@ -1773,56 +1768,48 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
 
     case EventType::NoiseFreq: {
       auto event = cursor.sourceOnly("Noise Frequency");
-      event.u8("frequency");
+      cursor.u8("frequency");
       return event;
     }
-    case EventType::Octave: {
-      auto event = cursor.command("Octave", SequenceSemantic::Pitch);
-      return event.set<&TrackState::octave>(event.u8("octave"));
-    }
+    case EventType::Octave:
+      return cursor.command("Octave", SequenceSemantic::Pitch).set<&TrackState::octave>(cursor.u8("octave"));
     case EventType::OctaveUp:
       return cursor.command("Octave Up", SequenceSemantic::Pitch).add<&TrackState::octave>(u8{1});
     case EventType::OctaveDown:
       return cursor.command("Octave Down", SequenceSemantic::Pitch).add<&TrackState::octave>(s8{-1});
-    case EventType::TransposeAbs: {
-      auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.set<&TrackState::transpose>(event.s8("semitones"));
-    }
-    case EventType::TransposeRel: {
-      auto event = cursor.command("Transpose Relative", SequenceSemantic::Pitch);
-      return event.add<&TrackState::transpose>(event.s8("semitones"));
-    }
-    case EventType::Tuning: {
-      auto event = cursor.command("Tuning", SequenceSemantic::Pitch);
-      return event.emitTuning(tuningCents(event.u8("tuning")));
-    }
+    case EventType::TransposeAbs:
+      return cursor.command("Transpose", SequenceSemantic::Pitch).set<&TrackState::transpose>(cursor.s8("semitones"));
+    case EventType::TransposeRel:
+      return cursor.command("Transpose Relative", SequenceSemantic::Pitch)
+          .add<&TrackState::transpose>(cursor.s8("semitones"));
+    case EventType::Tuning:
+      return cursor.command("Tuning", SequenceSemantic::Pitch).emitTuning(tuningCents(cursor.u8("tuning")));
     case EventType::ProgramChange: {
       auto event = cursor.command("Program", SequenceSemantic::Program);
-      event.derived("bank", u8{0}, SemanticOperandRole::InstrumentBank);
-      const u8 program = event.u8("program", SemanticOperandRole::InstrumentProgram);
-      return event.invoke<&Playback::programChange>(program);
+      cursor.derived("bank", u8{0}, SemanticOperandRole::InstrumentBank);
+      return event.invoke<&Playback::programChange>({cursor.u8("program", SemanticOperandRole::InstrumentProgram)});
     }
 
     case EventType::VolumeEnvelope: {
       if (profile.version == AKAOSNES_V1) {
-        auto event = cursor.command("Software Volume Envelope", SequenceSemantic::Level);
-        return event.invoke<&Playback::selectV1VolumeEnvelope>(event.u8("envelope"));
+        return cursor.command("Software Volume Envelope", SequenceSemantic::Level)
+            .invoke<&Playback::selectV1VolumeEnvelope>({cursor.u8("envelope")});
       }
       auto event = cursor.sourceOnly("Volume Envelope");
-      event.u8("envelope");
+      cursor.u8("envelope");
       return event;
     }
     case EventType::GainRelease: {
       auto event = cursor.command("GAIN Release Rate", SequenceSemantic::Envelope);
-      const u8 parameter = event.u8("rate");
-      event.derived("dsp_gain", akaoSnesV1Gain(parameter), SourceValueDisplay::Hex);
-      return event.invoke<&Playback::selectV1Gain>(parameter);
+      const u8 parameter = cursor.u8("rate");
+      cursor.derived("dsp_gain", akaoSnesV1Gain(parameter), SourceValueDisplay::Hex);
+      return event.invoke<&Playback::selectV1Gain>({parameter});
     }
     case EventType::DurationRate: {
       auto event = cursor.command("GAIN Trigger", SequenceSemantic::Envelope);
-      const u8 parameter = event.u8("duration_percent");
-      event.derived("driver_rate", akaoSnesV1DurationRate(parameter), SourceValueDisplay::Hex);
-      return event.invoke<&Playback::selectV1DurationRate>(parameter);
+      const u8 parameter = cursor.u8("duration_percent");
+      cursor.derived("driver_rate", akaoSnesV1DurationRate(parameter), SourceValueDisplay::Hex);
+      return event.invoke<&Playback::selectV1DurationRate>({parameter});
     }
     case EventType::AdsrAr:
     case EventType::AdsrDr:
@@ -1834,34 +1821,34 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
                                                                  : "ADSR Sustain Rate";
       if (usesDynamicAdsr(profile)) {
         auto event = cursor.command(label, SequenceSemantic::Envelope);
-        const u8 value = event.u8("value", SourceValueDisplay::Hex);
+        const u8 value = cursor.u8("value", SourceValueDisplay::Hex);
         if (type == EventType::AdsrAr) {
-          const u8 rate = event.derived("dsp_attack_rate", static_cast<u8>(value & 0x0f));
+          const u8 rate = cursor.derived("dsp_attack_rate", static_cast<u8>(value & 0x0f));
           return event.emitEnvelopeField<EnvelopeFields::Attack>(
               snesDspAdsrAttackSeconds(rate), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
         }
         if (type == EventType::AdsrDr) {
-          const u8 rate = event.derived("dsp_decay_rate", static_cast<u8>(value & 0x07));
+          const u8 rate = cursor.derived("dsp_decay_rate", static_cast<u8>(value & 0x07));
           return event.emitEnvelopeField<EnvelopeFields::Decay>(
               snesDspAdsrDecaySeconds(rate), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
         }
         if (type == EventType::AdsrSl) {
-          const u8 level = event.derived("dsp_sustain_level", static_cast<u8>(value & 0x07));
+          const u8 level = cursor.derived("dsp_sustain_level", static_cast<u8>(value & 0x07));
           return event.emitEnvelopeField<EnvelopeFields::Sustain>(
               (level + 1) / 8.0, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
         }
-        const u8 rate = event.derived("dsp_sustain_rate", static_cast<u8>(value & 0x1f));
+        const u8 rate = cursor.derived("dsp_sustain_rate", static_cast<u8>(value & 0x1f));
         return event.emitEnvelopeField<EnvelopeFields::SecondDecay>(
             snesDspAdsrSustainSeconds(rate), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
       }
       auto event = cursor.sourceOnly(label);
-      event.u8("value");
+      cursor.u8("value");
       return event;
     }
 
     case EventType::LoopStart: {
       auto event = cursor.command("Loop Start", SequenceSemantic::Loop);
-      const u8 count = event.u8("count");
+      const u8 count = cursor.u8("count");
       return event.invoke(
           [](Playback& playback, u8 repeatCount, Address start) {
             const u32 totalPlays = repeatCount == 0 ? 0u : static_cast<u32>(repeatCount + 1);
@@ -1874,42 +1861,41 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
             };
             playback.track.loopLevel = static_cast<u8>((playback.track.loopLevel + 1) % playback.track.loops.size());
           },
-          count, event.nextAddress());
+          {count, cursor.nextAddress()});
     }
     case EventType::LoopEnd:
       return cursor.command("Loop End", SequenceSemantic::Repeat).invokeFlow<&Playback::loopEnd>();
-    case EventType::OneTimeDuration: {
-      auto event = cursor.command("Duration One-Time", SequenceSemantic::Meta);
-      return event.set<&TrackState::onetimeDuration>(event.u8("duration"));
-    }
+    case EventType::OneTimeDuration:
+      return cursor.command("Duration One-Time", SequenceSemantic::Meta)
+          .set<&TrackState::onetimeDuration>(cursor.u8("duration"));
     case EventType::JumpToSfxLo:
     case EventType::JumpToSfxHi: {
       auto event = cursor.unsupported("Jump To SFX");
-      event.u8("sfx");
+      cursor.u8("sfx");
       return event.stop();
     }
     case EventType::End:
       return cursor.command("End", SequenceSemantic::End).end();
     case EventType::Tempo: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-      const u8 raw = event.u8("raw");
+      const u8 raw = cursor.u8("raw");
       const u8 tempo = normalizeTempoValue(profile.minorVersion, raw);
-      event.derived("tempo",
-                    tempoBeatsPerMinute(tempoMicrosecondsPerQuarter(profile.version, profile.minorVersion, tempo)),
-                    SourceValueDisplay::BeatsPerMinute);
-      return event.invoke<&Playback::tempoChange>(raw);
+      cursor.derived("tempo",
+                     tempoBeatsPerMinute(tempoMicrosecondsPerQuarter(profile.version, profile.minorVersion, tempo)),
+                     SourceValueDisplay::BeatsPerMinute);
+      return event.invoke<&Playback::tempoChange>({raw});
     }
     case EventType::TempoFade: {
       auto event = cursor.command("Tempo Fade", SequenceSemantic::Tempo);
-      const u16 length = profile.version == AKAOSNES_V1 ? event.u16le("length") : event.u8("length");
-      const u8 target = event.u8("raw");
+      const u16 length = profile.version == AKAOSNES_V1 ? cursor.u16le("length") : cursor.u8("length");
+      const u8 target = cursor.u8("raw");
       const u8 normalizedTarget = normalizeTempoValue(profile.minorVersion, target);
-      event.derived(
+      cursor.derived(
           "target_tempo",
           tempoBeatsPerMinute(tempoMicrosecondsPerQuarter(profile.version, profile.minorVersion, normalizedTarget)),
           SourceValueDisplay::BeatsPerMinute);
       return length == 0
-                 ? event.invoke<&Playback::tempoChange>(target)
+                 ? event.invoke<&Playback::tempoChange>({target})
                  : event.invoke(
                        [](Playback& playback, u16 ticks, u8 rawTempo) {
                          playback.track.tempoState.reset(playback.track.tempo);
@@ -1921,40 +1907,37 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
                                                ticks),
                              playback.track.tempoState.toRawTarget(tempo, ticks));
                        },
-                       length, target);
+                       {length, target});
     }
 
     case EventType::EchoVolume: {
       auto event = cursor.sourceOnly("Echo Volume");
-      event.u8("volume");
+      cursor.u8("volume");
       return event;
     }
     case EventType::EchoVolumeFade: {
       auto event = cursor.sourceOnly("Echo Volume Fade");
-      event.u8("length");
-      event.u8("volume");
+      cursor.u8("length");
+      cursor.u8("volume");
       return event;
     }
     case EventType::EchoFeedbackFir: {
       auto event = cursor.sourceOnly("Echo Feedback/FIR");
-      event.u8("feedback");
-      event.u8("fir");
+      cursor.u8("feedback");
+      cursor.u8("fir");
       return event;
     }
-    case EventType::MasterVolume: {
-      auto event = cursor.command("Master Volume", SequenceSemantic::Level);
-      return event.emitMasterLevel(levelFromLegacyMidiVolume(static_cast<u8>(event.u8("volume") >> 1)));
-    }
+    case EventType::MasterVolume:
+      return cursor.command("Master Volume", SequenceSemantic::Level)
+          .emitMasterLevel(levelFromLegacyMidiVolume(static_cast<u8>(cursor.u8("volume") >> 1)));
     case EventType::LoopBreak: {
       auto event = cursor.command("Loop Break", SequenceSemantic::RepeatBreak);
-      const u8 count = event.u8("count");
-      const Address destination = relocated(event, SemanticOperandRole::JumpTarget);
-      return event.invoke<&Playback::loopBreak>(count, destination).discoverTarget(destination);
+      const u8 count = cursor.u8("count");
+      const Address destination = relocated(SemanticOperandRole::JumpTarget);
+      return event.invoke<&Playback::loopBreak>({count, destination}).discoverTarget(destination);
     }
-    case EventType::Goto: {
-      auto event = cursor.command("Jump", SequenceSemantic::Jump);
-      return event.loopCandidate(relocated(event, SemanticOperandRole::LoopTarget));
-    }
+    case EventType::Goto:
+      return cursor.command("Jump", SequenceSemantic::Jump).loopCandidate(relocated(SemanticOperandRole::LoopTarget));
 
     case EventType::EchoFeedbackFade:
     case EventType::EchoFirFade:
@@ -1966,27 +1949,27 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
                                      : type == EventType::EchoFeedback   ? "Echo Feedback"
                                                                          : "Echo FIR";
       auto event = cursor.sourceOnly(label);
-      event.u8(fade ? "length" : "value");
+      cursor.u8(fade ? "length" : "value");
       if (fade) {
-        event.u8("target");
+        cursor.u8("target");
       }
       return event;
     }
     case EventType::CpuControlledSetValue: {
       auto event = cursor.sourceOnly("CPU-Controlled Set Value");
-      event.u8("value");
+      cursor.u8("value");
       return event;
     }
     case EventType::CpuControlledJump: {
       auto event =
           cursor.command("CPU-Controlled Jump", SequenceSemantic::Jump, CommandPlaybackStatus::AffectsControlFlow);
-      const Address destination = relocated(event, SemanticOperandRole::JumpTarget);
+      const Address destination = relocated(SemanticOperandRole::JumpTarget);
       return event.discoverTarget(destination);
     }
     case EventType::CpuControlledJumpV2: {
       auto event = cursor.command("CPU-Controlled Jump", SequenceSemantic::Jump, CommandPlaybackStatus::SourceOnly);
-      event.u8("arg");
-      relocated(event, SemanticOperandRole::JumpTarget);
+      cursor.u8("arg");
+      relocated(SemanticOperandRole::JumpTarget);
       return event;
     }
     case EventType::PercOn:
@@ -1999,18 +1982,17 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
         playback.track.percussion = false;
         playback.out.instrument(0, playback.track.nonPercussionProgram);
       });
-    case EventType::VolumeAlt: {
-      auto event = cursor.command("Expression", SequenceSemantic::Level);
-      return event.emitExpression(levelFromLegacyMidiVolume(event.u8("volume") & 0x7f));
-    }
+    case EventType::VolumeAlt:
+      return cursor.command("Expression", SequenceSemantic::Level)
+          .emitExpression(levelFromLegacyMidiVolume(cursor.u8("volume") & 0x7f));
     case EventType::IgnoreMasterVolumeByPrognum: {
       auto event = cursor.sourceOnly("Ignore Master Volume By Program");
-      event.u8("program");
+      cursor.u8("program");
       return event;
     }
     case EventType::PlaySfx: {
       auto event = cursor.unsupported("Play SFX");
-      event.u8("arg");
+      cursor.u8("arg");
       return event;
     }
   }

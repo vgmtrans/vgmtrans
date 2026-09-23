@@ -198,18 +198,18 @@ using Cursor = CompilerCursor<Playback>;
                                        SequenceSemantic semantic,
                                        CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback) {
   auto event = cursor.command(label, semantic, playback);
-  event.opcodeValue("delta_byte_0", cursor.opcode(), SourceValueDisplay::Hex);
+  cursor.opcodeValue("delta_byte_0", cursor.opcode(), SourceValueDisplay::Hex);
   for (u32 i = 1; i < source.deltaSize; ++i) {
-    event.u8("delta_byte", SourceValueDisplay::Hex);
+    cursor.u8("delta_byte", SourceValueDisplay::Hex);
   }
-  event.derived("delta", source.delta);
+  cursor.derived("delta", source.delta);
   if (source.explicitStatus) {
-    event.u8("status", SourceValueDisplay::Hex);
+    cursor.u8("status", SourceValueDisplay::Hex);
   } else {
-    event.derived("running_status", source.status, SourceValueDisplay::Hex);
+    cursor.derived("running_status", source.status, SourceValueDisplay::Hex);
   }
   if ((source.status & 0xf0) != 0xf0) {
-    event.derived("channel", static_cast<u8>(source.status & 0x0f), SemanticOperandRole::Channel);
+    cursor.derived("channel", static_cast<u8>(source.status & 0x0f), SemanticOperandRole::Channel);
   }
   return event;
 }
@@ -224,23 +224,22 @@ using Cursor = CompilerCursor<Playback>;
   const u8 family = source.status & 0xf0;
   const u8 channel = source.status & 0x0f;
   if (family == 0x90) {
-    auto event = beginEvent(cursor, source, source.data2 == 0 ? "Note Off" : "Note On", SequenceSemantic::Note);
-    const u8 key = event.u8("key", SourceValueDisplay::MidiNote);
-    const u8 velocity = event.u8("velocity");
-    return event.invoke<&Playback::note>(channel, key, velocity, source.delta);
+    return beginEvent(cursor, source, source.data2 == 0 ? "Note Off" : "Note On", SequenceSemantic::Note)
+        .invoke<&Playback::note>(
+            {channel, cursor.u8("key", SourceValueDisplay::MidiNote), cursor.u8("velocity"), source.delta});
   }
   if (family == 0xc0) {
-    auto event = beginEvent(cursor, source, "Program Change", SequenceSemantic::Program);
-    return event.invoke<&Playback::program>(channel, event.u8("program", SemanticOperandRole::InstrumentProgram),
-                                            source.delta);
+    return beginEvent(cursor, source, "Program Change", SequenceSemantic::Program)
+        .invoke<&Playback::program>(
+            {channel, cursor.u8("program", SemanticOperandRole::InstrumentProgram), source.delta});
   }
   if (family == 0xe0) {
     auto event = beginEvent(cursor, source, "Pitch Bend", SequenceSemantic::Pitch);
-    event.u8("lsb");
-    const u8 msb = event.u8("msb");
-    event.derived("driver_wheel", static_cast<s16>((static_cast<int>(msb) - 64) * 128),
-                  SourceValueDisplay::SignedDecimal);
-    return event.invoke<&Playback::pitchBend>(channel, msb, source.delta);
+    cursor.u8("lsb");
+    const u8 msb = cursor.u8("msb");
+    cursor.derived("driver_wheel", static_cast<s16>((static_cast<int>(msb) - 64) * 128),
+                   SourceValueDisplay::SignedDecimal);
+    return event.invoke<&Playback::pitchBend>({channel, msb, source.delta});
   }
   if (family == 0xb0) {
     const bool loopStart = source.data1 == 99 && source.data2 == 20;
@@ -250,37 +249,37 @@ using Cursor = CompilerCursor<Playback>;
                             : loopStart ? "Loop Start"
                                         : "Controller",
                             loopEnd || loopStart ? SequenceSemantic::Loop : SequenceSemantic::State);
-    const u8 controller = event.u8("controller");
+    const u8 controller = cursor.u8("controller");
     const auto role = controller == 0 ? SemanticOperandRole::InstrumentBank : SemanticOperandRole::Value;
-    const u8 value = event.u8("value", role);
+    const u8 value = cursor.u8("value", role);
     if (loopStart) {
-      event.derived("loop_start", Address{source.end}, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
+      cursor.derived("loop_start", Address{source.end}, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
     }
     if (loopEnd) {
       const Address destination{*source.loopDestination};
-      event.derived("repeat_count", source.loopCount);
-      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
-      event.invoke<&Playback::loopEnd>(source.loopCount, destination, source.delta).discoverTarget(destination);
+      cursor.derived("repeat_count", source.loopCount);
+      cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
+      event.invoke<&Playback::loopEnd>({source.loopCount, destination, source.delta}).discoverTarget(destination);
       return event;
     }
-    return event.invoke<&Playback::controller>(channel, controller, value, source.delta);
+    return event.invoke<&Playback::controller>({channel, controller, value, source.delta});
   }
   if (source.status == 0xff && source.data1 == 0x51) {
     auto event = beginEvent(cursor, source, "Tempo", SequenceSemantic::Tempo);
-    event.u8("meta_type", SourceValueDisplay::Hex);
-    const u8 high = event.u8("tempo_high");
-    const u8 middle = event.u8("tempo_middle");
-    const u8 low = event.u8("tempo_low");
+    cursor.u8("meta_type", SourceValueDisplay::Hex);
+    const u8 high = cursor.u8("tempo_high");
+    const u8 middle = cursor.u8("tempo_middle");
+    const u8 low = cursor.u8("tempo_low");
     const u32 tempo = (static_cast<u32>(high) << 16) | (static_cast<u32>(middle) << 8) | low;
-    event.derived("microseconds_per_quarter", tempo);
-    return event.invoke<&Playback::tempo>(tempo, source.delta);
+    cursor.derived("microseconds_per_quarter", tempo);
+    return event.invoke<&Playback::tempo>({tempo, source.delta});
   }
   if (source.status == 0xff && source.data1 == 0x2f) {
     auto event =
         beginEvent(cursor, source, "End of Sequence", SequenceSemantic::End, CommandPlaybackStatus::StopsPlayback);
-    event.u8("meta_type", SourceValueDisplay::Hex);
+    cursor.u8("meta_type", SourceValueDisplay::Hex);
     if (source.dataBytes > 1) {
-      event.u8("terminator", SourceValueDisplay::Hex);
+      cursor.u8("terminator", SourceValueDisplay::Hex);
     }
     return event.wait(source.delta).end();
   }

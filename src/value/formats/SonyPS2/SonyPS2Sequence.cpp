@@ -771,52 +771,52 @@ using Cursor = CompilerCursor<Playback>;
   }
   auto event = cursor.command(label, semantic, playback);
   if (source.end > source.offset + 1) {
-    event.rawBytes("encoded_bytes", source.end - source.offset - 1);
+    cursor.rawBytes("encoded_bytes", source.end - source.offset - 1);
   }
-  event.derived("delta", source.delta);
-  event.derived("status", source.status, SourceValueDisplay::Hex);
+  cursor.derived("delta", source.delta);
+  cursor.derived("status", source.status, SourceValueDisplay::Hex);
   if (source.status < 0xf0) {
-    event.derived("channel", source.channel, SemanticOperandRole::Channel);
+    cursor.derived("channel", source.channel, SemanticOperandRole::Channel);
   }
   if (source.malformed) {
     return event.stop();
   }
   if (family == 0x80) {
-    event.derived("key", source.data1, SourceValueDisplay::MidiNote);
-    return event.invoke<&Playback::noteOff>(source.channel, source.data1, source.delta);
+    cursor.derived("key", source.data1, SourceValueDisplay::MidiNote);
+    return event.invoke<&Playback::noteOff>({source.channel, source.data1, source.delta});
   }
   if (family == 0x90) {
-    event.derived("key", source.data1, SourceValueDisplay::MidiNote);
-    event.derived("velocity", source.data2);
-    return event.invoke<&Playback::note>(source.channel, source.data1, source.data2, source.delta);
+    cursor.derived("key", source.data1, SourceValueDisplay::MidiNote);
+    cursor.derived("velocity", source.data2);
+    return event.invoke<&Playback::note>({source.channel, source.data1, source.data2, source.delta});
   }
   if (family == 0xb0) {
-    event.derived("controller", source.data1);
-    event.derived("value", source.data2);
+    cursor.derived("controller", source.data1);
+    cursor.derived("value", source.data2);
     if (source.loopDestination) {
       const Address destination{*source.loopDestination};
-      event.derived("loop_id", source.loopId);
-      event.derived("repeat_count", source.loopCount);
-      event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
-      return event.invokeFlow<&Playback::loop>(source.loopId, source.loopCount, destination, source.delta)
+      cursor.derived("loop_id", source.loopId);
+      cursor.derived("repeat_count", source.loopCount);
+      cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
+      return event.invokeFlow<&Playback::loop>({source.loopId, source.loopCount, destination, source.delta})
           .discoverTarget(destination);
     }
-    return event.invoke<&Playback::controller>(source.channel, source.data1, source.data2, source.delta);
+    return event.invoke<&Playback::controller>({source.channel, source.data1, source.data2, source.delta});
   }
   if (family == 0xc0) {
-    event.derived("program", source.data1, SemanticOperandRole::InstrumentProgram);
-    return event.invoke<&Playback::programChange>(source.channel, source.data1, source.delta);
+    cursor.derived("program", source.data1, SemanticOperandRole::InstrumentProgram);
+    return event.invoke<&Playback::programChange>({source.channel, source.data1, source.delta});
   }
   if (family == 0xe0) {
     const u16 value = static_cast<u16>((source.data2 << 7) | source.data1);
-    event.derived("wheel", value);
-    return event.invoke<&Playback::pitchBend>(source.channel, value, source.delta);
+    cursor.derived("wheel", value);
+    return event.invoke<&Playback::pitchBend>({source.channel, value, source.delta});
   }
   if (source.status == 0xff && source.metaType == 0x51 && source.payload.size() == 3) {
     const u32 tempo =
         (static_cast<u32>(source.payload[0]) << 16) | (static_cast<u32>(source.payload[1]) << 8) | source.payload[2];
-    event.derived("microseconds_per_quarter", tempo);
-    return event.invoke<&Playback::tempo>(tempo, source.delta);
+    cursor.derived("microseconds_per_quarter", tempo);
+    return event.invoke<&Playback::tempo>({tempo, source.delta});
   }
   if (source.endEvent) {
     return event.wait(source.delta).end();
@@ -993,42 +993,42 @@ struct SeEvent {
                               : family == 0xb0 && !pitchSlide ? CommandPlaybackStatus::SourceOnly
                                                               : CommandPlaybackStatus::AffectsPlayback);
   if (source.end > source.offset + 1) {
-    event.rawBytes("encoded_bytes", source.end - source.offset - 1);
+    cursor.rawBytes("encoded_bytes", source.end - source.offset - 1);
   }
-  event.derived("delta_ms", source.delta);
+  cursor.derived("delta_ms", source.delta);
   if (source.malformed) {
     return event.stop();
   }
   if (note) {
-    event.derived("set", source.set, SemanticOperandRole::InstrumentBank);
-    event.derived("timbre", source.timbre, SemanticOperandRole::InstrumentProgram);
-    event.derived("key", source.key, SourceValueDisplay::MidiNote);
-    event.derived("velocity", source.velocity);
-    return event.invoke<&Playback::seNote>(source.set, source.timbre, source.key, source.velocity, source.noteOnOnly,
-                                           source.delta);
+    cursor.derived("set", source.set, SemanticOperandRole::InstrumentBank);
+    cursor.derived("timbre", source.timbre, SemanticOperandRole::InstrumentProgram);
+    cursor.derived("key", source.key, SourceValueDisplay::MidiNote);
+    cursor.derived("velocity", source.velocity);
+    return event.invoke<&Playback::seNote>(
+        {source.set, source.timbre, source.key, source.velocity, source.noteOnOnly, source.delta});
   }
   if (source.loopDestination) {
     const Address destination{*source.loopDestination};
-    event.derived("loop_id", source.loopId);
-    event.derived("repeat_count", source.loopCount);
-    event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
-    return event.invokeFlow<&Playback::loop>(source.loopId, source.loopCount, destination, source.delta)
+    cursor.derived("loop_id", source.loopId);
+    cursor.derived("repeat_count", source.loopCount);
+    cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
+    return event.invokeFlow<&Playback::loop>({source.loopId, source.loopCount, destination, source.delta})
         .discoverTarget(destination);
   }
   if (source.endEvent) {
     return event.wait(source.delta).end();
   }
-  event.derived("set", source.set, SemanticOperandRole::InstrumentBank);
-  event.derived("timbre", source.timbre, SemanticOperandRole::InstrumentProgram);
-  event.derived("key", source.key, SourceValueDisplay::MidiNote);
-  event.derived("operation", source.operation);
+  cursor.derived("set", source.set, SemanticOperandRole::InstrumentBank);
+  cursor.derived("timbre", source.timbre, SemanticOperandRole::InstrumentProgram);
+  cursor.derived("key", source.key, SourceValueDisplay::MidiNote);
+  cursor.derived("operation", source.operation);
   if (source.time != 0 || pitchSlide) {
-    event.derived("time_ms", source.time);
+    cursor.derived("time_ms", source.time);
   }
-  event.derived("value", source.value);
+  cursor.derived("value", source.value);
   if (pitchSlide) {
-    return event.invoke<&Playback::sePitch>(source.set, source.timbre, source.key, static_cast<u16>(source.value),
-                                            source.operation == 0x0f, source.time, source.delta);
+    return event.invoke<&Playback::sePitch>({source.set, source.timbre, source.key, static_cast<u16>(source.value),
+                                             source.operation == 0x0f, source.time, source.delta});
   }
   // These commands target one active (set,timbre,note) voice. Emitting a
   // generic MIDI fade or LFO update would still lose driver-specific curve,

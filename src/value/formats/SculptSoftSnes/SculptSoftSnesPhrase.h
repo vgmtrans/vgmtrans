@@ -176,17 +176,17 @@ template <class Playback, class DecodeCommand>
   return session.finish();
 }
 
-template <class Event>
-Phrase readPhrase(Event& event, std::set<u8>* referencedPrograms) {
+template <class Cursor>
+Phrase readPhrase(Cursor& cursor, std::set<u8>* referencedPrograms) {
   Phrase phrase;
-  phrase.start = event.addressLe("start", core::SemanticOperandRole::CallTarget);
-  phrase.end = event.addressLe("end");
-  phrase.count = event.u8("plays (0 = loop)");
-  phrase.transpose = event.u16le("pitch offset (1/20 semitone)");
-  phrase.volumeScale = event.u16le("volume multiplier (8.8)");
-  const u8 instruments = event.u8("instrument replacements");
+  phrase.start = cursor.addressLe("start", core::SemanticOperandRole::CallTarget);
+  phrase.end = cursor.addressLe("end");
+  phrase.count = cursor.u8("plays (0 = loop)");
+  phrase.transpose = cursor.u16le("pitch offset (1/20 semitone)");
+  phrase.volumeScale = cursor.u16le("volume multiplier (8.8)");
+  const u8 instruments = cursor.u8("instrument replacements");
   for (u32 i = 0; i < instruments; ++i) {
-    const u8 replacement = event.u8("replacement", core::SemanticOperandRole::Instrument);
+    const u8 replacement = cursor.u8("replacement", core::SemanticOperandRole::Instrument);
     phrase.instruments.push_back(replacement);
     if (referencedPrograms && replacement != 0xff) {
       referencedPrograms->insert(replacement);

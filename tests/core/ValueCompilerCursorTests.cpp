@@ -47,7 +47,11 @@ struct CompilerProbePlayback : SequencePlayback<CompilerProbeState> {
 };
 
 using ProbeCursor = CompilerCursor<CompilerProbePlayback>;
-using namespace command;
+
+template <class Event>
+concept AcceptsUnorderedNoteArguments =
+    requires(Event& event) { event.template invoke<&CompilerProbePlayback::note>(u8{}, u32{}); };
+static_assert(!AcceptsUnorderedNoteArguments<ProbeCursor::Event>);
 
 DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
                                           std::vector<Diagnostic>* diagnostics = nullptr) {
@@ -60,34 +64,34 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
     case 0x10:
       return cursor.command("Volume", SequenceSemantic::Level)
           .invoke([](CompilerProbePlayback& p, u8 volume) { p.out.level(LevelScale::linearFromMidi7(volume)); },
-                  Byte{"volume"});
+                  {cursor.u8("volume")});
     case 0x20:
       return cursor.command("Transpose", SequenceSemantic::State)
-          .set<&CompilerProbeState::transpose>(SignedByte{"semitones"});
+          .set<&CompilerProbeState::transpose>(cursor.s8("semitones"));
     case 0x21:
       return cursor.command("Toggle Enabled", SequenceSemantic::State).toggle<&CompilerProbeState::enabled>();
     case 0x22: {
       auto event = cursor.command("Pitch Bend Range", SequenceSemantic::Pitch);
-      const u8 semitones = event.u8("semitones");
+      const u8 semitones = cursor.u8("semitones");
       return event.set<&CompilerProbeState::pitchBendRange>(semitones).emitPitchBendRange(semitones);
     }
     case 0x23:
       return cursor.command("Pitch Bend", SequenceSemantic::Pitch)
-          .invoke<&CompilerProbePlayback::pitchBend>(SignedByte{"fraction"});
+          .invoke<&CompilerProbePlayback::pitchBend>({cursor.s8("fraction")});
     case 0x24: {
       auto event = cursor.command("Separate Actions", SequenceSemantic::State);
-      event.set<&CompilerProbeState::transpose>(event.s8("semitones"));
+      event.set<&CompilerProbeState::transpose>(cursor.s8("semitones"));
       event.emitExpression(0.5);
       return event.wait(3);
     }
     case 0x25: {
       auto event = cursor.command("Inline Handler", SequenceSemantic::Pan);
-      const u8 pan = event.u8("pan");
+      const u8 pan = cursor.u8("pan");
       return event.invoke(
           [pan](CompilerProbePlayback& playback, std::pair<double, double> scale) {
             playback.out.pan((pan / scale.first) - scale.second);
           },
-          std::pair{63.5, 1.0});
+          {std::pair{63.5, 1.0}});
     }
     case 0x26: {
       auto event = cursor.command("Conflicting Flow", SequenceSemantic::State);
@@ -111,10 +115,10 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
     }
     case 0x2a:
       return cursor.command("Wait Readiness", SequenceSemantic::State)
-          .set<&CompilerProbeState::readyDuringWaitAtTick>(Byte{"tick"});
+          .set<&CompilerProbeState::readyDuringWaitAtTick>(cursor.u8("tick"));
     case 0x2b:
       return cursor.command("During-Wait Expression", SequenceSemantic::State)
-          .invoke<&CompilerProbePlayback::duringWaitExpression>(Byte{"value"})
+          .invoke<&CompilerProbePlayback::duringWaitExpression>({cursor.u8("value")})
           .duringWaitWhen<&CompilerProbePlayback::readyDuringWait>();
     case 0x2c: {
       auto event = cursor.command("Invalid During-Wait Wait", SequenceSemantic::State);
@@ -126,6 +130,12 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
       auto event = cursor.command("Owned Output", SequenceSemantic::Program);
       std::string domain = "temporary source instrument domain";
       event.emitInstrument(domain, 257, InstrumentEnvelopeMode::PreserveDynamicOverride);
+      event.invoke(
+          [](CompilerProbePlayback& playback, std::string_view instrumentDomain) {
+            playback.out.instrument(InstrumentIdentity{.domain = std::string(instrumentDomain), .key = 257},
+                                    InstrumentEnvelopeMode::PreserveDynamicOverride);
+          },
+          {std::string_view(domain)});
       domain.assign(domain.size(), 'x');
       return event.emitLevel(0.5).emitLevel(0.75, ValueQuantization{.levels = 64});
     }
@@ -139,89 +149,89 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
           .emitEnvelopeField<EnvelopeFields::Sustain>(0.5, VoiceEnvelopeScope::ActiveVoices);
     case 0x30:
       return cursor.command("Note", SequenceSemantic::Note)
-          .invoke<&CompilerProbePlayback::note>(Byte{"key"}, VariableLength{"duration"});
+          .invoke<&CompilerProbePlayback::note>({cursor.u8("key"), cursor.varLen("duration")});
     case 0x40:
     case 0x41:
     case 0x42:
     case 0x43: {
       auto event = cursor.command("Note", SequenceSemantic::Note);
-      const u8 key = event.opcodeBits<0, 2>("key", SourceValueDisplay::MidiNote);
-      return event.invoke<&CompilerProbePlayback::note>(static_cast<u8>(60 + key), VariableLength{"duration"});
+      const u8 key = cursor.opcodeBits<0, 2>("key", SourceValueDisplay::MidiNote);
+      return event.invoke<&CompilerProbePlayback::note>({static_cast<u8>(60 + key), cursor.varLen("duration")});
     }
     case 0x50:
       return cursor.command("Rest", SequenceSemantic::Rest)
           .invoke([](CompilerProbePlayback&, u32 duration) { return Effects::wait(duration); },
-                  VariableLength{"duration"});
+                  {cursor.varLen("duration")});
     case 0x60: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
-      return event.jump(event.address("destination", SemanticOperandRole::JumpTarget));
+      return event.jump(cursor.address("destination", SemanticOperandRole::JumpTarget));
     }
     case 0x61: {
       auto event = cursor.command("Repeat", SequenceSemantic::Repeat);
-      const u8 slot = event.u8("slot");
-      const u32 totalPlays = event.u8("total_plays");
-      const Address destination = event.address("destination", SemanticOperandRole::RepeatTarget);
+      const u8 slot = cursor.u8("slot");
+      const u32 totalPlays = cursor.u8("total_plays");
+      const Address destination = cursor.address("destination", SemanticOperandRole::RepeatTarget);
       return event.repeatUntil(slot, totalPlays, destination);
     }
     case 0x62: {
       auto event = cursor.command("Call", SequenceSemantic::Call);
-      return event.call(event.address("destination", SemanticOperandRole::CallTarget));
+      return event.call(cursor.address("destination", SemanticOperandRole::CallTarget));
     }
     case 0x63:
       return cursor.command("Return", SequenceSemantic::Return).return_();
     case 0x64: {
       auto event = cursor.command("Equal-Valued Target", SequenceSemantic::Jump);
-      const Address destination = event.address("destination", SemanticOperandRole::JumpTarget);
-      event.u16be("count");
+      const Address destination = cursor.address("destination", SemanticOperandRole::JumpTarget);
+      cursor.u16be("count");
       return event.jump(destination);
     }
     case 0x69: {
       auto event = cursor.command("Duplicate Static Flow", SequenceSemantic::Jump);
-      const Address jumpDestination = event.address("jump_destination", SemanticOperandRole::JumpTarget);
-      const Address callDestination = event.address("call_destination", SemanticOperandRole::CallTarget);
+      const Address jumpDestination = cursor.address("jump_destination", SemanticOperandRole::JumpTarget);
+      const Address callDestination = cursor.address("call_destination", SemanticOperandRole::CallTarget);
       event.jump(jumpDestination);
       return event.call(callDestination);
     }
     case 0x6a: {
       auto event = cursor.command("Return Boundary Before Jump", SequenceSemantic::Jump);
-      const Address destination = event.address("destination", SemanticOperandRole::JumpTarget);
+      const Address destination = cursor.address("destination", SemanticOperandRole::JumpTarget);
       event.return_();
       return event.jump(destination);
     }
     case 0x6b: {
       auto event = cursor.command("Return Boundary After Jump", SequenceSemantic::Jump);
-      const Address destination = event.address("destination", SemanticOperandRole::JumpTarget);
+      const Address destination = cursor.address("destination", SemanticOperandRole::JumpTarget);
       event.jump(destination);
       return event.return_();
     }
     case 0x70: {
       auto event = cursor.sourceOnly("Conditional Fields");
-      const u8 wide = event.u8("wide");
+      const u8 wide = cursor.u8("wide");
       if (wide != 0) {
-        event.u16be("value");
+        cursor.u16be("value");
       } else {
-        event.u8("value");
+        cursor.u8("value");
       }
       return event;
     }
     case 0x71: {
       auto event = cursor.sourceOnly("Resolved Fields");
-      const auto relative = event.rawS8("relative");
-      event.resolvedValue("destination", relative, Address{12}, SourceValueDisplay::Address,
-                          SemanticOperandRole::JumpTarget);
+      const auto relative = cursor.rawS8("relative");
+      cursor.resolvedValue("destination", relative, Address{12}, SourceValueDisplay::Address,
+                           SemanticOperandRole::JumpTarget);
       enum class Mode : s8 { Alternate = -2 };
-      event.derived("enabled", true);
-      event.derived("mode", Mode::Alternate, SourceValueDisplay::Enum);
-      event.derived("label", "source label");
-      event.derived("fine", 1.5);
-      event.s8("signed");
+      cursor.derived("enabled", true);
+      cursor.derived("mode", Mode::Alternate, SourceValueDisplay::Enum);
+      cursor.derived("label", "source label");
+      cursor.derived("fine", 1.5);
+      cursor.s8("signed");
       return event;
     }
     case 0xff:
       return cursor.command("End", SequenceSemantic::End).end();
     default: {
       auto event = cursor.unsupported("Unsupported Opcode");
-      event.warning("Unsupported compiler-cursor probe opcode");
+      cursor.warning("Unsupported compiler-cursor probe opcode");
       return event.stop();
     }
   }
@@ -287,7 +297,7 @@ void compilerCursorCompilesAndExecutesTypedCommands() {
   const auto& noteFields = sourceMap.get(annotations[3]).fields;
   expect(noteFields.size() == 3 && noteFields[1].name == "key" && noteFields[1].range.offset == 6 &&
              noteFields[2].name == "duration" && noteFields[2].range.offset == 7,
-         "named operands should be read and annotated in argument order");
+         "braced arguments should read and annotate fields in source order");
   expect(sourceMap.get(annotations[5]).playbackStatus == CommandPlaybackStatus::AffectsPlayback &&
              sourceMap.get(annotations[6]).playbackStatus == CommandPlaybackStatus::SourceOnly,
          "compiled behavior should promote source-only presentation unless the event is explicitly ignored");
@@ -327,14 +337,17 @@ void compilerCursorOwnsOutputValuesAfterDecoding() {
   };
   const auto performance = SequenceVm().render(program);
   const auto& events = performance.tracks[0].events;
-  expect(events.size() == 3, "compiled output must retain every operation after source storage is gone");
+  expect(events.size() == 4, "compiled output must retain every operation after source storage is gone");
   const auto& instrument = std::get<InstrumentPerformanceEvent>(events[0]);
-  const auto& continuous = std::get<LevelPerformanceEvent>(events[1]);
-  const auto& quantized = std::get<LevelPerformanceEvent>(events[2]);
+  const auto& boundInstrument = std::get<InstrumentPerformanceEvent>(events[1]);
+  const auto& continuous = std::get<LevelPerformanceEvent>(events[2]);
+  const auto& quantized = std::get<LevelPerformanceEvent>(events[3]);
   expect(std::get<InstrumentIdentity>(instrument.instrument) ==
                  InstrumentIdentity{.domain = "temporary source instrument domain", .key = 257} &&
-             instrument.envelopeMode == InstrumentEnvelopeMode::PreserveDynamicOverride,
-         "compiled instrument selections must own a copy of the source domain and preserve envelope policy");
+             instrument.envelopeMode == InstrumentEnvelopeMode::PreserveDynamicOverride &&
+             boundInstrument.instrument == instrument.instrument &&
+             boundInstrument.envelopeMode == instrument.envelopeMode,
+         "direct output and bound arguments must own the source domain and preserve envelope policy");
   expect(continuous.linearGain == 0.5 && continuous.sourceQuantization.levels == 0 && quantized.linearGain == 0.75 &&
              quantized.sourceQuantization.levels == 64,
          "compiled level output must distinguish unspecified quantization from a declared native scale");
