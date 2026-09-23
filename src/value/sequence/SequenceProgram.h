@@ -170,7 +170,7 @@ struct CommandExecution {
   // Some bytecodes encode time before an event rather than after it. Delay the
   // body and its control-flow transition until that event time is reached.
   u32 delayTicks = 0;
-  // Notify the sequence coordinator without changing this track's control flow.
+  // Notify the sequence coordinator without changing this stream's control flow.
   SequenceCoordinatorSignal coordinatorSignal = SequenceCoordinatorSignal::None;
 
   [[nodiscard]] bool valid() const noexcept { return static_cast<bool>(body); }
@@ -207,8 +207,8 @@ struct SequenceStream {
 
 struct TrackProgram {
   // Decoded source track, independent of its playback tracks/channels.
-  // Most source tracks have one stream. Independent voices may execute the
-  // same commands separately; an interleaved stream instead lists all its channels.
+  // Most source tracks have one stream. Several streams can execute the same
+  // decoded commands separately; an interleaved stream lists all its channels.
   std::vector<SequenceStream> streams{{}};
   std::string name;
   Address startAddress;
@@ -237,9 +237,9 @@ struct TrackStateContext {
 };
 
 // Some drivers arrange a song as a playlist of parallel track sections. A play
-// command starts every listed channel at once, and the first EndSection command
-// advances the playlist. Track state survives that boundary; call stacks and
-// other control-flow state do not.
+// command starts the listed streams together. EndSection advances the playlist
+// according to waitForAllTracks. Track state survives that boundary; call stacks
+// and other stream control-flow state do not.
 enum class PlaylistCommandKind {
   PlaySection,
   Repeat,
@@ -265,8 +265,8 @@ struct PlaylistCommand {
 struct SectionPlaylist {
   Address startAddress;
   std::vector<PlaylistCommand> commands;
-  // Wait for every active track to end the section before advancing the playlist.
-  // When false, the first track to end the section advances the playlist.
+  // Wait for every active stream to end the section before advancing the playlist.
+  // When false, the first stream to end the section advances the playlist.
   bool waitForAllTracks = false;
 };
 
@@ -320,8 +320,8 @@ struct SequenceProgram {
   SequenceRuntime runtime;
   Timebase timebase;
   SequenceProgramBehavior behavior;
-  // A decoded track's position identifies its commands. Its source track
-  // numbers determine how many independent playback tracks execute them.
+  // A decoded track's position identifies its commands. Its streams determine
+  // execution; their channels become the output performance tracks.
   std::vector<TrackProgram> tracks;
   std::optional<SectionPlaylist> sectionPlaylist;
 

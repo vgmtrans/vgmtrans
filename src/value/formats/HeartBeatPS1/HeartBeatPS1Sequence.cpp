@@ -52,8 +52,6 @@ constexpr PitchBendLayerId kPitchWheelLayer{1};
 struct RuntimeConfig {
   u8 numerator = 4;
   u8 denominator = 4;
-  u16 ppqn = 480;
-  u32 initialTempo = 500000;
   std::array<u16, 4> bankIds{0xffff, 0xffff, 0xffff, 0xffff};
   std::vector<HeartBeatPs1InstrumentInfo> instruments;
 };
@@ -80,11 +78,8 @@ struct TrackState {
   u16 bank = 0xffff;
   u8 program = 0;
   u8 modulation = 64;
-  u32 tempo = 500000;
-  u16 ppqn = 480;
   u16 dynamicAdsr1 = 0;
   u16 dynamicAdsr2 = 0;
-  bool initialized = false;
   bool portamento = false;
   double portamentoMilliseconds = 0.0;
   std::optional<u8> previousKey;
@@ -92,17 +87,19 @@ struct TrackState {
   LfoState tremolo;
 };
 
-struct Playback : SequencePlayback<TrackState> {
+struct StreamState {
+  explicit StreamState(StreamStateContext source)
+      : tempo(source.sequence.behavior.initialTempoMicrosecondsPerQuarter), ppqn(source.sequence.timebase.ppqn) {}
+
+  u32 tempo;
+  u16 ppqn;
+};
+
+struct Playback : SequencePlayback<TrackState, StreamState> {
   ProgramState& programState;
 
-  void beforeCommand() {
-    if (track.initialized) {
-      return;
-    }
-    track.initialized = true;
+  void beginSection(bool) {
     track.bank = programState.config.bankIds.front();
-    track.ppqn = programState.config.ppqn;
-    track.tempo = programState.config.initialTempo;
     out.instrument(heartBeatPs1InstrumentIdentity(track.bank, track.program));
     if (track.channel == 0) {
       out.timeSignature(programState.config.numerator, programState.config.denominator, 24);
@@ -122,40 +119,26 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   [[nodiscard]] u32 portamentoTicks() const {
-    const double ticks = track.portamentoMilliseconds * 1000.0 * track.ppqn / std::max<u32>(track.tempo, 1);
+    const double ticks = track.portamentoMilliseconds * 1000.0 * stream.ppqn / std::max<u32>(stream.tempo, 1);
     return static_cast<u32>(std::clamp(std::round(ticks), 1.0, static_cast<double>(std::numeric_limits<u32>::max())));
   }
 
-  Effects noteOn(u8 channel, u8 key, u8 velocity, u32 delta) {
-    if (channel != track.channel) {
-      return Effects::wait(delta);
-    }
-    auto delayed = out.after(delta);
-    const PerformanceNoteId note = delayed.noteOn(key, driverLevel(velocity));
+  void noteOn(u8 key, u8 velocity) {
+    const PerformanceNoteId note = out.noteOn(key, driverLevel(velocity));
     if (track.portamento && track.previousKey && *track.previousKey != key && track.portamentoMilliseconds > 0.0) {
-      delayed
-          .pitchSlide(note, *track.previousKey, key,
-                      PitchSlideTiming::fixedDuration(portamentoTicks(), track.portamentoMilliseconds))
+      out.pitchSlide(note, *track.previousKey, key,
+                     PitchSlideTiming::fixedDuration(portamentoTicks(), track.portamentoMilliseconds))
           .preferPortamento()
           .useCurrentPortamentoTiming();
     }
     track.previousKey = key;
-    return Effects::wait(delta);
   }
 
-  Effects noteOff(u8 channel, u8 key, u32 delta) {
-    if (channel == track.channel) {
-      out.after(delta).noteOff(key);
-    }
-    return Effects::wait(delta);
-  }
+  void noteOff(u8 key) { out.noteOff(key); }
 
-  Effects program(u8 channel, u8 value, u32 delta) {
-    if (channel == track.channel) {
-      track.program = value;
-      out.after(delta).instrument(heartBeatPs1InstrumentIdentity(track.bank, track.program));
-    }
-    return Effects::wait(delta);
+  void program(u8 value) {
+    track.program = value;
+    out.instrument(heartBeatPs1InstrumentIdentity(track.bank, track.program));
   }
 
   [[nodiscard]] LfoPerformanceContext lfoContext(const LfoState& state) const {
@@ -170,134 +153,130 @@ struct Playback : SequencePlayback<TrackState> {
     return context;
   }
 
-  void emitVibrato(PerformanceEmitter& delayed) const {
+  void emitVibrato() const {
     auto context = lfoContext(track.vibrato);
     const double depth = track.vibrato.enabled ? track.vibrato.depth * track.modulation / 4096.0 : 0.0;
-    delayed.vibratoRate(*context.frequencyHz, context);
-    delayed.vibratoDepth(depth, std::move(context));
+    out.vibratoRate(*context.frequencyHz, context);
+    out.vibratoDepth(depth, std::move(context));
   }
 
-  void emitTremolo(PerformanceEmitter& delayed) const {
+  void emitTremolo() const {
     auto context = lfoContext(track.tremolo);
     context.delay = LfoDelay{.milliseconds = track.tremolo.delay * (1000.0 / 60.0)};
     context.tremoloGainMode = TremoloGainMode::BipolarAroundNominal;
     const double depth = track.tremolo.enabled ? track.tremolo.depth / 256.0 : 0.0;
-    delayed.tremoloRate(*context.frequencyHz, context);
-    delayed.tremoloLinearGainDepth(depth, std::move(context));
+    out.tremoloRate(*context.frequencyHz, context);
+    out.tremoloLinearGainDepth(depth, std::move(context));
   }
 
-  void updateEnvelope(PerformanceEmitter& delayed, EnvelopeFields fields) const {
-    delayed.updateEnvelope(psxSpuEnvelope(track.dynamicAdsr1, track.dynamicAdsr2), fields,
-                           VoiceEnvelopeScope::FutureAttacks);
+  void updateEnvelope(EnvelopeFields fields) const {
+    out.updateEnvelope(psxSpuEnvelope(track.dynamicAdsr1, track.dynamicAdsr2), fields,
+                       VoiceEnvelopeScope::FutureAttacks);
   }
 
-  Effects controller(u8 channel, u8 controller, u8 value, u32 delta) {
-    if (channel != track.channel) {
-      return Effects::wait(delta);
-    }
-    auto delayed = out.after(delta);
+  void controller(u8 controller, u8 value) {
     switch (controller) {
       case 1:
         track.modulation = value;
-        emitVibrato(delayed);
+        emitVibrato();
         break;
       case 2:
       case 11:
-        delayed.expression(driverLevel(value));
+        out.expression(driverLevel(value));
         break;
       case 5:
         track.portamento = value != 0;
         track.portamentoMilliseconds = (128u - value) * (1000.0 / 60.0);
-        delayed.portamentoEnable(track.portamento);
-        delayed.pitchTransitionSettings(track.portamentoMilliseconds);
+        out.portamentoEnable(track.portamento);
+        out.pitchTransitionSettings(track.portamentoMilliseconds);
         break;
       case 7:
-        delayed.level(driverLevel(value));
+        out.level(driverLevel(value));
         break;
       case 10:
-        delayed.channelPan(panPositionFrom7Bit(std::min<u8>(value, 127)));
+        out.channelPan(panPositionFrom7Bit(std::min<u8>(value, 127)));
         break;
       case 20:
-        delayed.masterLevel(driverLevel(value));
+        out.masterLevel(driverLevel(value));
         break;
       case 22:
         // The SPU effect-return depth is global; reverb send is value-core's
         // closest portable representation of the audible wet-depth change.
-        delayed.reverb(value / 127.0);
+        out.reverb(value / 127.0);
         break;
       case 32:
         if (value < programState.config.bankIds.size() && programState.config.bankIds[value] != 0xffff) {
           track.bank = programState.config.bankIds[value];
-          delayed.instrument(heartBeatPs1InstrumentIdentity(track.bank, track.program));
+          out.instrument(heartBeatPs1InstrumentIdentity(track.bank, track.program));
         }
         break;
       case 52:
         track.tremolo.waveform = value;
-        emitTremolo(delayed);
+        emitTremolo();
         break;
       case 53:
         track.tremolo.delay = value;
-        delayed.tremoloDelayPhysical(0, value * (1000.0 / 60.0));
+        out.tremoloDelayPhysical(0, value * (1000.0 / 60.0));
         break;
       case 54:
         track.tremolo.rate = value;
-        emitTremolo(delayed);
+        emitTremolo();
         break;
       case 55:
         track.tremolo.depth = value;
-        emitTremolo(delayed);
+        emitTremolo();
         break;
       case 56:
         track.vibrato.waveform = value;
-        emitVibrato(delayed);
+        emitVibrato();
         break;
       case 64:
-        delayed.sustainPedal(value != 0);
+        out.sustainPedal(value != 0);
         break;
       case 71:
         track.dynamicAdsr2 = static_cast<u16>((track.dynamicAdsr2 & 0xc03f) | ((127u - value) & 0x7f) << 6);
-        updateEnvelope(delayed, EnvelopeFields::SecondDecay);
+        updateEnvelope(EnvelopeFields::SecondDecay);
         break;
       case 72:
         track.dynamicAdsr2 = static_cast<u16>((track.dynamicAdsr2 & 0xffe0) | ((~value) & 0x1f));
-        updateEnvelope(delayed, EnvelopeFields::Release);
+        updateEnvelope(EnvelopeFields::Release);
         break;
       case 73:
         track.dynamicAdsr1 = static_cast<u16>((track.dynamicAdsr1 & 0x80ff) | ((127u - value) & 0x7f) << 8);
-        updateEnvelope(delayed, EnvelopeFields::Attack);
+        updateEnvelope(EnvelopeFields::Attack);
         break;
       case 74:
         track.dynamicAdsr2 = static_cast<u16>((track.dynamicAdsr2 & 0x803f) | 0x4000 | (((127u - value) & 0x7f) << 6));
-        updateEnvelope(delayed, EnvelopeFields::SecondDecay);
+        updateEnvelope(EnvelopeFields::SecondDecay);
         break;
       case 75:
         track.dynamicAdsr1 = static_cast<u16>((track.dynamicAdsr1 & 0xff0f) | (((~value) & 0x0f) << 4));
-        updateEnvelope(delayed, EnvelopeFields::Decay);
+        updateEnvelope(EnvelopeFields::Decay);
         break;
       case 76:
         track.vibrato.rate = value;
-        emitVibrato(delayed);
+        emitVibrato();
         break;
       case 77:
         track.vibrato.depth = value;
-        emitVibrato(delayed);
+        emitVibrato();
         break;
       case 78:
         track.vibrato.enabled = value != 0;
-        emitVibrato(delayed);
+        emitVibrato();
         break;
       case 79:
         track.dynamicAdsr1 = static_cast<u16>((track.dynamicAdsr1 & 0xfff0) | (value & 0x0f));
-        updateEnvelope(delayed, EnvelopeFields::Sustain);
+        updateEnvelope(EnvelopeFields::Sustain);
         break;
       case 91:
         // This is a future-voice routing override in the driver. The current
         // performance model has channel send rather than future-attack scope.
-        delayed.reverb(value == 0 ? 0.0 : 1.0);
+        out.reverb(value == 0 ? 0.0 : 1.0);
         break;
       case 92:
         track.tremolo.enabled = value != 0;
-        emitTremolo(delayed);
+        emitTremolo();
         break;
       case 121:
         track.modulation = 64;
@@ -306,15 +285,15 @@ struct Playback : SequencePlayback<TrackState> {
         track.tremolo = {};
         track.dynamicAdsr1 = 0;
         track.dynamicAdsr2 = 0;
-        delayed.sustainPedal(false);
-        delayed.portamentoEnable(false);
-        delayed.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::FutureAttacks);
-        delayed.level(1.0);
-        delayed.expression(1.0);
-        delayed.channelPan(0.5);
-        delayed.pitchBend(0.0, kPitchWheelLayer);
-        delayed.vibratoDepth(0.0);
-        delayed.tremoloLinearGainDepth(0.0);
+        out.sustainPedal(false);
+        out.portamentoEnable(false);
+        out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::FutureAttacks);
+        out.level(1.0);
+        out.expression(1.0);
+        out.channelPan(0.5);
+        out.pitchBend(0.0, kPitchWheelLayer);
+        out.vibratoDepth(0.0);
+        out.tremoloLinearGainDepth(0.0);
         break;
       default:
         // CC4/9/21/23/69/126/127 control SPU noise, signed phase,
@@ -322,13 +301,9 @@ struct Playback : SequencePlayback<TrackState> {
         // remain fully decoded even though value-core has no matching event.
         break;
     }
-    return Effects::wait(delta);
   }
 
-  Effects pitchBend(u8 channel, u16 value, u32 delta) {
-    if (channel != track.channel) {
-      return Effects::wait(delta);
-    }
+  void pitchBend(u16 value) {
     const double wheel =
         value < 8192 ? (static_cast<double>(value) - 8192.0) / 8192.0 : (static_cast<double>(value) - 8192.0) / 8191.0;
     double semitones = wheel * 2.0;
@@ -337,30 +312,21 @@ struct Playback : SequencePlayback<TrackState> {
         semitones = wheel < 0.0 ? wheel * tone->bendDownSemitones : wheel * tone->bendUpSemitones;
       }
     }
-    out.after(delta).pitchBend(semitones, kPitchWheelLayer);
-    return Effects::wait(delta);
+    out.pitchBend(semitones, kPitchWheelLayer);
   }
 
-  Effects tempo(u32 microsecondsPerQuarter, u32 delta) {
+  void tempo(u32 microsecondsPerQuarter) {
     if (microsecondsPerQuarter != 0) {
-      track.tempo = microsecondsPerQuarter;
-      if (track.channel == 0) {
-        out.after(delta).tempo(microsecondsPerQuarter);
-      }
+      stream.tempo = microsecondsPerQuarter;
+      out.tempo(microsecondsPerQuarter);
     }
-    return Effects::wait(delta);
   }
 
-  Effects sourceOnly(u32 delta) { return Effects::wait(delta); }
-
-  Effects loopEnd(u8 count, Address destination, u32 delta) {
-    Effects effects = Effects::wait(delta);
+  Effects loopEnd(u8 count, Address destination) {
     if (count == 127) {
-      effects.flowOverride = vm.declaredLoop(destination).flowOverride;
-    } else if (count != 0) {
-      effects.flowOverride = vm.countedRepeatUntil(0, static_cast<u32>(count) + 1, destination).flowOverride;
+      return vm.declaredLoop(destination);
     }
-    return effects;
+    return count == 0 ? vm.fallthrough() : vm.countedRepeatUntil(0, static_cast<u32>(count) + 1, destination);
   }
 };
 
@@ -533,7 +499,7 @@ using Cursor = CompilerCursor<Playback>;
     playback = CommandPlaybackStatus::SourceOnly;
   }
 
-  auto event = cursor.command(label, semantic, playback);
+  auto event = cursor.command(label, semantic, playback).delay(source.delta);
   if (source.end > source.offset + 1) {
     cursor.rawBytes("encoded_bytes", source.end - source.offset - 1);
   }
@@ -545,15 +511,12 @@ using Cursor = CompilerCursor<Playback>;
   if (family == 0x80) {
     cursor.derived("key", source.data1, SourceValueDisplay::MidiNote);
     cursor.derived("velocity", source.data2);
-    return event.invoke<&Playback::noteOff>({channel, source.data1, source.delta});
+    return event.channel(channel).invoke<&Playback::noteOff>({source.data1});
   }
   if (family == 0x90) {
     cursor.derived("key", source.data1, SourceValueDisplay::MidiNote);
     cursor.derived("velocity", source.data2);
-    return event.invoke<&Playback::noteOn>({channel, source.data1, source.data2, source.delta});
-  }
-  if (family == 0xa0 || family == 0xd0) {
-    return event.invoke<&Playback::sourceOnly>({source.delta});
+    return event.channel(channel).invoke<&Playback::noteOn>({source.data1, source.data2});
   }
   if (family == 0xb0) {
     cursor.derived("controller", source.data1);
@@ -563,33 +526,32 @@ using Cursor = CompilerCursor<Playback>;
       const Address destination{*source.loopDestination};
       cursor.derived("repeat_count", source.loopCount);
       cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
-      return event.invoke<&Playback::loopEnd>({source.loopCount, destination, source.delta})
-          .discoverTarget(destination);
+      return event.invoke<&Playback::loopEnd>({source.loopCount, destination}).discoverTarget(destination);
     }
     if (source.data1 == 99 && source.data2 == 20) {
       cursor.derived("loop_start", Address{source.end}, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
     }
-    return event.invoke<&Playback::controller>({channel, source.data1, source.data2, source.delta});
+    return event.channel(channel).invoke<&Playback::controller>({source.data1, source.data2});
   }
   if (family == 0xc0) {
     cursor.derived("program", source.data1, SemanticOperandRole::InstrumentProgram);
-    return event.invoke<&Playback::program>({channel, source.data1, source.delta});
+    return event.channel(channel).invoke<&Playback::program>({source.data1});
   }
   if (family == 0xe0) {
     const u16 value = static_cast<u16>((source.data2 << 7) | source.data1);
     cursor.derived("wheel", value);
-    return event.invoke<&Playback::pitchBend>({channel, value, source.delta});
+    return event.channel(channel).invoke<&Playback::pitchBend>({value});
   }
   if (source.status == 0xff && source.data1 == 0x51 && source.payloadSize == 3) {
     const u32 payload = source.end - 3;
     const u32 tempo = reader.be24(payload);
     cursor.derived("microseconds_per_quarter", tempo);
-    return event.invoke<&Playback::tempo>({tempo, source.delta});
+    return event.invoke<&Playback::tempo>({tempo});
   }
   if (source.status == 0xff && source.data1 == 0x2f) {
     return event.end();
   }
-  return event.invoke<&Playback::sourceOnly>({source.delta});
+  return event;
 }
 
 }  // namespace
@@ -620,8 +582,6 @@ SequenceProgram parseHeartBeatPs1Sequence(ByteReader reader, AssetId id, const H
   program.runtime = makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{
       .numerator = layout.rhythmNumerator,
       .denominator = static_cast<u8>(1u << layout.rhythmDenominatorPower),
-      .ppqn = layout.ppqn,
-      .initialTempo = layout.initialTempo,
       .bankIds = layout.bankIds,
       .instruments = instruments,
   });
@@ -675,9 +635,10 @@ SequenceProgram parseHeartBeatPs1Sequence(ByteReader reader, AssetId id, const H
     }
     return decodeEvent(reader, layout.dataEnd, *event, diagnostics);
   });
-  track.streams.resize(layout.trackCount);
+  auto& channels = track.streams.front().channels;
+  channels.clear();
   for (u32 number = 0; number < layout.trackCount; ++number) {
-    track.streams[number].channels = {number};
+    channels.push_back(number);
   }
   program.tracks.push_back(std::move(track));
   return program;

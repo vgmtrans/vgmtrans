@@ -921,16 +921,18 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
               outputSequence, programState, !hasSectionPlaylist));
         }
       }
+      auto beginSection = [&](const std::vector<std::optional<Address>>& starts, u64 tick) {
+        for (size_t i = 0; i < executors.size(); ++i) {
+          executors[i]->beginSection(i < starts.size() ? starts[i] : std::nullopt, tick);
+        }
+      };
 
       std::optional<detail::SectionPlaylistRunner> playlist;
       if (program.sectionPlaylist) {
         playlist.emplace(*program.sectionPlaylist, options);
         const detail::PlaylistAdvance first = playlist->advance(0);
         if (first.streamStarts != nullptr) {
-          for (size_t i = 0; i < executors.size(); ++i) {
-            const std::optional<Address> start = i < first.streamStarts->size() ? (*first.streamStarts)[i] : std::nullopt;
-            executors[i]->beginSection(start, 0);
-          }
+          beginSection(*first.streamStarts, 0);
         }
       }
 
@@ -995,8 +997,8 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
             continue;
           }
           const u64 boundary = executors[selected]->tick();
-          // Tracks are visited in stable source order, so keep same-tick work
-          // from tracks processed before the boundary command.
+          // Streams are visited in stable source order, so keep same-tick work
+          // from streams processed before the boundary command.
           for (size_t i = 0; i < executors.size(); ++i) {
             executors[i]->trimAt(boundary, i <= selected);
           }
@@ -1012,10 +1014,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
             sequenceEndTick = boundary;
             break;
           }
-          for (size_t i = 0; i < executors.size(); ++i) {
-            const std::optional<Address> start = i < next.streamStarts->size() ? (*next.streamStarts)[i] : std::nullopt;
-            executors[i]->beginSection(start, boundary);
-          }
+          beginSection(*next.streamStarts, boundary);
           continue;
         }
 

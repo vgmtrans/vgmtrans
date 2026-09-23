@@ -3776,6 +3776,66 @@ pre-cleanup executable byte for byte. This includes five additional NinSnes
 Sunsoft/Quest fixtures with later sections and track reactivation.
 The music corpus was unavailable for this checkpoint.
 
+## HeartBeatPS1 migration and completion review
+
+HeartBeatPS1 now executes one stream serving its declared playback tracks.
+Decoder routing selects the musical channel; every event carries its leading
+source delay. Musical handlers no longer accept channel/delta arguments, filter
+channels, construct delayed emitters, or return a wait. LFO/envelope helpers use
+the current emitter directly. Source-only events need no playback handler.
+
+Tempo and PPQN belong to stream state, initialized from the sequence itself;
+the runtime settings no longer duplicate them. Track state retains instruments,
+controllers, and voice history. Initialization uses beginSection instead of an
+initialized flag checked on every command. Channel-tagged loop commands remain
+global, including loops encoded on channels outside the declared track count.
+HeartBeatPS1's sequence implementation loses 39 lines in this pass.
+
+One compact case in the existing HeartBeatPS1 tests exercises finite/infinite
+repeats across two tracks, initialization before a leading delay, same-tick
+source order, portamento after a tempo change, ignored-event timing, and delayed
+loop/end boundaries. It reuses the existing container fixture. Permanent test
+code grows by 41 lines; no test files or permanent export-comparison harnesses
+were added.
+
+NamcoSnes assessment: it has a shared command clock and flow, not physically
+independent sequencers. Its masked note/control commands address several voices
+in one opcode, and its active/slur masks can also change unselected voices.
+Its per-voice tick processing must continue during waits. The current scalar
+routing API cannot express these broadcasts followed by one shared wait.
+Executing an Effects-returning body once per selected voice would require rules
+for combining waits/branches; splitting stream and voice command phases would
+introduce another execution convention. Neither is justified by removing a few
+mask/global-event guards. Retain its current independent executions for now,
+document that compatibility arrangement at construction, and revisit only with
+a simpler, demonstrably useful broadcast design. No NamcoSnes playback behavior
+was changed.
+
+The final shared-code pass consolidated initial and subsequent playlist entry
+through one local beginSection operation. Comments now distinguish decoded
+tracks, execution streams, and output tracks accurately, including the playlist
+completion policy. TrackProgram, TrackState, TrackStateContext, and ordinary
+track terminology remain intact. No additional lifecycle API was introduced.
+
+Validation: warning-free macOS Debug build and all 22 CTest targets passed.
+Before/after comparisons covered 74 generated inputs, 75 sequences, and 186
+MIDI/SF2/DLS artifacts. 180 artifacts matched byte for byte. The six differing
+MIDIs are standalone/collection exports of three HeartBeatPS1 cases: an explicit
+terminal delay adds three ticks, and a delayed infinite-loop boundary retains
+four previously truncated ticks. Parsing every MIDI event confirmed that only
+end-of-track timestamps changed; notes, controllers, and every other event
+matched. All SF2/DLS outputs matched. HeartBeatPS1's legacy reader also advances
+time before processing commands.
+The music corpus was unavailable, so this does not claim real-archive parity.
+
+This pass removes 37 production lines overall. Relative to the pre-refactor
+core-rewrite checkpoint, the four migrated sequence implementations lose 106
+lines, while production code overall grows by 65 lines and tests by 105.
+The benefit is a more accurate ownership model and simpler musical handlers,
+not a large total line-count reduction. The four direct migrations and focused
+lifecycle cleanup form a coherent stopping point; forcing NamcoSnes through a
+new broadcast abstraction would weaken that result.
+
 ## Further investigation
 
 - Keep test growth proportional to behavioral risk. Prefer existing coverage

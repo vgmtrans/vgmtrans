@@ -834,6 +834,9 @@ SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetI
       0, layout.sequenceAddress,
       [&](u32 offset) { return decodeCommand(reader, offset, diagnostics, references); }));
   program.runtime = makeCompiledRuntime<Playback, ProgramState>(DriverData{std::move(source), layout});
+  // Masked commands affect several voices, then advance the shared source clock
+  // once. Until the VM supports that combination, each voice independently
+  // executes the same decoded commands and filters their masks.
   auto& streams = program.tracks.front().streams;
   streams.resize(kTrackCount);
   for (u32 number = 0; number < kTrackCount; ++number) {

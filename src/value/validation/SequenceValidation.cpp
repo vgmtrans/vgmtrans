@@ -72,10 +72,10 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
           report.error("sequence.playlist.track-count",
                        "Sequence play command entries did not match the execution stream count", command.range);
         } else {
-          size_t playbackIndex = 0;
+          size_t streamIndex = 0;
           for (const auto& track : program.tracks) {
             for (size_t i = 0; i < track.streams.size(); ++i) {
-              const auto start = command.streamStarts[playbackIndex++];
+              const auto start = command.streamStarts[streamIndex++];
               if (start && !track.commandIndex(*start)) {
                 report.error("sequence.playlist.missing-track-start",
                              "Sequence play command referenced a track start that was not decoded", command.range);

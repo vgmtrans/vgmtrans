@@ -48,18 +48,20 @@ void be16(std::vector<u8>& bytes, size_t offset, u16 value) {
   bytes[offset + 1] = static_cast<u8>(value);
 }
 
-std::vector<u8> heartBeatFixture(bool hasProgramTone = true) {
+std::vector<u8> heartBeatFixture(bool hasProgramTone = true, std::vector<u8> events = {}) {
   constexpr u32 headerSize = 0x3c;
   constexpr u32 sampleSize = 0x20;
   constexpr u32 attributeSize = 8 + 0x24 + 0x14;
-  const std::vector<u8> events{
-      0,    0xb0, 32,   0,    0,    0xc0, 0,  0, 0xb0, 56, 2,  0, 0xb0, 76, 63, 0, 0xb0, 77, 16,  0, 0xb0, 78, 1,   0,
-      0xb0, 52,   2,    0,    0xb0, 54,   63, 0, 0xb0, 55, 32, 0, 0xb0, 92, 1,  0, 0xb0, 73, 100, 0, 0xb0, 72, 20,  0,
-      0xb0, 74,   60,   0,    0xb0, 79,   8,  0, 0xb0, 22, 50, 0, 0xb0, 91, 1,  0, 0xb0, 5,  121, 0, 0x90, 60, 100, 0,
-      0xe0, 0x00, 0x00, 1,    0xe0, 0x7f, 0x7f, 9, 0x80, 60, 0,  0, 0xb0, 99, 20, 0, 0xb0, 6, 2,   0, 0x90, 62, 100, 1,
-      0x80, 62,   0,    0,
-      0xb0, 99,   30,   0xff, 0x2f, 0,
-  };
+  if (events.empty()) {
+    events = {
+        0,    0xb0, 32,   0,  0,    0xc0, 0,    0,  0xb0, 56, 2,    0,  0xb0, 76,   63,   0,  0xb0, 77,
+        16,   0,    0xb0, 78, 1,    0,    0xb0, 52, 2,    0,  0xb0, 54, 63,   0,    0xb0, 55, 32,   0,
+        0xb0, 92,   1,    0,  0xb0, 73,   100,  0,  0xb0, 72, 20,   0,  0xb0, 74,   60,   0,  0xb0, 79,
+        8,    0,    0xb0, 22, 50,   0,    0xb0, 91, 1,    0,  0xb0, 5,  121,  0,    0x90, 60, 100,  0,
+        0xe0, 0x00, 0x00, 1,  0xe0, 0x7f, 0x7f, 9,  0x80, 60, 0,    0,  0xb0, 99,   20,   0,  0xb0, 6,
+        2,    0,    0x90, 62, 100,  1,    0x80, 62, 0,    0,  0xb0, 99, 30,   0xff, 0x2f, 0,
+    };
+  }
   const u32 sequenceSize = 0x10 + static_cast<u32>(events.size());
   const u32 sampleOffset = headerSize;
   const u32 attributeOffset = sampleOffset + sampleSize;
@@ -193,6 +195,44 @@ void sequenceModelsAuditedDriverFeatures() {
          "global wet depth and future-voice reverb routing should both remain audible");
 }
 
+void interleavedTimingAndGlobalLoops() {
+  for (const u8 repeats : {1, 127}) {
+    const std::vector<u8> events{
+        5, 0xc1, 0,    0,   0xb1, 5,    122,  0, 0x91, 48,   100,     0,  0x90, 60, 100,  // First notes at tick 5.
+        2, 0xff, 0x51, 3,   0x03, 0xd0, 0x90, 0, 0x91, 50,   100,          // Tempo then portamento at tick 7.
+        3, 0x81, 48,   0,   0,    0x81, 50,   0, 0,    0x80, 60,      0,   // Release both tracks at tick 10.
+        4, 0xd7, 0,    0,   0xb7, 99,   20,   0, 0xb7, 6,    repeats,      // Global loop on absent channel 7.
+        2, 0x91, 52,   100, 3,    0x81, 52,   0, 4,    0xb7, 99,      30,  // Nine-tick loop, including both delays.
+        3, 0xff, 0x2f, 0,   0xff, 0x2f, 0,  // Delayed end followed by the required bare terminal marker.
+    };
+    const auto bytes = heartBeatFixture(true, events);
+    auto container = readHeartBeatPs1Container(ByteReader{SourceId{91}, bytes}, 0);
+    expect(container && container->sequence, "interleaved HeartBeatPS1 fixture should parse");
+    auto layout = *container->sequence;
+    layout.trackCount = 2;
+    const auto program = parseHeartBeatPs1Sequence(ByteReader{SourceId{91}, bytes}, AssetId{91}, layout, {});
+    const auto performance = SequenceVm({.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = 1}).render(program);
+    expect(program.streamCount() == 1 && performance.tracks.size() == 2 && performance.diagnostics.empty(),
+           "HeartBeatPS1 should execute one stream serving two tracks");
+    const auto& first = performance.tracks[0];
+    const auto& second = performance.tracks[1];
+    const auto notes = eventsOfType<NotePerformanceEvent>(second);
+    expect(notes.size() == 4 && notes[0]->header.tick == 5 && notes[1]->header.tick == 7 &&
+               notes[2]->header.tick == 16 && notes[3]->header.tick == 25 && notes[2]->durationTicks == 3,
+           "channel-encoded loops must repeat the whole stream, including leading and trailing delays");
+    expect(eventsOfType<NotePerformanceEvent>(first).front()->header.tick == 5 &&
+               notes[0]->header.sequence < eventsOfType<NotePerformanceEvent>(first).front()->header.sequence &&
+               eventsOfType<InstrumentPerformanceEvent>(second).front()->header.tick == 0,
+           "same-tick notes should retain source order and initialization should precede the first delay");
+    const auto& slide = second.automations.front();
+    expect(slide.header.tick == 7 && std::get<PitchTransitionIntent>(slide.intent).timing.timelineTicks == 192,
+           "portamento on another channel should use the stream tempo changed at that tick");
+    const u64 end = repeats == 1 ? 35 : 32;
+    expect(first.endTick == end && second.endTick == end,
+           "all tracks should consume the loop-end delay and any explicit terminal delay");
+  }
+}
+
 void moduleBuildsEmbeddedWaveBank() {
   Session session;
   session.registerFormat(heartBeatPs1Module());
@@ -244,6 +284,7 @@ void rejectsOutOfRangeToneReferences() {
 
 void runHeartBeatPs1ModuleTests() {
   sequenceModelsAuditedDriverFeatures();
+  interleavedTimingAndGlobalLoops();
   moduleBuildsEmbeddedWaveBank();
   moduleSkipsBanksWithoutReferencedTones();
   rejectsOutOfRangeToneReferences();

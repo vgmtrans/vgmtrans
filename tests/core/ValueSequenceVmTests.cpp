@@ -1399,7 +1399,7 @@ void sequenceVmSwitchesParallelSectionsAtTheFirstChannelEnd() {
           },
   };
 
-  expect(validateSequenceProgram(program).empty(), "playlist entries should address expanded playback tracks");
+  expect(validateSequenceProgram(program).empty(), "playlist entries should address execution streams");
   const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.diagnostics.empty(), "parallel section fixture should render without diagnostics");
   expect(performance.tracks.size() == 2 && performance.tracks[0].endTick == 12 && performance.tracks[1].endTick == 12,
