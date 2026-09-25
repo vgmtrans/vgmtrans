@@ -56,28 +56,18 @@ DependencySelection WdBankId::operator()(const DependencyContext& context) const
 void prepareSequence(SequencePreparationContext& context, const SequenceData& sequence) {
   RuntimeConfig config{.defaultBank = sequence.waveBankId};
   const SoundBankData* selected = nullptr;
-  for (const auto& bank : context.soundBanks) {
-    if (bank.metadata.format != kSquarePs2FormatName) {
-      continue;
-    }
-    const auto* data = bank.privateData.get<SoundBankData>();
-    if (data == nullptr) {
-      context.fail("SquarePS2 WD bank is missing retained envelope data", bank.metadata.range);
-      return;
-    }
-    if (data->bankId != sequence.waveBankId) {
+  for (const auto& bank : context.banks<SoundBankData>(kSquarePs2FormatName)) {
+    if (bank.data.bankId != sequence.waveBankId) {
       continue;
     }
     if (selected != nullptr) {
-      context.fail("SquarePS2 collection contains multiple WD banks with the requested driver ID",
-                   context.sequence->metadata.range);
+      context.fail("SquarePS2 collection contains multiple WD banks with the requested driver ID");
       return;
     }
-    selected = data;
+    selected = &bank.data;
   }
   if (selected == nullptr) {
-    context.warning("SquarePS2 BGM has no matching WD bank; dynamic ADSR reset will use sequence defaults",
-                    context.sequence->metadata.range);
+    context.warning("SquarePS2 BGM has no matching WD bank; dynamic ADSR reset will use sequence defaults");
   } else {
     config.envelopes = selected->envelopes;
   }

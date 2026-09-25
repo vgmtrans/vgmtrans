@@ -125,12 +125,8 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
       failed = true;
     }
   }
-  std::vector<const MiscAsset*> miscAssets;
-  miscAssets.reserve(members.miscAssets.size());
   for (const AssetId assetId : members.miscAssets) {
-    if (const auto* misc = snapshot.asset<MiscAsset>(assetId)) {
-      miscAssets.push_back(misc);
-    } else {
+    if (snapshot.asset<MiscAsset>(assetId) == nullptr) {
       diagnostics.push_back(exportError("Collection miscellaneous asset was not found"));
       failed = true;
     }
@@ -179,8 +175,7 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
         }
       }
       if (!failed && sequence != nullptr && sequence->prepare) {
-        SequencePreparationContext context{sequence,   sequenceRuntime, soundBanks, samplePools,
-                                           miscAssets, diagnostics,     bankUses};
+        SequencePreparationContext context{*sequence, sequenceRuntime, soundBanks, diagnostics, bankUses};
         sequence->prepare(context);
         failed = context.failed;
       }

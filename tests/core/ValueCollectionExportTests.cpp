@@ -443,8 +443,7 @@ struct ForeignRuntimeTrackState {};
 struct ForeignRuntimePlayback : SequencePlayback<ForeignRuntimeTrackState> {};
 
 void bindPerformanceRuntime(SequencePreparationContext& context) {
-  const auto* sequence = context.sequence;
-  const bool fail = sequence != nullptr && sequence->metadata.name == "Failing Sequence";
+  const bool fail = context.sequence.metadata.name == "Failing Sequence";
   if (!context.replaceSequenceRuntime(makeCompiledRuntime<ProbePlayback, PreparedProbeProgramState>(fail))) {
     return;
   }
@@ -634,19 +633,14 @@ void collectionBindingProducesAnImmutableInstrumentView() {
              snapshot.asset<SoundBankAsset>(durable.metadata.id)->instruments.front().name == "Durable Instrument",
          "collection binding should preserve selected asset identity without mutating durable assets");
 
-  auto miscBuilder = builder;
-  SequenceProgramAsset miscSequence{.metadata = {.id = AssetId{4}}};
-  miscSequence.prepare = [id = manifest.metadata.id](SequencePreparationContext& context) {
-    const auto* selected = context.misc(id);
-    if (selected == nullptr || selected->privateData.get<u32>() == nullptr || *selected->privateData.get<u32>() != 42) {
-      context.fail("miscellaneous asset was not available during preparation");
-    }
-  };
-  miscBuilder.assets.emplace_back(miscSequence);
-  miscBuilder.collections.front().members.sequence = miscSequence.metadata.id;
-  const auto miscBinding = bindCollection(miscBuilder.finish(), CollectionId{0});
-  expect(miscBinding.collection && miscBinding.diagnostics.empty(),
-         "sequence preparation should expose selected miscellaneous assets");
+  expect(snapshot.collection(CollectionId{0})->members.miscAssets == std::vector{manifest.metadata.id} &&
+             *snapshot.asset<MiscAsset>(manifest.metadata.id)->privateData.get<u32>() == 42,
+         "supplemental assets should remain available for collection inspection");
+  auto missingMiscBuilder = builder;
+  missingMiscBuilder.collections.front().members.miscAssets = {AssetId{99}};
+  const auto missingMisc = bindCollection(missingMiscBuilder.finish(), CollectionId{0});
+  expect(!missingMisc.collection, "binding should still validate supplemental asset membership");
+  diagnosticWithMessage(missingMisc.diagnostics, "Collection miscellaneous asset was not found");
   const auto artifacts =
       exportCollection(snapshot, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Dls}});
 

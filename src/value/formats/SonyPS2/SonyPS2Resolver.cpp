@@ -319,16 +319,8 @@ void prepareSonyPs2Bank(BankPreparationContext& context, const SoundBankData& da
 void prepareSonyPs2Sequence(SequencePreparationContext& context) {
   std::vector<ProgramRuntimeInfo> programs;
   u32 bankNumber = 0;
-  for (const auto& bank : context.soundBanks) {
-    if (bank.metadata.format != kFormatName) {
-      continue;
-    }
-    const auto* data = bank.privateData.get<SoundBankData>();
-    if (data == nullptr) {
-      context.fail("SonyPS2 HD is missing retained program data", bank.metadata.range);
-      return;
-    }
-    for (auto program : data->runtimePrograms) {
+  for (const auto& bank : context.banks<SoundBankData>(kFormatName)) {
+    for (auto program : bank.data.runtimePrograms) {
       program.bank = static_cast<u8>(std::min<u32>(bankNumber, 255));
       programs.push_back(program);
     }

@@ -10,63 +10,63 @@
 
 #include <algorithm>
 #include <span>
+#include <string_view>
 
 namespace vgmtrans::core {
+
+template <class Data>
+struct BankInput {
+  const SoundBankAsset& asset;
+  const Data& data;
+  const AssetPrivateData placement;
+};
 
 // A sequence configures its private runtime from prepared, read-only banks.
 // Logical bank addressing is assigned during resolution and applied by each
 // bank's own preparation hook.
 struct SequencePreparationContext {
 public:
-  SequencePreparationContext(const SequenceProgramAsset* sequence, SequenceRuntime& sequenceRuntime,
-                             std::span<const SoundBankAsset> soundBanks,
-                             std::span<const SamplePoolAsset* const> samplePools,
-                             std::span<const MiscAsset* const> miscAssets, std::vector<Diagnostic>& diagnostics,
+  SequencePreparationContext(const SequenceProgramAsset& sequence, SequenceRuntime& sequenceRuntime,
+                             std::span<const SoundBankAsset> soundBanks, std::vector<Diagnostic>& diagnostics,
                              std::span<const DependencyTarget> bankUses = {})
-      : sequence(sequence), soundBanks(soundBanks), samplePools(samplePools), miscAssets(miscAssets),
-        diagnostics(diagnostics), sequenceRuntime_(sequenceRuntime), bankUses_(bankUses) {}
+      : sequence(sequence), diagnostics(diagnostics), sequenceRuntime_(sequenceRuntime), soundBanks_(soundBanks),
+        bankUses_(bankUses) {}
 
-  const SequenceProgramAsset* sequence;
-  std::span<const SoundBankAsset> soundBanks;
-  std::span<const SamplePoolAsset* const> samplePools;
-  std::span<const MiscAsset* const> miscAssets;
+  const SequenceProgramAsset& sequence;
   std::vector<Diagnostic>& diagnostics;
   bool failed = false;
 
-  [[nodiscard]] const SoundBankAsset* soundBank(AssetId id) const noexcept {
-    const auto found = std::ranges::find(soundBanks, id, [](const SoundBankAsset& asset) { return asset.metadata.id; });
-    return found == soundBanks.end() ? nullptr : &*found;
-  }
-
+  // Preserve selected order, skip other formats, and reject matching banks
+  // without the requested data. Placements are empty when none was assigned.
   template <class Data>
-  [[nodiscard]] const Data* bankPlacement(AssetId id) const {
-    const auto use = std::ranges::find(bankUses_, id, &DependencyTarget::asset);
-    return use == bankUses_.end() ? nullptr : use->placement.template get<Data>();
-  }
-
-  [[nodiscard]] const SamplePoolAsset* samplePool(AssetId id) const noexcept {
-    const auto found =
-        std::ranges::find(samplePools, id, [](const SamplePoolAsset* asset) { return asset->metadata.id; });
-    return found == samplePools.end() ? nullptr : *found;
-  }
-
-  [[nodiscard]] const MiscAsset* misc(AssetId id) const noexcept {
-    const auto found = std::ranges::find(miscAssets, id, [](const MiscAsset* asset) { return asset->metadata.id; });
-    return found == miscAssets.end() ? nullptr : *found;
+  [[nodiscard]] std::vector<BankInput<Data>> banks(std::string_view format) {
+    std::vector<BankInput<Data>> result;
+    for (const auto& bank : soundBanks_) {
+      if (bank.metadata.format != format) {
+        continue;
+      }
+      const auto* data = bank.privateData.template get<Data>();
+      if (data == nullptr) {
+        fail("Sequence bank input is missing its retained format data", bank.metadata.range);
+        return {};
+      }
+      const auto use = std::ranges::find(bankUses_, bank.metadata.id, &DependencyTarget::asset);
+      result.push_back({bank, *data, use == bankUses_.end() ? AssetPrivateData{} : use->placement});
+    }
+    return result;
   }
 
   [[nodiscard]] bool replaceSequenceRuntime(SequenceRuntime replacement) {
-    const SourceRange range = sequence != nullptr ? sequence->metadata.range : SourceRange{};
     if (!sequenceRuntime_.valid()) {
-      fail("Collection binding cannot replace a sequence runtime with no executor", range);
+      fail("Collection binding cannot replace a sequence runtime with no executor");
       return false;
     }
     if (!replacement.valid()) {
-      fail("Collection binding produced a replacement sequence runtime with no executor", range);
+      fail("Collection binding produced a replacement sequence runtime with no executor");
       return false;
     }
     if (sequenceRuntime_.execute != replacement.execute) {
-      fail("Collection binding produced an incompatible sequence runtime family", range);
+      fail("Collection binding produced an incompatible sequence runtime family");
       return false;
     }
     sequenceRuntime_ = std::move(replacement);
@@ -85,11 +85,12 @@ private:
     diagnostics.push_back(Diagnostic{
         .severity = severity,
         .message = std::move(message),
-        .range = range,
+        .range = range.valid() ? range : sequence.metadata.range,
     });
   }
 
   SequenceRuntime& sequenceRuntime_;
+  std::span<const SoundBankAsset> soundBanks_;
   std::span<const DependencyTarget> bankUses_;
 };
 

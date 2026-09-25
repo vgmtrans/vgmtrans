@@ -140,17 +140,13 @@ void prepareSegSatBank(BankPreparationContext& context, const SegSatBankBindingD
 
 void prepareSegSatSequence(SequencePreparationContext& context, const SegSatSequenceBindingData& sequence) {
   std::vector<SegSatVelocityBank> velocityBanks;
-  for (const auto& bank : context.soundBanks) {
-    if (bank.metadata.format != kSegSatFormatName) {
-      continue;
-    }
-    const auto* data = bank.privateData.get<SegSatBankBindingData>();
-    const auto* use = context.bankPlacement<SegSatBankUse>(bank.metadata.id);
-    if (data == nullptr || use == nullptr) {
-      context.fail("SegSat bank is missing retained data or its logical bank assignment", bank.metadata.range);
+  for (const auto& bank : context.banks<SegSatBankBindingData>(kSegSatFormatName)) {
+    const auto* use = bank.placement.get<SegSatBankUse>();
+    if (use == nullptr) {
+      context.fail("SegSat bank is missing its logical bank assignment", bank.asset.metadata.range);
       return;
     }
-    auto runtime = *data;
+    auto runtime = bank.data;
     runtime.sourceBank = use->logicalBank;
     velocityBanks.push_back(std::move(runtime));
   }

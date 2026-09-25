@@ -104,8 +104,27 @@ void assignBanks(BankAssignmentContext& context) {
 SegSat uses this step to reserve exact physical bank matches before assigning
 fallback logical roles. Each bank applies its assignment through
 `BankPreparationContext::placement`. Sequence preparation runs afterward with
-read-only banks; it can read the same assignment with `bankPlacement<T>(id)` and
-configure its private runtime. Runtime replacement must retain the executor family.
+read-only prepared banks. Like `samples<Data>()`, `banks<Data>(format)` presents
+each input's `asset`, retained `data`, and `placement` together:
+
+```cpp
+void prepareSequence(SequencePreparationContext& context) {
+  RuntimeConfig config;
+  for (const auto& bank : context.banks<BankData>(kFormatName)) {
+    appendPrograms(config, bank.data);
+  }
+  static_cast<void>(context.replaceSequenceRuntime(sequenceRuntime(std::move(config))));
+}
+```
+
+Bank views preserve selected order and skip other formats. A matching bank with
+missing retained data fails preparation; it is not silently skipped. A placement
+is empty when no sequence assignment exists. `context.sequence` is always a
+reference to the sequence being prepared. Both preparation contexts default
+diagnostics to their owner's source range. Supplemental assets remain available
+through collection inspection, outside the audio preparation interface.
+
+Runtime replacement must retain the executor family.
 Different sequences can assign different logical addresses to the same durable
 bank. Standalone bank preparation has no sequence assignment.
 

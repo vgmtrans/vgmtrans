@@ -580,7 +580,7 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
   };
   sequence.recipe.assignBanks = assignSegSatBanks;
   sequence.prepare = [](SequencePreparationContext& context) {
-    prepareSegSatSequence(context, *context.sequence->privateData.get<SegSatSequenceBindingData>());
+    prepareSegSatSequence(context, *context.sequence.privateData.get<SegSatSequenceBindingData>());
   };
   sequence.privateData = AssetPrivateData::make(SegSatSequenceBindingData{
       .volumeModel = SegSatVolumeModel::V1_33,

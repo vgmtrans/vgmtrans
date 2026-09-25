@@ -182,7 +182,7 @@ private:
 template <class Data, class Prepare>
 ScanSequenceDraft& ScanSequenceDraft::prepare(Prepare callback) {
   return prepare([callback = std::move(callback)](SequencePreparationContext& context) {
-    const auto* data = context.sequence == nullptr ? nullptr : context.sequence->privateData.template get<Data>();
+    const auto* data = context.sequence.privateData.template get<Data>();
     if (data == nullptr) {
       context.fail("Sequence is missing its preparation data");
       return;

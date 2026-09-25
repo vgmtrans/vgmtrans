@@ -357,6 +357,51 @@ void combinedRequestsPreserveUnresolvedOutcomes() {
   }
 }
 
+void sequencePreparationValidatesOnlyTheRequestedFormat() {
+  const SourceRange sequenceRange{.source = SourceId{1}, .offset = 0, .size = 4};
+  const SourceRange bankRange{.source = SourceId{1}, .offset = 4, .size = 4};
+  std::vector<u32> observed;
+  test::SessionSnapshotBuilder builder;
+  builder.assets = {
+      SequenceProgramAsset{.metadata = {.id = AssetId{1}, .range = sequenceRange},
+                           .prepare =
+                               [&](SequencePreparationContext& context) {
+                                 observed.clear();
+                                 for (const auto& bank : context.banks<ProbeData>("Bank")) {
+                                   observed.push_back(bank.data.value);
+                                   expect(bank.placement.empty(), "unassigned banks should have an empty placement");
+                                 }
+                                 context.warning("sequence warning");
+                               }},
+      SoundBankAsset{.metadata = {.id = AssetId{2}, .format = "Bank"},
+                     .privateData = AssetPrivateData::make(ProbeData{20})},
+      SoundBankAsset{.metadata = {.id = AssetId{3}, .format = "Foreign"}},
+      SoundBankAsset{.metadata = {.id = AssetId{4}, .format = "Bank", .range = bankRange},
+                     .privateData = AssetPrivateData::make(ProbeData{40})},
+      SoundBankAsset{.metadata = {.id = AssetId{5}, .format = "Foreign"},
+                     .privateData = AssetPrivateData::make(ProbeData{50})},
+  };
+  builder.collections = {
+      {.id = CollectionId{1},
+       .members = {.sequence = AssetId{1}, .soundBanks = {AssetId{2}, AssetId{3}, AssetId{4}, AssetId{5}}}}};
+  auto validBuilder = builder;
+  const auto valid = bindCollection(validBuilder.finish(), CollectionId{1});
+  expect(valid.collection && observed == std::vector<u32>{20, 40} && valid.diagnostics.size() == 1 &&
+             valid.diagnostics.front().range == sequenceRange,
+         "bank views must preserve selection order, skip foreign formats regardless of payload, and default "
+         "diagnostics to the sequence");
+
+  for (const auto& missing : {AssetPrivateData{}, AssetPrivateData::make(u32{40})}) {
+    auto invalidBuilder = builder;
+    std::get<SoundBankAsset>(invalidBuilder.assets[3]).privateData = missing;
+    const auto invalid = bindCollection(invalidBuilder.finish(), CollectionId{1});
+    expect(!invalid.collection && observed.empty() && invalid.diagnostics.front().severity == Severity::Error &&
+               invalid.diagnostics.front().range == bankRange &&
+               invalid.diagnostics.front().message == "Sequence bank input is missing its retained format data",
+           "a matching bank with absent or wrong data must fail at the bank's range, not disappear from preparation");
+  }
+}
+
 void bankAssignmentsBelongToEachSequenceAndRespectManualSelection() {
   SourceStore sources;
   const AssetId bankId{3};
@@ -376,9 +421,11 @@ void bankAssignmentsBelongToEachSequenceAndRespectManualSelection() {
                        }},
         .prepare =
             [](SequencePreparationContext& context) {
-              const auto& bank = context.soundBanks.front();
-              const auto* address = context.bankPlacement<u32>(bank.metadata.id);
-              expect(address && bank.instruments.front().explicitAddress->bank == *address,
+              const auto banks = context.banks<ProbeData>("Bank");
+              expect(banks.size() == 1, "sequence preparation should expose the selected bank's retained data");
+              const auto& bank = banks.front();
+              const auto* address = bank.placement.get<u32>();
+              expect(address && bank.asset.instruments.front().explicitAddress->bank == *address,
                      "sequence preparation must observe the bank's applied relationship assignment");
             },
     };
@@ -452,6 +499,7 @@ void bankAssignmentsBelongToEachSequenceAndRespectManualSelection() {
 }  // namespace
 
 void runValueAssetResolutionTests() {
+  sequencePreparationValidatesOnlyTheRequestedFormat();
   combinedRequestsPreserveUnresolvedOutcomes();
   resolutionStatusAndAlternativePlacementsSurvivePublication();
   bankAssignmentsBelongToEachSequenceAndRespectManualSelection();

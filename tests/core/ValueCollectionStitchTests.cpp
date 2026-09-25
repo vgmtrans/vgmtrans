@@ -93,8 +93,7 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
   SequenceProgramConfig config96 = config48;
   config96.timebase.ppqn = 96;
   const SequencePreparer binder = [](SequencePreparationContext& context) {
-    const auto* sequence = context.sequence;
-    const bool leaveDirtyMidiState = sequence != nullptr && sequence->metadata.name == "Part 0";
+    const bool leaveDirtyMidiState = context.sequence.metadata.name == "Part 0";
     if (!context.replaceSequenceRuntime(makeCompiledRuntime<ProbePlayback, StitchProgramState>(leaveDirtyMidiState))) {
       return;
     }
