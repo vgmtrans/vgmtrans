@@ -5,12 +5,14 @@
  */
 
 #pragma once
+
+#include "main/base/ToastType.h"
+
 #include <QObject>
 #include <QVector>
 
 class QWidget;
 class Toast;
-enum class ToastType;
 
 class ToastHost : public QObject {
   Q_OBJECT

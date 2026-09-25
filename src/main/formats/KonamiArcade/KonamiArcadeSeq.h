@@ -17,7 +17,7 @@ public:
     KonamiArcadeFormatVer fmt_version,
     u32 offset,
     u32 memOffset,
-    const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
+    const KonamiArcadeInstrSet::DrumTable& drums,
     float nmiRate,
     const std::string& name
   );
@@ -26,7 +26,7 @@ public:
   bool parseTrackPointers() override;
 
   u32 memOffset() { return m_memOffset; }
-  const std::array<KonamiArcadeInstrSet::drum, 46>& drums() { return m_drums; }
+  const KonamiArcadeInstrSet::DrumTable& drums() { return m_drums; }
   float nmiRate() { return m_nmiRate; }
 
 public:
@@ -38,7 +38,7 @@ public:
 
 private:
   u32 m_memOffset;
-  const std::array<KonamiArcadeInstrSet::drum, 46> m_drums;
+  const KonamiArcadeInstrSet::DrumTable m_drums;
   float m_nmiRate;
 
   u8 m_tempoSlideDuration;

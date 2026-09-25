@@ -1,0 +1,337 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include "../TestSupport.h"
+#include "SessionTestSupport.h"
+
+#include "value/scan/FormatModule.h"
+#include "value/scan/ScanResultBuilder.h"
+#include "value/session/Session.h"
+
+#include <array>
+
+using namespace vgmtrans::core;
+
+namespace {
+
+struct BuilderPrivateData {
+  u32 value = 0;
+};
+
+void formatRegistryStoresCopyableModulesAtomically() {
+  FormatRegistry registry;
+  registry.add(probeSequenceModule());
+  registry.add(FormatModule{
+      .name = std::string("DynamicProbe"),
+      .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+      .scan = scanProbeSequence,
+  });
+  registry.add(SourceExtractor{
+      .name = "DynamicExtractor",
+      .acceptedFormats = {"probe-container"},
+      .extract = [](const ExtractionInput&) { return ExtractionResult{}; },
+  });
+
+  const FormatRegistry copy = registry;
+  expect(copy.modules().size() == 2, "format registry should copy registered module values");
+  expect(copy.modules()[0].name == "ProbeSequence", "format registry should preserve copied module names");
+  expect(copy.modules()[1].name == "DynamicProbe", "format registry should own dynamically registered module names");
+  expect(copy.modules()[0].scan && copy.modules()[1].scan, "format registry should preserve copied module scanners");
+  expect(copy.modules()[0].preferredSampleFilter == SampleFilter::None,
+         "formats should prefer no sample filtering unless they opt into a filter");
+  expect(copy.findModule("DynamicProbe") != nullptr &&
+             copy.findModule("DynamicProbe")->preferredSampleFilter == SampleFilter::SnesDspLowPass,
+         "format registry should expose a format's preferred sample filter");
+  expect(copy.findModule("Missing") == nullptr, "format registry should report missing modules");
+  expect(copy.extractors().size() == 1 && copy.extractors().front().name == "DynamicExtractor",
+         "format registry should copy source extractor values");
+  expectThrows<std::invalid_argument>([&] { registry.add(FormatModule{.name = "Broken"}); },
+                                      "format registry should reject incomplete module values");
+
+  expectThrows<std::invalid_argument>(
+      [&] {
+        registry.add(FormatModule{
+            .name = "DuplicateAcceptedFormat",
+            .acceptedFormats = {"same", "same"},
+            .scan = scanProbeSequence,
+        });
+      },
+      "format registry should reject duplicate accepted formats without partially registering a module");
+  expect(registry.modules().size() == 2, "failed registration must leave the module list unchanged");
+
+  expectThrows<std::invalid_argument>(
+      [&] {
+        registry.add(FormatModule{
+            .name = "ProbeSequence",
+            .scan = scanProbeSequence,
+        });
+      },
+      "format registry should reject duplicate module names without partially registering a module");
+  expect(registry.modules().size() == 2, "failed registration must leave the module list unchanged");
+
+  expectThrows<std::invalid_argument>(
+      [&] {
+        registry.add(SourceExtractor{
+            .name = "DynamicExtractor",
+            .extract = [](const ExtractionInput&) { return ExtractionResult{}; },
+        });
+      },
+      "format registry should reject duplicate extractor names without partially registering an extractor");
+  expect(registry.extractors().size() == 1, "failed registration must leave the extractor list unchanged");
+}
+
+void scanResultBuilderCoversCommonScannerPlumbing() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "builder.probe"}, {0xaa, 0xbb, 0xcc});
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = sources.source(source),
+      .reader = sources.reader(source),
+      .ids = ids,
+  };
+
+  ScanResultBuilder out(input, "ProbeBuilder");
+  const auto wholeSource = input.reader.range(0, input.reader.size());
+
+  auto sequence = out.sequence("Builder Sequence", wholeSource)
+                      .data(BuilderPrivateData{.value = 11})
+                      .program(probeSequenceProgram());
+  expectThrows<std::logic_error>([&] { sequence.data(BuilderPrivateData{.value = 99}); },
+                                 "scan result builder should reject a second private data value for one asset");
+  auto bank = out.soundBank("Builder Bank", input.reader.range(0, 1)).data(BuilderPrivateData{.value = 22});
+  auto samplePool = out.samplePool("Builder Samples", input.reader.range(1, 2));
+  samplePool.data(BuilderPrivateData{.value = 33});
+  auto& samples = samplePool.samples();
+  samples.add(0, Sample{
+                     .name = "Builder Sample",
+                     .codec = AudioCodec::PcmS8,
+                     .encodedData = input.reader.range(1, 2),
+                     .sampleRate = 32000,
+                     .channels = 1,
+                 });
+  const auto misc =
+      out.misc("Builder Misc", input.reader.range(0, 1)).data(BuilderPrivateData{.value = 44}).payload({0xaa});
+
+  sequence.collectionName("Builder Song").useBank(bank).includeMisc(misc);
+  bank.useSamples(samplePool);
+  out.warning("builder warning", input.reader.range(0, 1));
+
+  ScanResult result = out.finish();
+  expect(result.assets.size() == 4, "scan result builder should add sequence, instrument, sample, and misc assets");
+  expect(metadata(result.assets[0]).id == AssetId{0} && metadata(result.assets[0]).format == "ProbeBuilder",
+         "scan result builder should assign sequence metadata");
+  expect(metadata(result.assets[1]).id == AssetId{1}, "scan result builder should assign instrument metadata");
+  expect(metadata(result.assets[2]).id == AssetId{2}, "scan result builder should assign sample metadata");
+  expect(metadata(result.assets[3]).id == AssetId{3}, "scan result builder should assign misc metadata");
+  const auto* sequenceData = std::get<SequenceProgramAsset>(result.assets[0]).privateData.get<BuilderPrivateData>();
+  const auto* instrumentData = std::get<SoundBankAsset>(result.assets[1]).privateData.get<BuilderPrivateData>();
+  const auto* sampleData = std::get<SamplePoolAsset>(result.assets[2]).privateData.get<BuilderPrivateData>();
+  const auto* miscData = std::get<MiscAsset>(result.assets[3]).privateData.get<BuilderPrivateData>();
+  expect(sequenceData != nullptr && sequenceData->value == 11 && instrumentData != nullptr &&
+             instrumentData->value == 22 && sampleData != nullptr && sampleData->value == 33 && miscData != nullptr &&
+             miscData->value == 44 &&
+             std::get<SamplePoolAsset>(result.assets[2]).privateData.get<std::string>() == nullptr,
+         "every asset draft should retain an immutable typed private payload");
+  const auto collections = dependencyCollections(AssetCatalog{sources, SharedSequence<Asset>{result.assets}});
+  expect(collections.size() == 1, "scan result builder should declare one sequence collection");
+  expect(collections[0].members.sequence == sequence.id(),
+         "scan result builder should preserve the collection sequence");
+  expect(collections[0].members.soundBanks == std::vector<AssetId>{bank.id()},
+         "scan result builder should preserve the collection instrument set");
+  expect(collections[0].members.samplePools == std::vector<AssetId>{samplePool.id()},
+         "scan result builder should preserve the collection sample collection");
+  expect(collections[0].members.miscAssets == std::vector<AssetId>{misc.id()},
+         "scan result builder should preserve the collection misc asset");
+  expect(result.diagnostics.size() == 1 && result.diagnostics[0].message == "builder warning",
+         "scan result builder should preserve diagnostics");
+}
+
+void sessionStoresTheOwningFormatsPreferredSampleFilter() {
+  Session session;
+  session.registerFormat(FormatModule{
+      .name = "FilteredSamples",
+      .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
+      .scan =
+          [](const ScanInput& input) {
+            ScanResultBuilder out(input, "FilteredSamples");
+            auto pool = out.samplePool("Filtered Samples", input.reader.range(0, 1));
+            auto& samples = pool.samples();
+            samples.add(0, Sample{
+                               .name = "Filtered Sample",
+                               .codec = AudioCodec::PcmS8,
+                               .encodedData = input.reader.range(0, 1),
+                               .sampleRate = 8000,
+                           });
+            return out.finish();
+          },
+  });
+  session.addSource(SourceFile{.name = "samples.bin"}, {0});
+  session.scanPendingSources();
+
+  const auto snapshot = session.snapshot();
+  expect(!snapshot.assets().empty(), "filtered sample fixture should publish one sample collection");
+  const auto* samples = std::get_if<SamplePoolAsset>(&snapshot.assets().front());
+  expect(samples != nullptr && samples->pool.preferredFilter == SampleFilter::PsxSpuLowPass,
+         "sample assets should retain their owning format's preferred export filter");
+}
+
+void scanResultBuilderPublishesCollectionsByDefaultAndPreservesOptOut() {
+  SourceStore sources;
+  const auto source = sources.add(SourceFile{.name = "collection-defaults.bin"}, {0});
+  ScanIdAllocator ids;
+  ScanResultBuilder out(ScanInput{.source = sources.source(source), .reader = sources.reader(source), .ids = ids},
+                        "Defaults");
+  const auto song = out.sequence("Song").program(probeSequenceProgram());
+  const auto bank = out.soundBank("Bank");
+  const auto table = out.misc("Table", sources.reader(source).range(0, 1)).payload({0});
+  auto loose = out.sequence("Loose").program(probeSequenceProgram()).withoutCollection();
+  loose.useBank(bank).useBanks([id = bank.id()](const DependencyContext&) { return selectAll(std::array{id}); });
+  loose.includeMisc(table).collectionName("Still loose");
+  const auto result = out.finish();
+  const auto collections = dependencyCollections(AssetCatalog{sources, SharedSequence<Asset>{result.assets}});
+  expect(collections.size() == 1 && collections.front().members.sequence == song.id() &&
+             collections.front().name == "Song" && collections.front().members.soundBanks.empty(),
+         "publishing a sequence must create a collection even without bank requests or explicit collection metadata");
+  const auto& retained = std::get<SequenceProgramAsset>(result.assets.back());
+  expect(retained.metadata.id == loose.id() && retained.recipe.banks.size() == 2 &&
+             retained.collection.miscAssets == std::vector{table.id()} && !retained.collection.enabled,
+         "bank requests, naming, and supplemental assets must not undo an explicit collection opt-out");
+}
+
+void scanResultBuilderNamesSequenceCollections() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "fallback.spc", .title = "Tagged Song"}, {0xaa});
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = sources.source(source),
+      .reader = sources.reader(source),
+      .ids = ids,
+  };
+
+  ScanResultBuilder out(input, "ProbeBuilder");
+  expect(out.sourceDisplayName() == "Tagged Song", "source display name should prefer source metadata");
+  const auto sequence =
+      out.sequence("Sequence").program(probeSequenceProgram()).collectionName(out.sourceDisplayName());
+
+  const ScanResult result = out.finish();
+  const auto collections = dependencyCollections(AssetCatalog{sources, SharedSequence<Asset>{result.assets}});
+  expect(collections.size() == 1 && collections[0].name == "Tagged Song",
+         "a sequence collection can use a source title independently of the sequence name");
+  expect(collections[0].members.sequence == sequence.id(),
+         "sequence collection identity should not depend on its display name");
+}
+
+void scanResultBuilderInfersSequenceRangesUnlessExplicit() {
+  const std::vector<u8> bytes(32);
+  const ByteReader reader(SourceId{7}, bytes);
+  ScanIdAllocator ids;
+  ScanInput input{.source = SourceFile{.id = reader.source()}, .reader = reader, .ids = ids};
+  for (const SourceRange bounds : {SourceRange{}, reader.range(12, 0), reader.range(12, 2)}) {
+    ScanResultBuilder out(input, "RangeProbe");
+    auto sequence = out.sequence("Sequence", bounds);
+    auto header = out.sourceMap().header("Header", reader.range(10, 4)).owner(ObjectRefs::sequence(sequence.id()));
+    out.sourceMap().table("Track pointers", reader.range(2, 2)).parent(header.id());
+    out.sourceMap().header("Another sequence", reader.range(0, 32)).owner(ObjectRefs::sequence(AssetId{99}));
+    out.sourceMap().table("Foreign source", SourceRange{.source = SourceId{8}, .size = 32}).parent(header.id());
+    const SourceCommand command{.range = reader.range(20, 2)};
+    sequence.program(SequenceProgram{.tracks = {TrackProgram{.commands = {command}}}});
+    const ScanResult result = out.finish();
+    expect(metadata(result.assets.front()).range == (bounds.valid() ? bounds : reader.range(2, 20)),
+           "inferred sequence bounds should span owned metadata and commands, while explicit bounds stay exact");
+  }
+}
+
+void scanResultBuilderChecksAllDraftsBeforeConsumingValues() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "builder-uncommitted.probe"}, {0xaa});
+  ScanIdAllocator ids;
+  ScanInput input{.source = sources.source(source), .reader = sources.reader(source), .ids = ids};
+
+  ScanResultBuilder out(input, "ProbeBuilder");
+  auto bank = out.soundBank("Complete Bank");
+  bank.instruments().append(Instrument{.name = "Retained Instrument"});
+  auto sequence = out.sequence("Incomplete Sequence");
+  auto misc = out.misc("Incomplete Misc", input.reader.range(0, 1));
+  sequence.collectionName("Broken");
+
+  expectThrows<std::logic_error>([&] { static_cast<void>(out.finish()); },
+                                 "scan result builder should reject a sequence draft that was never given a program");
+
+  sequence.program(SequenceProgram{.tracks = {TrackProgram{.name = "Retained Track"}}});
+  expectThrows<std::logic_error>([&] { static_cast<void>(out.finish()); },
+                                 "scan result builder should reject a misc draft that was never given a payload");
+
+  misc.payload({});
+  const auto result = out.finish();
+  expect(result.assets.size() == 3 && std::get<SoundBankAsset>(result.assets[0]).instruments.size() == 1 &&
+             std::get<SoundBankAsset>(result.assets[0]).instruments[0].name == "Retained Instrument" &&
+             std::get<SequenceProgramAsset>(result.assets[1]).program.tracks.size() == 1 &&
+             std::get<SequenceProgramAsset>(result.assets[1]).program.tracks[0].name == "Retained Track" &&
+             std::get<MiscAsset>(result.assets[2]).payload.empty(),
+         "failed finalization must leave every draft intact for repair, including an explicitly empty payload");
+}
+
+void scanResultBuilderPublishesEmptySynthDrafts() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "builder-sample-ref.probe"}, {0xaa});
+  ScanIdAllocator ids;
+  ScanInput input{.source = sources.source(source), .reader = sources.reader(source), .ids = ids};
+
+  ScanResultBuilder out(input, "ProbeBuilder");
+  const auto samples = out.samplePool("Recognized Samples");
+  const auto instruments = out.soundBank("Recognized Instruments");
+  const ScanResult result = out.finish();
+  expect(result.assets.size() == 2 && metadata(result.assets[0]).id == samples.id() &&
+             metadata(result.assets[1]).id == instruments.id(),
+         "creating a synth draft should publish it in creation order even when it remains empty");
+  expect(std::get<SamplePoolAsset>(result.assets[0]).pool.samples.empty() &&
+             std::get<SoundBankAsset>(result.assets[1]).instruments.empty(),
+         "empty published synth assets should remain ordinary visible assets");
+}
+
+void scanResultBuilderCursorReportsMalformedFields() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "cursor.probe"}, {0xaa, 0xbb, 0xcc});
+  ScanIdAllocator ids;
+  ScanInput input{.source = sources.source(source), .reader = sources.reader(source), .ids = ids};
+
+  ScanResultBuilder out(input, "ProbeBuilder");
+  RecordReader validCursor(input.reader, 1, 3, &out.diagnostics(), false);
+  const auto value = validCursor.u16leAt(0, "probe value");
+  expect(value && *value == 0xccbb, "parse cursor should return parsed field values");
+  expect(value.range == SourceRange{.source = source, .offset = 1, .size = 2},
+         "parse cursor should return parsed field ranges");
+  out.sourceMap().header("Probe Header", input.reader.range(1, 2)).field("probe_value", value);
+
+  RecordReader cursor(input.reader, 2, 3, &out.diagnostics(), false);
+  expect(!cursor.u32leAt(0, "probe field"), "record reader should reject fields outside its range");
+
+  const ScanResult result = out.finish();
+  const auto headerIds = result.sourceMap.withRole(source, SourceRole::Header);
+  expect(headerIds.size() == 1, "ranged parse values should be accepted by annotation fields");
+  const auto& header = result.sourceMap.get(headerIds[0]);
+  expect(header.fields.size() == 1 && header.fields[0].name == "probe_value" &&
+             std::get<u64>(header.fields[0].value) == 0xccbb &&
+             header.fields[0].range == SourceRange{.source = source, .offset = 1, .size = 2},
+         "annotation fields should use the parsed value range");
+  expect(result.diagnostics.size() == 1, "parse cursor should report malformed fields as diagnostics");
+  expect(result.diagnostics[0].message == "Truncated field 'probe field'",
+         "record reader diagnostic should name the failed field");
+}
+
+}  // namespace
+
+void runValueRegistryTests() {
+  formatRegistryStoresCopyableModulesAtomically();
+  scanResultBuilderCoversCommonScannerPlumbing();
+  scanResultBuilderPublishesCollectionsByDefaultAndPreservesOptOut();
+  scanResultBuilderNamesSequenceCollections();
+  scanResultBuilderInfersSequenceRangesUnlessExplicit();
+  scanResultBuilderChecksAllDraftsBeforeConsumingValues();
+  scanResultBuilderPublishesEmptySynthDrafts();
+  scanResultBuilderCursorReportsMalformedFields();
+  sessionStoresTheOwningFormatsPreferredSampleFilter();
+}

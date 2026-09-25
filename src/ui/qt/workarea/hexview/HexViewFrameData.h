@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "base/Types.h"
+#include "value/base/Types.h"
 
 #include <array>
 #include <cstdint>
@@ -18,8 +18,6 @@
 #include <QPointF>
 #include <QRectF>
 #include <QSize>
-
-class VGMFile;
 
 namespace HexViewFrame {
 
@@ -52,7 +50,9 @@ struct GlyphAtlasView {
 };
 
 struct Data {
-  VGMFile* vgmfile = nullptr;
+  std::span<const u8> bytes;
+  std::span<const u16> itemIds;
+  u32 baseOffset = 0;
   QSize viewportSize;
   qreal dpr = 1.0;
   int totalLines = 0;
