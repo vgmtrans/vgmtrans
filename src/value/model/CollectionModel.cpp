@@ -15,7 +15,6 @@ namespace {
 
 [[nodiscard]] CollectionIssue missingRoleIssue(std::string code, std::string role, std::optional<AssetId> asset) {
   return CollectionIssue{
-      .impact = CollectionIssueImpact::Incomplete,
       .severity = asset ? Severity::Error : Severity::Warning,
       .code = std::move(code),
       .message = asset ? "Collection references missing " + role + " asset " + std::to_string(asset->value)
@@ -40,7 +39,6 @@ CollectionIssue missingSamplePoolIssue(std::optional<AssetId> asset) {
 
 CollectionIssue ambiguousMatchIssue(std::string message, std::optional<AssetId> asset, SourceRange range) {
   return CollectionIssue{
-      .impact = CollectionIssueImpact::Ambiguous,
       .severity = Severity::Warning,
       .code = "ambiguous-match",
       .message = std::move(message),

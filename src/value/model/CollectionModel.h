@@ -23,15 +23,8 @@ struct CollectionMembers {
   std::vector<AssetId> miscAssets;
 };
 
-// Ordered by precedence so a collection's status is its greatest issue impact.
-enum class CollectionIssueImpact {
-  None,
-  Incomplete,
-  Ambiguous,
-};
-
+// Diagnostic presentation is independent of dependency usability.
 struct CollectionIssue {
-  CollectionIssueImpact impact = CollectionIssueImpact::None;
   Severity severity = Severity::Info;
   std::string code;
   std::string message;
@@ -39,9 +32,13 @@ struct CollectionIssue {
   SourceRange range;
 };
 
-// The supported dependency chain is sequence -> sound bank -> sample pool.
-enum class DependencyRole { SoundBank, SamplePool };
+// Audio dependencies form sequence -> sound bank -> sample pool. Supplemental
+// references connect a sequence to inspection assets outside that audio chain.
+enum class DependencyRole { SoundBank, SamplePool, Supplemental };
 
+// Ordered by precedence. Each relationship owns its outcome; collection status
+// is the greatest of those outcomes, independent of diagnostic severity.
+// Incomplete and ambiguous inputs may still be usable; failed resolution blocks preparation.
 enum class ResolutionStatus { Resolved, Incomplete, Ambiguous, Failed };
 
 // A selected provider and optional format-owned placement within it. Two banks

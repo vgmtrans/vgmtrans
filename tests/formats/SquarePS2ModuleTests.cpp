@@ -246,7 +246,7 @@ void syntheticArchiveCoversDriverFeatures() {
   expect(wd.assets().size() == 1 && wd.collections().empty(), "a standalone WD should not create a collection");
   const SessionSnapshot bgm = scan("music.bgm", "/fixture/music.bgm", bgmFixture()).snapshot();
   expect(bgm.assets().size() == 1 && bgm.collections().size() == 1 &&
-             bgm.collections().front().issueImpact() == CollectionIssueImpact::Incomplete,
+             bgm.collections().front().resolutionStatus() == ResolutionStatus::Incomplete,
          "a standalone BGM should retain an incomplete sequence-rooted collection");
   expect(bindCollection(bgm, bgm.collections().front().id).collection.has_value(),
          "a BGM without a WD should still prepare its sequence runtime with defaults");

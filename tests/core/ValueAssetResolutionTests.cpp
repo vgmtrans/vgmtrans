@@ -25,29 +25,46 @@ struct ProbeData {
   u32 value = 0;
 };
 
-void collectionIssuesDeriveImpact() {
-  const CollectionIssue missingSequence = missingSequenceIssue();
-  expect(missingSequence.impact == CollectionIssueImpact::Incomplete && missingSequence.severity == Severity::Warning &&
-             missingSequence.code == "missing-sequence",
-         "missing sequence helper should create a warning issue");
-  const std::vector<CollectionIssue> missingIssues{missingSequence};
-  expect(Collection{.issues = missingIssues}.issueImpact() == CollectionIssueImpact::Incomplete,
-         "missing issues should make a collection incomplete");
+void collectionStatusControlsPreparationIndependentlyOfDiagnostics() {
+  expect(Collection{}.resolutionStatus() == ResolutionStatus::Resolved,
+         "a collection with no dependency requests has no unresolved obligations");
+  const std::array statuses{ResolutionStatus::Resolved, ResolutionStatus::Incomplete, ResolutionStatus::Ambiguous,
+                            ResolutionStatus::Failed};
+  for (const auto bankStatus : statuses) {
+    for (const auto sampleStatus : statuses) {
+      const auto expected = std::max(bankStatus, sampleStatus);
+      Collection collection{
+          .id = CollectionId{1},
+          .members = {.sequence = AssetId{1}, .soundBanks = {AssetId{2}}},
+          .issues = {{.severity = Severity::Error, .code = "presentation-only", .message = "An error diagnostic"}},
+          .dependencies = {{.owner = AssetId{1},
+                            .role = DependencyRole::SoundBank,
+                            .status = bankStatus,
+                            .targets = {{AssetId{2}, {}}}},
+                           {.owner = AssetId{2}, .role = DependencyRole::SamplePool, .status = sampleStatus}},
+      };
+      expect(collection.resolutionStatus() == expected,
+             "collection summaries must combine dependency outcomes, regardless of diagnostic severity");
+      std::ranges::reverse(collection.dependencies);
+      if (expected == ResolutionStatus::Failed) {
+        collection.issues.clear();
+      }
+      expect(collection.resolutionStatus() == expected,
+             "reordering dependencies or removing diagnostics must not change the outcome");
 
-  const CollectionIssue missingInstrument = missingSoundBankIssue(AssetId{7});
-  expect(missingInstrument.severity == Severity::Error && missingInstrument.asset == AssetId{7},
-         "missing instrument helper should preserve a broken asset reference");
-
-  const CollectionIssue ambiguous = ambiguousMatchIssue("multiple banks match");
-  const std::vector<CollectionIssue> ambiguousIssues{ambiguous};
-  expect(Collection{.issues = ambiguousIssues}.issueImpact() == CollectionIssueImpact::Ambiguous,
-         "ambiguous match issue should make a collection ambiguous");
-  expect(Collection{.issues = {missingSequence, ambiguous}}.issueImpact() == CollectionIssueImpact::Ambiguous,
-         "ambiguity should take precedence when a collection is also incomplete");
-
-  const Collection incomplete{.issues = {missingSamplePoolIssue()}};
-  expect(incomplete.issueImpact() == CollectionIssueImpact::Incomplete,
-         "collection impact should be derived from its issues");
+      bool prepared = false;
+      test::SessionSnapshotBuilder builder;
+      builder.assets = {SequenceProgramAsset{.metadata = {.id = AssetId{1}},
+                                             .prepare = [&](SequencePreparationContext&) { prepared = true; }},
+                        SoundBankAsset{.metadata = {.id = AssetId{2}}}};
+      builder.collections = {collection};
+      const auto bound = bindCollection(builder.finish(), collection.id);
+      const bool usable = expected != ResolutionStatus::Failed;
+      expect(prepared == usable && bound.collection.has_value() == usable,
+             "export must use the same typed outcome: failure blocks even without diagnostics; other outcomes may "
+             "prepare despite error diagnostics");
+    }
+  }
 }
 
 void matchingKeepsTiesAndRejectsIncompatibleCandidates() {
@@ -232,7 +249,7 @@ void dependencyFailuresAreLocalAndAmbiguityRetainsAlternatives() {
              choice.dependencies.front().alternatives.size() == 2 &&
              choice.dependencies.front().alternatives[0].asset == AssetId{2} &&
              choice.dependencies.front().alternatives[1].asset == AssetId{3} &&
-             choice.issues.front().impact == CollectionIssueImpact::Ambiguous,
+             choice.issues.front().severity == Severity::Warning,
          "an unresolved choice must retain candidates without claiming both providers");
 
   sequence.recipe.banks.front() = exact(first.metadata.id);
@@ -323,7 +340,7 @@ void resolutionStatusAndAlternativePlacementsSurvivePublication() {
   desired = {.members = {.soundBanks = {bank.metadata.id}}};
   resolveDependencies(AssetCatalog{sources, SharedSequence<Asset>{std::vector<Asset>{bank}}}, desired);
   expect(desired.dependencies.front().status == ResolutionStatus::Incomplete &&
-             desired.issues.front().impact == CollectionIssueImpact::Incomplete,
+             desired.issues.front().severity == Severity::Warning,
          "a missing provider is explicitly incomplete, rather than a fatal selector failure");
 }
 
@@ -507,7 +524,7 @@ void runValueAssetResolutionTests() {
   dependenciesPreserveSharingPlacementsAndPrivatePreparation();
   manualChoicesOverrideSequenceRequestsAndConstrainBankInputs();
   dependencyFailuresAreLocalAndAmbiguityRetainsAlternatives();
-  collectionIssuesDeriveImpact();
+  collectionStatusControlsPreparationIndependentlyOfDiagnostics();
   matchingKeepsTiesAndRejectsIncompatibleCandidates();
   discoveryExposesTypedAssetDataAndSources();
 }

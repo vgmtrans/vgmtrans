@@ -92,9 +92,7 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
       collection->name.empty() ? "collection-" + std::to_string(collection->id.value) : collection->name;
   const SequenceProgramAsset* sequence = nullptr;
   SequenceRuntime sequenceRuntime;
-  bool failed = std::ranges::any_of(collection->dependencies, [](const ResolvedDependency& dependency) {
-    return dependency.status == ResolutionStatus::Failed;
-  });
+  bool failed = collection->resolutionStatus() == ResolutionStatus::Failed;
   if (members.sequence) {
     sequence = snapshot.asset<SequenceProgramAsset>(*members.sequence);
     if (sequence == nullptr) {
@@ -133,15 +131,16 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
   }
 
   for (const auto& dependency : collection->dependencies) {
-    const bool ownerSelected =
-        dependency.role == DependencyRole::SoundBank
-            ? members.sequence == dependency.owner
-            : std::ranges::find(members.soundBanks, dependency.owner) != members.soundBanks.end();
+    const bool ownerSelected = dependency.role == DependencyRole::SamplePool
+                                   ? std::ranges::find(members.soundBanks, dependency.owner) != members.soundBanks.end()
+                                   : members.sequence == dependency.owner;
     if (!ownerSelected) {
       diagnostics.push_back(exportError("Dependency owner is not a selected sequence or sound bank"));
       failed = true;
     }
-    const auto& providers = dependency.role == DependencyRole::SoundBank ? members.soundBanks : members.samplePools;
+    const auto& providers = dependency.role == DependencyRole::SamplePool  ? members.samplePools
+                            : dependency.role == DependencyRole::SoundBank ? members.soundBanks
+                                                                           : members.miscAssets;
     for (const auto& target : dependency.targets) {
       if (std::ranges::find(providers, target.asset) == providers.end()) {
         diagnostics.push_back(exportError("Dependency provider is not a selected collection member"));

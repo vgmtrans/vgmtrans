@@ -524,7 +524,7 @@ void sessionMatchesCollectionsAcrossSeparateSourceScans() {
   project = session.snapshot();
   expect(project.assets().size() == 2, "second source scan should add the matching sequence asset");
   expect(project.collections().size() == 1, "typed asset data should update the existing bank collection");
-  expect(project.collections()[0].issueImpact() == CollectionIssueImpact::None,
+  expect(project.collections()[0].resolutionStatus() == ResolutionStatus::Resolved,
          "bank collection should become complete when sequence and instruments are both present");
   expect(project.collections()[0].members.sequence.has_value(),
          "completed bank collection should reference the sequence");
@@ -655,7 +655,7 @@ void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
   session.scanPendingSources();
   SessionSnapshot project = session.snapshot();
   expect(project.collections().size() == 1, "matching bank files should produce one collection");
-  expect(project.collections()[0].issueImpact() == CollectionIssueImpact::None,
+  expect(project.collections()[0].resolutionStatus() == ResolutionStatus::Resolved,
          "matched bank collection should be complete");
   const CollectionId collectionId = project.collections()[0].id;
 
@@ -666,7 +666,7 @@ void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
   expect(project.assets().size() == 1, "removing one matched source should leave the other asset active");
   expect(project.collections().size() == 1, "the remaining typed asset should keep the bank collection alive");
   expect(project.collections()[0].id == collectionId, "collection id should be preserved for the same key");
-  expect(project.collections()[0].issueImpact() == CollectionIssueImpact::Incomplete,
+  expect(project.collections()[0].resolutionStatus() == ResolutionStatus::Incomplete,
          "remaining sequence-only collection should become incomplete");
   expect(project.collections()[0].members.sequence.has_value(), "remaining collection should keep the sequence asset");
   expect(project.collections()[0].members.soundBanks.empty(),
@@ -1073,7 +1073,8 @@ void sessionReportsDesiredCollectionMissingAssetReferences() {
     session.scanPendingSources();
     const auto snapshot = session.snapshot();
     const auto& collection = snapshot.collections().front();
-    expect(collection.members.soundBanks.empty() && collection.issues.front().code == "invalid-dependency",
+    expect(collection.members.soundBanks.empty() && collection.issues.front().code == "invalid-dependency" &&
+               collection.resolutionStatus() == ResolutionStatus::Failed,
            "missing and wrong-type dependency targets must not enter collection membership");
     expect(!bindCollection(snapshot, collection.id).collection,
            "invalid dependencies must prevent publication of a prepared collection");
@@ -1081,30 +1082,44 @@ void sessionReportsDesiredCollectionMissingAssetReferences() {
 }
 
 void sessionKeepsSequenceCollectionsWhenSupplementalAssetsDisappear() {
-  Session session;
-  session.registerFormat(FormatModule{
-      .name = "Supplemental", .scan = [](const ScanInput& input) {
-        ScanResultBuilder out(input, "Supplemental");
-        auto sequence = out.sequence("Song").program(probeSequenceProgram());
-        auto misc = out.misc("Table", input.reader.range(0, 1)).payload({0});
-        sequence.includeMisc(misc).includeMisc(sequence.id());
-        out.sourceMap().header("Sequence", input.reader.range(0, 1)).owner(ObjectRefs::sequence(sequence.id()));
-        out.sourceMap().header("Table", input.reader.range(0, 1)).owner(ObjectRefs::misc(misc.id()));
-        return out.finish();
-      }});
-  session.addSource(SourceFile{.name = "supplemental.bin"}, {0});
-  session.scanPendingSources();
-  const auto before = session.snapshot();
-  const auto& collection = before.collections().front();
-  expect(collection.members.miscAssets.size() == 1 && collection.issues.front().code == "wrong-type-misc",
-         "supplemental references must reject an asset of the wrong type");
-  session.removeAssets(collection.members.miscAssets);
-  const auto after = session.snapshot();
-  const auto* updated = after.collection(collection.id);
-  expect(updated != nullptr && updated->members.sequence == collection.members.sequence &&
-             updated->members.miscAssets.empty() && updated->issues.front().code == "missing-misc",
-         "removing an inspection asset must retain the sequence's identity and report the missing reference");
-  expect(collection.members.miscAssets.size() == 1, "earlier snapshots must retain their supplemental membership");
+  for (const bool wrongType : {false, true}) {
+    Session session;
+    session.registerFormat(FormatModule{
+        .name = "Supplemental", .scan = [wrongType](const ScanInput& input) {
+          ScanResultBuilder out(input, "Supplemental");
+          auto sequence = out.sequence("Song").program(probeSequenceProgram());
+          auto misc = out.misc("Table", input.reader.range(0, 1)).payload({0});
+          sequence.includeMisc(misc);
+          if (wrongType) {
+            sequence.includeMisc(sequence.id());
+          }
+          out.sourceMap().header("Sequence", input.reader.range(0, 1)).owner(ObjectRefs::sequence(sequence.id()));
+          out.sourceMap().header("Table", input.reader.range(0, 1)).owner(ObjectRefs::misc(misc.id()));
+          return out.finish();
+        }});
+    session.addSource(SourceFile{.name = "supplemental.bin"}, {0});
+    session.scanPendingSources();
+    const auto before = session.snapshot();
+    const auto& collection = before.collections().front();
+    expect(collection.members.miscAssets.size() == 1 &&
+               collection.dependencies.back().role == DependencyRole::Supplemental &&
+               collection.dependencies.back().targets.front().asset == collection.members.miscAssets.front() &&
+               collection.resolutionStatus() == (wrongType ? ResolutionStatus::Incomplete : ResolutionStatus::Resolved),
+           "supplemental references must retain valid targets and report their own typed outcome");
+    expect(wrongType ? collection.issues.front().code == "wrong-type-misc" : collection.issues.empty(),
+           "supplemental references must diagnose an asset of the wrong type");
+    expect(bindCollection(before, collection.id).collection.has_value(),
+           "supplemental errors must not prevent audio preparation");
+    session.removeAssets(collection.members.miscAssets);
+    const auto after = session.snapshot();
+    const auto* updated = after.collection(collection.id);
+    expect(updated != nullptr && updated->members.sequence == collection.members.sequence &&
+               updated->members.miscAssets.empty() && updated->issues.front().code == "missing-misc" &&
+               updated->resolutionStatus() == ResolutionStatus::Incomplete &&
+               bindCollection(after, updated->id).collection.has_value(),
+           "removing an inspection asset must retain the sequence's identity and report the missing reference");
+    expect(collection.members.miscAssets.size() == 1, "earlier snapshots must retain their supplemental membership");
+  }
 }
 
 void sessionReconcilesCollectionsBySequenceIdentity() {

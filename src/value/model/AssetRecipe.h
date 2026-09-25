@@ -42,10 +42,7 @@ public:
     if (status_ == ResolutionStatus::Resolved) {
       status_ = ResolutionStatus::Incomplete;
     }
-    issues_.push_back({.impact = CollectionIssueImpact::Incomplete,
-                       .severity = Severity::Warning,
-                       .code = std::move(code),
-                       .message = std::move(message)});
+    issues_.push_back({.severity = Severity::Warning, .code = std::move(code), .message = std::move(message)});
     return *this;
   }
 
@@ -63,10 +60,8 @@ public:
   [[nodiscard]] static DependencySelection failed(std::string message) {
     DependencySelection result;
     result.status_ = ResolutionStatus::Failed;
-    result.issues_.push_back({.impact = CollectionIssueImpact::Incomplete,
-                              .severity = Severity::Error,
-                              .code = "dependency-resolution-failed",
-                              .message = std::move(message)});
+    result.issues_.push_back(
+        {.severity = Severity::Error, .code = "dependency-resolution-failed", .message = std::move(message)});
     return result;
   }
 

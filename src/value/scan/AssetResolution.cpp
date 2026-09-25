@@ -145,8 +145,7 @@ private:
           mode_ != ResolutionMode::Manual || std::ranges::find(selected(role), target.asset) != selected(role).end();
       if (!correctType || !allowed) {
         resolved.status = ResolutionStatus::Failed;
-        result_.issues.push_back({.impact = CollectionIssueImpact::Incomplete,
-                                  .severity = Severity::Error,
+        result_.issues.push_back({.severity = Severity::Error,
                                   .code = "invalid-dependency",
                                   .message = !correctType
                                                  ? "Asset dependency refers to a missing or wrong-type provider"

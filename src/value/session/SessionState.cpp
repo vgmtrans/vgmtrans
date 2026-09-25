@@ -300,15 +300,20 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
 void SessionState::validateMiscAssets(DesiredCollection& desired) {
   // Resolution already validates the sequence and audio providers. Supplemental
   // inspection assets are direct scanner references and can disappear separately.
+  if (desired.members.miscAssets.empty()) {
+    return;
+  }
+  ResolvedDependency supplemental{.owner = desired.members.sequence.value(), .role = DependencyRole::Supplemental};
   std::erase_if(desired.members.miscAssets, [&](AssetId id) {
     if (asset<MiscAsset>(id) != nullptr) {
+      supplemental.targets.push_back({id, {}});
       return false;
     }
+    supplemental.status = ResolutionStatus::Incomplete;
     const bool missing = !containsAsset(id);
     addError("Collection '" + desired.name + "' references misc asset id " + std::to_string(id.value) +
              (missing ? " that does not exist" : " that is not a misc asset"));
     desired.issues.push_back(CollectionIssue{
-        .impact = CollectionIssueImpact::Incomplete,
         .severity = Severity::Error,
         .code = missing ? "missing-misc" : "wrong-type-misc",
         .message = "Collection references " + std::string(missing ? "missing" : "wrong-type") + " misc asset " +
@@ -317,6 +322,7 @@ void SessionState::validateMiscAssets(DesiredCollection& desired) {
     });
     return true;
   });
+  desired.dependencies.push_back(std::move(supplemental));
 }
 
 void SessionState::rebuildViews() {

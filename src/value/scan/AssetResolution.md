@@ -64,6 +64,15 @@ failure. Diagnostics explain these outcomes; their code strings do not control
 export. Akao's coverage selection and Tamsoft's first-choice fallback retain their
 native policies through these operations.
 
+Each resolved relationship owns its status. `Collection::resolutionStatus()`
+derives the summary using the precedence `Failed > Ambiguous > Incomplete > Resolved`;
+export checks that same summary before preparation. `CollectionIssue` contains only
+diagnostic information: changing a message, code, or severity, or removing the
+diagnostic, cannot change the outcome. A resolved collection can carry warnings;
+an incomplete or ambiguous collection may still have usable selected inputs.
+Resolution status describes matching, not whether later preparation or rendering
+will succeed.
+
 Selection examines immutable assets. It must not mutate format state, construct
 collections, or capture borrowed pointers in its result. Asset IDs and owned
 `AssetPrivateData` placements survive the temporary catalog.
@@ -137,6 +146,9 @@ bank. Standalone bank preparation has no sequence assignment.
   across song tables before publication, preserving the first entry's name.
 - Banks and sample pools remain assets without generating synthetic collections.
   `bindSoundBank` resolves and prepares a standalone bank's own dependencies.
+- Supplemental inspection references have their own recorded outcome. Missing or
+  wrong-type references are omitted from membership and make the collection
+  incomplete, preserving audio preparation despite their error diagnostics.
 - Each owner has one ordered input list for its dependency role. Multiple requests
   combine into that list, preserving unresolved outcomes and alternatives. Bank
   inputs deduplicate assets; sample inputs preserve distinct placements within

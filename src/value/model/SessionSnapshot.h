@@ -49,7 +49,7 @@ struct Collection {
   std::vector<ResolvedDependency> dependencies;
 
   [[nodiscard]] bool isDiscovered() const noexcept { return origin == CollectionOrigin::Discovered; }
-  [[nodiscard]] CollectionIssueImpact issueImpact() const noexcept;
+  [[nodiscard]] ResolutionStatus resolutionStatus() const noexcept;
 };
 
 // Copyable read-only view of one Session revision. Copies share immutable
