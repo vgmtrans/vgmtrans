@@ -4,8 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/NamcoSnes/NamcoSnes.h"
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
 
+#include "value/formats/NamcoSnes/NamcoSnes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/SnesDsp.h"
 
@@ -21,23 +23,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::namco_snes;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
-
-template <class Event>
-std::vector<const Event*> events(const PerformanceTrack& track) {
-  std::vector<const Event*> result;
-  for (const PerformanceEvent& event : track.events) {
-    if (const auto* typed = std::get_if<Event>(&event)) {
-      result.push_back(typed);
-    }
-  }
-  return result;
-}
 
 class DriverFixture {
 public:
@@ -172,29 +157,29 @@ void interleavedRuntimePreservesDynamicDriverFeatures() {
   expect(performance.diagnostics.empty() && performance.tracks.size() == kTrackCount,
          "the physical stream should render as eight source voices without diagnostics");
 
-  const auto voice0Notes = events<NotePerformanceEvent>(performance.tracks[0]);
-  const auto voice1Notes = events<NotePerformanceEvent>(performance.tracks[1]);
+  const auto voice0Notes = eventsOfType<NotePerformanceEvent>(performance.tracks[0]);
+  const auto voice1Notes = eventsOfType<NotePerformanceEvent>(performance.tracks[1]);
   expect(voice0Notes.size() == 4 && voice1Notes.size() == 1 && voice1Notes.front()->header.tick == 2,
          "masked notes, percussion, noise, rests, and delayed note-on should retain driver timing");
   expect(voice0Notes[1]->durationTicks == 3 && voice0Notes[2]->durationTicks == 3,
          "gate values should latch on attack and release after value-plus-one driver ticks");
 
-  const auto envelopes = events<EnvelopePerformanceEvent>(performance.tracks[0]);
+  const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(performance.tracks[0]);
   expect(!envelopes.empty() && envelopes.front()->update.values &&
              std::abs(*envelopes.front()->update.values->releaseSeconds -
                       snesDspGainEnvelopeSeconds(0xaa, 0x7ff, 0)) < 0.000001,
          "sequence-selected ADSR should retain its separate GAIN release rate");
-  const auto pitchTable = events<PitchBendPerformanceEvent>(performance.tracks[0]);
+  const auto pitchTable = eventsOfType<PitchBendPerformanceEvent>(performance.tracks[0]);
   expect(!pitchTable.empty() &&
              std::ranges::all_of(pitchTable, [](const PitchBendPerformanceEvent* event) {
                return event->layer != kPrimaryPitchBendLayer;
              }) &&
              !performance.tracks[0].automations.empty(),
          "pitch tables should remain independent of the track's musical slides");
-  expect(events<PitchBendRangePerformanceEvent>(performance.tracks[0]).empty(),
+  expect(eventsOfType<PitchBendRangePerformanceEvent>(performance.tracks[0]).empty(),
          "physical pitch-table values should not emit exporter-specific bend ranges");
 
-  const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks[0]);
+  const auto instruments = eventsOfType<InstrumentPerformanceEvent>(performance.tracks[0]);
   expect(std::ranges::any_of(instruments,
                              [](const InstrumentPerformanceEvent* event) {
                                return event->instrument == InstrumentSelection{InstrumentAddress{127, 0}};
@@ -206,7 +191,7 @@ void interleavedRuntimePreservesDynamicDriverFeatures() {
                                  }),
          "percussion and DSP noise should remain distinct from melodic SRCN instruments");
 
-  const auto reverb = events<ReverbPerformanceEvent>(performance.tracks[0]);
+  const auto reverb = eventsOfType<ReverbPerformanceEvent>(performance.tracks[0]);
   expect(reverb.size() == 6 && reverb.back()->leftGain == 0.5 && reverb.back()->rightGain == 0.5 &&
              reverb.back()->delayMilliseconds == 48.0 && reverb.back()->feedback == -1.0 &&
              reverb.back()->filterIndex == 2 && reverb.back()->voiceMask == 3,
@@ -217,8 +202,8 @@ void percussionPitchMappingIsAppliedExactlyOnce() {
   DriverFixture fixture(Version::WagyanParadise);
   fixture.sequence({0x00, 1, 0x01, 0x80, 0x25, 0x80, 0xfe, 0x26, 0x80, 0x80, 0x09, 0x80, 0x80, 0x03});
   const PerformanceSequence performance = render(fixture);
-  const auto notes = events<NotePerformanceEvent>(performance.tracks[0]);
-  const auto tunings = events<TuningPerformanceEvent>(performance.tracks[0]);
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks[0]);
+  const auto tunings = eventsOfType<TuningPerformanceEvent>(performance.tracks[0]);
 
   expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->key == 0 && tunings.size() == 1 &&
              std::abs(tunings.front()->cents + 150.0) < 0.000001,
@@ -228,7 +213,7 @@ void percussionPitchMappingIsAppliedExactlyOnce() {
 void pitchTableIndexUsesSpcAccumulatorWrapping() {
   DriverFixture fixture(Version::WagyanParadise);
   fixture.sequence({0x00, 1, 0x01, 0x80, 0x24, 0x80, 0x80, 0x09, 0x80, 0x30, 0x03});
-  const auto bends = events<PitchBendPerformanceEvent>(render(fixture).tracks[0]);
+  const auto bends = eventsOfType<PitchBendPerformanceEvent>(render(fixture).tracks[0]);
 
   expect(bends.size() == 1 && bends.front()->semitones == 0.0,
          "pitch table index $80 should alias index zero like the driver's eight-bit ASL A");
@@ -240,8 +225,8 @@ void attacksFollowThePhysicalVoiceLifecycle() {
                     0x09, 0x80, 0x31, 0x0c, 0x80, 0x09, 0x80, 0x31, 0x0c, 0x00,
                     0x09, 0x80, 0x54, 0x03});
   const PerformanceSequence performance = render(fixture);
-  const auto notes = events<NotePerformanceEvent>(performance.tracks[0]);
-  const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks[0]);
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks[0]);
+  const auto instruments = eventsOfType<InstrumentPerformanceEvent>(performance.tracks[0]);
 
   expect(performance.diagnostics.empty() && instruments.size() == 1 && notes.size() == 3 &&
              notes[0]->header.tick == 2 &&
@@ -256,9 +241,9 @@ void everyTriggerLatchesLiveVoiceControls() {
                     0x21, 0x80, 0x40, 0x23, 0x80, 2,    0x0c, 0x80, 0x09, 0x80, 0x31,
                     0x21, 0x80, 0xa0, 0x09, 0x80, 0x54, 0x03});
   const PerformanceSequence performance = render(fixture);
-  const auto notes = events<NotePerformanceEvent>(performance.tracks[0]);
-  const auto levels = events<LevelPerformanceEvent>(performance.tracks[0]);
-  const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks[0]);
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks[0]);
+  const auto levels = eventsOfType<LevelPerformanceEvent>(performance.tracks[0]);
+  const auto instruments = eventsOfType<InstrumentPerformanceEvent>(performance.tracks[0]);
 
   expect(performance.diagnostics.empty() && notes.size() == 2 && notes[1]->key == 0x31 + 12,
          "a slur trigger should latch pitch controls");
@@ -292,13 +277,13 @@ void bothRepeatCountersFollowTheSharedIncrementRules() {
   fixture.sequence({0x00, 1,    0x04, 1,    0x01, 0x80, 0x09, 0x80, 0x30, 0x06, 3,    0x06,
                     0x20, 0x03});
   const PerformanceSequence repeat = render(fixture);
-  expect(repeat.diagnostics.empty() && events<NotePerformanceEvent>(repeat.tracks[0]).size() == 3,
+  expect(repeat.diagnostics.empty() && eventsOfType<NotePerformanceEvent>(repeat.tracks[0]).size() == 3,
          "repeat-until should increment before comparison and preserve its finite driver count");
 
   fixture.sequence({0x00, 1,    0x04, 1,    0x01, 0x80, 0x09, 0x80, 0x30, 0x07, 2,    0x10,
                     0x20, 0x08, 0x06, 0x20, 0x03});
   const PerformanceSequence repeatBreak = render(fixture);
-  expect(repeatBreak.diagnostics.empty() && events<NotePerformanceEvent>(repeatBreak.tracks[0]).size() == 2,
+  expect(repeatBreak.diagnostics.empty() && eventsOfType<NotePerformanceEvent>(repeatBreak.tracks[0]).size() == 2,
          "repeat-break should share its slot counter, branch on equality, and reset it when taken");
 }
 

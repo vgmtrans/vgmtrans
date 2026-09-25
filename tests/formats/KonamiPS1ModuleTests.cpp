@@ -4,12 +4,14 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/KonamiPS1/KonamiPS1.h"
-#include "value/formats/SonyPS1/SonyPS1.h"
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
 
 #include "value/export/CollectionBinding.h"
-#include "value/session/Session.h"
+#include "value/formats/KonamiPS1/KonamiPS1.h"
+#include "value/formats/SonyPS1/SonyPS1.h"
 #include "value/sequence/SequenceVm.h"
+#include "value/session/Session.h"
 #include "value/synth/PsxSpu.h"
 
 #include <algorithm>
@@ -26,12 +28,6 @@ namespace {
 
 constexpr u16 kAzureDreamsCounterTarget = 0x1c00;
 constexpr u16 kSuikoden2CounterTarget = 0x1ca0;
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void le16(std::vector<u8>& bytes, size_t offset, u16 value) {
   bytes[offset] = static_cast<u8>(value);
@@ -80,17 +76,6 @@ std::vector<u8> fixedKdt(std::vector<u8> track) {
   le16(bytes, 0x10, static_cast<u16>(track.size()));
   std::ranges::copy(track, bytes.begin() + 0x50);
   return bytes;
-}
-
-template <class Event>
-std::vector<const Event*> eventsOfType(const PerformanceTrack& track) {
-  std::vector<const Event*> result;
-  for (const auto& value : track.events) {
-    if (const auto* event = std::get_if<Event>(&value)) {
-      result.push_back(event);
-    }
-  }
-  return result;
 }
 
 void layoutsUseAuditedSizesAndBothTableGenerations() {

@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/NeverlandSnes/NeverlandSnes.h"
-
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
 #include "ValueFormatTestSupport.h"
 
+#include "value/formats/NeverlandSnes/NeverlandSnes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 
@@ -23,12 +24,6 @@ using namespace vgmtrans::formats::neverland_snes;
 
 namespace {
 
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
-
 void writeLe16(std::vector<u8>& bytes, u32 offset, u16 value) {
   bytes[offset] = static_cast<u8>(value);
   bytes[offset + 1] = static_cast<u8>(value >> 8);
@@ -38,20 +33,9 @@ void writeBytes(std::vector<u8>& bytes, u32 offset, std::initializer_list<u8> va
   std::ranges::copy(values, bytes.begin() + offset);
 }
 
-template <class Event>
-std::vector<const Event*> events(const PerformanceTrack& track) {
-  std::vector<const Event*> result;
-  for (const PerformanceEvent& event : track.events) {
-    if (const auto* typed = std::get_if<Event>(&event)) {
-      result.push_back(typed);
-    }
-  }
-  return result;
-}
-
 std::vector<const ModulationPerformanceEvent*> modulationEvents(const PerformanceTrack& track,
                                                                 ModulationPerformanceTarget target) {
-  auto result = events<ModulationPerformanceEvent>(track);
+  auto result = eventsOfType<ModulationPerformanceEvent>(track);
   std::erase_if(result, [=](const ModulationPerformanceEvent* event) { return event->target != target; });
   return result;
 }
@@ -168,13 +152,13 @@ void playlistsCallSectionsAndRespectDialectTranspose() {
   writeBytes(bytes, 0x10, {0x3c, 4, 3, 0x7f, 0xfd});
   writeBytes(bytes, 0x20, {0xbd, 0xfd});
   const PerformanceSequence performance = render(bytes);
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 2 && notes[0]->key == 86.0 && notes[0]->header.tick == 0 &&
              notes[1]->key == 85.0 && notes[1]->header.tick == 4,
          "playlist entries should call sections, preserve note memory, and clear transpose at each FD");
 
   const PerformanceSequence original = render(std::move(bytes), runtimeLayout(Version::Original));
-  const auto originalNotes = events<NotePerformanceEvent>(original.tracks.front());
+  const auto originalNotes = eventsOfType<NotePerformanceEvent>(original.tracks.front());
   expect(original.diagnostics.empty() && originalNotes.size() == 2 && originalNotes[1]->key == 85.0,
          "the original driver should also clear playlist transpose at each FD");
 }
@@ -189,7 +173,7 @@ void playlistTransposeDoesNotLeakIntoLaterSections() {
 
   for (Version version : {Version::Original, Version::Modern}) {
     const PerformanceSequence performance = render(bytes, runtimeLayout(version));
-    const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+    const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
     expect(performance.diagnostics.empty() && notes.size() == 5 && notes[0]->key == 86.0 &&
                notes[1]->key == 84.0 && notes[2]->key == 84.0 && notes[3]->key == 89.0 &&
                notes[4]->key == 84.0,
@@ -203,7 +187,7 @@ void repeatFramesCanSpanSections() {
   writeBytes(bytes, 0x10, {0xfb, 0x3c, 1, 1, 0x7f, 0xfd});
   writeBytes(bytes, 0x20, {0xbd, 0xfc, 2, 0xfd});
   const PerformanceSequence performance = render(std::move(bytes));
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 4 && notes[0]->key == 84.0 && notes[1]->key == 85.0 &&
              notes[2]->key == 84.0 && notes[3]->key == 85.0 && notes.back()->header.tick == 3,
          "loop frames should restore the voice address and playlist cursor across section boundaries");
@@ -217,7 +201,7 @@ void reusedSectionsDoNotImplyLoops() {
   writeBytes(bytes, 0x30, {0x3e, 1, 1, 0x7f, 0xfc, 0});
 
   const PerformanceSequence performance = render(std::move(bytes));
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && performance.tracks.front().endTick == 4 && notes.size() == 4 &&
              notes[0]->key == 84.0 && notes[1]->key == 85.0 && notes[2]->key == 85.0 && notes[3]->key == 86.0,
          "reusing a section should not stop playback before the driver's explicit loop command");
@@ -229,7 +213,7 @@ void excessRepeatStartsAreIgnored() {
   writeBytes(bytes, 0x10, {0xfb, 0xfb, 0xfb, 0x3c, 1, 1, 0x7f, 0xfc, 1, 0xfc, 1, 0xfd});
 
   const PerformanceSequence performance = render(std::move(bytes));
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && performance.tracks.front().endTick == 1 && notes.size() == 1,
          "a third nested repeat start should be ignored, matching the driver's two-slot repeat stack");
 }
@@ -273,10 +257,10 @@ void modernEffectsRetainPhysicalDriverState() {
   const auto vibratoRate = modulationEvents(track, ModulationPerformanceTarget::VibratoRate);
   const auto tremolo = modulationEvents(track, ModulationPerformanceTarget::TremoloDepth);
   const auto tremoloRate = modulationEvents(track, ModulationPerformanceTarget::TremoloRate);
-  const auto envelopes = events<EnvelopePerformanceEvent>(track);
-  const auto reverbs = events<ReverbPerformanceEvent>(track);
-  const auto balances = events<StereoBalancePerformanceEvent>(track);
-  const auto tempos = events<TempoPerformanceEvent>(track);
+  const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(track);
+  const auto reverbs = eventsOfType<ReverbPerformanceEvent>(track);
+  const auto balances = eventsOfType<StereoBalancePerformanceEvent>(track);
+  const auto tempos = eventsOfType<TempoPerformanceEvent>(track);
 
   expect(performance.diagnostics.empty() && vibrato.size() >= 2 && vibrato.back()->context.shape &&
              vibrato.back()->context.shape->samples.size() == 256 && vibrato.back()->context.frequencyHz == 4.0 &&
@@ -304,7 +288,7 @@ void originalAdsrSiblingResetAndEnergyDriftAreAudited() {
   writeBytes(original, 0x10, {0xff, 0x0b, 0x07, 0xff, 0x0c, 0x05, 0xff, 0x0d, 3,
                               0xff, 0x0e, 0x1c, 0x3c, 4, 3, 0x7f, 0xfd});
   const PerformanceSequence early = render(std::move(original), runtimeLayout(Version::Original));
-  const auto earlyEnvelopes = events<EnvelopePerformanceEvent>(early.tracks.front());
+  const auto earlyEnvelopes = eventsOfType<EnvelopePerformanceEvent>(early.tracks.front());
   expect(early.diagnostics.empty() && earlyEnvelopes.size() == 8 && !earlyEnvelopes[0]->update.values &&
              earlyEnvelopes[0]->update.fields == EnvelopeFields::Decay &&
              earlyEnvelopes[2]->update.fields == EnvelopeFields::Attack &&
@@ -318,7 +302,7 @@ void originalAdsrSiblingResetAndEnergyDriftAreAudited() {
   writeBytes(drift, 0, {0x00, 0x10, 0xff});
   writeBytes(drift, 0x10, {0xff, 0x05, 4, 0x3c, 12, 12, 0x7f, 0xff, 0x07, 0, 0xfd});
   const PerformanceSequence moved = render(std::move(drift), energy);
-  const auto bends = events<PitchBendPerformanceEvent>(moved.tracks.front());
+  const auto bends = eventsOfType<PitchBendPerformanceEvent>(moved.tracks.front());
   expect(moved.diagnostics.empty() && std::ranges::any_of(bends, [](const PitchBendPerformanceEvent* event) {
            return event->semitones > 0.0;
          }),

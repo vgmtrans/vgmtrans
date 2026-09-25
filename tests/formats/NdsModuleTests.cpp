@@ -4,8 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/export/midi/PerformanceMidiRenderer.h"
 #include "../MidiTestSupport.h"
+#include "../TestSupport.h"
+#include "ValueFormatTestSupport.h"
+
+#include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/export/synth/ModulationScaling.h"
 #include "value/formats/NDS/Nds.h"
 #include "value/formats/NDS/NdsEnvelope.h"
@@ -14,8 +17,6 @@
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/SampleDecoder.h"
 #include "value/validation/SynthValidation.h"
-
-#include "ValueFormatTestSupport.h"
 
 #include <array>
 #include <cmath>
@@ -31,12 +32,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::nds;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 const SourceAnnotation* annotationWithKind(const SourceMap& sourceMap, SourceId source, SourceRole role,
                                            std::string_view category) {
@@ -1546,4 +1541,32 @@ void ndsSynthBuilderPreservesSparseWaveIndexesAcrossArchives() {
          "sparse SWAR source indexes must not leak into dense sample annotation owners");
   expect(result.sourceMap.ownedBy(ObjectRefs::region(bankRef->id(), 0, 0)).size() == 1,
          "NDS regions should retain stable instrument and region ownership");
+}
+
+void runNdsModuleTests() {
+  ndsLayoutResolvesNamesFilesAndDependencies();
+  ndsLayoutBoundsMalformedTablesAndPointers();
+  ndsSequenceFatRangesHandleNormalEmptyAndRecoveredFiles();
+  ndsModuleOnlyBuildsDependenciesOfReferencedBanks();
+  ndsSequenceDecodesAndRendersNoteWaitCommands();
+  ndsSequenceComposesPitchBendRangeBehavior();
+  ndsSequenceEmitsStickyDynamicAdsr();
+  ndsSequenceModelsNitroLfoRegisters();
+  ndsSynthModulatorsUseSequenceLfoRanges();
+  ndsSequenceRevealsRunningSineLfoAtDepthChange();
+  ndsSequencePreservesPortamentoTimingIntent();
+  ndsSequencePreservesTiedSweepVoices();
+  ndsSequenceExecutesCallAndReturn();
+  ndsSequenceDiscoversSecondaryTrackAddresses();
+  ndsSequenceTrackAddressDiscoveryKeepsMalformedBootstrapCommands();
+  ndsSequenceAnnotatesModulationDelayOperands();
+  ndsSequenceAnnotatesPartialModulationDelayOperands();
+  ndsSequenceKeepsEmptyPlaceholderTrack();
+  ndsSequenceMarksUnterminatedVarLenAsTruncated();
+  ndsSequenceDoesNotLinkInvalidControlTargets();
+  ndsMalformedRecoveryKeepsExecutableJumps();
+  ndsSynthParserConvertsMaximumReleaseRate();
+  ndsSynthParserDerivesAdpcmLengthsSafely();
+  ndsWaveArchiveReportsTruncatedSampleHeaders();
+  ndsSynthBuilderPreservesSparseWaveIndexesAcrossArchives();
 }

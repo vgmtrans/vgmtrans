@@ -10,12 +10,7 @@
 #include <iostream>
 #include <string_view>
 
-void hosaSequencePreservesAuditedGrammarAndMixer();
-void hosaVibratoUsesExactDriverTables();
-void hosaUnterminatedFinalTrackStopsAtZeroPadding();
-void hosaTracksMayShareSequenceData();
-void hosaSequenceLoopRestoresEveryTrack();
-void hosaModuleBuildsDriverAccurateRegions();
+void runHOSAModuleTests();
 
 int main(int argc, char** argv) {
   try {
@@ -30,12 +25,7 @@ int main(int argc, char** argv) {
       }
       return vgmtrans::tests::scanValueFormatArchive(argv[1], corpus);
     }
-    hosaSequencePreservesAuditedGrammarAndMixer();
-    hosaVibratoUsesExactDriverTables();
-    hosaUnterminatedFinalTrackStopsAtZeroPadding();
-    hosaTracksMayShareSequenceData();
-    hosaSequenceLoopRestoresEveryTrack();
-    hosaModuleBuildsDriverAccurateRegions();
+    runHOSAModuleTests();
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
     return 1;

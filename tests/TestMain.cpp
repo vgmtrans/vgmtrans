@@ -7,13 +7,14 @@
 #include <exception>
 #include <iostream>
 
-void runCompileSnesModuleTests();
+// CMake supplies the suite function for test files without a corpus CLI.
+void VGMTRANS_TEST_SUITE();
 
 int main() {
   try {
-    runCompileSnesModuleTests();
+    VGMTRANS_TEST_SUITE();
   } catch (const std::exception& error) {
-    std::cerr << "CompileSnes tests failed: " << error.what() << '\n';
+    std::cerr << error.what() << '\n';
     return 1;
   }
   return 0;

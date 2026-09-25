@@ -4,8 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/HeartBeatSnes/HeartBeatSnes.h"
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
 
+#include "value/formats/HeartBeatSnes/HeartBeatSnes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 #include "value/synth/SnesDsp.h"
@@ -24,26 +26,9 @@ using namespace vgmtrans::formats::heartbeat_snes;
 
 namespace {
 
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
-
-template <class Event>
-std::vector<const Event*> events(const PerformanceTrack& track) {
-  std::vector<const Event*> result;
-  for (const PerformanceEvent& event : track.events) {
-    if (const auto* typed = std::get_if<Event>(&event)) {
-      result.push_back(typed);
-    }
-  }
-  return result;
-}
-
 std::vector<const ModulationPerformanceEvent*> modulationEvents(const PerformanceTrack& track,
                                                                 ModulationPerformanceTarget target) {
-  auto result = events<ModulationPerformanceEvent>(track);
+  auto result = eventsOfType<ModulationPerformanceEvent>(track);
   std::erase_if(result, [=](const ModulationPerformanceEvent* event) { return event->target != target; });
   return result;
 }
@@ -198,9 +183,9 @@ void scannerBuildsAuditedDynamicInstruments() {
 void noteGatesLegatoAndMixingMatchTheDriver() {
   const PerformanceSequence dq3 =
       render(Version::DragonQuest3, {0xde, 0xe3, 0x80, 0x08, 0x7f, 0x80, 0xd2, 0x82, 0xd3, 0xec, 0x00});
-  const auto notes = events<NotePerformanceEvent>(dq3.tracks.front());
-  const auto levels = events<LevelPerformanceEvent>(dq3.tracks.front());
-  const auto instruments = events<InstrumentPerformanceEvent>(dq3.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(dq3.tracks.front());
+  const auto levels = eventsOfType<LevelPerformanceEvent>(dq3.tracks.front());
+  const auto instruments = eventsOfType<InstrumentPerformanceEvent>(dq3.tracks.front());
   const auto* legatoTransition =
       dq3.tracks.front().automations.empty() ? nullptr : pitchTransitionIntent(dq3.tracks.front().automations.front());
   const double defaultMaster = std::pow(0xc0 / 255.0, 2.0);
@@ -215,13 +200,13 @@ void noteGatesLegatoAndMixingMatchTheDriver() {
 void versionedOpcodesConsumeTheirDriverOperands() {
   const PerformanceSequence dq6 =
       render(Version::DragonQuest6, {0xde, 0xaa, 0xbb, 0x08, 0x7f, 0x80, 0xec, 0x01, 0x02, 0x03, 0x00});
-  expect(dq6.diagnostics.empty() && events<NotePerformanceEvent>(dq6.tracks.front()).size() == 1,
+  expect(dq6.diagnostics.empty() && eventsOfType<NotePerformanceEvent>(dq6.tracks.front()).size() == 1,
          "DQ6 should consume the reserved DE/EC operands instead of treating them as DQ3 PMON toggles");
 }
 
 void programChangesRestoreThePatchEnvelope() {
   const PerformanceSequence program = render(Version::DragonQuest3, {0xd4, 3, 0x00});
-  const auto envelopes = events<EnvelopePerformanceEvent>(program.tracks.front());
+  const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(program.tracks.front());
   expect(envelopes.size() == 1 && !envelopes.front()->update.values &&
              envelopes.front()->update.fields == EnvelopeFields::All &&
              envelopes.front()->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks,
@@ -272,7 +257,7 @@ void echoCommandsPreserveDspState() {
   const PerformanceSequence echo = render(
       Version::DragonQuest3,
       {0xea, 0x40, 0xc0, 0xeb, 5, 0x80, 3, 0xee, 0xef, 0x34, 0x33, 0x00, 0xd9, 0xe5, 0x01, 0xfc, 0xeb, 0xed, 0x00});
-  const auto reverb = events<ReverbPerformanceEvent>(echo.tracks.front());
+  const auto reverb = eventsOfType<ReverbPerformanceEvent>(echo.tracks.front());
   expect(echo.diagnostics.empty() && reverb.size() == 6,
          "initial echo state and every echo command should emit portable reverb events");
   expect(reverb[2]->delayMilliseconds == 80.0 && reverb[2]->feedback == -1.0,
@@ -284,7 +269,7 @@ void echoCommandsPreserveDspState() {
 void dynamicAdsrUsesAuditedFieldSemantics() {
   const PerformanceSequence performance =
       render(Version::DragonQuest3, {0xf0, 0x6f, 0xa7, 0xf9, 0x03, 0x05, 0xf9, 0x06, 0x1a, 0xf9, 0x07, 0x1b, 0x00});
-  const auto envelopes = events<EnvelopePerformanceEvent>(performance.tracks.front());
+  const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && envelopes.size() == 4,
          "all complete and partial ADSR commands should emit envelope events");
   expect(envelopes[0]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks && envelopes[0]->update.values,
@@ -304,7 +289,7 @@ void extendedLoopsUseTheDriverRepeatCount() {
   // Repeat count 3 makes the conditional branch play the body three times.
   const PerformanceSequence loop =
       render(Version::DragonQuest3, {0xf9, 0x00, 3, 0x04, 0x7f, 0x80, 0xf9, 0x01, 3, 0, 0x00});
-  expect(loop.diagnostics.empty() && events<NotePerformanceEvent>(loop.tracks.front()).size() == 3,
+  expect(loop.diagnostics.empty() && eventsOfType<NotePerformanceEvent>(loop.tracks.front()).size() == 3,
          "the extended repeat counter should decrement and branch exactly like the SPC700 handler");
 }
 

@@ -4,9 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/ChunSnes/ChunSnes.h"
 #include "../MidiTestSupport.h"
+#include "../TestSupport.h"
+
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/formats/ChunSnes/ChunSnes.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <stdexcept>
@@ -19,12 +21,6 @@ namespace {
 using namespace vgmtrans;
 using namespace vgmtrans::core;
 using namespace vgmtrans::formats::chun_snes;
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 }  // namespace
 

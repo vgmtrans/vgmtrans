@@ -4,10 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/CompileSnes/CompileSnes.h"
 #include "../MidiTestSupport.h"
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
 
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/formats/CompileSnes/CompileSnes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 
@@ -23,12 +25,6 @@ using namespace vgmtrans::formats::compile_snes;
 
 namespace {
 
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
-
 void writeLe16(std::vector<u8>& bytes, u32 offset, u16 value) {
   bytes[offset] = static_cast<u8>(value);
   bytes[offset + 1] = static_cast<u8>(value >> 8);
@@ -36,17 +32,6 @@ void writeLe16(std::vector<u8>& bytes, u32 offset, u16 value) {
 
 void writeBytes(std::vector<u8>& bytes, u32 offset, std::initializer_list<u8> values) {
   std::ranges::copy(values, bytes.begin() + offset);
-}
-
-template <class Event>
-std::vector<const Event*> events(const PerformanceTrack& track) {
-  std::vector<const Event*> result;
-  for (const PerformanceEvent& event : track.events) {
-    if (const auto* typed = std::get_if<Event>(&event)) {
-      result.push_back(typed);
-    }
-  }
-  return result;
 }
 
 std::vector<u8> fixture(std::initializer_list<u8> score = {
@@ -181,13 +166,13 @@ void commandWidthsFollowEachDriverRevision() {
 void frameCurvesDynamicAdsrAndEchoRenderPhysically() {
   const PerformanceSequence performance = render(fixture());
   const PerformanceTrack& track = performance.tracks.front();
-  const auto notes = events<NotePerformanceEvent>(track);
-  const auto envelopes = events<EnvelopePerformanceEvent>(track);
-  const auto levels = events<LevelPerformanceEvent>(track);
-  const auto bends = events<PitchBendPerformanceEvent>(track);
-  const auto pans = events<StereoBalancePerformanceEvent>(track);
-  const auto reverbs = events<ReverbPerformanceEvent>(track);
-  const auto tempos = events<TempoPerformanceEvent>(track);
+  const auto notes = eventsOfType<NotePerformanceEvent>(track);
+  const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(track);
+  const auto levels = eventsOfType<LevelPerformanceEvent>(track);
+  const auto bends = eventsOfType<PitchBendPerformanceEvent>(track);
+  const auto pans = eventsOfType<StereoBalancePerformanceEvent>(track);
+  const auto reverbs = eventsOfType<ReverbPerformanceEvent>(track);
+  const auto tempos = eventsOfType<TempoPerformanceEvent>(track);
   expect(performance.diagnostics.empty() && performance.timebase.ppqn == 12 && notes.size() == 1 &&
              std::abs(notes.front()->key - 96.0) < 0.001 && notes.front()->durationTicks == 4 &&
              tempos.front()->microsecondsPerQuarter == 384000,
@@ -207,7 +192,7 @@ void frameCurvesDynamicAdsrAndEchoRenderPhysically() {
 void curveControlBytesAreComparedAsCommands() {
   std::vector<u8> releaseBytes = fixture({0x88, 0x01, 0x60, 0xde, 2, 0x00, 0xde, 4, 0x82});
   writeBytes(releaseBytes, 0x2500, {0x83, 1, 15, 0x80});
-  const auto releaseLevels = events<LevelPerformanceEvent>(render(releaseBytes).tracks.front());
+  const auto releaseLevels = eventsOfType<LevelPerformanceEvent>(render(releaseBytes).tracks.front());
   expect(std::ranges::any_of(releaseLevels, [](const LevelPerformanceEvent* level) { return level->header.tick >= 2; }),
          "curve command 83 should wait for note release and then continue the table");
 
@@ -216,20 +201,20 @@ void curveControlBytesAreComparedAsCommands() {
     writeBytes(resetBytes, 0x2500 + step * 2, {1, 31});
   }
   writeBytes(resetBytes, 0x2500 + 132, {0x82, 1, 15, 0x80});
-  const auto resetLevels = events<LevelPerformanceEvent>(render(resetBytes).tracks.front());
+  const auto resetLevels = eventsOfType<LevelPerformanceEvent>(render(resetBytes).tracks.front());
   expect(std::ranges::none_of(resetLevels, [](const LevelPerformanceEvent* level) { return level->header.tick != 0; }),
          "curve command 82 should restart the table even when it appears beyond offset 82");
 }
 
 void standaloneDurationsRepeatTheCurrentNoteAndGate() {
   const PerformanceSequence repeated = render(fixture({0x60, 0xdf, 0xdf, 0x82}));
-  const auto repeatedNotes = events<NotePerformanceEvent>(repeated.tracks.front());
+  const auto repeatedNotes = eventsOfType<NotePerformanceEvent>(repeated.tracks.front());
   expect(repeated.diagnostics.empty() && repeatedNotes.size() == 2 && repeatedNotes[0]->header.tick == 0 &&
              repeatedNotes[1]->header.tick == 4,
          "standalone duration opcodes should replay the current note instead of acting as metadata only");
 
   const PerformanceSequence gated = render(fixture({0x60, 0xf0, 2, 0x82}));
-  const auto gatedNotes = events<NotePerformanceEvent>(gated.tracks.front());
+  const auto gatedNotes = eventsOfType<NotePerformanceEvent>(gated.tracks.front());
   expect(gated.diagnostics.empty() && gatedNotes.size() == 1 && gatedNotes.front()->durationTicks == 2,
          "duration-table commands with a gate byte should preserve early key-off timing");
 }
@@ -240,7 +225,7 @@ void trackAndPercussionFlagsDoNotBecomeStereoPhase() {
   writeBytes(bytes, 0x2211, {0, 0, 0, 0, 0x20, 0, 0, 0x60});
 
   const PerformanceSequence performance = render(bytes);
-  const auto balances = events<StereoBalancePerformanceEvent>(performance.tracks.front());
+  const auto balances = eventsOfType<StereoBalancePerformanceEvent>(performance.tracks.front());
   expect(balances.size() >= 2 &&
              std::ranges::all_of(
                  balances, [](const auto* balance) { return balance->leftGain > 0.49 && balance->rightGain > 0.49; }),
@@ -253,7 +238,7 @@ void monoModeForcesCenterAndIgnoresStereoPhase() {
 
   const auto layout = findLayout(ByteReader(SourceId{306}, bytes));
   const PerformanceSequence performance = render(bytes);
-  const auto balances = events<StereoBalancePerformanceEvent>(performance.tracks.front());
+  const auto balances = eventsOfType<StereoBalancePerformanceEvent>(performance.tracks.front());
   expect(layout && !layout->stereoEnabled && !balances.empty() &&
              std::ranges::all_of(
                  balances, [](const auto* balance) { return balance->leftGain > 0.49 && balance->rightGain > 0.49; }),

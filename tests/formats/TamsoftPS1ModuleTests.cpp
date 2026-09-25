@@ -4,10 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/TamsoftPS1/TamsoftPS1.h"
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
 
-#include "value/session/Session.h"
+#include "value/formats/TamsoftPS1/TamsoftPS1.h"
 #include "value/sequence/SequenceVm.h"
+#include "value/session/Session.h"
 #include "value/synth/PsxSpu.h"
 
 #include <algorithm>
@@ -21,12 +23,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::tamsoft_ps1;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void le16(std::vector<u8>& bytes, size_t offset, u16 value) {
   bytes[offset] = static_cast<u8>(value);
@@ -72,17 +68,6 @@ std::vector<u8> bank(Generation generation) {
   bytes[0x810] = 0x11;
   bytes[0x811] = 1;
   return bytes;
-}
-
-template <class Event>
-std::vector<const Event*> events(const PerformanceTrack& track) {
-  std::vector<const Event*> found;
-  for (const auto& event : track.events) {
-    if (const auto* value = std::get_if<Event>(&event)) {
-      found.push_back(value);
-    }
-  }
-  return found;
 }
 
 void layoutsDistinguishDriverGenerationsAndPlayedTracks() {
@@ -140,19 +125,19 @@ void sequenceUsesAuditedMixerPitchReverbAndDelaySemantics() {
       SequenceVm(LoopPolicy::PlayOnce).render(parseSequence(reader, AssetId{304}, layouts.front()));
   expect(performance.diagnostics.empty() && performance.tracks.size() == 1,
          "audited Tamsoft fixture should render one clean driver voice");
-  const auto levels = events<LevelPerformanceEvent>(performance.tracks.front());
-  const auto balances = events<StereoBalancePerformanceEvent>(performance.tracks.front());
+  const auto levels = eventsOfType<LevelPerformanceEvent>(performance.tracks.front());
+  const auto balances = eventsOfType<StereoBalancePerformanceEvent>(performance.tracks.front());
   expect(levels.size() == 2 && std::abs(levels.back()->linearGain - 6400.0 / 16383.0) < 0.000001,
          "E0 should retain the SPU register's 0x3fff full-scale gain");
   expect(balances.size() == 2 && balances.back()->leftGain == 1.0 && balances.back()->rightGain == 0.5,
          "E1 should remain two independent gain lanes rather than an invented pan law");
 
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(notes.size() == 3 && std::abs(notes[0]->key - 48.0) < 0.001 &&
              std::abs(notes[1]->key - 60.0) < 0.001 && std::abs(notes[2]->key - 48.0) < 0.001 &&
              notes[1]->header.tick == 1 && notes[2]->header.tick == 2,
          "key, direct pitch change, and pitch retrigger should preserve the driver's attack behavior");
-  const auto reverbs = events<ReverbPerformanceEvent>(performance.tracks.front());
+  const auto reverbs = eventsOfType<ReverbPerformanceEvent>(performance.tracks.front());
   expect(reverbs.size() == 4 && reverbs[1]->send == 0.5 && reverbs.back()->filterIndex == 3,
          "track routing, signed depth, and reverb mode should remain explicit");
 
@@ -161,7 +146,7 @@ void sequenceUsesAuditedMixerPitchReverbAndDelaySemantics() {
   const auto zeroLayout = readSequenceLayouts(zeroReader);
   const auto zeroPerformance =
       SequenceVm(LoopPolicy::PlayOnce).render(parseSequence(zeroReader, AssetId{305}, zeroLayout.front()));
-  expect(events<NotePerformanceEvent>(zeroPerformance.tracks.front()).front()->header.tick == 65'536,
+  expect(eventsOfType<NotePerformanceEvent>(zeroPerformance.tracks.front()).front()->header.tick == 65'536,
          "a zero delta should reproduce the signed 16-bit counter's 65,536-tick wrap");
 }
 
@@ -179,9 +164,9 @@ void externalChannelBecomesAnInheritedDelayedTrack() {
   expect(program.tracks.size() == 2, "a forward F9 should materialize one cloned driver voice");
   const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
   expect(performance.tracks.size() == 2 &&
-             events<NotePerformanceEvent>(performance.tracks[1]).front()->header.tick == 3,
+             eventsOfType<NotePerformanceEvent>(performance.tracks[1]).front()->header.tick == 3,
          "the cloned voice should begin at the spawn tick and execute its relative target");
-  const auto cloneLevels = events<LevelPerformanceEvent>(performance.tracks[1]);
+  const auto cloneLevels = eventsOfType<LevelPerformanceEvent>(performance.tracks[1]);
   expect(!cloneLevels.empty() && std::abs(cloneLevels.front()->linearGain - 6400.0 / 16383.0) < 0.000001,
          "F9 should inherit the source voice's current mixer state");
 }

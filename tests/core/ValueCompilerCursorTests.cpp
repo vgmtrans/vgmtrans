@@ -4,10 +4,18 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "ValueTestSupport.h"
+#include "../TestSupport.h"
+#include "SequenceTestSupport.h"
 
+#include "value/base/LevelScale.h"
+#include "value/scan/ScanTypes.h"
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompilerCursor.h"
+
+#include <algorithm>
+#include <array>
+
+using namespace vgmtrans::core;
 
 namespace {
 
@@ -582,13 +590,8 @@ void compilerCursorExecutesEligibleCommandsDuringWaits() {
              std::get<ExpressionPerformanceEvent>(boundaryEvents[2]).header.tick == 2,
          "the VM should poll once when a wait begins and resume ordinary command execution at its final boundary");
 
-  bool rejectedWait = false;
-  try {
-    static_cast<void>(render({0x2a, 0x00, 0x50, 0x02, 0x2c, 0xff}));
-  } catch (const std::logic_error&) {
-    rejectedWait = true;
-  }
-  expect(rejectedWait, "a command executed during another command's wait must remain a zero-time operation");
+  expectThrows<std::logic_error>([&] { static_cast<void>(render({0x2a, 0x00, 0x50, 0x02, 0x2c, 0xff})); },
+                                 "a command executed during another command's wait must remain a zero-time operation");
 }
 
 void compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior() {
@@ -616,22 +619,14 @@ void compilerCursorKeepsExactTargetOperandRoles() {
 }
 
 void compilerCursorRejectsConflictingDefaultFlowDeclarations() {
-  const auto decode = [](std::initializer_list<u8> source) {
-    const std::vector<u8> bytes(source);
-    return decodeProbeCommand(ByteReader(SourceId{18}, bytes), 0, static_cast<u32>(bytes.size()));
-  };
-
-  const auto rejects = [&](std::initializer_list<u8> source) {
-    try {
-      static_cast<void>(decode(source));
-      return false;
-    } catch (const std::logic_error&) {
-      return true;
-    }
-  };
-  expect(rejects({0x69, 0x00, 0x01, 0x00, 0x02}), "a command should reject a second default transition");
-  expect(rejects({0x6a, 0x00, 0x01}) && rejects({0x6b, 0x00, 0x01}),
-         "a default return should conflict with another default transition in either declaration order");
+  for (const auto& bytes : {std::vector<u8>{0x69, 0x00, 0x01, 0x00, 0x02}, std::vector<u8>{0x6a, 0x00, 0x01},
+                            std::vector<u8>{0x6b, 0x00, 0x01}}) {
+    expectThrows<std::logic_error>(
+        [&] {
+          static_cast<void>(decodeProbeCommand(ByteReader(SourceId{18}, bytes), 0, static_cast<u32>(bytes.size())));
+        },
+        "a command must reject competing default transitions, regardless of declaration order");
+  }
 }
 
 void compilerCursorRejectsConflictingComposedFlow() {
@@ -651,13 +646,8 @@ void compilerCursorRejectsConflictingComposedFlow() {
       .tracks = {track},
   };
 
-  bool rejected = false;
-  try {
-    static_cast<void>(SequenceVm().render(program));
-  } catch (const std::logic_error&) {
-    rejected = true;
-  }
-  expect(rejected, "one compiled source command should not produce multiple control-flow results");
+  expectThrows<std::logic_error>([&] { static_cast<void>(SequenceVm().render(program)); },
+                                 "one compiled source command should not produce multiple control-flow results");
 }
 
 void compilerCursorAnalysisStopsAfterItsScheduledPrepass() {

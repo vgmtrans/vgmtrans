@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "../TestSupport.h"
+
 #include "value/export/CollectionBinding.h"
 #include "value/extractors/PsfExtractor.h"
 #include "value/formats/SquarePS2/SquarePS2.h"
@@ -29,12 +31,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::square_ps2;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void le16(std::vector<u8>& bytes, size_t offset, u16 value) {
   bytes[offset] = static_cast<u8>(value);

@@ -4,9 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "../PerformanceTestSupport.h"
+
 #include "value/formats/HOSA/HOSA.h"
 #include "value/formats/HOSA/HOSALfo.h"
-
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 #include "value/synth/PsxSpu.h"
@@ -73,15 +74,6 @@ std::vector<u8> multiTrackFixture(const std::vector<std::vector<u8>>& tracks) {
     cursor += static_cast<u32>(tracks[i].size());
   }
   return bytes;
-}
-
-template <class Event>
-std::vector<const Event*> eventsOfType(const PerformanceTrack& track) {
-  std::vector<const Event*> events;
-  for (const auto& value : track.events) {
-    if (const auto* event = std::get_if<Event>(&value)) events.push_back(event);
-  }
-  return events;
 }
 
 std::vector<u8> scannerFixture() {
@@ -333,4 +325,13 @@ void hosaModuleBuildsDriverAccurateRegions() {
          "region tuning should preserve the driver's seven-bit pitch wrap");
   expect(std::abs(std::pow(10.0, -wrappedRegion.attenuationDb / 20.0) - 110.0 / 127.0) < 1e-12,
          "the Serene Town drum-region volume should remain a linear 110/127 amplitude factor");
+}
+
+void runHOSAModuleTests() {
+  hosaSequencePreservesAuditedGrammarAndMixer();
+  hosaVibratoUsesExactDriverTables();
+  hosaUnterminatedFinalTrackStopsAtZeroPadding();
+  hosaTracksMayShareSequenceData();
+  hosaSequenceLoopRestoresEveryTrack();
+  hosaModuleBuildsDriverAccurateRegions();
 }

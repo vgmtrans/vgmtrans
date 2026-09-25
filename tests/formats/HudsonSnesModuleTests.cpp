@@ -4,8 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/HudsonSnes/HudsonSnes.h"
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
 
+#include "value/formats/HudsonSnes/HudsonSnes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 #include "value/synth/SnesDsp.h"
@@ -29,12 +31,6 @@ using namespace vgmtrans::formats::hudson_snes;
 
 namespace {
 
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
-
 void writeLe16(std::vector<u8>& bytes, u32 offset, u16 value) {
   bytes[offset] = static_cast<u8>(value);
   bytes[offset + 1] = static_cast<u8>(value >> 8);
@@ -52,17 +48,6 @@ void writeBytes(std::vector<u8>& bytes, u32 offset, std::initializer_list<u8> va
 void appendBytes(std::vector<u8>& bytes, u32& cursor, std::initializer_list<u8> values) {
   writeBytes(bytes, cursor, values);
   cursor += values.size();
-}
-
-template <class Event>
-std::vector<const Event*> events(const PerformanceTrack& track) {
-  std::vector<const Event*> result;
-  for (const PerformanceEvent& event : track.events) {
-    if (const auto* typed = std::get_if<Event>(&event)) {
-      result.push_back(typed);
-    }
-  }
-  return result;
 }
 
 template <class Timing>
@@ -180,7 +165,7 @@ void earlyGateReleaseStateMachineMatchesSuperBomberman2() {
   instruments.recipes.instruments.front().gain = 0x8a;
   const PerformanceSequence performance =
       render(Version::Early, 1, false, {0xd5, 8, 0x40, 3, 0x40, 3, 0xff}, std::move(instruments));
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 2 && notes[0]->header.tick == 0 &&
              notes[0]->durationTicks == 4 && notes[1]->header.tick == 6 && notes[1]->durationTicks == 4,
          "Hudson early quantize 8 should raise KOF on the penultimate driver tick");
@@ -193,8 +178,8 @@ void earlyGateReleaseStateMachineMatchesSuperBomberman2() {
 
   const PerformanceSequence shortened = render(
       Version::Early, 0, false, {0xd5, 4, 0x40, 8, 0xd5, 7, 0x40, 8, 0xd5, 0, 0x40, 8, 0xd5, 0x80, 0x40, 8, 0xff});
-  const auto shortenedNotes = events<NotePerformanceEvent>(shortened.tracks.front());
-  const auto envelopes = events<EnvelopePerformanceEvent>(shortened.tracks.front());
+  const auto shortenedNotes = eventsOfType<NotePerformanceEvent>(shortened.tracks.front());
+  const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(shortened.tracks.front());
   expect(shortened.diagnostics.empty() && shortenedNotes.size() == 4 && shortenedNotes[0]->durationTicks == 5 &&
              shortenedNotes[1]->durationTicks == 7 && shortenedNotes[2]->durationTicks == 1 &&
              shortenedNotes[3]->durationTicks == 1 && envelopes.size() == 3,
@@ -239,8 +224,8 @@ void headerDecodesEveryVersionTwoRecipe() {
       reader, Layout{.version = Version::V2, .sequenceHeaderAddress = 0x100, .noteLengthTableAddress = 0x340},
       AssetId{155});
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
-  const auto reverbs = events<ReverbPerformanceEvent>(performance.tracks.front());
-  const auto levels = events<LevelPerformanceEvent>(performance.tracks.front());
+  const auto reverbs = eventsOfType<ReverbPerformanceEvent>(performance.tracks.front());
+  const auto levels = eventsOfType<LevelPerformanceEvent>(performance.tracks.front());
   const ReverbPerformanceEvent* reverb = reverbs.empty() ? nullptr : reverbs.back();
   const std::string echoDetail = reverb == nullptr
                                      ? " (no reverb event)"
@@ -279,15 +264,15 @@ void earlyHeaderGrammarSupportsBothInstrumentLengths() {
 
 void v2VolumeUsesThePostVelocityMixerCurve() {
   const PerformanceSequence relative = render(Version::V2, 2, false, {0xd9, 51, 0xdc, 0xf6, 0xff});
-  const auto levels = events<LevelPerformanceEvent>(relative.tracks.front());
+  const auto levels = eventsOfType<LevelPerformanceEvent>(relative.tracks.front());
   expect(relative.diagnostics.empty() && levels.size() >= 2 &&
              std::abs(levels[levels.size() - 2]->linearGain - 26.0 / 128.0) < 0.000001 &&
              std::abs(levels.back()->linearGain - 14.0 / 128.0) < 0.000001,
          "Super Bomberman 5 DC F6 should map 51 -> 41 through the 2.x mixer curve (26 -> 14)");
 
   const PerformanceSequence velocity = render(Version::V2, 2, true, {0xd9, 51, 0x10, 6, 63, 0xff});
-  const auto velocityLevels = events<LevelPerformanceEvent>(velocity.tracks.front());
-  const auto notes = events<NotePerformanceEvent>(velocity.tracks.front());
+  const auto velocityLevels = eventsOfType<LevelPerformanceEvent>(velocity.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(velocity.tracks.front());
   expect(velocity.diagnostics.empty() && !velocityLevels.empty() && notes.size() == 1 &&
              std::abs(notes.front()->linearVelocity - 0.5) < 0.000001 &&
              std::abs(velocityLevels.back()->linearGain * notes.front()->linearVelocity - 6.0 / 128.0) < 0.000001,
@@ -298,10 +283,10 @@ void v2PlaybackUsesAuditedTempoLfosAndDynamicAdsr() {
   const PerformanceSequence performance = render(
       Version::V2, 2, true, {0xd1, 120,  0xe2, 64, 32,   0,    0xe3, 2,    0xf2, 2,    0xfe, 0x1a, 0x0f, 0xfe, 0x1b,
                              7,    0xfe, 0x1c, 3,  0xfe, 0x1d, 0x12, 0xfe, 0x1e, 0x08, 0x10, 6,    63,   0xff});
-  const auto tempos = events<TempoPerformanceEvent>(performance.tracks.front());
-  const auto modulation = events<ModulationPerformanceEvent>(performance.tracks.front());
-  const auto envelopes = events<EnvelopePerformanceEvent>(performance.tracks.front());
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto tempos = eventsOfType<TempoPerformanceEvent>(performance.tracks.front());
+  const auto modulation = eventsOfType<ModulationPerformanceEvent>(performance.tracks.front());
+  const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   const auto tremolo = std::ranges::find_if(modulation, [](const ModulationPerformanceEvent* event) {
     return event->target == ModulationPerformanceTarget::TremoloDepth && event->volumeDepthLinearGain;
   });
@@ -317,17 +302,17 @@ void conditionalDispatchAndEarlyOperandLayoutsMatchTheDriver() {
   const PerformanceSequence conditional =
       render(Version::V2, 2, true, {0xfe, 0x10, 0x00, 0x05, 0xfe, 0x12, 0x00, 0x05, 0xfe, 0x14,
                                     0x10, 0x00, 0x10, 0x01, 0x7f, 0xff, 0x20, 0x01, 0x7f, 0xff});
-  const auto conditionalNotes = events<NotePerformanceEvent>(conditional.tracks.front());
+  const auto conditionalNotes = eventsOfType<NotePerformanceEvent>(conditional.tracks.front());
   expect(conditional.diagnostics.empty() && conditionalNotes.size() == 1 && conditionalNotes.front()->key == 25.0,
          "subcommand 14 should jump when Z is set because the SPC dispatch BNE skips the embedded goto");
 
   const PerformanceSequence early = render(Version::Early, 0, false, {0xf1, 0x10, 0x01, 0xff});
-  const auto earlyNotes = events<NotePerformanceEvent>(early.tracks.front());
+  const auto earlyNotes = eventsOfType<NotePerformanceEvent>(early.tracks.front());
   expect(early.diagnostics.empty() && earlyNotes.size() == 1 && earlyNotes.front()->durationTicks == 1,
          "early-driver F1 must remain operandless and a custom one-tick duration must not use table alternation");
 
   const PerformanceSequence directQuantize = render(Version::V2, 0, false, {0xd5, 0x80, 0x10, 1, 0xff});
-  const auto directNotes = events<NotePerformanceEvent>(directQuantize.tracks.front());
+  const auto directNotes = eventsOfType<NotePerformanceEvent>(directQuantize.tracks.front());
   expect(directQuantize.diagnostics.empty() && directNotes.size() == 1 && directNotes.front()->durationTicks == 1,
          "direct quantize zero should preserve the driver's zero gate instead of inventing a 256-tick wrap");
 }
@@ -350,8 +335,8 @@ void customPitchAttackAndPercussionPreserveDriverCurvesAndMixerRows() {
   ParsedHeader drums = runtimeData();
   drums.recipes.drums.push_back(DrumSlot{.note = 24, .sourceProgram = 0, .sourceKey = 60, .volume = 32, .pan = 0});
   const PerformanceSequence percussion = render(Version::V2, 2, false, {0xfe, 0x03, 0x10, 6, 0xff}, std::move(drums));
-  const auto levels = events<LevelPerformanceEvent>(percussion.tracks.front());
-  const auto balances = events<StereoBalancePerformanceEvent>(percussion.tracks.front());
+  const auto levels = eventsOfType<LevelPerformanceEvent>(percussion.tracks.front());
+  const auto balances = eventsOfType<StereoBalancePerformanceEvent>(percussion.tracks.front());
   expect(percussion.diagnostics.empty() && !levels.empty() && !balances.empty() &&
              std::abs(levels.back()->linearGain - 9.0 / 128.0) < 0.000001 && balances.back()->leftGain == 0.0 &&
              balances.back()->rightGain == 1.0,
@@ -362,8 +347,8 @@ void v1MixerAndPitchPipelineMatchesSuperBomberman3() {
   ParsedHeader drums = runtimeData();
   drums.recipes.drums.push_back(DrumSlot{.note = 24, .sourceProgram = 0, .sourceKey = 60, .volume = 0x80, .pan = 15});
   const PerformanceSequence percussion = render(Version::V1, 2, false, {0xfe, 0x03, 0x10, 6, 0xff}, std::move(drums));
-  const auto levels = events<LevelPerformanceEvent>(percussion.tracks.front());
-  const auto balances = events<StereoBalancePerformanceEvent>(percussion.tracks.front());
+  const auto levels = eventsOfType<LevelPerformanceEvent>(percussion.tracks.front());
+  const auto balances = eventsOfType<StereoBalancePerformanceEvent>(percussion.tracks.front());
   expect(percussion.diagnostics.empty() && !levels.empty() && !balances.empty() &&
              std::abs(levels.back()->linearGain - 128.0 / 255.0) < 0.000001 &&
              std::abs(levels.back()->linearGain * balances.back()->leftGain - 44.0 / 127.0) < 0.000001,
@@ -371,8 +356,8 @@ void v1MixerAndPitchPipelineMatchesSuperBomberman3() {
 
   const PerformanceSequence pitched =
       render(Version::V1, 2, false, {0xe2, 12, 6, 0xe3, 1, 0xe9, 127, 68, 1, 0xe9, 0, 0, 0, 0x18, 6, 0x20, 6, 0xff});
-  const auto notes = events<NotePerformanceEvent>(pitched.tracks.front());
-  const auto modulation = events<ModulationPerformanceEvent>(pitched.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(pitched.tracks.front());
+  const auto modulation = eventsOfType<ModulationPerformanceEvent>(pitched.tracks.front());
   const ModulationPerformanceEvent* vibrato = nullptr;
   for (const auto* event : modulation) {
     if (event->target == ModulationPerformanceTarget::VibratoDepth && event->context.pitchRangeSemitones &&
@@ -406,7 +391,7 @@ void pitchScriptsUseDriverDefaultsAndZeroMeans256Ticks() {
 
 void reversePhasePreservesSignedStereoGains() {
   const PerformanceSequence performance = render(Version::V2, 2, false, {0xda, 15, 0xdb, 3, 0x10, 6, 0xff});
-  const auto balances = events<StereoBalancePerformanceEvent>(performance.tracks.front());
+  const auto balances = eventsOfType<StereoBalancePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && !balances.empty() && balances.back()->leftGain < 0.0 &&
              balances.back()->rightGain < 0.0,
          "reverse-phase commands should retain signed left and right channel gains");
@@ -414,7 +399,7 @@ void reversePhasePreservesSignedStereoGains() {
 
 void periodicVolumeSlidesRunOnTheDriverClock() {
   const PerformanceSequence performance = render(Version::V2, 2, false, {0xd9, 40, 0xf3, 8, 0x00, 24, 0xff});
-  const auto levels = events<LevelPerformanceEvent>(performance.tracks.front());
+  const auto levels = eventsOfType<LevelPerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && levels.size() >= 5 &&
              std::abs(levels.back()->linearGain - 17.0 / 128.0) < 0.000001,
          "periodic volume slides should accumulate eighth-steps at the driver's timebase-adjusted interval");

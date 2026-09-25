@@ -4,14 +4,15 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/Akao/Akao.h"
 #include "../MidiTestSupport.h"
+#include "../TestSupport.h"
+#include "ValueFormatTestSupport.h"
+
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/formats/Akao/Akao.h"
 #include "value/scan/CollectionDiscovery.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
-
-#include "ValueFormatTestSupport.h"
 
 #include <algorithm>
 #include <array>
@@ -25,12 +26,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::akao;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void writeLe16(std::vector<u8>& bytes, size_t offset, u16 value) {
   bytes[offset] = static_cast<u8>(value & 0xff);
@@ -1006,4 +1001,26 @@ void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView() {
   const auto directInstrumentExport = session.exportSoundBank(soundBankId, SynthExportFormat::Dls, ExportRequest{});
   expect(!directInstrumentExport.bytes.empty(),
          "direct Akao instrument-set export should use the bound collection view");
+}
+
+void runAkaoFormatTests() {
+  akaoSequenceLayoutRejectsFalsePositiveHeaders();
+  akaoSequenceDecodesLegacyRelativeJumpTargets();
+  akaoSequenceDecodesConditionalBranchSideTargets();
+  akaoSequenceAnalysisUsesSemanticOperands();
+  akaoPointerInstrumentsSelectTheirExportedPrograms();
+  akaoTablePointersUseNonControlSourceLinks();
+  akaoSequenceDecodesRepeatFlowWithoutManualLayerLeaks();
+  akaoRepeatSourceLinksUseSpecificRolesOnly();
+  akaoVersion10OverlayCommandsUseLegacyLengthsAndProgramChange();
+  akaoPanLawFollowsDriverProfile();
+  akaoLoopBranchUsesCurrentRepeatPass();
+  akaoTieAfterRestDoesNotExtendPreviousNote();
+  akaoTempoFadeEmitsDriverTickRamp();
+  akaoPitchSlideAppliesOnceToTheNextNote();
+  akaoPortamentoRetainsPitchTransitionIntent();
+  akaoRequiredArticulationsComeFromInstrumentRows();
+  akaoMelodicRegionsDropAdvancingOverlaps();
+  akaoSampleSelectionUsesPlayableArticulations();
+  akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView();
 }

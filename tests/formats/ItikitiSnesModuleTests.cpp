@@ -4,11 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/ItikitiSnes/ItikitiSnes.h"
 #include "../MidiTestSupport.h"
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
 
 #include "value/base/LevelScale.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/formats/ItikitiSnes/ItikitiSnes.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
@@ -26,12 +28,6 @@ using namespace vgmtrans::formats::itikiti_snes;
 
 namespace {
 
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
-
 void writeLe16(std::vector<u8>& bytes, u32 offset, u16 value) {
   bytes[offset] = static_cast<u8>(value);
   bytes[offset + 1] = static_cast<u8>(value >> 8);
@@ -41,20 +37,9 @@ void writeBytes(std::vector<u8>& bytes, u32 offset, std::initializer_list<u8> va
   std::ranges::copy(values, bytes.begin() + offset);
 }
 
-template <class Event>
-std::vector<const Event*> events(const PerformanceTrack& track) {
-  std::vector<const Event*> result;
-  for (const PerformanceEvent& event : track.events) {
-    if (const auto* typed = std::get_if<Event>(&event)) {
-      result.push_back(typed);
-    }
-  }
-  return result;
-}
-
 std::vector<const ModulationPerformanceEvent*> modulationEvents(const PerformanceTrack& track,
                                                                 ModulationPerformanceTarget target) {
-  auto result = events<ModulationPerformanceEvent>(track);
+  auto result = eventsOfType<ModulationPerformanceEvent>(track);
   std::erase_if(result, [=](const ModulationPerformanceEvent* event) { return event->target != target; });
   return result;
 }
@@ -136,7 +121,7 @@ void groupFallbackAndProgramBanksMatchTheDriver() {
          "an inactive invalid music pointer should fall back to the active valid driver group");
 
   const PerformanceSequence performance = render({0x10, 0x22, 0}, 1);
-  const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks.front());
+  const auto instruments = eventsOfType<InstrumentPerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() &&
              std::ranges::any_of(instruments,
                                  [](const auto* event) {
@@ -156,8 +141,8 @@ void physicalLfosAndMixerStateArePreserved() {
   const auto tremolo = modulationEvents(track, ModulationPerformanceTarget::TremoloDepth);
   const auto tremoloRate = modulationEvents(track, ModulationPerformanceTarget::TremoloRate);
   const auto panLfo = modulationEvents(track, ModulationPerformanceTarget::PanDepth);
-  const auto reverb = events<ReverbPerformanceEvent>(track);
-  const auto balance = events<StereoBalancePerformanceEvent>(track);
+  const auto reverb = eventsOfType<ReverbPerformanceEvent>(track);
+  const auto balance = eventsOfType<StereoBalancePerformanceEvent>(track);
   const double minimum = 12.0 * std::log2(1.0 - 32.0 / 256.0);
   const double maximum = 12.0 * std::log2(1.0 + 32.0 / 128.0);
 
@@ -200,7 +185,7 @@ void lfoModesFollowTheDriverStateMachine() {
   const auto continuousDepth = modulationEvents(continuous.tracks.front(), ModulationPerformanceTarget::VibratoDepth);
   const auto continuousDelay = modulationEvents(continuous.tracks.front(), ModulationPerformanceTarget::VibratoDelay);
   const auto portamentoDepth = modulationEvents(portamento.tracks.front(), ModulationPerformanceTarget::VibratoDepth);
-  const auto portamentoNotes = events<NotePerformanceEvent>(portamento.tracks.front());
+  const auto portamentoNotes = eventsOfType<NotePerformanceEvent>(portamento.tracks.front());
   const auto tremoloDepth = modulationEvents(stoppedTremolo.tracks.front(), ModulationPerformanceTarget::TremoloDepth);
   const MidiSequence portamentoMidi =
       renderMidiSequence(portamento, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
@@ -256,8 +241,8 @@ void lfoModesFollowTheDriverStateMachine() {
 void trackAndMasterVolumeRetainIndependentResolution() {
   const PerformanceSequence performance = render({0x01, 0x80, 0x03, 0x80, 0x0c, 0x80, 0});
   const PerformanceTrack& track = performance.tracks.front();
-  const auto levels = events<LevelPerformanceEvent>(track);
-  const auto masters = events<MasterLevelPerformanceEvent>(track);
+  const auto levels = eventsOfType<LevelPerformanceEvent>(track);
+  const auto masters = eventsOfType<MasterLevelPerformanceEvent>(track);
   const double half = 128.0 / 255.0;
 
   expect(performance.diagnostics.empty() && levels.size() == 3 && levels[0]->linearGain == 1.0 &&
@@ -284,8 +269,8 @@ void trackAndMasterVolumeRetainIndependentResolution() {
 
 void dynamicAdsrPitchAndControlFlowAreAudited() {
   const PerformanceSequence envelope = render({0x12, 0x2f, 0x13, 0x0e, 0x14, 0x0d, 0x15, 0x1a, 0x16, 0x11, 0xf0, 0});
-  const auto envelopes = events<EnvelopePerformanceEvent>(envelope.tracks.front());
-  const auto tuning = events<TuningPerformanceEvent>(envelope.tracks.front());
+  const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(envelope.tracks.front());
+  const auto tuning = eventsOfType<TuningPerformanceEvent>(envelope.tracks.front());
   expect(envelope.diagnostics.empty() && envelopes.size() == 5 &&
              envelopes[0]->update.fields == EnvelopeFields::Attack && envelopes[0]->update.values &&
              envelopes[0]->update.values->attackSeconds == snesDspAdsrAttackSeconds(0x0f) &&
@@ -297,13 +282,13 @@ void dynamicAdsrPitchAndControlFlowAreAudited() {
          "fine tuning should use the driver's multiplicative pitch fraction");
 
   const PerformanceSequence pitchLimits = render({0x0b, 0xff, 0x17, 0x9c, 0x37, 8, 0x17, 0x00, 0x3f, 8, 0});
-  const auto limitedNotes = events<NotePerformanceEvent>(pitchLimits.tracks.front());
+  const auto limitedNotes = eventsOfType<NotePerformanceEvent>(pitchLimits.tracks.front());
   expect(pitchLimits.diagnostics.empty() && limitedNotes.size() == 2 && limitedNotes[0]->key == 51.0 &&
              limitedNotes[1]->key == 119.0,
          "note-base saturation should precede signed transpose and the DSP's 96-note pitch ceiling");
 
   const PerformanceSequence slide = render({0x37, 8, 0x29, 3, 2, 0x3f, 8, 0});
-  const auto slideNotes = events<NotePerformanceEvent>(slide.tracks.front());
+  const auto slideNotes = eventsOfType<NotePerformanceEvent>(slide.tracks.front());
   const auto* slideIntent =
       slide.tracks.front().automations.empty() ? nullptr : pitchTransitionIntent(slide.tracks.front().automations[0]);
   expect(slide.diagnostics.empty() && slideNotes.size() == 2 && slideNotes[0]->durationTicks == 6 && slideIntent &&
@@ -314,7 +299,7 @@ void dynamicAdsrPitchAndControlFlowAreAudited() {
   const auto* glide = portamento.tracks.front().automations.empty()
                           ? nullptr
                           : pitchTransitionIntent(portamento.tracks.front().automations.front());
-  expect(portamento.diagnostics.empty() && events<NotePerformanceEvent>(portamento.tracks.front()).size() == 2 &&
+  expect(portamento.diagnostics.empty() && eventsOfType<NotePerformanceEvent>(portamento.tracks.front()).size() == 2 &&
              glide && glide->previousNote && glide->startKey == 24.0 && glide->targetKey == 25.0 &&
              glide->timing.timelineTicks == 4,
          "persistent portamento should continue one voice and preserve its exact glide duration");
@@ -328,17 +313,17 @@ void dynamicAdsrPitchAndControlFlowAreAudited() {
       "portamento should begin at the pitch reached by a preceding one-shot slide");
 
   const PerformanceSequence repeat = render({0x2a, 1, 0x37, 8, 0x2e, 0});
-  expect(repeat.diagnostics.empty() && events<NotePerformanceEvent>(repeat.tracks.front()).size() == 2,
+  expect(repeat.diagnostics.empty() && eventsOfType<NotePerformanceEvent>(repeat.tracks.front()).size() == 2,
          "repeat counts should describe additional plays, matching the SPC700 repeat stack");
   const PerformanceSequence tie = render({0x37, 8, 0xf7, 8, 0});
-  const auto tiedNotes = events<NotePerformanceEvent>(tie.tracks.front());
+  const auto tiedNotes = eventsOfType<NotePerformanceEvent>(tie.tracks.front());
   expect(tie.diagnostics.empty() && tiedNotes.size() == 1 && tiedNotes.front()->durationTicks == 14,
          "ties should suppress retriggering and extend the prior gate with the driver's two-tick release margin");
 }
 
 void packedLengthPatternsFollowTheDriverByteOrder() {
   const PerformanceSequence performance = render({0x09, 0x94, 0x35, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0});
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   constexpr std::array<u32, 7> lengths{96, 72, 48, 32, 24, 12, 6};
   u64 tick = 0;
   expect(performance.diagnostics.empty() && notes.size() == lengths.size(),

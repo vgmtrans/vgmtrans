@@ -4,9 +4,19 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "ValueTestSupport.h"
-#include "value/validation/SequenceValidation.h"
 #include "../MidiTestSupport.h"
+#include "../TestSupport.h"
+#include "DiagnosticTestSupport.h"
+#include "SequenceTestSupport.h"
+
+#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/validation/SequenceValidation.h"
+
+#include <algorithm>
+#include <array>
+#include <limits>
+
+using namespace vgmtrans::core;
 
 namespace {
 
@@ -21,14 +31,13 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfe, 0x02, 0x00};
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeProgramCommand>(track, config, Address{0}, probeRange(0, programBytes.size()), programBytes);
+  addProbeCommand(track, Address{0}, probeRange(0, programBytes.size()), programBytes);
   track.commands.back().annotation = SourceAnnotationId{10};
-  const CommandId noteCommandId =
-      addProbeCommand<ProbeNoteCommand>(track, config, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
+  const CommandId noteCommandId = addProbeCommand(track, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
   track.commands.back().annotation = SourceAnnotationId{11};
-  addProbeCommand<ProbeJumpCommand>(track, config, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes);
+  addProbeCommand(track, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes);
   track.commands.back().annotation = SourceAnnotationId{12};
-  addProbeCommand<ProbeEndCommand>(track, config, Address{8}, probeRange(8, endBytes.size()), endBytes);
+  addProbeCommand(track, Address{8}, probeRange(8, endBytes.size()), endBytes);
   track.commands.back().annotation = SourceAnnotationId{13};
 
   const SequenceProgram program{
@@ -216,8 +225,8 @@ void sequenceVmReplaysInfiniteLoopsWhenRequested() {
 
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfe, 0x00, 0x00};
-  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeJumpCommand>(track, config, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
+  addProbeCommand(track, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand(track, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
@@ -248,9 +257,9 @@ void sequenceVmStopsDeclaredLoopBeforeTargetReplay() {
   const std::array<u8, 2> programBytes{0x80, 0x05};
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> loopBytes{0xfb, 0x00, 0x00};
-  addProbeCommand<ProbeProgramCommand>(track, config, Address{0}, probeRange(0, programBytes.size()), programBytes);
-  addProbeCommand<ProbeNoteCommand>(track, config, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeDeclaredLoopCommand>(track, config, Address{5}, probeRange(5, loopBytes.size()), loopBytes);
+  addProbeCommand(track, Address{0}, probeRange(0, programBytes.size()), programBytes);
+  addProbeCommand(track, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
+  addProbeCommand(track, Address{5}, probeRange(5, loopBytes.size()), loopBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
@@ -281,12 +290,10 @@ void sequenceVmPreservesLoopsWithCommandDelays() {
     TrackProgram track{.streams = {{.channels = {7, 9}}}, .startAddress = Address{0}};
     const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
     const std::array<u8, 3> loopBytes{0xfb, 0x00, 0x00};
-    const CommandId noteCommand =
-        addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+    const CommandId noteCommand = addProbeCommand(track, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
     track.commands.back().execution.channel = 9;
     track.commands.back().execution.delayTicks = 3;
-    const CommandId loopCommand = addProbeCommand<ProbeDeclaredLoopCommand>(track, config, Address{3},
-                                                                            probeRange(3, loopBytes.size()), loopBytes);
+    const CommandId loopCommand = addProbeCommand(track, Address{3}, probeRange(3, loopBytes.size()), loopBytes);
     track.commands.back().execution.delayTicks = 5;
     track.commands.back().flow.defaultTransition.jumpSemantics = semantics;
     const SequenceProgram program{
@@ -320,11 +327,9 @@ void sequenceVmLoopCandidateRequiresVisitedDestination() {
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> jumpToStartBytes{0xfc, 0x00, 0x00};
   const std::array<u8, 3> jumpToBodyBytes{0xfc, 0x00, 0x00};
-  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeLoopCandidateCommand>(track, config, Address{3}, probeRange(3, jumpToStartBytes.size()),
-                                             jumpToStartBytes);
-  addProbeCommand<ProbeLoopCandidateCommand>(track, config, Address{10}, probeRange(10, jumpToBodyBytes.size()),
-                                             jumpToBodyBytes);
+  addProbeCommand(track, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand(track, Address{3}, probeRange(3, jumpToStartBytes.size()), jumpToStartBytes);
+  addProbeCommand(track, Address{10}, probeRange(10, jumpToBodyBytes.size()), jumpToBodyBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
@@ -358,12 +363,10 @@ void sequenceVmLoopCandidateIgnoresRepeatState() {
   const std::array<u8, 3> loopCandidateBytes{0xfc, 0x00, 0x00};
   const std::array<u8, 5> repeatBytes{0xf0, 0x00, 0x02, 0x0a, 0x00};
 
-  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeJumpCommand>(track, config, Address{3}, probeRange(3, jumpToRepeatBytes.size()),
-                                    jumpToRepeatBytes);
-  addProbeCommand<ProbeLoopCandidateCommand>(track, config, Address{10}, probeRange(10, loopCandidateBytes.size()),
-                                             loopCandidateBytes);
-  addProbeCommand<ProbeRepeatCommand>(track, config, Address{20}, probeRange(20, repeatBytes.size()), repeatBytes);
+  addProbeCommand(track, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand(track, Address{3}, probeRange(3, jumpToRepeatBytes.size()), jumpToRepeatBytes);
+  addProbeCommand(track, Address{10}, probeRange(10, loopCandidateBytes.size()), loopCandidateBytes);
+  addProbeCommand(track, Address{20}, probeRange(20, repeatBytes.size()), repeatBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
@@ -388,10 +391,8 @@ void sequenceVmPreservesLoopCandidateAsPerformanceMarkers() {
 
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfc, 0x00, 0x00};
-  const CommandId noteCommand =
-      addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  const CommandId jumpCommand =
-      addProbeCommand<ProbeLoopCandidateCommand>(track, config, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
+  const CommandId noteCommand = addProbeCommand(track, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  const CommandId jumpCommand = addProbeCommand(track, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
@@ -422,11 +423,9 @@ void sequenceVmPreservesLoopsAsPerformanceMarkers() {
   const std::array<u8, 2> programBytes{0x80, 0x05};
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfe, 0x02, 0x00};
-  addProbeCommand<ProbeProgramCommand>(track, config, Address{0}, probeRange(0, programBytes.size()), programBytes);
-  const CommandId noteCommand =
-      addProbeCommand<ProbeNoteCommand>(track, config, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
-  const CommandId jumpCommand =
-      addProbeCommand<ProbeJumpCommand>(track, config, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes);
+  addProbeCommand(track, Address{0}, probeRange(0, programBytes.size()), programBytes);
+  const CommandId noteCommand = addProbeCommand(track, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
+  const CommandId jumpCommand = addProbeCommand(track, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
@@ -490,9 +489,9 @@ void sequenceVmUsesProgramCommandLimit() {
   const std::array<u8, 2> programBytes{0x80, 0x05};
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfe, 0x02, 0x00};
-  addProbeCommand<ProbeProgramCommand>(track, config, Address{0}, probeRange(0, programBytes.size()), programBytes);
-  addProbeCommand<ProbeNoteCommand>(track, config, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeJumpCommand>(track, config, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes);
+  addProbeCommand(track, Address{0}, probeRange(0, programBytes.size()), programBytes);
+  addProbeCommand(track, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
+  addProbeCommand(track, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
@@ -535,8 +534,7 @@ void sequenceVmUsesInitialTempoAndGlobalEventOrder() {
         .startAddress = Address{address},
     };
     const std::array<u8, 2> bytes{0x80, program};
-    addProbeCommand<ProbeProgramCommand>(track, orderConfig, Address{address}, probeRange(address, bytes.size()),
-                                         bytes);
+    addProbeCommand(track, Address{address}, probeRange(address, bytes.size()), bytes);
     return track;
   };
   const SequenceProgram orderedProgram{
@@ -568,7 +566,7 @@ void sequenceVmEmitsProgramInitialChannelState() {
   };
 
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeEndCommand>(track, config, Address{0}, probeRange(0, endBytes.size()), endBytes);
+  addProbeCommand(track, Address{0}, probeRange(0, endBytes.size()), endBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
@@ -627,7 +625,7 @@ void sequenceVmEmitsInitialMasterLevelOnce() {
   const auto makeTrack = [&](u32 id) {
     TrackProgram track{.streams = {{.channels = {id}}}, .startAddress = Address{0}};
     const std::array<u8, 1> endBytes{0xff};
-    addProbeCommand<ProbeEndCommand>(track, config, Address{0}, probeRange(id, endBytes.size()), endBytes);
+    addProbeCommand(track, Address{0}, probeRange(id, endBytes.size()), endBytes);
     return track;
   };
   const SequenceProgram program{
@@ -710,11 +708,11 @@ void sequenceVmAllowsRepeatedCallsToSameSubroutine() {
   const std::array<u8, 1> endBytes{0xff};
   const std::array<u8, 3> noteBytes{0x90, 0x05, 0x04};
   const std::array<u8, 1> returnBytes{0xfd};
-  addProbeCommand<ProbeCallCommand>(track, config, Address{0}, probeRange(0, callBytes.size()), callBytes);
-  addProbeCommand<ProbeCallCommand>(track, config, Address{3}, probeRange(3, callBytes.size()), callBytes);
-  addProbeCommand<ProbeEndCommand>(track, config, Address{6}, probeRange(6, endBytes.size()), endBytes);
-  addProbeCommand<ProbeNoteCommand>(track, config, Address{10}, probeRange(10, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeReturnCommand>(track, config, Address{13}, probeRange(13, returnBytes.size()), returnBytes);
+  addProbeCommand(track, Address{0}, probeRange(0, callBytes.size()), callBytes);
+  addProbeCommand(track, Address{3}, probeRange(3, callBytes.size()), callBytes);
+  addProbeCommand(track, Address{6}, probeRange(6, endBytes.size()), endBytes);
+  addProbeCommand(track, Address{10}, probeRange(10, noteBytes.size()), noteBytes);
+  addProbeCommand(track, Address{13}, probeRange(13, returnBytes.size()), returnBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
@@ -747,9 +745,9 @@ void sequenceVmReplaysFiniteRepeatBlocks() {
   const std::array<u8, 3> noteBytes{0x90, 0x00, 0x0c};
   const std::array<u8, 5> repeatBytes{0xf0, 0x00, 0x03, 0x00, 0x00};
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeRepeatCommand>(track, config, Address{3}, probeRange(3, repeatBytes.size()), repeatBytes);
-  addProbeCommand<ProbeEndCommand>(track, config, Address{8}, probeRange(8, endBytes.size()), endBytes);
+  addProbeCommand(track, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand(track, Address{3}, probeRange(3, repeatBytes.size()), repeatBytes);
+  addProbeCommand(track, Address{8}, probeRange(8, endBytes.size()), endBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
@@ -782,11 +780,9 @@ void sequenceVmRepeatReplayUsesCommandAddressesNotSourceOffsets() {
   const std::array<u8, 5> repeatBytes{0xf0, 0x00, 0x02, 0xe8, 0x03};
   const std::array<u8, 3> jumpToSelfBytes{0xfe, 0xd0, 0x07};
 
-  addProbeCommand<ProbeJumpCommand>(track, config, Address{1000}, probeRange(100, jumpToOutsideBytes.size()),
-                                    jumpToOutsideBytes);
-  addProbeCommand<ProbeRepeatCommand>(track, config, Address{1003}, probeRange(103, repeatBytes.size()), repeatBytes);
-  addProbeCommand<ProbeJumpCommand>(track, config, Address{2000}, probeRange(200, jumpToSelfBytes.size()),
-                                    jumpToSelfBytes);
+  addProbeCommand(track, Address{1000}, probeRange(100, jumpToOutsideBytes.size()), jumpToOutsideBytes);
+  addProbeCommand(track, Address{1003}, probeRange(103, repeatBytes.size()), repeatBytes);
+  addProbeCommand(track, Address{2000}, probeRange(200, jumpToSelfBytes.size()), jumpToSelfBytes);
 
   SequenceProgram program = config.makeProgram();
   program.runtime = probeSequenceRuntime();
@@ -808,12 +804,10 @@ void sequenceVmDetectsCycleWhenRepeatCommandsReuseOneCounter() {
   const std::array<u8, 5> shortRepeatBytes{0xf0, 0x00, 0x02, 0x00, 0x00};
   const std::array<u8, 5> outerRepeatBytes{0xf0, 0x00, 0x04, 0x00, 0x00};
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeRepeatCommand>(track, config, Address{3}, probeRange(3, shortRepeatBytes.size()),
-                                      shortRepeatBytes);
-  addProbeCommand<ProbeRepeatCommand>(track, config, Address{8}, probeRange(8, outerRepeatBytes.size()),
-                                      outerRepeatBytes);
-  addProbeCommand<ProbeEndCommand>(track, config, Address{13}, probeRange(13, endBytes.size()), endBytes);
+  addProbeCommand(track, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand(track, Address{3}, probeRange(3, shortRepeatBytes.size()), shortRepeatBytes);
+  addProbeCommand(track, Address{8}, probeRange(8, outerRepeatBytes.size()), outerRepeatBytes);
+  addProbeCommand(track, Address{13}, probeRange(13, endBytes.size()), endBytes);
 
   SequenceProgram program = config.makeProgram();
   program.runtime = probeSequenceRuntime();
@@ -838,11 +832,11 @@ void sequenceVmExecutesNestedCallInsideRepeat() {
   const std::array<u8, 1> endBytes{0xff};
   const std::array<u8, 3> noteBytes{0x90, 0x05, 0x04};
   const std::array<u8, 1> returnBytes{0xfd};
-  addProbeCommand<ProbeCallCommand>(track, config, Address{0}, probeRange(0, callBytes.size()), callBytes);
-  addProbeCommand<ProbeRepeatCommand>(track, config, Address{3}, probeRange(3, repeatBytes.size()), repeatBytes);
-  addProbeCommand<ProbeEndCommand>(track, config, Address{8}, probeRange(8, endBytes.size()), endBytes);
-  addProbeCommand<ProbeNoteCommand>(track, config, Address{20}, probeRange(20, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeReturnCommand>(track, config, Address{23}, probeRange(23, returnBytes.size()), returnBytes);
+  addProbeCommand(track, Address{0}, probeRange(0, callBytes.size()), callBytes);
+  addProbeCommand(track, Address{3}, probeRange(3, repeatBytes.size()), repeatBytes);
+  addProbeCommand(track, Address{8}, probeRange(8, endBytes.size()), endBytes);
+  addProbeCommand(track, Address{20}, probeRange(20, noteBytes.size()), noteBytes);
+  addProbeCommand(track, Address{23}, probeRange(23, returnBytes.size()), returnBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
@@ -871,11 +865,11 @@ void sequenceVmExecutesRepeatInsideCall() {
   const std::array<u8, 3> noteBytes{0x90, 0x05, 0x04};
   const std::array<u8, 5> repeatBytes{0xf0, 0x00, 0x03, 0x14, 0x00};
   const std::array<u8, 1> returnBytes{0xfd};
-  addProbeCommand<ProbeCallCommand>(track, config, Address{0}, probeRange(0, callBytes.size()), callBytes);
-  addProbeCommand<ProbeEndCommand>(track, config, Address{3}, probeRange(3, endBytes.size()), endBytes);
-  addProbeCommand<ProbeNoteCommand>(track, config, Address{20}, probeRange(20, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeRepeatCommand>(track, config, Address{23}, probeRange(23, repeatBytes.size()), repeatBytes);
-  addProbeCommand<ProbeReturnCommand>(track, config, Address{28}, probeRange(28, returnBytes.size()), returnBytes);
+  addProbeCommand(track, Address{0}, probeRange(0, callBytes.size()), callBytes);
+  addProbeCommand(track, Address{3}, probeRange(3, endBytes.size()), endBytes);
+  addProbeCommand(track, Address{20}, probeRange(20, noteBytes.size()), noteBytes);
+  addProbeCommand(track, Address{23}, probeRange(23, repeatBytes.size()), repeatBytes);
+  addProbeCommand(track, Address{28}, probeRange(28, returnBytes.size()), returnBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
@@ -903,11 +897,10 @@ void sequenceVmRunsRepeatBreakSideEffectsOnlyWhenBranchTaken() {
   const std::array<u8, 4> repeatBreakBytes{0xf1, 0x00, 0x0c, 0x00};
   const std::array<u8, 5> repeatBytes{0xf0, 0x00, 0x03, 0x00, 0x00};
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeRepeatBreakCommand>(track, config, Address{3}, probeRange(3, repeatBreakBytes.size()),
-                                           repeatBreakBytes);
-  addProbeCommand<ProbeRepeatCommand>(track, config, Address{7}, probeRange(7, repeatBytes.size()), repeatBytes);
-  addProbeCommand<ProbeEndCommand>(track, config, Address{12}, probeRange(12, endBytes.size()), endBytes);
+  addProbeCommand(track, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand(track, Address{3}, probeRange(3, repeatBreakBytes.size()), repeatBreakBytes);
+  addProbeCommand(track, Address{7}, probeRange(7, repeatBytes.size()), repeatBytes);
+  addProbeCommand(track, Address{12}, probeRange(12, endBytes.size()), endBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
@@ -943,13 +936,12 @@ void sequenceVmRepeatBreakCanBranchToPreviouslyVisitedCode() {
   const std::array<u8, 4> repeatBreakBytes{0xf1, 0x00, 0x00, 0x00};
   const std::array<u8, 5> repeatBytes{0xf0, 0x00, 0x02, 0x14, 0x00};
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeJumpCommand>(track, config, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
-  addProbeCommand<ProbeNoteCommand>(track, config, Address{20}, probeRange(20, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeRepeatBreakCommand>(track, config, Address{23}, probeRange(23, repeatBreakBytes.size()),
-                                           repeatBreakBytes);
-  addProbeCommand<ProbeRepeatCommand>(track, config, Address{27}, probeRange(27, repeatBytes.size()), repeatBytes);
-  addProbeCommand<ProbeEndCommand>(track, config, Address{32}, probeRange(32, endBytes.size()), endBytes);
+  addProbeCommand(track, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand(track, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
+  addProbeCommand(track, Address{20}, probeRange(20, noteBytes.size()), noteBytes);
+  addProbeCommand(track, Address{23}, probeRange(23, repeatBreakBytes.size()), repeatBreakBytes);
+  addProbeCommand(track, Address{27}, probeRange(27, repeatBytes.size()), repeatBytes);
+  addProbeCommand(track, Address{32}, probeRange(32, endBytes.size()), endBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
@@ -975,12 +967,10 @@ void sequenceVmPreservesLoopMarkersForInteriorJumpTarget() {
   const std::array<u8, 2> programBytes{0x80, 0x05};
   const std::array<u8, 3> noteBytes{0x90, 0x00, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfe, 0x05, 0x00};
-  addProbeCommand<ProbeProgramCommand>(track, config, Address{0}, probeRange(0, programBytes.size()), programBytes);
-  addProbeCommand<ProbeNoteCommand>(track, config, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
-  const CommandId loopStartCommand =
-      addProbeCommand<ProbeNoteCommand>(track, config, Address{5}, probeRange(5, noteBytes.size()), noteBytes);
-  const CommandId jumpCommand =
-      addProbeCommand<ProbeJumpCommand>(track, config, Address{8}, probeRange(8, jumpBytes.size()), jumpBytes);
+  addProbeCommand(track, Address{0}, probeRange(0, programBytes.size()), programBytes);
+  addProbeCommand(track, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
+  const CommandId loopStartCommand = addProbeCommand(track, Address{5}, probeRange(5, noteBytes.size()), noteBytes);
+  const CommandId jumpCommand = addProbeCommand(track, Address{8}, probeRange(8, jumpBytes.size()), jumpBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
@@ -1007,9 +997,8 @@ void sequenceVmDoesNotWrapCommandAddressOverflow() {
   };
 
   const std::array<u8, 3> noteBytes{0x90, 0x00, 0x04};
-  addProbeCommand<ProbeNoteCommand>(track, config, Address{1}, SourceRange{}, noteBytes);
-  addProbeCommand<ProbeNoteCommand>(track, config, Address{std::numeric_limits<u64>::max() - 1}, SourceRange{},
-                                    noteBytes);
+  addProbeCommand(track, Address{1}, SourceRange{}, noteBytes);
+  addProbeCommand(track, Address{std::numeric_limits<u64>::max() - 1}, SourceRange{}, noteBytes);
   // The decoded continuation is authoritative and must not wrap to the other
   // command merely because address + source size would overflow.
   track.commands.back().flow.continuation = Address{std::numeric_limits<u64>::max()};
@@ -1165,9 +1154,9 @@ void sequenceVmReportsMissingJumpTargetAfterEmittedEvents() {
 
   const std::array<u8, 3> noteBytes{0x90, 0x00, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfe, 0x63, 0x00};
-  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand(track, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
   const SourceRange jumpRange = probeRange(3, jumpBytes.size());
-  addProbeCommand<ProbeJumpCommand>(track, config, Address{3}, jumpRange, jumpBytes);
+  addProbeCommand(track, Address{3}, jumpRange, jumpBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),

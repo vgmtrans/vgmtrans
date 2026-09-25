@@ -4,10 +4,21 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "ValueTestSupport.h"
+#include "../TestSupport.h"
+
+#include "value/base/LevelScale.h"
+#include "value/base/Source.h"
 #include "value/sequence/SequenceMotion.h"
+#include "value/sequence/SequenceVm.h"
 #include "value/sequence/TempoRelativeModulation.h"
 #include "value/validation/SequenceValidation.h"
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <limits>
+
+using namespace vgmtrans::core;
 
 namespace {
 
@@ -39,42 +50,18 @@ void byteReaderChecksBoundsAndEndian() {
   expect(reader.le32(1) == 0x56781234, "reader should read little-endian u32");
   expect(reader.be32(1) == 0x34127856, "reader should read big-endian u32");
 
-  bool threw = false;
-  try {
-    static_cast<void>(reader.u8At(5));
-  } catch (const std::out_of_range&) {
-    threw = true;
-  }
-  expect(threw, "reader should throw on out-of-range access");
+  expectThrows<std::out_of_range>([&] { static_cast<void>(reader.u8At(5)); },
+                                  "reader should throw on out-of-range access");
 
   const std::array<u8, 3> maximumBytes{0xff, 0xff, 0xff};
   const ByteReader maximum{SourceId{7}, maximumBytes};
   for (const auto read : {&ByteReader::le24, &ByteReader::be24}) {
     expect((maximum.*read)(0) == 0xffffff, "24-bit reads must preserve every bit without sign extension");
     for (const u64 offset : {u64{3}, u64{5}, std::numeric_limits<u64>::max()}) {
-      threw = false;
-      try {
-        static_cast<void>((reader.*read)(offset));
-      } catch (const std::out_of_range&) {
-        threw = true;
-      }
-      expect(threw, "24-bit reads must reject truncated and overflowing source offsets");
+      expectThrows<std::out_of_range>([&] { static_cast<void>((reader.*read)(offset)); },
+                                      "24-bit reads must reject truncated and overflowing source offsets");
     }
   }
-}
-
-void sourceCommandsRetainOnlySemanticData() {
-  const SequenceProgramConfig config = probeSequenceConfig();
-  TrackProgram track{.startAddress = Address{0}};
-  const std::array<u8, 2> programBytes{0x80, 0x05};
-  const SourceRange range = probeRange(0, programBytes.size());
-  const CommandId commandId = addProbeCommand<ProbeProgramCommand>(track, config, Address{0}, range, programBytes);
-  const SourceCommand& command = track.commands.at(commandId.value);
-
-  expect(track.commands.size() == 1, "track should append one source command");
-  expect(command.range == range && command.range.size == programBytes.size(),
-         "source command should retain the range needed to inspect encoded bytes");
-  expect(command.execution.valid(), "source command should retain its compiled playback body");
 }
 
 void sequenceSourceRangeIncludesDecodedCommandsFromTheBaseSource() {
@@ -128,101 +115,22 @@ void sequenceValidationProtectsPositionalCommandStorage() {
          "sequence validation should reject duplicate, out-of-order, and missing-start command storage");
 }
 
-void collectionIssuesDeriveImpact() {
-  const CollectionIssue missingSequence = missingSequenceIssue();
-  expect(missingSequence.impact == CollectionIssueImpact::Incomplete && missingSequence.severity == Severity::Warning &&
-             missingSequence.code == "missing-sequence",
-         "missing sequence helper should create a warning issue");
-  const std::vector<CollectionIssue> missingIssues{missingSequence};
-  expect(Collection{.issues = missingIssues}.issueImpact() == CollectionIssueImpact::Incomplete,
-         "missing issues should make a collection incomplete");
-
-  const CollectionIssue missingInstrument = missingSoundBankIssue(AssetId{7});
-  expect(missingInstrument.severity == Severity::Error && missingInstrument.asset == AssetId{7},
-         "missing instrument helper should preserve a broken asset reference");
-
-  const CollectionIssue ambiguous = ambiguousMatchIssue("multiple banks match");
-  const std::vector<CollectionIssue> ambiguousIssues{ambiguous};
-  expect(Collection{.issues = ambiguousIssues}.issueImpact() == CollectionIssueImpact::Ambiguous,
-         "ambiguous match issue should make a collection ambiguous");
-  expect(Collection{.issues = {missingSequence, ambiguous}}.issueImpact() == CollectionIssueImpact::Ambiguous,
-         "ambiguity should take precedence when a collection is also incomplete");
-
-  const Collection incomplete{.issues = {missingSamplePoolIssue()}};
-  expect(incomplete.issueImpact() == CollectionIssueImpact::Incomplete,
-         "collection impact should be derived from its issues");
-}
-
-void performanceAutomationRetainsIntentAlongsideOneEventTimeline() {
+void performanceEventsForCommandMatchBothTrackAndCommand() {
   const PerformanceTrack track{
       .id = TrackId{3},
       .events =
           {
-              MarkerPerformanceEvent{
-                  .header = PerformanceEventHeader{.track = TrackId{3}, .tick = 0, .sequence = 0},
-                  .text = "start",
-              },
-              LevelPerformanceEvent{
-                  .header =
-                      PerformanceEventHeader{
-                          .sourceCommand = {TrackId{3}, CommandId{9}},
-                          .sourceAnnotation = SourceAnnotationId{11},
-                          .track = TrackId{3},
-                          .tick = 0,
-                          .sequence = 1,
-                          .automation = PerformanceAutomationId{0},
-                      },
-                  .linearGain = 0.75,
-              },
-              LevelPerformanceEvent{
-                  .header =
-                      PerformanceEventHeader{
-                          .sourceCommand = {TrackId{3}, CommandId{9}},
-                          .sourceAnnotation = SourceAnnotationId{11},
-                          .track = TrackId{3},
-                          .tick = 1,
-                          .sequence = 2,
-                          .automation = PerformanceAutomationId{0},
-                      },
-                  .linearGain = 0.5,
-              },
-              NotePerformanceEvent{
-                  .header =
-                      PerformanceEventHeader{
-                          .sourceCommand = {TrackId{4}, CommandId{9}}, .track = TrackId{3}, .tick = 2, .sequence = 3},
-                  .key = 60,
-                  .durationTicks = 1,
-              },
+              MarkerPerformanceEvent{.text = "unowned"},
+              LevelPerformanceEvent{.header = {.sourceCommand = {TrackId{3}, CommandId{9}}}, .linearGain = 0.75},
+              LevelPerformanceEvent{.header = {.sourceCommand = {TrackId{3}, CommandId{9}}}, .linearGain = 0.5},
+              NotePerformanceEvent{.header = {.sourceCommand = {TrackId{4}, CommandId{9}}}, .key = 60},
+              NotePerformanceEvent{.header = {.sourceCommand = {TrackId{3}, CommandId{10}}}, .key = 62},
           },
-      .automations = {PerformanceAutomation{
-          .id = PerformanceAutomationId{0},
-          .header =
-              PerformanceEventHeader{
-                  .sourceCommand = {TrackId{3}, CommandId{9}},
-                  .sourceAnnotation = SourceAnnotationId{11},
-                  .track = TrackId{3},
-                  .tick = 0,
-              },
-          .intent =
-              ScalarPerformanceAutomationIntent{
-                  .target = PerformanceAutomationTarget::Level,
-                  .targetValue = 0.5,
-                  .durationTicks = 1,
-              },
-      }},
   };
 
-  expect(track.events.size() == 4 && performanceEventHeader(track.events[1]).automation == PerformanceAutomationId{0} &&
-             performanceEventHeader(track.events[2]).automation == PerformanceAutomationId{0},
-         "realized automation events should remain in the track timeline with their source-intent association");
-
-  const auto sourceEvents = performanceEventsForCommand(track, {TrackId{3}, CommandId{9}});
-  expect(sourceEvents.size() == 2 && std::ranges::all_of(sourceEvents,
-                                                         [](const PerformanceEvent* event) {
-                                                           return performanceEventHeader(*event).sourceAnnotation ==
-                                                                  SourceAnnotationId{11};
-                                                         }),
-         "automation points should remain linked to the command and annotation that defined their intent");
+  expect(performanceEventsForCommand(track, {TrackId{3}, CommandId{9}}) ==
+             std::vector<const PerformanceEvent*>{&track.events[1], &track.events[2]},
+         "command lookup should return only matching events in timeline order");
 }
 
 void performanceEmitterBindsScalarAutomationWithoutExposingStorage() {
@@ -258,13 +166,8 @@ void performanceEmitterBindsScalarAutomationWithoutExposingStorage() {
   u32 otherAutomation = 0;
   PerformanceEmitter otherOut{
       otherTrack, {otherTrack.id, CommandId{10}}, SourceAnnotationId{12}, 0, otherSequence, otherNote, otherAutomation};
-  bool rejectedOtherTrack = false;
-  try {
-    fade.output(otherOut).pitchBend(0.0);
-  } catch (const std::logic_error&) {
-    rejectedOtherTrack = true;
-  }
-  expect(rejectedOtherTrack, "an automation binding should not attach to another performance track");
+  expectThrows<std::logic_error>([&] { fade.output(otherOut).pitchBend(0.0); },
+                                 "an automation binding should not attach to another performance track");
 }
 
 void sequenceMotionPreservesDelayAndTargetCompletion() {
@@ -368,13 +271,8 @@ void performanceEmitterResolvesDeclaredPanLawIntoEvents() {
   PerformanceEmitter undeclared{
       undeclaredTrack, {undeclaredTrack.id, CommandId{10}}, SourceAnnotationId{12}, 0, nextSequence, nextNote,
       nextAutomation};
-  bool rejectedUndeclaredPan = false;
-  try {
-    undeclared.pan(0.0);
-  } catch (const std::logic_error&) {
-    rejectedUndeclaredPan = true;
-  }
-  expect(rejectedUndeclaredPan, "positional pan should reject a format that did not declare its pan law");
+  expectThrows<std::logic_error>([&] { undeclared.pan(0.0); },
+                                 "positional pan should reject a format that did not declare its pan law");
 }
 
 void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
@@ -615,11 +513,9 @@ void tempoMapRetainsInitialTempoAndOwnsItsPoints() {
 void runValueSequenceModelTests() {
   levelScaleRoundTripsMidiValues();
   byteReaderChecksBoundsAndEndian();
-  sourceCommandsRetainOnlySemanticData();
   sequenceSourceRangeIncludesDecodedCommandsFromTheBaseSource();
   sequenceValidationProtectsPositionalCommandStorage();
-  collectionIssuesDeriveImpact();
-  performanceAutomationRetainsIntentAlongsideOneEventTimeline();
+  performanceEventsForCommandMatchBothTrackAndCommand();
   performanceEmitterBindsScalarAutomationWithoutExposingStorage();
   sequenceMotionPreservesDelayAndTargetCompletion();
   fixedPointMotionRetargetsFromTheRoundedSourceValue();

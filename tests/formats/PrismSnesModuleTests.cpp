@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/PrismSnes/PrismSnes.h"
-
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
 #include "ValueFormatTestSupport.h"
 
+#include "value/formats/PrismSnes/PrismSnes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 
@@ -25,23 +26,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::prism_snes;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
-
-template <class Event>
-std::vector<const Event*> events(const PerformanceTrack& track) {
-  std::vector<const Event*> result;
-  for (const PerformanceEvent& event : track.events) {
-    if (const auto* typed = std::get_if<Event>(&event)) {
-      result.push_back(typed);
-    }
-  }
-  return result;
-}
 
 class DriverFixture {
 public:
@@ -195,7 +179,7 @@ void decodeStateFollowsCallsAndRepeats() {
   const ByteReader reader(SourceId{310}, fixture.data());
   const auto program = decodeSequence(RetainedSource::copyOf(reader), *findLayout(reader), AssetId{310});
   const auto performance = SequenceVm().render(program);
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 2 && notes[0]->header.tick == 0 &&
              notes[1]->header.tick == 8 && performance.tracks.front().endTick == 12,
          "a called block must carry duration-mode changes back to its caller");
@@ -206,7 +190,7 @@ void decodeStateFollowsCallsAndRepeats() {
     expect(repeated.tracks.front().commandIndex(Address{0x5207}).has_value(),
            "repeat discovery must retain the encoded continuation, including after an infinite repeat");
     const auto rendered = SequenceVm().render(repeated);
-    expect(events<NotePerformanceEvent>(rendered.tracks.front()).size() == (count == 0 ? 1 : 2),
+    expect(eventsOfType<NotePerformanceEvent>(rendered.tracks.front()).size() == (count == 0 ? 1 : 2),
            "repeat discovery must preserve finite and infinite playback policy");
   }
 }
@@ -242,12 +226,12 @@ void dynamicDriverFeaturesRenderFromCapturedTables() {
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed);
   const PerformanceTrack& track = performance.tracks.front();
 
-  const auto tempo = events<TempoPerformanceEvent>(track);
-  const auto notes = events<NotePerformanceEvent>(track);
-  const auto pitch = events<PitchBendPerformanceEvent>(track);
-  const auto levels = events<LevelPerformanceEvent>(track);
-  const auto envelopes = events<EnvelopePerformanceEvent>(track);
-  const auto reverb = events<ReverbPerformanceEvent>(track);
+  const auto tempo = eventsOfType<TempoPerformanceEvent>(track);
+  const auto notes = eventsOfType<NotePerformanceEvent>(track);
+  const auto pitch = eventsOfType<PitchBendPerformanceEvent>(track);
+  const auto levels = eventsOfType<LevelPerformanceEvent>(track);
+  const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(track);
+  const auto reverb = eventsOfType<ReverbPerformanceEvent>(track);
   expect(performance.diagnostics.empty() && !tempo.empty() && tempo.back()->microsecondsPerQuarter == 600000 &&
              notes.size() == 2 && !pitch.empty() && !levels.empty() && envelopes.size() >= 2 && !reverb.empty() &&
              !track.automations.empty(),
@@ -264,7 +248,7 @@ void dynamicDriverFeaturesRenderFromCapturedTables() {
                                       event->delayMilliseconds == 64.0;
                              }),
          "echo must retain voice masks, signed stereo gains, feedback, FIR identity, and EDL timing");
-  expect(std::ranges::any_of(events<InstrumentPerformanceEvent>(track),
+  expect(std::ranges::any_of(eventsOfType<InstrumentPerformanceEvent>(track),
                              [](const auto* event) {
                                const auto* identity = std::get_if<InstrumentIdentity>(&event->instrument);
                                return identity && identity->key == 2;
@@ -280,7 +264,7 @@ void gainTablesControlNoteAmplitude() {
   SequenceProgram parsed = decodeSequence(RetainedSource::copyOf(reader), layout, AssetId{307});
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed);
   const PerformanceTrack& track = performance.tracks.front();
-  const auto expression = events<ExpressionPerformanceEvent>(track);
+  const auto expression = eventsOfType<ExpressionPerformanceEvent>(track);
   expect(
       performance.diagnostics.empty() && expression.size() > 3 &&
           std::ranges::any_of(expression,
@@ -311,9 +295,9 @@ void instrumentChangesWaitForTheNextAttack() {
   SequenceProgram parsed = decodeSequence(RetainedSource::copyOf(reader), layout, AssetId{308});
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed);
   const PerformanceTrack& track = performance.tracks.front();
-  const auto instruments = events<InstrumentPerformanceEvent>(track);
-  const auto envelopes = events<EnvelopePerformanceEvent>(track);
-  const auto expression = events<ExpressionPerformanceEvent>(track);
+  const auto instruments = eventsOfType<InstrumentPerformanceEvent>(track);
+  const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(track);
+  const auto expression = eventsOfType<ExpressionPerformanceEvent>(track);
 
   expect(performance.diagnostics.empty() && instruments.size() == 3 &&
              std::get<InstrumentIdentity>(instruments[1]->instrument).key == 2 && instruments[1]->header.tick == 0 &&
@@ -340,10 +324,10 @@ void leadingTiesAreSilentDelays() {
   const auto parsed = decodeSequence(RetainedSource::copyOf(reader), *findLayout(reader), AssetId{309});
   const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed);
   const PerformanceTrack& track = performance.tracks.front();
-  const auto notes = events<NotePerformanceEvent>(track);
+  const auto notes = eventsOfType<NotePerformanceEvent>(track);
 
   expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->header.tick == 2 &&
-             !notes.front()->extendsPrevious && events<EnvelopePerformanceEvent>(track).empty(),
+             !notes.front()->extendsPrevious && eventsOfType<EnvelopePerformanceEvent>(track).empty(),
          "a leading tie must consume time without inventing a note or active-voice envelope update");
 }
 
@@ -395,8 +379,8 @@ void subtrackTriggersRunTheirChildScore() {
          "ED must reset manual duration before decoding its trigger notes");
 
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed);
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
-  const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
+  const auto instruments = eventsOfType<InstrumentPerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->key == 60.0 &&
              std::ranges::any_of(instruments,
                                  [](const InstrumentPerformanceEvent* event) {

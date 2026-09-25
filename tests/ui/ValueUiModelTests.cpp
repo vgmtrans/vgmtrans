@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "../TestSupport.h"
+
 #include "application/WorkspaceController.h"
 #include "models/ValueModels.h"
 #include "value/scan/FormatModule.h"
@@ -23,12 +25,6 @@ namespace {
 
 using namespace vgmtrans::core;
 using namespace vgmtrans::ui;
-
-void expect(bool condition, const char* message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 ScanResult scanUiProbe(const ScanInput& input) {
   ScanResultBuilder result(input, "UI Probe");

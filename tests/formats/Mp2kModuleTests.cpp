@@ -4,6 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
+
 #include "value/extractors/PsfExtractor.h"
 #include "value/formats/MP2k/MP2k.h"
 #include "value/formats/MP2k/MP2kEnvelope.h"
@@ -28,12 +31,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::mp2k;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void le16(std::vector<u8>& bytes, size_t offset, u16 value) {
   bytes[offset] = static_cast<u8>(value);
@@ -178,17 +175,6 @@ SourceId scanMp2k(Session& session, std::string name, std::vector<u8> bytes) {
   const SourceId source = session.addSource(SourceFile{.name = std::move(name)}, std::move(bytes));
   session.scanPendingSources();
   return source;
-}
-
-template <class Event>
-std::vector<const Event*> eventsOfType(const PerformanceTrack& track) {
-  std::vector<const Event*> events;
-  for (const auto& value : track.events) {
-    if (const auto* event = std::get_if<Event>(&value)) {
-      events.push_back(event);
-    }
-  }
-  return events;
 }
 
 void mp2kModuleBuildsAuditedSequenceAndSynth() {

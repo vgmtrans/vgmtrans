@@ -4,16 +4,17 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "../TestSupport.h"
+#include "../core/SessionSnapshotBuilder.h"
+
 #include "value/base/LevelScale.h"
 #include "value/export/CollectionBinding.h"
 #include "value/export/Export.h"
 #include "value/extractors/PsfExtractor.h"
 #include "value/formats/SegSat/SegSat.h"
-#include "value/session/Session.h"
 #include "value/sequence/SequenceVm.h"
+#include "value/session/Session.h"
 #include "value/synth/SampleDecoder.h"
-
-#include "../core/SessionSnapshotBuilder.h"
 
 #include <zlib.h>
 
@@ -31,12 +32,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::segsat;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void be16(std::vector<u8>& bytes, size_t offset, u16 value) {
   bytes[offset] = static_cast<u8>(value >> 8);
@@ -717,4 +712,15 @@ void segSatSsfExtractorUsesFourByteMiniHeader() {
   expect(result.diagnostics.empty() && result.sources.size() == 1 &&
              result.sources.front().bytes == std::vector<u8>({0x12, 0x34, 0x56}),
          "SSF extraction should overlay payload bytes immediately after its four-byte load address");
+}
+
+void runSegSatModuleTests() {
+  segSatVlCurveMatchesMm8Saturation();
+  segSatTempoDeltaBytesPreserveSourceOrder();
+  segSatCollectionBindingSuppliesVlTablesToSequence();
+  segSatRuntimeMapSelectsBankInsideAnotherSampleSpan();
+  segSatMultiBankPlaybackUsesTheActiveBanksVlTable();
+  segSatDirectOutputPreservesHardwareStereoGains();
+  segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources();
+  segSatSsfExtractorUsesFourByteMiniHeader();
 }

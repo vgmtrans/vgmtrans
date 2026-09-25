@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/MoriSnes/MoriSnes.h"
-
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
 #include "ValueFormatTestSupport.h"
 
+#include "value/formats/MoriSnes/MoriSnes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 
@@ -27,23 +28,6 @@ using namespace vgmtrans::formats::mori_snes;
 namespace {
 
 constexpr PitchBendLayerId kVoiceScriptPitchLayer{1};
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
-
-template <class Event>
-std::vector<const Event*> events(const PerformanceTrack& track) {
-  std::vector<const Event*> result;
-  for (const PerformanceEvent& event : track.events) {
-    if (const auto* typed = std::get_if<Event>(&event)) {
-      result.push_back(typed);
-    }
-  }
-  return result;
-}
 
 bool hasPitchBend(const std::vector<const PitchBendPerformanceEvent*>& bends, PitchBendLayerId layer, u64 tick,
                   double semitones) {
@@ -247,14 +231,14 @@ void eventTimingAndAuditedCommandsRenderPhysically() {
   bytes[0x1203] = 0;
   const PerformanceSequence performance = render(std::move(bytes));
   const PerformanceTrack& track = performance.tracks.front();
-  const auto notes = events<NotePerformanceEvent>(track);
-  const auto levels = events<LevelPerformanceEvent>(track);
-  const auto bends = events<PitchBendPerformanceEvent>(track);
+  const auto notes = eventsOfType<NotePerformanceEvent>(track);
+  const auto levels = eventsOfType<LevelPerformanceEvent>(track);
+  const auto bends = eventsOfType<PitchBendPerformanceEvent>(track);
   const auto sourceBend = std::ranges::find_if(
       bends, [](const PitchBendPerformanceEvent* bend) { return bend->layer == kPrimaryPitchBendLayer; });
-  const auto ranges = events<PitchBendRangePerformanceEvent>(track);
-  const auto tempos = events<TempoPerformanceEvent>(track);
-  const auto reverbs = events<ReverbPerformanceEvent>(track);
+  const auto ranges = eventsOfType<PitchBendRangePerformanceEvent>(track);
+  const auto tempos = eventsOfType<TempoPerformanceEvent>(track);
+  const auto reverbs = eventsOfType<ReverbPerformanceEvent>(track);
 
   expect(performance.diagnostics.empty() && notes.size() == 2 && notes[0]->header.tick == 0 &&
              notes[1]->header.tick == 4 * 256 && notes[0]->durationTicks == 3 * 256 &&
@@ -315,8 +299,8 @@ void sourceVoiceScriptChangesFutureReleaseBehavior() {
   bytes[0x0314] = 5;
 
   const PerformanceSequence performance = render(std::move(bytes));
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
-  const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
+  const auto instruments = eventsOfType<InstrumentPerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 2 && notes[0]->durationTicks == 5 * 256 &&
              notes[1]->durationTicks == 8 * 256 && instruments.size() == 2 &&
              std::get<InstrumentIdentity>(instruments.back()->instrument).key == (kDirectInstrumentFlag | 0x0220),
@@ -332,7 +316,7 @@ void zeroDurationNotesReuseTheDriverVoice() {
       0xd0,
   };
   const PerformanceSequence performance = render(std::move(bytes));
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->header.tick == 0 &&
              notes.front()->durationTicks == 11 * 256 && !notes.front()->maximumDurationMilliseconds,
          "duration zero should reuse a matching hardware voice, and a later tempo-clocked note should close that "
@@ -350,8 +334,8 @@ void cbCharaEqualPriorityVoiceCannotStealAnotherTrack() {
   std::ranges::copy(std::array<u8, 6>{1, 0, 0x40, 0x80, 0x81, 0xe0}, bytes.begin() + starts.back());
 
   const PerformanceSequence performance = render(std::move(bytes), Version::CbChara, 0x30, std::move(starts));
-  const auto first = events<NotePerformanceEvent>(performance.tracks.front());
-  const auto last = events<NotePerformanceEvent>(performance.tracks.back());
+  const auto first = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
+  const auto last = eventsOfType<NotePerformanceEvent>(performance.tracks.back());
   expect(first.size() == 1 && first.front()->durationTicks == std::numeric_limits<u32>::max() && last.size() == 1,
          "an equal-priority request should be rejected instead of stealing another track's hardware voice");
 }
@@ -363,7 +347,7 @@ void fixedClockModeUsesTimerDurations() {
       0xd0,
   };
   const PerformanceSequence performance = render(std::move(bytes));
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->header.tick == 0 &&
              notes.front()->durationTicks == std::numeric_limits<u32>::max() &&
              notes.front()->maximumDurationMilliseconds &&
@@ -432,14 +416,14 @@ void shienDialectUsesItsDriverTimingAndPointers() {
 
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program);
   const PerformanceTrack& track = performance.tracks.front();
-  const auto tempos = events<TempoPerformanceEvent>(track);
-  const auto masters = events<MasterLevelPerformanceEvent>(track);
-  const auto ranges = events<PitchBendRangePerformanceEvent>(track);
-  const auto bends = events<PitchBendPerformanceEvent>(track);
+  const auto tempos = eventsOfType<TempoPerformanceEvent>(track);
+  const auto masters = eventsOfType<MasterLevelPerformanceEvent>(track);
+  const auto ranges = eventsOfType<PitchBendRangePerformanceEvent>(track);
+  const auto bends = eventsOfType<PitchBendPerformanceEvent>(track);
   const auto sourceBend = std::ranges::find_if(
       bends, [](const PitchBendPerformanceEvent* bend) { return bend->layer == kPrimaryPitchBendLayer; });
-  const auto notes = events<NotePerformanceEvent>(track);
-  const auto reverbs = events<ReverbPerformanceEvent>(track);
+  const auto notes = eventsOfType<NotePerformanceEvent>(track);
+  const auto reverbs = eventsOfType<ReverbPerformanceEvent>(track);
   expect(performance.diagnostics.empty() && !tempos.empty() &&
              tempos.back()->microsecondsPerQuarter == 92'160'000u / 0x80 && !masters.empty() &&
              std::abs(masters.back()->linearGain - 66.0 / 256.0) < 0.000001 && !ranges.empty() &&
@@ -471,8 +455,8 @@ void cbCharaUsesTheEarlySparseDialect() {
   const double expectedUnityKey = 72.0 - 12.0 * std::log2(4286.0 / 4096.0) - 24.0;
   const PerformanceSequence performance = render({0xc7, 0x5a, 0xe0}, Version::CbChara, 0x30);
   const PerformanceSequence combatribesPerformance = render({0xc7, 0x7f, 0xe0}, Version::Combatribes, 0x28);
-  const auto tempos = events<TempoPerformanceEvent>(performance.tracks.front());
-  const auto combatribesTempos = events<TempoPerformanceEvent>(combatribesPerformance.tracks.front());
+  const auto tempos = eventsOfType<TempoPerformanceEvent>(performance.tracks.front());
+  const auto combatribesTempos = eventsOfType<TempoPerformanceEvent>(combatribesPerformance.tracks.front());
 
   expect(layout && layout->traits.version == Version::CbChara && layout->spcDirAddress == 0x2000 &&
              layout->panTableAddress == 0x1100 && layout->traits.timerMilliseconds() == 6.0 &&
@@ -537,9 +521,9 @@ void loopingVoicePreludeRemainsSeparateFromItsVibratoCycle() {
 
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program);
   const PerformanceTrack& track = performance.tracks.front();
-  const auto notes = events<NotePerformanceEvent>(track);
-  const auto bends = events<PitchBendPerformanceEvent>(track);
-  const auto expressions = events<ExpressionPerformanceEvent>(track);
+  const auto notes = eventsOfType<NotePerformanceEvent>(track);
+  const auto bends = eventsOfType<PitchBendPerformanceEvent>(track);
+  const auto expressions = eventsOfType<ExpressionPerformanceEvent>(track);
   const auto faded = std::ranges::find_if(expressions, [](const ExpressionPerformanceEvent* expression) {
     return expression->header.tick == 15 * 0x20 &&
            std::abs(expression->linearGain - 140.0 / 210.0) < 0.000001;
@@ -605,7 +589,7 @@ void physicalVoiceScriptsCanBoundNotes() {
   bytes[0x0304] = 3;
 
   const PerformanceSequence performance = render(std::move(bytes));
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(notes.size() == 1 && notes.front()->maximumDurationMilliseconds &&
              std::abs(*notes.front()->maximumDurationMilliseconds - 5 * 0.009875 * 1000.0) < 0.000001,
          "a voice script's fixed-clock DB should bound a duration-zero note independently of sequence tempo");
@@ -646,8 +630,8 @@ void physicalVoiceScriptsCanRetriggerNotes() {
   bytes[0x0302] = 0xe0;
 
   const PerformanceSequence performance = render(std::move(bytes));
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
-  const auto bends = events<PitchBendPerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
+  const auto bends = eventsOfType<PitchBendPerformanceEvent>(performance.tracks.front());
   const auto resets = std::ranges::count_if(bends, [](const PitchBendPerformanceEvent* bend) {
     return bend->layer == kVoiceScriptPitchLayer && bend->semitones == 0.0;
   });
@@ -719,10 +703,10 @@ void liveSongSelectionAndHardwareSoundEffectsAreRecovered() {
   SequenceParse parsed = decodeSequence(RetainedSource::copyOf(reader), *sfxLayout, AssetId{400});
   sfx = std::vector<u8>{};
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
-  const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks.front());
-  const auto expressions = events<ExpressionPerformanceEvent>(performance.tracks.front());
-  const auto bends = events<PitchBendPerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
+  const auto instruments = eventsOfType<InstrumentPerformanceEvent>(performance.tracks.front());
+  const auto expressions = eventsOfType<ExpressionPerformanceEvent>(performance.tracks.front());
+  const auto bends = eventsOfType<PitchBendPerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->maximumDurationMilliseconds &&
              std::abs(*notes.front()->maximumDurationMilliseconds - 7 * 9.875) < 0.000001 && instruments.size() == 1 &&
              std::get<InstrumentIdentity>(instruments.front()->instrument).key == (kDirectInstrumentFlag | 0x1800) &&

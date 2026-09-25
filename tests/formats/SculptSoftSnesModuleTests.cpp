@@ -4,11 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/SculptSoftSnes/SculptSoftSnes.h"
+#include "../MidiTestSupport.h"
+#include "../TestSupport.h"
+
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/formats/SculptSoftSnes/SculptSoftSnes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
-#include "../MidiTestSupport.h"
 
 #include <algorithm>
 #include <cmath>
@@ -19,12 +21,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::sculpt_soft_snes;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void bytes(std::vector<u8>& data, u32 at, std::initializer_list<u8> values) {
   std::ranges::copy(values, data.begin() + at);

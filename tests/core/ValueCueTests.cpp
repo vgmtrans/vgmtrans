@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "../TestSupport.h"
+
 #include "value/extractors/CueExtractor.h"
 #include "value/formats/ValueFormats.h"
 #include "value/session/Session.h"
@@ -18,12 +20,6 @@ using namespace vgmtrans::core;
 using vgmtrans::formats::cue::cueExtractor;
 
 namespace {
-
-void expect(bool condition, const char* message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 struct Fixture {
   std::filesystem::path directory = std::filesystem::temp_directory_path() /

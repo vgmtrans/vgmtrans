@@ -4,8 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/PandoraBoxSnes/PandoraBoxSnes.h"
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
 
+#include "value/formats/PandoraBoxSnes/PandoraBoxSnes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 #include "value/synth/SnesDsp.h"
@@ -23,12 +25,6 @@ using namespace vgmtrans::formats::pandora_box_snes;
 
 namespace {
 
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
-
 void writeLe16(std::vector<u8>& bytes, u32 offset, u16 value) {
   bytes[offset] = static_cast<u8>(value);
   bytes[offset + 1] = static_cast<u8>(value >> 8);
@@ -38,20 +34,9 @@ void writeBytes(std::vector<u8>& bytes, u32 offset, std::initializer_list<u8> va
   std::ranges::copy(values, bytes.begin() + offset);
 }
 
-template <class Event>
-std::vector<const Event*> events(const PerformanceTrack& track) {
-  std::vector<const Event*> result;
-  for (const PerformanceEvent& event : track.events) {
-    if (const auto* typed = std::get_if<Event>(&event)) {
-      result.push_back(typed);
-    }
-  }
-  return result;
-}
-
 std::vector<const ModulationPerformanceEvent*> modulationEvents(const PerformanceTrack& track,
                                                                 ModulationPerformanceTarget target) {
-  auto result = events<ModulationPerformanceEvent>(track);
+  auto result = eventsOfType<ModulationPerformanceEvent>(track);
   std::erase_if(result, [=](const auto* event) { return event->target != target; });
   return result;
 }
@@ -144,16 +129,16 @@ void fineTuningMatchesDriverPitch() {
     return (45.0 + 12.0 * std::log2(pitch / 4096.0) - key) * 100.0;
   };
   const PerformanceSequence performance = render({0xe1, 60, 0x01, 4, 0xe1, 0xf6, 0x0a, 4, 0xf5});
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
-  const auto tuning = events<TuningPerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
+  const auto tuning = eventsOfType<TuningPerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 2 && tuning.size() == 2 && notes[0]->key == 36.0 &&
              notes[1]->key == 45.0 && std::abs(tuning[0]->cents - tuningFor(0x0983 + 60, 36)) < 0.000001 &&
              std::abs(tuning[1]->cents - tuningFor(0x1000 - 10, 45)) < 0.000001,
          "notes should retain nominal keys while pitch-table and signed $E1 offsets become exact tuning");
 
   const PerformanceSequence tied = render({0x11, 4, 0xe1, 60, 0x11, 4, 0x02, 4, 0xf5});
-  const auto tiedNotes = events<NotePerformanceEvent>(tied.tracks.front());
-  const auto tiedTuning = events<TuningPerformanceEvent>(tied.tracks.front());
+  const auto tiedNotes = eventsOfType<NotePerformanceEvent>(tied.tracks.front());
+  const auto tiedTuning = eventsOfType<TuningPerformanceEvent>(tied.tracks.front());
   expect(tiedNotes.size() == 3 && tiedNotes[1]->extendsPrevious && !tiedNotes[1]->restartsEnvelope &&
              tiedTuning.size() == 2 &&
              std::abs(tiedTuning.back()->cents - tuningFor(0x0a14 + 60, 37)) < 0.000001,
@@ -173,10 +158,10 @@ void versionedVolumeAndDynamicAdsrMatchTheDrivers() {
   const PerformanceSequence traverse = render({0xf6, 0xff, 0xf5}, Version::Traverse);
   const PerformanceSequence standardDirect = render({0xf6, 0x40, 0xe6, 0xf5});
   const PerformanceSequence traverseDirect = render({0xf6, 0x40, 0xe7, 0xf5}, Version::Traverse);
-  const auto standardLevels = events<LevelPerformanceEvent>(standard.tracks.front());
-  const auto traverseLevels = events<LevelPerformanceEvent>(traverse.tracks.front());
-  const auto standardDirectLevels = events<LevelPerformanceEvent>(standardDirect.tracks.front());
-  const auto traverseDirectLevels = events<LevelPerformanceEvent>(traverseDirect.tracks.front());
+  const auto standardLevels = eventsOfType<LevelPerformanceEvent>(standard.tracks.front());
+  const auto traverseLevels = eventsOfType<LevelPerformanceEvent>(traverse.tracks.front());
+  const auto standardDirectLevels = eventsOfType<LevelPerformanceEvent>(standardDirect.tracks.front());
+  const auto traverseDirectLevels = eventsOfType<LevelPerformanceEvent>(traverseDirect.tracks.front());
   expect(!standardLevels.empty() && !traverseLevels.empty() &&
              std::abs(standardLevels.back()->linearGain - 0x3c / 255.0) < 0.000001 &&
              std::abs(traverseLevels.back()->linearGain - 0x3c / 255.0) < 0.000001 &&
@@ -196,9 +181,9 @@ void modulationEnvelopeReverbAndPanRemainPhysical() {
       0xf5,
   });
   const PerformanceTrack& track = performance.tracks.front();
-  const auto balance = events<StereoBalancePerformanceEvent>(track);
-  const auto reverb = events<ReverbPerformanceEvent>(track);
-  const auto envelope = events<EnvelopePerformanceEvent>(track);
+  const auto balance = eventsOfType<StereoBalancePerformanceEvent>(track);
+  const auto reverb = eventsOfType<ReverbPerformanceEvent>(track);
+  const auto envelope = eventsOfType<EnvelopePerformanceEvent>(track);
   const auto depth = modulationEvents(track, ModulationPerformanceTarget::VibratoDepth);
   const auto rate = modulationEvents(track, ModulationPerformanceTarget::VibratoRate);
   expect(performance.diagnostics.empty() && !balance.empty() && balance.back()->leftGain == 0.75 &&
@@ -231,23 +216,23 @@ void modulationEnvelopeReverbAndPanRemainPhysical() {
 
 void slursAndNestedRepeatBreaksFollowDriverFlow() {
   const PerformanceSequence slur = render({0x11, 4, 0x12, 4, 0xf5});
-  const auto notes = events<NotePerformanceEvent>(slur.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(slur.tracks.front());
   expect(slur.diagnostics.empty() && notes.size() == 2 && !notes.back()->restartsEnvelope &&
              !notes.back()->restartsLfoPhase,
          "a slurred key change should continue the active DSP voice without KON or LFO restart");
   const PerformanceSequence shortGate = render({0x49, 0x01, 1, 0xf5});
-  const auto shortNotes = events<NotePerformanceEvent>(shortGate.tracks.front());
+  const auto shortNotes = eventsOfType<NotePerformanceEvent>(shortGate.tracks.front());
   expect(shortGate.diagnostics.empty() && shortNotes.size() == 1 && shortNotes.front()->durationTicks == 1,
          "a sub-tick quantized gate should still sound until the driver's next sequence update");
 
   const PerformanceSequence repeat = render({0xec, 2, 0x01, 4, 0xee, 0x02, 4, 0xed, 0xf5});
-  expect(repeat.diagnostics.empty() && events<NotePerformanceEvent>(repeat.tracks.front()).size() == 3,
+  expect(repeat.diagnostics.empty() && eventsOfType<NotePerformanceEvent>(repeat.tracks.front()).size() == 3,
          "repeat break should branch only on the final pass of the paired repeat frame");
   const PerformanceSequence single = render({0xec, 1, 0x01, 4, 0xee, 0x02, 4, 0xed, 0xf5});
-  expect(single.diagnostics.empty() && events<NotePerformanceEvent>(single.tracks.front()).size() == 1,
+  expect(single.diagnostics.empty() && eventsOfType<NotePerformanceEvent>(single.tracks.front()).size() == 1,
          "a count-one repeat break should skip the remainder of its first and only pass");
   const PerformanceSequence infinite = render({0xec, 0xff, 0x01, 4, 0xed, 0xf5});
-  expect(infinite.diagnostics.empty() && events<NotePerformanceEvent>(infinite.tracks.front()).size() == 1,
+  expect(infinite.diagnostics.empty() && eventsOfType<NotePerformanceEvent>(infinite.tracks.front()).size() == 1,
          "$FF repeats should be declared loops and stop PlayOnce rendering after one pass");
 }
 

@@ -4,9 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/KonamiTMNT2/KonamiTMNT2.h"
+#include "../TestSupport.h"
 
 #include "value/extractors/MameRomSetExtractor.h"
+#include "value/formats/KonamiTMNT2/KonamiTMNT2.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/SampleDecoder.h"
 
@@ -23,12 +24,6 @@ using namespace vgmtrans::formats::konami_tmnt2;
 namespace mame = vgmtrans::formats::mame;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void write(std::vector<u8>& bytes, u32 offset, std::initializer_list<u8> values) {
   std::ranges::copy(values, bytes.begin() + offset);
@@ -469,4 +464,13 @@ void konamiTmnt2SampleReleaseTremoloAndAdpcmAreDistinct() {
   const auto reverse = decodeSample(sample, encoded);
   expect(reverse && reverse->pcm == std::vector<s16>({256, 768, -32000, -32000}),
          "reversed K053260 PPCM should reverse bytes without reversing nibble order");
+}
+
+void runKonamiTMNT2ModuleTests() {
+  konamiTmnt2ContextualFlowAndDynamicYmReleaseRender();
+  konamiTmnt2DialectWidthsMatchTheMusicParsers();
+  konamiTmnt2SampleReleaseTremoloAndAdpcmAreDistinct();
+  konamiTmnt2SteppedModulationRunsAndRestoresOverTime();
+  konamiTmnt2NativeLfoUsesHardwareRateAndChannelRamp();
+  konamiTmnt2AliasesMiscSamplesAndTrackLabels();
 }

@@ -4,8 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "commands.h"
+#include "../TestSupport.h"
+
 #include "ExportOptions.h"
+#include "commands.h"
 #include "value/export/CollectionStitch.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceVm.h"
@@ -24,12 +26,6 @@ namespace {
 
 using namespace vgmtrans::core;
 using namespace vgmtrans::shell;
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 struct TemporaryDirectory {
   std::filesystem::path path =

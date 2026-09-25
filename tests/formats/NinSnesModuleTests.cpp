@@ -4,11 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/NinSnes/NinSnes.h"
 #include "../MidiTestSupport.h"
+#include "../TestSupport.h"
 
-#include "value/formats/NinSnes/NinSnesPatterns.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/formats/NinSnes/NinSnes.h"
+#include "value/formats/NinSnes/NinSnesPatterns.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/SnesDsp.h"
 
@@ -32,12 +33,6 @@ constexpr std::array kProfileIds{
     ProfileId::QuintetTs, ProfileId::FalcomYs4, ProfileId::Koei,        ProfileId::SunsoftEarlier, ProfileId::Sunsoft,
     ProfileId::SunsoftBenkei,
 };
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void writeLe16(std::vector<u8>& bytes, size_t offset, u16 value) {
   bytes[offset] = static_cast<u8>(value);

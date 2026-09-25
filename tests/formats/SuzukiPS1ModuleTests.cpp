@@ -4,10 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/SuzukiPS1/SuzukiPS1.h"
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
 
-#include "value/session/Session.h"
+#include "value/formats/SuzukiPS1/SuzukiPS1.h"
 #include "value/sequence/SequenceVm.h"
+#include "value/session/Session.h"
 #include "value/synth/PsxSpu.h"
 
 #include <algorithm>
@@ -21,12 +23,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::suzuki_ps1;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void le16(std::vector<u8>& bytes, size_t offset, u16 value) {
   bytes[offset] = static_cast<u8>(value);
@@ -90,17 +86,6 @@ std::vector<u8> scannerFixture() {
   // following one-block sample.
   bytes[bankOffset + headerSize + 0x10 + 1] = 1;
   return bytes;
-}
-
-template <class Event>
-std::vector<const Event*> eventsOfType(const PerformanceTrack& track) {
-  std::vector<const Event*> events;
-  for (const auto& value : track.events) {
-    if (const auto* event = std::get_if<Event>(&value)) {
-      events.push_back(event);
-    }
-  }
-  return events;
 }
 
 }  // namespace
@@ -211,4 +196,10 @@ void suzukiPs1ModuleBuildsFractionallyTunedWdsSynth() {
       envelopes.size() == 2 && envelopes.back()->update.values ==
                                    psxSpuEnvelope(composePsxAdsr1(1, 0x20, 8, 8), composePsxAdsr2(1, 1, 0x40, 1, 0x10)),
       "sequence ADSR writes should start from the registers retained by bank scanning");
+}
+
+void runSuzukiPS1ModuleTests() {
+  suzukiPs1DynamicAdsrUsesAuditedDriverCommands();
+  suzukiPs1RepeatsRestoreTheirSavedOctaves();
+  suzukiPs1ModuleBuildsFractionallyTunedWdsSynth();
 }

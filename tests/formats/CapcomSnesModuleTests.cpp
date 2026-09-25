@@ -4,19 +4,19 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/CapcomSnes/CapcomSnes.h"
 #include "../MidiTestSupport.h"
+#include "../TestSupport.h"
+#include "ValueFormatTestSupport.h"
 
-#include "value/export/InstrumentVariants.h"
 #include "value/export/Export.h"
+#include "value/export/InstrumentVariants.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/formats/CapcomSnes/CapcomSnes.h"
+#include "value/formats/ValueFormats.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
-#include "value/formats/ValueFormats.h"
 #include "value/synth/SnesDsp.h"
-
-#include "ValueFormatTestSupport.h"
 
 #include <algorithm>
 #include <array>
@@ -35,12 +35,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::capcom_snes;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 std::string hexAddress(u64 value) {
   std::ostringstream out;
@@ -1792,4 +1786,28 @@ void capcomSnesV1SequencePreservesUnknownOneByteEvents() {
   expect(performance.diagnostics.empty(), "CapcomSnes V1 unknown one-byte events should render without diagnostics");
   expect(performance.tracks[0].events.size() == 3,
          "CapcomSnes V1 fixture should emit initial defaults and still reach the later note");
+}
+
+void runCapcomSnesModuleTests() {
+  capcomSnesLayoutSelectsSongListAndFixedHeaders();
+  capcomSnesLayoutFallsBackToV2SongList();
+  capcomSnesLayoutReadsOldAndRejectsMalformedDspInit();
+  capcomSnesModuleDiscoversSequenceInstrumentsAndSamples();
+  capcomSnesModuleWarnsWhenDetectedSynthIsEmpty();
+  capcomSnesCompiledAndPerformanceSnapshotsAreStable();
+  capcomSnesLfoValuesAreResolvedDuringDecode();
+  capcomSnesCompiledCommandsDoNotNeedEngineProfile();
+  capcomSnesModuleScansSpcThroughVirtualAramSource();
+  capcomSnesInstrumentTableSkipsBlankSlotsLikeLegacy();
+  capcomSnesNoteStateCommandsAreTypedAndInterpreted();
+  capcomSnesSourceDecoderDecodesAndRendersDriverCommands();
+  capcomSnesInitialDurationRateIsFullLength();
+  capcomSnesPanPerformanceCarriesGainCompensation();
+  capcomSnesSequenceEmitsSourceOnlyDriverSemantics();
+  capcomSnesReleaseRateIsStickyAcrossInstrumentChanges();
+  capcomSnesSequenceEmitsStructuredPitchSlides();
+  capcomSnesSequenceExecutesRepeatUntilCommand();
+  capcomSnesSequenceAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken();
+  capcomSnesSequenceDecodesRepeatBreakSideTargets();
+  capcomSnesV1SequencePreservesUnknownOneByteEvents();
 }

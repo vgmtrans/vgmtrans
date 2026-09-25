@@ -4,16 +4,17 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/KonamiSnes/KonamiSnes.h"
 #include "../MidiTestSupport.h"
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
+#include "ValueFormatTestSupport.h"
 
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/formats/KonamiSnes/KonamiSnes.h"
 #include "value/formats/ValueFormats.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 #include "value/synth/SnesDsp.h"
-
-#include "ValueFormatTestSupport.h"
 
 #include <algorithm>
 #include <array>
@@ -30,12 +31,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::konami_snes;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void writeLe16(std::vector<u8>& bytes, size_t offset, u16 value) {
   bytes[offset] = static_cast<u8>(value & 0xff);
@@ -57,17 +52,6 @@ const SourceAnnotation* annotationWithKind(const SourceMap& sourceMap, SourceId 
     }
   }
   return nullptr;
-}
-
-template <class Event>
-std::vector<const Event*> performanceEvents(const PerformanceTrack& track) {
-  std::vector<const Event*> result;
-  for (const PerformanceEvent& event : track.events) {
-    if (const auto* typed = std::get_if<Event>(&event)) {
-      result.push_back(typed);
-    }
-  }
-  return result;
 }
 
 bool hasNonZeroPitchBendBefore(const MidiTrack& track, u64 tick) {
@@ -790,7 +774,7 @@ void konamiSnesEchoPreservesGlobalDspState() {
   const PerformanceSequence performance = renderKonamiSnesProgram(
       KONAMISNES_V6,
       {{0xf4, 0x01, 0x40, 0xc0, 0xf5, 0x04, 0xe0, 0xaa, 0xe0, 0x02, 0xf4, 0, 0x7f, 0x7f, 0xff}, {0xe0, 0x04, 0xff}});
-  const auto changes = performanceEvents<ReverbPerformanceEvent>(performance.tracks[0]);
+  const auto changes = eventsOfType<ReverbPerformanceEvent>(performance.tracks[0]);
   expect(changes.size() == 4 && changes[1]->voiceMask == 1 && std::abs(*changes[1]->leftGain - 64.0 / 127.0) < 0.0001 &&
              std::abs(*changes[1]->rightGain + 64.0 / 127.0) < 0.0001,
          "Konami F4 should preserve signed stereo EVOL and the global EON mask");
@@ -801,7 +785,7 @@ void konamiSnesEchoPreservesGlobalDspState() {
   const PerformanceSequence indexed =
       renderKonamiSnesProgram(KONAMISNES_V2, {{0xf5, 0x02, 0x10, 0x01, 0xf4, 0x01, 0x20, 0x20, 0xff}}, 0,
                               /*indexedEchoFilter=*/true);
-  const auto indexedChanges = performanceEvents<ReverbPerformanceEvent>(indexed.tracks[0]);
+  const auto indexedChanges = eventsOfType<ReverbPerformanceEvent>(indexed.tracks[0]);
   expect(indexedChanges.size() == 2 && indexedChanges.back()->filterIndex == 1,
          "Konami F5 should retain indexed FIR state while echo is disabled");
 }
@@ -889,7 +873,7 @@ void konamiSnesPercussionUsesPackedGsDrumBank() {
   };
 
   const PerformanceSequence performance = renderKonamiSnesTrack(bytes);
-  expect(performanceEvents<InstrumentPerformanceEvent>(performance.tracks.front()).size() == 1,
+  expect(eventsOfType<InstrumentPerformanceEvent>(performance.tracks.front()).size() == 1,
          "percussion off should not invent a melodic instrument restoration");
   const MidiSequence midi = renderMidiSequence(performance);
   const auto& events = midi.tracks[0].events;
@@ -983,7 +967,7 @@ void konamiSnesCompilerCursorUsesVersionedOperandLengths() {
 void konamiSnesDynamicAdsrMatchesEachDriverFamily() {
   const auto envelopesFor = [](const PerformanceSequence& performance) {
     std::vector<EnvelopePerformanceEvent> result;
-    for (const auto* event : performanceEvents<EnvelopePerformanceEvent>(performance.tracks.front())) {
+    for (const auto* event : eventsOfType<EnvelopePerformanceEvent>(performance.tracks.front())) {
       result.push_back(*event);
     }
     return result;
@@ -998,8 +982,8 @@ void konamiSnesDynamicAdsrMatchesEachDriverFamily() {
       KONAMISNES_V1, {{0xea, 0x4e, 0xee, 0x7f, 0xfa, 0x8c, 0xd2, 0x64, 0x3c, 0x08, 0x32, 0x8a, 0xff}});
   const auto contra = envelopesFor(contraPerformance);
   Envelope expectedContra = snesDspEnvelope(0x8e, 0xe2, 0xe2);
-  const auto contraNotes = performanceEvents<NotePerformanceEvent>(contraPerformance.tracks.front());
-  const auto contraLevels = performanceEvents<LevelPerformanceEvent>(contraPerformance.tracks.front());
+  const auto contraNotes = eventsOfType<NotePerformanceEvent>(contraPerformance.tracks.front());
+  const auto contraLevels = eventsOfType<LevelPerformanceEvent>(contraPerformance.tracks.front());
   expect(contra.size() == 1 && contra[0].update.values == expectedContra && contraNotes.size() == 1 &&
              contraNotes[0]->durationTicks == 6 && contraLevels.size() > 3 && contraLevels.back()->linearGain == 0.0,
          "V1 0xFA software release should extend the keyed voice and fade the driver's mixed level");
@@ -1064,7 +1048,7 @@ void konamiSnesPreservesLateEnvelopeRegisterState() {
   writeLe16(bytes, 0x2000, 0x2002);
   writeBytes(bytes, 0x2002, std::array<u8, 11>{0xe2, 0x00, 0xfa, 0x8f, 0x42, 0x00, 0xfb, 0x55, 0xed, 0x00, 0xff});
   const auto dynamic = renderKonamiSnesAramSequence(bytes, layout);
-  const auto updates = performanceEvents<EnvelopePerformanceEvent>(dynamic.tracks.front());
+  const auto updates = eventsOfType<EnvelopePerformanceEvent>(dynamic.tracks.front());
   expect(updates.size() == 3 && updates[0]->update.values == snesDspEnvelope(0x8f, 0x42, 0x9f) &&
              updates[1]->update.values == snesDspEnvelope(0x8f, 0x55, 0x9f) &&
              updates[2]->update.values == snesDspEnvelope(0x00, 0x55, 0x9f),
@@ -1076,7 +1060,7 @@ void konamiSnesPreservesLateEnvelopeRegisterState() {
   writeLe16(bytes, 0x2000, 0x2002);
   writeBytes(bytes, 0x2002, std::array<u8, 7>{0xe2, 0x00, 0xe2, 0x04, 0xed, 0x00, 0xff});
   const auto instrumentChange = renderKonamiSnesAramSequence(bytes, layout);
-  const auto afterInstrument = performanceEvents<EnvelopePerformanceEvent>(instrumentChange.tracks.front());
+  const auto afterInstrument = eventsOfType<EnvelopePerformanceEvent>(instrumentChange.tracks.front());
   expect(afterInstrument.size() == 1 && afterInstrument.front()->update.values == snesDspEnvelope(0x00, 0xe0, 0x9f),
          "a late ADSR instrument load should preserve inactive GAIN even though it saves a new companion");
 
@@ -1084,7 +1068,7 @@ void konamiSnesPreservesLateEnvelopeRegisterState() {
              std::array<u8, 17>{0xe2, 0x00, 0xe2, 0x04, 0xed, 0x00, 0x62, 115, 0x3c, 1, 0x40, 0x7f, 0x3d, 1, 0x40, 0x7f,
                                 0xff});
   const auto released = renderKonamiSnesAramSequence(bytes, layout);
-  const auto restored = performanceEvents<EnvelopePerformanceEvent>(released.tracks.front());
+  const auto restored = eventsOfType<EnvelopePerformanceEvent>(released.tracks.front());
   Envelope expectedRestore = snesDspEnvelope(0x00, 0xe0, 0xe0);
   expectedRestore.releaseSeconds = snesDspGainEnvelopeSeconds(0x8f, 0x7ff, 0);
   expect(restored.size() == 3 && restored.back()->update.values == expectedRestore,
@@ -1096,7 +1080,7 @@ void konamiSnesMixerAndPanFollowVersionedDriverMath() {
          "Konami tracks should begin at the driver's zero volume");
 
   const auto lastLevel = [](const PerformanceSequence& performance) {
-    const auto levels = performanceEvents<LevelPerformanceEvent>(performance.tracks.front());
+    const auto levels = eventsOfType<LevelPerformanceEvent>(performance.tracks.front());
     expect(!levels.empty(), "mixer fixture should emit a composite level");
     return levels.back()->linearGain;
   };
@@ -1113,9 +1097,9 @@ void konamiSnesMixerAndPanFollowVersionedDriverMath() {
   const auto v3PanPerformance = renderKonamiSnesProgram(KONAMISNES_V3, {{0xe3, 0, 0xff}});
   const auto v5PanPerformance = renderKonamiSnesProgram(KONAMISNES_V5, {{0xe3, 10, 0xff}});
   const auto v6PanPerformance = renderKonamiSnesProgram(KONAMISNES_V6, {{0xe3, 10, 0xff}});
-  const auto v3Pan = performanceEvents<StereoBalancePerformanceEvent>(v3PanPerformance.tracks.front());
-  const auto v5Pan = performanceEvents<StereoBalancePerformanceEvent>(v5PanPerformance.tracks.front());
-  const auto v6Pan = performanceEvents<StereoBalancePerformanceEvent>(v6PanPerformance.tracks.front());
+  const auto v3Pan = eventsOfType<StereoBalancePerformanceEvent>(v3PanPerformance.tracks.front());
+  const auto v5Pan = eventsOfType<StereoBalancePerformanceEvent>(v5PanPerformance.tracks.front());
+  const auto v6Pan = eventsOfType<StereoBalancePerformanceEvent>(v6PanPerformance.tracks.front());
   expect(v3Pan.size() == 2 && v3Pan.back()->leftGain == 0.0 &&
              std::abs(v3Pan.back()->rightGain - 254.0 / 256.0) < 0.0001 && v5Pan.size() == 2 &&
              std::abs(v5Pan.back()->leftGain - 0x46 / 256.0) < 0.0001 && v6Pan.size() == 2 &&
@@ -1127,10 +1111,10 @@ void konamiSnesZeroNotesAndLegatoMatchDriverGating() {
   const std::vector<u8> zeroAfterNote{0xee, 0x80, 0x3c, 1, 0x7f, 0x7f, 0x3d, 1, 0x7f, 0x00, 0xff};
   const auto v2 = renderKonamiSnesProgram(KONAMISNES_V2, {zeroAfterNote});
   const auto v3 = renderKonamiSnesProgram(KONAMISNES_V3, {zeroAfterNote});
-  const auto v2Levels = performanceEvents<LevelPerformanceEvent>(v2.tracks.front());
-  const auto v3Levels = performanceEvents<LevelPerformanceEvent>(v3.tracks.front());
-  expect(performanceEvents<NotePerformanceEvent>(v2.tracks.front()).size() == 1 &&
-             performanceEvents<NotePerformanceEvent>(v3.tracks.front()).size() == 1 &&
+  const auto v2Levels = eventsOfType<LevelPerformanceEvent>(v2.tracks.front());
+  const auto v3Levels = eventsOfType<LevelPerformanceEvent>(v3.tracks.front());
+  expect(eventsOfType<NotePerformanceEvent>(v2.tracks.front()).size() == 1 &&
+             eventsOfType<NotePerformanceEvent>(v3.tracks.front()).size() == 1 &&
              std::ranges::any_of(v2Levels,
                                  [](const LevelPerformanceEvent* level) {
                                    return level->header.tick == 1 && level->linearGain == 0.0;
@@ -1140,7 +1124,7 @@ void konamiSnesZeroNotesAndLegatoMatchDriverGating() {
 
   const auto silentFade =
       renderKonamiSnesProgram(KONAMISNES_V3, {{0xee, 0x80, 0xef, 4, 0x40, 0xe0, 4, 0x3c, 1, 0x7f, 0x7f, 0xff}});
-  const auto silentFadeLevels = performanceEvents<LevelPerformanceEvent>(silentFade.tracks.front());
+  const auto silentFadeLevels = eventsOfType<LevelPerformanceEvent>(silentFade.tracks.front());
   expect(silentFade.tracks.front().automations.empty() && !silentFadeLevels.empty() &&
              std::abs(silentFadeLevels.back()->linearGain - 2.0 / 127.0) < 0.0001,
          "a late volume fade should advance silently at zero note volume and apply its raw result to the next note");
@@ -1149,18 +1133,18 @@ void konamiSnesZeroNotesAndLegatoMatchDriverGating() {
   const auto v1Rate101 = renderKonamiSnesProgram(KONAMISNES_V1, {{0x62, 101, 0x3c, 4, 0xff, 0x3e, 4, 0xff, 0xff}});
   expect(v1Rate100.tracks.front().automations.empty() && v1Rate101.tracks.front().automations.size() == 1,
          "V1 duration 100 should gate for the full note but only 101 should continue a changing pitch");
-  const auto continuedNotes = performanceEvents<NotePerformanceEvent>(v1Rate101.tracks.front());
+  const auto continuedNotes = eventsOfType<NotePerformanceEvent>(v1Rate101.tracks.front());
   expect(continuedNotes.size() == 2 && continuedNotes[1]->restartsLfoPhase &&
              continuedNotes[1]->restartsVibratoLfoPhase == true,
          "a Konami legato source note should still reset its per-note LFO state");
 
   const auto tied = renderKonamiSnesProgram(KONAMISNES_V1, {{0x3c, 4, 100, 0x7f, 0x62, 1, 0xe1, 2, 50, 0xff}});
-  const auto tiedNotes = performanceEvents<NotePerformanceEvent>(tied.tracks.front());
+  const auto tiedNotes = eventsOfType<NotePerformanceEvent>(tied.tracks.front());
   expect(tiedNotes.size() == 2 && tiedNotes.back()->extendsPrevious,
          "E1 should test the preceding note's raw held rate even after the default duration changes");
 
   const auto afterRest = renderKonamiSnesProgram(KONAMISNES_V2, {{0x3c, 2, 0x7f, 0x7f, 0xe0, 1, 0xe1, 2, 0x7f, 0xff}});
-  expect(performanceEvents<NotePerformanceEvent>(afterRest.tracks.front()).size() == 1,
+  expect(eventsOfType<NotePerformanceEvent>(afterRest.tracks.front()).size() == 1,
          "an explicit tie after a rest should not revive the earlier held note");
 
   const auto portamentoAfterRest =
@@ -1169,7 +1153,7 @@ void konamiSnesZeroNotesAndLegatoMatchDriverGating() {
                                                0xe0, 1,                 // rest forces the next note to attack
                                                0xf0, 3,                 // persistent portamento
                                                0x3e, 4, 100, 0x7f, 0xff}});
-  const auto portamentoNotes = performanceEvents<NotePerformanceEvent>(portamentoAfterRest.tracks.front());
+  const auto portamentoNotes = eventsOfType<NotePerformanceEvent>(portamentoAfterRest.tracks.front());
   const auto transition = std::ranges::find_if(
       portamentoAfterRest.tracks.front().automations,
       [](const PerformanceAutomation& automation) { return pitchTransitionIntent(automation) != nullptr; });
@@ -1182,18 +1166,18 @@ void konamiSnesZeroNotesAndLegatoMatchDriverGating() {
 
 void konamiSnesLowCommandsAndInstrumentPanAreVersioned() {
   const auto v1Default = renderKonamiSnesProgram(KONAMISNES_V1, {{0xee, 0x7f, 0x3c, 1, 100, 0x7f, 0x63, 0x00, 0xff}});
-  const auto v1DefaultLevels = performanceEvents<LevelPerformanceEvent>(v1Default.tracks.front());
+  const auto v1DefaultLevels = eventsOfType<LevelPerformanceEvent>(v1Default.tracks.front());
   expect(
       std::ranges::none_of(v1DefaultLevels, [](const LevelPerformanceEvent* level) { return level->header.tick == 1; }),
       "V1 opcode 0x63 should change only the saved default note volume");
 
   const auto tuningPerformance = renderKonamiSnesProgram(KONAMISNES_V5, {{0x78, 0xff}});
-  const auto tuning = performanceEvents<TuningPerformanceEvent>(tuningPerformance.tracks.front());
+  const auto tuning = eventsOfType<TuningPerformanceEvent>(tuningPerformance.tracks.front());
   expect(tuning.size() == 1 && std::abs(tuning.front()->cents + 12.5) < 0.0001,
          "instant-tuning nibble 8 should decode as signed -8");
 
   const auto echoPerformance = renderKonamiSnesProgram(KONAMISNES_V6, {{0xff}, {0x63, 0xe0, 1, 0x64, 0xff}});
-  const auto echo = performanceEvents<ReverbPerformanceEvent>(echoPerformance.tracks[1]);
+  const auto echo = eventsOfType<ReverbPerformanceEvent>(echoPerformance.tracks[1]);
   expect(echo.size() == 3 && echo[1]->voiceMask == 0x02 && echo[2]->voiceMask == 0,
          "V6 low opcodes 0x63 and 0x64 should set and clear the current voice's EON bit");
 
@@ -1212,7 +1196,7 @@ void konamiSnesLowCommandsAndInstrumentPanAreVersioned() {
       .percussionInstrumentTableAddress = 0x4300,
   };
   const auto instrumentPan = renderKonamiSnesAramSequence(bytes, layout);
-  const auto pans = performanceEvents<StereoBalancePerformanceEvent>(instrumentPan.tracks.front());
+  const auto pans = eventsOfType<StereoBalancePerformanceEvent>(instrumentPan.tracks.front());
   expect(pans.size() == 2 && std::abs(pans.back()->leftGain - 0x0e / 256.0) < 0.0001,
          "instrument loads should apply row pan only while the persistent instrument-pan flag is enabled");
 
@@ -1220,7 +1204,7 @@ void konamiSnesLowCommandsAndInstrumentPanAreVersioned() {
   writeLe16(bytes, 0x2000, 0x2002);
   writeBytes(bytes, 0x2002, std::array<u8, 8>{0xfc, 0x80, 0x04, 0x3c, 1, 0x7f, 0x7f, 0xff});
   const auto combined = renderKonamiSnesAramSequence(bytes, layout);
-  const auto levels = performanceEvents<LevelPerformanceEvent>(combined.tracks.front());
+  const auto levels = eventsOfType<LevelPerformanceEvent>(combined.tracks.front());
   expect(!levels.empty() && std::abs(levels.back()->linearGain - 2.0 / 127.0) < 0.0001,
          "FC should mix its new track volume with the newly loaded subtractive instrument volume");
 }
@@ -1363,7 +1347,7 @@ void konamiSnesHeldNoteUsesRealizedInlineSlidePitch() {
                                                0xef, 0xb4, 0x02,              // volume fade
                                                0x0e, 0xb4, 0x7d, 0x7f,        // another held key $0e
                                                0xff}});
-  const auto notes = performanceEvents<NotePerformanceEvent>(performance.tracks[0]);
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks[0]);
   expect(notes.size() == 3 && notes[1]->extendsPrevious && notes[2]->extendsPrevious &&
              notes[0]->note == notes[1]->note && notes[1]->note == notes[2]->note,
          "a held note at an inline slide's realized target should extend the sounding voice");
@@ -1402,7 +1386,7 @@ void konamiSnesHeldNoteRestartsPitchEnvelopeWithoutRetrigger() {
                                                0x4d, 0x06, 0x65, 0x65,  // held key $4d
                                                0x4d, 0x06, 0x65, 0x65,  // repeat without another attack
                                                0xff}});
-  const auto notes = performanceEvents<NotePerformanceEvent>(performance.tracks[0]);
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks[0]);
   expect(notes.size() == 3 && notes[1]->note == notes[2]->note && notes[2]->extendsPrevious,
          "a repeated held key should retain its sounding voice while the pitch envelope restarts");
   expect(std::ranges::count_if(
@@ -1486,4 +1470,33 @@ void konamiSnesPlayOnceCoordinatesGlobalLoopCompletion() {
              repeatedMidi.tracks[0].events,
              [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event.payload); }) == 2,
          "requested Konami loop playback should remain visible in default MIDI output");
+}
+
+void runKonamiSnesModuleTests() {
+  konamiSnesLayoutDiscoversDirectHeaderAndSynthTables();
+  konamiSnesLayoutInfersSpcDirFromInstrumentTables();
+  konamiSnesBatmanReturnsAramUsesV2LayoutAndBoundedBank();
+  konamiSnesModuleDiscoversSequenceInstrumentsAndSamples();
+  konamiSnesSynthParsersStopAtInvalidBankedInstrument();
+  konamiSnesSynthBuilderGroupsPercussionAndPreservesSampleRules();
+  konamiSnesProgramChangeReemitsCurrentFineTune();
+  konamiSnesEarlyVibratoQuantizesRateAtCommandTempo();
+  konamiSnesEchoPreservesGlobalDspState();
+  konamiSnesLinearDriverPitchUsesSharedTransitions();
+  konamiSnesProportionalPortamentoMatchesDriverCurve();
+  konamiSnesPercussionUsesPackedGsDrumBank();
+  konamiSnesCompilerCursorDecodesVersionedFlowAndTruncation();
+  konamiSnesCompilerCursorUsesVersionedOperandLengths();
+  konamiSnesDynamicAdsrMatchesEachDriverFamily();
+  konamiSnesPreservesLateEnvelopeRegisterState();
+  konamiSnesMixerAndPanFollowVersionedDriverMath();
+  konamiSnesZeroNotesAndLegatoMatchDriverGating();
+  konamiSnesLowCommandsAndInstrumentPanAreVersioned();
+  konamiSnesEveryVersionRendersSourceFreeCommands();
+  konamiSnesSequenceSimulationPreservesDriverVibratoDepth();
+  konamiSnesCompiledPlaybackHandlesCallsLoopsTiesAndSlides();
+  konamiSnesHeldNoteUsesRealizedInlineSlidePitch();
+  konamiSnesHeldNoteRestartsPitchEnvelopeWithoutRetrigger();
+  konamiSnesCompiledAutomationTicksFades();
+  konamiSnesPlayOnceCoordinatesGlobalLoopCompletion();
 }

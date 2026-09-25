@@ -4,20 +4,23 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/AkaoSnes/AkaoSnes.h"
 #include "../MidiTestSupport.h"
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
+#include "ValueFormatTestSupport.h"
+
+#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/formats/AkaoSnes/AkaoSnes.h"
 #include "value/formats/AkaoSnes/AkaoSnesV4Lfo.h"
 #include "value/formats/ValueFormats.h"
-#include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 #include "value/synth/SnesDsp.h"
-#include "ValueFormatTestSupport.h"
 
 #include <algorithm>
 #include <array>
-#include <cstddef>
 #include <cmath>
+#include <cstddef>
 #include <stdexcept>
 #include <string>
 #include <variant>
@@ -27,12 +30,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::akao_snes;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void writeLe16(std::vector<u8>& bytes, size_t offset, u16 value) {
   bytes[offset] = static_cast<u8>(value & 0xff);
@@ -76,17 +73,6 @@ PerformanceSequence renderTracks(AkaoSnesProfile profile, std::vector<TrackProgr
       .tracks = std::move(tracks),
   };
   return SequenceVm(options).render(program);
-}
-
-template <class Event>
-std::vector<const Event*> eventsOfType(const PerformanceTrack& track) {
-  std::vector<const Event*> events;
-  for (const PerformanceEvent& event : track.events) {
-    if (const auto* typed = std::get_if<Event>(&event)) {
-      events.push_back(typed);
-    }
-  }
-  return events;
 }
 
 const SourceAnnotation* annotationWithKind(const SourceMap& sourceMap, SourceId source, SourceRole role,
@@ -1205,4 +1191,22 @@ void akaoSnesV4TieExtendsShortenedPreviousNote() {
   expect(note != midi.tracks[0].events.end(), "AkaoSnes V4 tie fixture should render a MIDI note");
   expect(std::get<NoteDuration>(note->payload).duration == 142,
          "AkaoSnes V4 tie should extend the previous shortened note instead of leaving it at 94 ticks");
+}
+
+void runAkaoSnesModuleTests() {
+  akaoSnesLayoutDiscoversFf4StyleAram();
+  akaoSnesLayoutDiscoversLatePercussionTable();
+  akaoSnesModuleDiscoversSequenceInstrumentsAndSamples();
+  akaoSnesV4TieExtendsShortenedPreviousNote();
+  akaoSnesCompilerCursorResolvesRelocatedBranchesWithoutRetainingBytes();
+  akaoSnesCompilerCursorCoversVersionBoundariesAndDurations();
+  akaoSnesDynamicAdsrCoversHardwareFields();
+  akaoSnesV1SoftwareEnvelopesDriveLevelWithoutDynamicInstruments();
+  akaoSnesCompilerCursorCoversRemapsUnknownsAndTruncation();
+  akaoSnesV3VibratoPreservesSquareWaveModesAndSteppedAttack();
+  akaoSnesV4LfosPreserveDriverFamiliesAndPackedModes();
+  akaoSnesCompiledAutomationTicksControllerAndTempoFades();
+  akaoSnesCompilerCursorCoversLoopsAndCpuBranches();
+  akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo();
+  akaoSnesSecretOfManaEchoEventsEmitReverb();
 }

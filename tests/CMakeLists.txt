@@ -9,178 +9,120 @@ if(ENABLE_SHELL)
             -P ${CMAKE_CURRENT_SOURCE_DIR}/shell/ShellCliTests.cmake)
 endif()
 
-add_executable(vgmtrans-value-core-tests)
-target_sources(vgmtrans-value-core-tests
-  PRIVATE
-    formats/AsciiShuichiSnesModuleTests.cpp
-    formats/CapcomSnesModuleTests.cpp
-    formats/CompileSnesModuleTests.cpp
-    formats/FalcomSnesModuleTests.cpp
-    formats/GraphResSnesModuleTests.cpp
-    formats/HeartBeatPS1ModuleTests.cpp
-    formats/HeartBeatSnesModuleTests.cpp
-    formats/HudsonSnesModuleTests.cpp
-    formats/ItikitiSnesModuleTests.cpp
-    formats/SculptSoftSnesModuleTests.cpp
-    formats/MoriSnesModuleTests.cpp
-    formats/CpsModuleTests.cpp
-    formats/KonamiArcadeModuleTests.cpp
-    formats/KonamiPS1ModuleTests.cpp
-    formats/KonamiTMNT2ModuleTests.cpp
-    formats/KonamiSnesModuleTests.cpp
-    formats/Mp2kModuleTests.cpp
-    formats/NamcoSnesModuleTests.cpp
-    formats/NeverlandSnesModuleTests.cpp
-    formats/NinSnesModuleTests.cpp
-    formats/HOSAModuleTests.cpp
-    formats/PandoraBoxSnesModuleTests.cpp
-    formats/PrismSnesModuleTests.cpp
-    formats/RareSnesModuleTests.cpp
-    formats/AkaoSnesModuleTests.cpp
-    formats/AkaoFormatTests.cpp
-    formats/NdsModuleTests.cpp
-    formats/SegSatModuleTests.cpp
-    formats/SonyPS1ModuleTests.cpp
-    formats/SoftCreatSnesModuleTests.cpp
-    formats/SuzukiPS1ModuleTests.cpp
-    formats/SuzukiSnesModuleTests.cpp
-    formats/TamsoftPS1ModuleTests.cpp
-    formats/TriAcePS1ModuleTests.cpp
-    formats/WolfTeamSnesModuleTests.cpp
-    core/SessionSnapshotBuilder.h
-    core/ValueCollectionDiscoveryTests.cpp
-    core/ValueCollectionStitchTests.cpp
-    core/ValueCompilerCursorTests.cpp
-    core/ValueInstrumentVariantTests.cpp
-    core/ValueMidiTests.cpp
-    core/ValuePsxTests.cpp
-    core/ValueRegistryTests.cpp
-    core/ValueSequenceModelTests.cpp
-    core/ValueSequenceVmTests.cpp
-    core/ValueSessionTests.cpp
-    core/ValueSourceMapTests.cpp
-    core/SampleFilteringTests.cpp
-    core/ValueSynthBuilderTests.cpp
-    core/ValueSynthExportTests.cpp
-    core/ValueCoreTests.cpp
+# Format regressions run once, in their own executables. The core suite only
+# contains architecture tests, so a format failure does not hide unrelated tests.
+function(add_value_test target)
+  add_executable(${target} ${ARGN})
+  target_link_libraries(${target} PRIVATE vgmtransvalueformats vgmtransvaluecore ZLIB::ZLIB)
+  target_compile_features(${target} PRIVATE cxx_std_20)
+  add_test(NAME ${target} COMMAND ${target})
+endfunction()
+
+function(add_value_format_test target source suite)
+  add_value_test(${target} ${source} TestMain.cpp)
+  target_compile_definitions(${target} PRIVATE VGMTRANS_TEST_SUITE=${suite})
+endfunction()
+
+add_value_test(vgmtrans-value-core-tests
+  core/ValueCollectionDiscoveryTests.cpp
+  core/ValueCollectionStitchTests.cpp
+  core/ValueCompilerCursorTests.cpp
+  core/ValueInstrumentVariantTests.cpp
+  core/ValueMidiEncodingTests.cpp
+  core/ValueMidiRendererTests.cpp
+  core/ValueMidiPitchTests.cpp
+  core/ValueMidiModulationTests.cpp
+  core/ValueSequenceExportTests.cpp
+  core/ValueModulationTests.cpp
+  core/ValuePsxTests.cpp
+  core/ValueRegistryTests.cpp
+  core/ValueSequenceModelTests.cpp
+  core/ValueSequenceVmTests.cpp
+  core/ValueSessionTests.cpp
+  core/ValueSourceMapTests.cpp
+  core/ValueSampleTests.cpp
+  core/ValueSynthBuilderTests.cpp
+  core/ValueSynthExportTests.cpp
+  core/ValueCollectionExportTests.cpp
+  core/ValueCoreTests.cpp
 )
-target_link_libraries(vgmtrans-value-core-tests PRIVATE vgmtransvalueformats vgmtransvaluecore ZLIB::ZLIB)
-target_compile_features(vgmtrans-value-core-tests PRIVATE cxx_std_20)
 
-add_test(NAME vgmtrans-value-core-tests COMMAND vgmtrans-value-core-tests)
+add_value_test(vgmtrans-cue-tests core/ValueCueTests.cpp)
 
-add_executable(vgmtrans-cue-tests core/ValueCueTests.cpp)
-target_link_libraries(vgmtrans-cue-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
-target_compile_features(vgmtrans-cue-tests PRIVATE cxx_std_20)
-add_test(NAME vgmtrans-cue-tests COMMAND vgmtrans-cue-tests)
-
-add_executable(vgmtrans-nin-snes-tests
-  formats/NinSnesModuleTests.cpp
-  formats/NinSnesTestMain.cpp)
-target_link_libraries(vgmtrans-nin-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore ZLIB::ZLIB)
-target_compile_features(vgmtrans-nin-snes-tests PRIVATE cxx_std_20)
-add_test(NAME vgmtrans-nin-snes-tests COMMAND vgmtrans-nin-snes-tests)
-
-add_executable(vgmtrans-konami-ps1-tests
-  formats/KonamiPS1ModuleTests.cpp
-  formats/KonamiPS1TestMain.cpp)
-target_link_libraries(vgmtrans-konami-ps1-tests PRIVATE vgmtransvalueformats vgmtransvaluecore ZLIB::ZLIB)
-target_compile_features(vgmtrans-konami-ps1-tests PRIVATE cxx_std_20)
-add_test(NAME vgmtrans-konami-ps1-tests COMMAND vgmtrans-konami-ps1-tests)
-
-add_executable(vgmtrans-hosa-tests
-  formats/HOSAModuleTests.cpp
-  formats/HOSATestMain.cpp)
-target_link_libraries(vgmtrans-hosa-tests PRIVATE vgmtransvalueformats vgmtransvaluecore ZLIB::ZLIB)
-target_compile_features(vgmtrans-hosa-tests PRIVATE cxx_std_20)
-add_test(NAME vgmtrans-hosa-tests COMMAND vgmtrans-hosa-tests)
-
-add_executable(vgmtrans-namco-snes-tests
-  formats/NamcoSnesModuleTests.cpp
-  formats/NamcoSnesTestMain.cpp)
-target_link_libraries(vgmtrans-namco-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
-target_compile_features(vgmtrans-namco-snes-tests PRIVATE cxx_std_20)
-add_test(NAME vgmtrans-namco-snes-tests COMMAND vgmtrans-namco-snes-tests)
-
-add_executable(vgmtrans-square-ps2-tests formats/SquarePS2ModuleTests.cpp)
-target_link_libraries(vgmtrans-square-ps2-tests PRIVATE vgmtransvalueformats vgmtransvaluecore ZLIB::ZLIB)
-target_compile_features(vgmtrans-square-ps2-tests PRIVATE cxx_std_20)
-add_test(NAME vgmtrans-square-ps2-tests COMMAND vgmtrans-square-ps2-tests)
-
-add_executable(vgmtrans-sony-ps2-tests formats/SonyPS2ModuleTests.cpp)
-target_link_libraries(vgmtrans-sony-ps2-tests PRIVATE vgmtransvalueformats vgmtransvaluecore ZLIB::ZLIB)
-target_compile_features(vgmtrans-sony-ps2-tests PRIVATE cxx_std_20)
-add_test(NAME vgmtrans-sony-ps2-tests COMMAND vgmtrans-sony-ps2-tests)
-
-add_executable(vgmtrans-compile-snes-tests
-  formats/CompileSnesModuleTests.cpp
-  formats/CompileSnesTestMain.cpp)
-target_link_libraries(vgmtrans-compile-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
-target_compile_features(vgmtrans-compile-snes-tests PRIVATE cxx_std_20)
-add_test(NAME vgmtrans-compile-snes-tests COMMAND vgmtrans-compile-snes-tests)
-
-add_executable(vgmtrans-mp2k-tests
-  formats/Mp2kModuleTests.cpp
-  formats/Mp2kTestMain.cpp)
-target_link_libraries(vgmtrans-mp2k-tests PRIVATE vgmtransvalueformats vgmtransvaluecore ZLIB::ZLIB)
-target_compile_features(vgmtrans-mp2k-tests PRIVATE cxx_std_20)
-add_test(NAME vgmtrans-mp2k-tests COMMAND vgmtrans-mp2k-tests)
-
-add_executable(vgmtrans-hudson-snes-tests
-  formats/HudsonSnesModuleTests.cpp
-  formats/HudsonSnesTestMain.cpp
-)
-target_link_libraries(vgmtrans-hudson-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
-target_compile_features(vgmtrans-hudson-snes-tests PRIVATE cxx_std_20)
-add_test(NAME vgmtrans-hudson-snes-tests COMMAND vgmtrans-hudson-snes-tests)
-
-add_executable(vgmtrans-heartbeat-snes-tests
-  formats/HeartBeatSnesModuleTests.cpp
-  formats/HeartBeatSnesTestMain.cpp
-)
-target_link_libraries(vgmtrans-heartbeat-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
-target_compile_features(vgmtrans-heartbeat-snes-tests PRIVATE cxx_std_20)
-add_test(NAME vgmtrans-heartbeat-snes-tests COMMAND vgmtrans-heartbeat-snes-tests)
-
-add_executable(vgmtrans-ascii-shuichi-snes-tests
-  formats/AsciiShuichiSnesModuleTests.cpp
-  formats/AsciiShuichiSnesTestMain.cpp
-)
-target_link_libraries(vgmtrans-ascii-shuichi-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
-target_compile_features(vgmtrans-ascii-shuichi-snes-tests PRIVATE cxx_std_20)
-add_test(NAME vgmtrans-ascii-shuichi-snes-tests COMMAND vgmtrans-ascii-shuichi-snes-tests)
-
-add_executable(vgmtrans-prism-snes-tests
-  formats/PrismSnesModuleTests.cpp
-  formats/PrismSnesTestMain.cpp
-)
-target_link_libraries(vgmtrans-prism-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
-target_compile_features(vgmtrans-prism-snes-tests PRIVATE cxx_std_20)
-add_test(NAME vgmtrans-prism-snes-tests COMMAND vgmtrans-prism-snes-tests)
-
-add_executable(vgmtrans-falcom-snes-tests
-  formats/FalcomSnesModuleTests.cpp
-  formats/FalcomSnesTestMain.cpp
-)
-target_link_libraries(vgmtrans-falcom-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
-target_compile_features(vgmtrans-falcom-snes-tests PRIVATE cxx_std_20)
-add_test(NAME vgmtrans-falcom-snes-tests COMMAND vgmtrans-falcom-snes-tests)
-
-add_executable(vgmtrans-chun-snes-tests
-  formats/ChunSnesModuleTests.cpp
-  formats/ChunSnesTestMain.cpp
-)
-target_link_libraries(vgmtrans-chun-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
-target_compile_features(vgmtrans-chun-snes-tests PRIVATE cxx_std_20)
-add_test(NAME vgmtrans-chun-snes-tests COMMAND vgmtrans-chun-snes-tests)
-
-add_executable(vgmtrans-wolf-team-snes-tests
-  formats/WolfTeamSnesModuleTests.cpp
-  formats/WolfTeamSnesTestMain.cpp
-)
-target_link_libraries(vgmtrans-wolf-team-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
-target_compile_features(vgmtrans-wolf-team-snes-tests PRIVATE cxx_std_20)
-add_test(NAME vgmtrans-wolf-team-snes-tests COMMAND vgmtrans-wolf-team-snes-tests)
+add_value_format_test(vgmtrans-akao-tests
+  formats/AkaoFormatTests.cpp runAkaoFormatTests)
+add_value_format_test(vgmtrans-akao-snes-tests
+  formats/AkaoSnesModuleTests.cpp runAkaoSnesModuleTests)
+add_value_test(vgmtrans-ascii-shuichi-snes-tests
+  formats/AsciiShuichiSnesModuleTests.cpp formats/AsciiShuichiSnesTestMain.cpp)
+add_value_format_test(vgmtrans-capcom-snes-tests
+  formats/CapcomSnesModuleTests.cpp runCapcomSnesModuleTests)
+add_value_test(vgmtrans-chun-snes-tests
+  formats/ChunSnesModuleTests.cpp formats/ChunSnesTestMain.cpp)
+add_value_format_test(vgmtrans-compile-snes-tests
+  formats/CompileSnesModuleTests.cpp runCompileSnesModuleTests)
+add_value_format_test(vgmtrans-cps-tests
+  formats/CpsModuleTests.cpp runCpsModuleTests)
+add_value_test(vgmtrans-falcom-snes-tests
+  formats/FalcomSnesModuleTests.cpp formats/FalcomSnesTestMain.cpp)
+add_value_format_test(vgmtrans-graph-res-snes-tests
+  formats/GraphResSnesModuleTests.cpp runGraphResSnesModuleTests)
+add_value_test(vgmtrans-hosa-tests
+  formats/HOSAModuleTests.cpp formats/HOSATestMain.cpp)
+add_value_format_test(vgmtrans-heart-beat-ps1-tests
+  formats/HeartBeatPS1ModuleTests.cpp runHeartBeatPs1ModuleTests)
+add_value_test(vgmtrans-heartbeat-snes-tests
+  formats/HeartBeatSnesModuleTests.cpp formats/HeartBeatSnesTestMain.cpp)
+add_value_format_test(vgmtrans-hudson-snes-tests
+  formats/HudsonSnesModuleTests.cpp runHudsonSnesModuleTests)
+add_value_format_test(vgmtrans-itikiti-snes-tests
+  formats/ItikitiSnesModuleTests.cpp runItikitiSnesModuleTests)
+add_value_format_test(vgmtrans-konami-arcade-tests
+  formats/KonamiArcadeModuleTests.cpp runKonamiArcadeModuleTests)
+add_value_test(vgmtrans-konami-ps1-tests
+  formats/KonamiPS1ModuleTests.cpp formats/KonamiPS1TestMain.cpp)
+add_value_format_test(vgmtrans-konami-snes-tests
+  formats/KonamiSnesModuleTests.cpp runKonamiSnesModuleTests)
+add_value_format_test(vgmtrans-konami-tmnt2-tests
+  formats/KonamiTMNT2ModuleTests.cpp runKonamiTMNT2ModuleTests)
+add_value_format_test(vgmtrans-mori-snes-tests
+  formats/MoriSnesModuleTests.cpp runMoriSnesModuleTests)
+add_value_test(vgmtrans-mp2k-tests
+  formats/Mp2kModuleTests.cpp formats/Mp2kTestMain.cpp)
+add_value_test(vgmtrans-namco-snes-tests
+  formats/NamcoSnesModuleTests.cpp formats/NamcoSnesTestMain.cpp)
+add_value_format_test(vgmtrans-nds-tests
+  formats/NdsModuleTests.cpp runNdsModuleTests)
+add_value_format_test(vgmtrans-neverland-snes-tests
+  formats/NeverlandSnesModuleTests.cpp runNeverlandSnesModuleTests)
+add_value_test(vgmtrans-nin-snes-tests
+  formats/NinSnesModuleTests.cpp formats/NinSnesTestMain.cpp)
+add_value_format_test(vgmtrans-pandora-box-snes-tests
+  formats/PandoraBoxSnesModuleTests.cpp runPandoraBoxSnesModuleTests)
+add_value_format_test(vgmtrans-prism-snes-tests
+  formats/PrismSnesModuleTests.cpp runPrismSnesModuleTests)
+add_value_format_test(vgmtrans-rare-snes-tests
+  formats/RareSnesModuleTests.cpp runRareSnesModuleTests)
+add_value_test(vgmtrans-sculpt-soft-snes-tests
+  formats/SculptSoftSnesModuleTests.cpp formats/SculptSoftSnesTestMain.cpp)
+add_value_format_test(vgmtrans-seg-sat-tests
+  formats/SegSatModuleTests.cpp runSegSatModuleTests)
+add_value_format_test(vgmtrans-soft-creat-snes-tests
+  formats/SoftCreatSnesModuleTests.cpp runSoftCreatSnesModuleTests)
+add_value_format_test(vgmtrans-sony-ps1-tests
+  formats/SonyPS1ModuleTests.cpp runSonyPS1ModuleTests)
+add_value_test(vgmtrans-sony-ps2-tests formats/SonyPS2ModuleTests.cpp)
+add_value_test(vgmtrans-square-ps2-tests formats/SquarePS2ModuleTests.cpp)
+add_value_format_test(vgmtrans-suzuki-ps1-tests
+  formats/SuzukiPS1ModuleTests.cpp runSuzukiPS1ModuleTests)
+add_value_format_test(vgmtrans-suzuki-snes-tests
+  formats/SuzukiSnesModuleTests.cpp runSuzukiSnesModuleTests)
+add_value_format_test(vgmtrans-tamsoft-ps1-tests
+  formats/TamsoftPS1ModuleTests.cpp runTamsoftPs1ModuleTests)
+add_value_format_test(vgmtrans-tri-ace-ps1-tests
+  formats/TriAcePS1ModuleTests.cpp runTriAcePs1ModuleTests)
+add_value_test(vgmtrans-wolf-team-snes-tests
+  formats/WolfTeamSnesModuleTests.cpp formats/WolfTeamSnesTestMain.cpp)
 
 if(ENABLE_UI_QT)
   add_executable(vgmtrans-value-ui-tests ui/ValueUiModelTests.cpp)
@@ -320,10 +262,3 @@ foreach(segsat_file IN LISTS VGMTRANS_PARITY_SEGSAT_FILES)
     "vgmtrans-parity-segsat-${segsat_parity_index}-synth"
     PROPERTIES RUN_SERIAL TRUE)
 endforeach()
-
-add_executable(vgmtrans-sculpt-soft-snes-tests
-  formats/SculptSoftSnesModuleTests.cpp
-  formats/SculptSoftSnesTestMain.cpp)
-target_link_libraries(vgmtrans-sculpt-soft-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore ZLIB::ZLIB)
-target_compile_features(vgmtrans-sculpt-soft-snes-tests PRIVATE cxx_std_20)
-add_test(NAME vgmtrans-sculpt-soft-snes-tests COMMAND vgmtrans-sculpt-soft-snes-tests)

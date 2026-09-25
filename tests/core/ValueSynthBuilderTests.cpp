@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "../TestSupport.h"
+
 #include "value/base/RecordReader.h"
 #include "value/platform/SnesSampleDirectory.h"
 #include "value/scan/ScanResultBuilder.h"
@@ -19,12 +21,6 @@
 using namespace vgmtrans::core;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 bool hasLink(const SourceAnnotation& annotation, SourceLinkRole role, const SourceTarget& target) {
   return std::ranges::any_of(annotation.links,

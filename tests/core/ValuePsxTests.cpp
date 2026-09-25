@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "../TestSupport.h"
+
 #include "value/base/Source.h"
 #include "value/synth/PsxAdpcm.h"
 #include "value/synth/PsxSpu.h"
@@ -17,12 +19,6 @@
 using namespace vgmtrans::core;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void psxAdsrRegistersAndEnvelopeAreSharedValues() {
   expect(composePsxAdsr1(1, 0x7f, 0x0f, 0x0f) == 0xffff, "PSX ADSR1 composition should preserve every native field");

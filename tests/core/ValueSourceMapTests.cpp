@@ -4,9 +4,16 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "ValueTestSupport.h"
+#include "../TestSupport.h"
+#include "SessionTestSupport.h"
+
 #include "value/session/SessionState.h"
 #include "value/validation/ScanValidation.h"
+
+#include <algorithm>
+#include <array>
+
+using namespace vgmtrans::core;
 
 namespace {
 
@@ -131,37 +138,31 @@ void sourceAnnotationsCarryOutlinePolicyForTreeConsumers() {
 }
 
 void sourceMapRejectsDuplicateAnnotationIds() {
-  bool sourceMapThrew = false;
-  try {
-    static_cast<void>(SourceMap{{
-        SourceAnnotation{
-            .id = SourceAnnotationId{7},
-            .range = SourceRange{.source = SourceId{3}, .offset = 0, .size = 1},
-            .role = SourceRole::Header,
-            .label = "First",
-        },
-        SourceAnnotation{
-            .id = SourceAnnotationId{7},
-            .range = SourceRange{.source = SourceId{3}, .offset = 1, .size = 1},
-            .role = SourceRole::Header,
-            .label = "Second",
-        },
-    }});
-  } catch (const std::logic_error&) {
-    sourceMapThrew = true;
-  }
-  expect(sourceMapThrew, "source map should reject duplicate annotation ids");
+  expectThrows<std::logic_error>(
+      [&] {
+        static_cast<void>(SourceMap{{
+            SourceAnnotation{
+                .id = SourceAnnotationId{7},
+                .range = SourceRange{.source = SourceId{3}, .offset = 0, .size = 1},
+                .role = SourceRole::Header,
+                .label = "First",
+            },
+            SourceAnnotation{
+                .id = SourceAnnotationId{7},
+                .range = SourceRange{.source = SourceId{3}, .offset = 1, .size = 1},
+                .role = SourceRole::Header,
+                .label = "Second",
+            },
+        }});
+      },
+      "source map should reject duplicate annotation ids");
 
   SourceMapBuilder builder([]() { return SourceAnnotationId{9}; });
   static_cast<void>(builder.header("First", SourceRange{.source = SourceId{3}, .offset = 0, .size = 1}));
 
-  bool builderThrew = false;
-  try {
-    static_cast<void>(builder.header("Second", SourceRange{.source = SourceId{3}, .offset = 1, .size = 1}));
-  } catch (const std::logic_error&) {
-    builderThrew = true;
-  }
-  expect(builderThrew, "source map builder should reject duplicate annotation ids from its allocator");
+  expectThrows<std::logic_error>(
+      [&] { static_cast<void>(builder.header("Second", SourceRange{.source = SourceId{3}, .offset = 1, .size = 1})); },
+      "source map builder should reject duplicate annotation ids from its allocator");
 }
 
 void annotationViewsOutliveJoinedSourceMaps() {
@@ -193,19 +194,17 @@ void sessionStateRejectsCrossScanAnnotationIdCollisions() {
                                     }}},
                                 });
 
-  bool threw = false;
-  try {
-    state.appendScan(SourceId{2}, ScanResult{
-                                      .sourceMap = SourceMap{{SourceAnnotation{
-                                          .id = SourceAnnotationId{7},
-                                          .range = SourceRange{.source = SourceId{2}, .offset = 0, .size = 1},
-                                          .label = "Second",
-                                      }}},
-                                  });
-  } catch (const std::invalid_argument&) {
-    threw = true;
-  }
-  expect(threw, "session state should reject annotation ids already owned by another scan");
+  expectThrows<std::invalid_argument>(
+      [&] {
+        state.appendScan(SourceId{2}, ScanResult{
+                                          .sourceMap = SourceMap{{SourceAnnotation{
+                                              .id = SourceAnnotationId{7},
+                                              .range = SourceRange{.source = SourceId{2}, .offset = 0, .size = 1},
+                                              .label = "Second",
+                                          }}},
+                                      });
+      },
+      "session state should reject annotation ids already owned by another scan");
   expect(state.sourceMap().annotations().size() == 1,
          "a rejected scan append should leave the existing annotations unchanged");
 }
@@ -229,13 +228,8 @@ void sessionStatePreflightsSourceAnnotationIdCollisions() {
       }}},
   };
 
-  bool threw = false;
-  try {
-    state.appendScan(SourceId{2}, std::move(result));
-  } catch (const std::invalid_argument&) {
-    threw = true;
-  }
-  expect(threw, "session state should reject source annotation ids owned by an earlier scan");
+  expectThrows<std::invalid_argument>([&] { state.appendScan(SourceId{2}, std::move(result)); },
+                                      "session state should reject source annotation ids owned by an earlier scan");
   expect(state.assets().empty(), "source annotation collision should be rejected before scan assets are published");
   expect(state.sourceMap().annotations().size() == 1,
          "source annotation collision should not mutate existing session state");

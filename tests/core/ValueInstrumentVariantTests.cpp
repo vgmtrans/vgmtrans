@@ -4,11 +4,19 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "ValueTestSupport.h"
 #include "../MidiTestSupport.h"
+#include "../TestSupport.h"
+#include "SynthExportTestSupport.h"
 
 #include "value/export/InstrumentVariants.h"
 #include "value/export/PerformanceInstrumentSelection.h"
+#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/export/synth/SynthExportData.h"
+
+#include <algorithm>
+#include <array>
+
+using namespace vgmtrans::core;
 
 namespace {
 
@@ -73,11 +81,20 @@ void instrumentSelectionPreservesIdentityAndFallbackPolicies() {
   exactMatch.name = "Identity match";
   const SoundBankAsset bank{.instruments = {addressMatch, exactMatch, addressMatch, exactMatch}};
 
-  for (const u32 mode : {0, 1, 2, 3}) {
-    InstrumentPerformanceEvent selection{.header = eventHeader(0, 0), .instrument = InstrumentAddress{.program = 5}};
-    if (mode < 2) {
-      selection.instrument = InstrumentIdentity{.domain = mode == 0 ? "dynamic-envelope-test" : "missing", .key = 5};
-    }
+  struct SelectionCase {
+    decltype(InstrumentPerformanceEvent::instrument) selection;
+    std::optional<InstrumentAddress> noteAddress;
+    size_t firstMatch;
+    const Instrument* performanceMatch;
+  };
+  const std::array cases{
+      SelectionCase{InstrumentIdentity{.domain = "dynamic-envelope-test", .key = 5}, {}, 1, &bank.instruments[1]},
+      SelectionCase{InstrumentIdentity{.domain = "missing", .key = 5}, {}, 0, nullptr},
+      SelectionCase{InstrumentAddress{.program = 5}, {}, 0, &bank.instruments[0]},
+      SelectionCase{InstrumentAddress{.program = 5}, InstrumentAddress{.program = 7}, 1, &bank.instruments[0]},
+  };
+  for (const auto& test : cases) {
+    const InstrumentPerformanceEvent selection{.header = eventHeader(0, 0), .instrument = test.selection};
     const auto performance = sequenceWithEvents({
         selection,
         EnvelopePerformanceEvent{
@@ -86,17 +103,16 @@ void instrumentSelectionPreservesIdentityAndFallbackPolicies() {
         NotePerformanceEvent{.header = eventHeader(0, 2),
                              .key = 60,
                              .durationTicks = 4,
-                             .instrumentAddress = mode == 3 ? std::optional{InstrumentAddress{0, 7}} : std::nullopt,
+                             .instrumentAddress = test.noteAddress,
                              .note = PerformanceNoteId{1}},
     });
     const std::array<const SoundBankAsset*, 2> inputs{nullptr, &bank};
     const auto selected = selectSynthInstruments(inputs, &performance);
-    const size_t first = mode == 0 || mode == 3 ? 1 : 0;
+    const size_t first = test.firstMatch;
     expect(selected == std::vector<const Instrument*>{&bank.instruments[first], &bank.instruments[first + 2]},
            "used-instrument filtering must prefer exact identities, fall back to addresses, and retain every match in "
            "bank order");
-    expect(findPerformanceInstrument(selection.instrument, inputs) ==
-               (mode == 1 ? nullptr : &bank.instruments[mode == 0 ? 1 : 0]),
+    expect(findPerformanceInstrument(selection.instrument, inputs) == test.performanceMatch,
            "ordinary performance lookup must require an exact identity and select only its first match");
 
     std::array banks{bank};

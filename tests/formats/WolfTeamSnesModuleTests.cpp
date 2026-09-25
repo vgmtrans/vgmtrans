@@ -4,10 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/WolfTeamSnes/WolfTeamSnes.h"
 #include "../MidiTestSupport.h"
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
 
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/formats/WolfTeamSnes/WolfTeamSnes.h"
 #include "value/platform/SnesSampleDirectory.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
@@ -24,12 +26,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::wolf_team_snes;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void writeBytes(std::vector<u8>& bytes, u32 offset, std::initializer_list<u8> values) {
   std::ranges::copy(values, bytes.begin() + offset);
@@ -91,17 +87,6 @@ Layout directArcusLayout(std::vector<u16> streams) {
                                       .entrySize = 6,
                                       .confirmed = true},
   };
-}
-
-template <class Event>
-std::vector<const Event*> events(const PerformanceTrack& track) {
-  std::vector<const Event*> result;
-  for (const PerformanceEvent& event : track.events) {
-    if (const auto* typed = std::get_if<Event>(&event)) {
-      result.push_back(typed);
-    }
-  }
-  return result;
 }
 
 PerformanceSequence render(const Layout& layout, std::vector<u8> bytes) {
@@ -217,12 +202,12 @@ void lateCommandsRenderLoopsSplitsLfoAndDynamicAdsr() {
   expect(performance.diagnostics.empty() && performance.tracks.size() == 1,
          "source-free late playback should finish without VM diagnostics");
   const PerformanceTrack& track = performance.tracks.front();
-  expect(!sequenceConfig().behavior.initialMonoModeChannels && events<MonoModePerformanceEvent>(track).empty(),
+  expect(!sequenceConfig().behavior.initialMonoModeChannels && eventsOfType<MonoModePerformanceEvent>(track).empty(),
          "polyphonic Wolf Team tracks must not emit a MIDI mono-mode initialization");
-  const auto notes = events<NotePerformanceEvent>(track);
-  const auto instruments = events<InstrumentPerformanceEvent>(track);
-  const auto envelopes = events<EnvelopePerformanceEvent>(track);
-  const auto balances = events<StereoBalancePerformanceEvent>(track);
+  const auto notes = eventsOfType<NotePerformanceEvent>(track);
+  const auto instruments = eventsOfType<InstrumentPerformanceEvent>(track);
+  const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(track);
+  const auto balances = eventsOfType<StereoBalancePerformanceEvent>(track);
   expect(notes.size() == 2 && notes[0]->key == 32.0 && notes[0]->durationTicks == 4 && notes[1]->key == 84.0,
          "late notes should preserve delay/gate duration and normalize driver pitch indexes into its 0-95 table");
   expect(instruments.size() >= 4 &&
@@ -297,8 +282,8 @@ void arcusSustainsUntilKeyOffAndUsesPhysicalPitch() {
   writeBytes(bytes, 0x3040, {0xf8});
   const PerformanceSequence performance = render(directArcusLayout({0x3000, 0x3040}), bytes);
   const PerformanceTrack& track = performance.tracks.front();
-  const auto notes = events<NotePerformanceEvent>(track);
-  const auto bends = events<PitchBendPerformanceEvent>(track);
+  const auto notes = eventsOfType<NotePerformanceEvent>(track);
+  const auto bends = eventsOfType<PitchBendPerformanceEvent>(track);
   expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->durationTicks == 5,
          "Arcus gate zero should remain sustained through pitch commands until E0 keys the voice off");
   expect(notes.front()->key == 72.0 && !bends.empty() && bends.back()->semitones > 0.0 && !track.automations.empty(),
@@ -317,7 +302,7 @@ void duplicateSegmentPointersUseRuntimeIndex() {
   layout.instruments.patchMapAddress.reset();
   layout.instruments.entrySize = 8;
   const PerformanceSequence performance = render(layout, bytes);
-  expect(performance.diagnostics.empty() && events<NotePerformanceEvent>(performance.tracks.front()).size() == 1,
+  expect(performance.diagnostics.empty() && eventsOfType<NotePerformanceEvent>(performance.tracks.front()).size() == 1,
          "duplicate segment pointers must advance by runtime segment index instead of looping on one source address");
 }
 
@@ -328,7 +313,7 @@ void segmentedKeyOffRevisesEveryActiveNoteIdentity() {
   writeBytes(bytes, 0x0500, {0x00, 0x8f, 0xe0, 0x00, 0, 0});
   writeBytes(bytes, 0x3000, {0x60, 0x01, 0x0a, 0x7f, 0x61, 0x02, 0x00, 0x7f, 0xe0, 0x00, 0xfd});
   const PerformanceSequence performance = render(directArcusLayout({0x3000}), bytes);
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 2 && notes[0]->header.tick == 0 &&
              notes[0]->durationTicks == 3 && notes[1]->header.tick == 1 && notes[1]->durationTicks == 2,
          "E0 must truncate every still-active gated or sustained note without revising unrelated note identities");
@@ -342,7 +327,7 @@ void duplicatePhrasePointersUseRuntimeIndex() {
   writeBytes(bytes, 0x3040, {0x30, 0x01, 0xff, 0xff, 0x91});
   const Layout layout = directLateLayout(Variant::TalesOfPhantasia, {0x3000, 0x3000, 0x3040});
   const PerformanceSequence performance = render(layout, bytes);
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->header.tick == 4,
          "duplicate phrase pointers and their loop markers must use runtime phrase state instead of a source address");
 }
@@ -353,7 +338,7 @@ void nestedLateLoopMarkersPreferTheInnerCounter() {
   addLatePitchTable(bytes);
   writeBytes(bytes, 0x3000, {0x92, 0x90, 0x01, 0x92, 0x90, 0x01, 0x93, 0x02, 0x93, 0x02, 0x30, 0x01, 0xff, 0xff, 0x91});
   const PerformanceSequence performance = render(directLateLayout(Variant::TalesOfPhantasia, {0x3000}), bytes);
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->header.tick == 6,
          "nested 92/93 loops must exhaust and reset the inner marker before advancing the outer counter");
 }
@@ -365,8 +350,8 @@ void leadingJockeyProgramChangesCarryTheirDelay() {
   writeBytes(bytes, 0x3000, {0x96, 0x05, 0x03, 0x30, 0x01, 0xff, 0xff, 0x91});
   const Layout layout = directLateLayout(Variant::LeadingJockey, {0x3000}, LateTraits{0x48, false, false, true});
   const PerformanceSequence performance = render(layout, bytes);
-  const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks.front());
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto instruments = eventsOfType<InstrumentPerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->header.tick == 5 &&
              instruments.size() == 2 && std::get<InstrumentIdentity>(instruments.back()->instrument).key == 3,
          "Leading Jockey's three-byte 96 must select the direct SRCN before applying its encoded delay");
@@ -383,8 +368,8 @@ void middleFinePitchInterpolatesAdjacentDspWords() {
   layout.instruments.patchMapAddress.reset();
   layout.instruments.entrySize = 8;
   const PerformanceSequence performance = render(layout, bytes);
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
-  const auto tunings = events<TuningPerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
+  const auto tunings = eventsOfType<TuningPerformanceEvent>(performance.tracks.front());
   const int previous = static_cast<int>(bytes[0x0180] | (bytes[0x0181] << 8)) * 2;
   const int base = static_cast<int>(bytes[0x0182] | (bytes[0x0183] << 8)) * 2;
   const int next = static_cast<int>(bytes[0x0184] | (bytes[0x0185] << 8)) * 2;
@@ -403,7 +388,7 @@ void timerArithmeticKeepsLateWidthAndSegmentedByteWrap() {
   addLatePitchTable(lateBytes);
   writeBytes(lateBytes, 0x3000, {0x95, 0x00, 0x01, 0x91});
   const PerformanceSequence late = render(directLateLayout(Variant::TalesOfPhantasia, {0x3000}), lateBytes);
-  const auto lateTempos = events<TempoPerformanceEvent>(late.tracks.front());
+  const auto lateTempos = eventsOfType<TempoPerformanceEvent>(late.tracks.front());
   expect(lateTempos.size() == 1 && lateTempos.front()->microsecondsPerQuarter == 60000000,
          "late-family timer division must preserve the full 10000 target instead of wrapping it to a byte");
 
@@ -417,7 +402,7 @@ void timerArithmeticKeepsLateWidthAndSegmentedByteWrap() {
   middleLayout.instruments.patchMapAddress.reset();
   middleLayout.instruments.entrySize = 8;
   const PerformanceSequence middle = render(middleLayout, middleBytes);
-  const auto middleTempos = events<TempoPerformanceEvent>(middle.tracks.front());
+  const auto middleTempos = eventsOfType<TempoPerformanceEvent>(middle.tracks.front());
   expect(middleTempos.size() == 1 && middleTempos.front()->microsecondsPerQuarter == 96000,
          "segmented timer targets must retain the driver's byte wrap after rounded division");
 }
@@ -428,7 +413,7 @@ void latePitchBendClampsToTheLegacyTwelveSemitoneWheel() {
   addLatePitchTable(bytes);
   writeBytes(bytes, 0x3000, {0x94, 0x00, 0xff, 0x94, 0x00, 0xbf, 0x91});
   const PerformanceSequence performance = render(directLateLayout(Variant::TalesOfPhantasia, {0x3000}), bytes);
-  const auto bends = events<PitchBendPerformanceEvent>(performance.tracks.front());
+  const auto bends = eventsOfType<PitchBendPerformanceEvent>(performance.tracks.front());
   expect(bends.size() == 2 && bends[0]->semitones == -12.0 &&
              std::abs(bends[1]->semitones - 8191.0 * 12.0 / 8192.0) < 1e-12,
          "94 must clamp wrapped centered bytes to the legacy signed 14-bit pitch-wheel endpoints");
@@ -532,7 +517,7 @@ void sameKeyTimedNotesMoveThePendingNoteOff() {
 
   const PerformanceSequence performance =
       render(directLateLayout(Variant::TalesOfPhantasia, {0x4753, 0x47dc}), std::move(bytes));
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(
       notes.size() == 1 && notes[0]->header.tick == 0 && notes[0]->durationTicks == 192 && !notes[0]->extendsPrevious,
       "Freeze's 0x47dc note must move the pending 0x4753 note-off without another attack");
@@ -553,7 +538,7 @@ void sameKeyTimedNotesMoveThePendingNoteOff() {
   writeBytes(segmented, 0x3000, {0x60, 0x04, 0x0a, 0x7f, 0x60, 0x05, 0x14, 0x7f, 0xfd});
   writeBytes(segmented, 0x3040, {0xe1, 0x1e, 0x7f, 0xfd});
   const PerformanceSequence segmentedPerformance = render(directArcusLayout({0x3000, 0x3040}), std::move(segmented));
-  const auto segmentedNotes = events<NotePerformanceEvent>(segmentedPerformance.tracks.front());
+  const auto segmentedNotes = eventsOfType<NotePerformanceEvent>(segmentedPerformance.tracks.front());
   expect(segmentedNotes.size() == 1 && segmentedNotes.front()->durationTicks == 24,
          "segmented Wolf Team timed notes must use the same pending-note-off behavior");
 }

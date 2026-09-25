@@ -4,11 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/SoftCreatSnes/SoftCreatSnes.h"
-
 #include "../MidiTestSupport.h"
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
 #include "ValueFormatTestSupport.h"
+
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/formats/SoftCreatSnes/SoftCreatSnes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 
@@ -24,12 +26,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::softcreat_snes;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void writeLe16(std::vector<u8>& bytes, u32 offset, u16 value) {
   bytes[offset] = static_cast<u8>(value);
@@ -64,17 +60,6 @@ void writeModernPointerColumns(std::vector<u8>& bytes, u8 songCount,
 void writeSplitPointer(std::vector<u8>& bytes, u16 lowColumn, u16 highColumn, u8 song, u16 address) {
   bytes[lowColumn + song] = static_cast<u8>(address);
   bytes[highColumn + song] = static_cast<u8>(address >> 8);
-}
-
-template <class Event>
-std::vector<const Event*> events(const PerformanceTrack& track) {
-  std::vector<const Event*> result;
-  for (const PerformanceEvent& event : track.events) {
-    if (const auto* typed = std::get_if<Event>(&event)) {
-      result.push_back(typed);
-    }
-  }
-  return result;
 }
 
 PerformanceSequence render(const std::vector<u8>& commands, Version version = Version::V2) {
@@ -365,7 +350,7 @@ void versionedOpcodesRetainTheirRealOperandLengths() {
          "V6d AA should consume a volume-decay factor, not toggle echo");
 
   const PerformanceSequence v1 = render({0x8c, 4, 0x92, 3, 0x20, 0x80}, Version::V1);
-  const auto v1Notes = events<NotePerformanceEvent>(v1.tracks.front());
+  const auto v1Notes = eventsOfType<NotePerformanceEvent>(v1.tracks.front());
   expect(v1.diagnostics.empty() && v1Notes.size() == 1 && v1Notes.front()->durationTicks == 4,
          "V1 should decode its even-numbered commands as their later equivalents");
 }
@@ -376,11 +361,11 @@ void physicalEffectsAndSoftwareGainRender() {
        0x8e, 0, 4, 7, 1, 0xaa, 0xac, 0x40, 0xad, 0xc0, 0xae, 0xe0,
        0xaf, 0x7f, 0, 0, 0, 0, 0, 0, 0, 0x80});
   const PerformanceTrack& track = performance.tracks.front();
-  const auto notes = events<NotePerformanceEvent>(track);
-  const auto expression = events<ExpressionPerformanceEvent>(track);
-  const auto modulation = events<ModulationPerformanceEvent>(track);
-  const auto reverb = events<ReverbPerformanceEvent>(track);
-  const auto balance = events<StereoBalancePerformanceEvent>(track);
+  const auto notes = eventsOfType<NotePerformanceEvent>(track);
+  const auto expression = eventsOfType<ExpressionPerformanceEvent>(track);
+  const auto modulation = eventsOfType<ModulationPerformanceEvent>(track);
+  const auto reverb = eventsOfType<ReverbPerformanceEvent>(track);
+  const auto balance = eventsOfType<StereoBalancePerformanceEvent>(track);
   expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->durationTicks == 8,
          "the feature fixture should render one eight-tick note without diagnostics");
   expect(!expression.empty() && std::ranges::any_of(expression, [](const auto* event) {
@@ -409,8 +394,8 @@ void physicalEffectsAndSoftwareGainRender() {
 void gainHoldContinuesTheCurrentEnvelope() {
   const PerformanceSequence performance =
       render({0xa2, 1, 0, 6, 50, 1, 50, 6, 0x3d, 1, 0x9f, 0x90, 16, 0x9c, 0x3c, 30, 0x80});
-  const auto expression = events<ExpressionPerformanceEvent>(performance.tracks.front());
-  const auto modulation = events<ModulationPerformanceEvent>(performance.tracks.front());
+  const auto expression = eventsOfType<ExpressionPerformanceEvent>(performance.tracks.front());
+  const auto modulation = eventsOfType<ModulationPerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && expression.size() >= 6 && expression[0]->header.tick == 0 &&
              expression[0]->linearGain == 0.0 && expression[1]->header.tick == 1 &&
              std::abs(expression[1]->linearGain - 10.0 / 127.0) < 0.000001 &&
@@ -423,7 +408,7 @@ void restsPreserveTheKeyedVoice() {
   const PerformanceSequence performance =
       render({0xa2, 1, 120, 1, 120, 1, 120, 14, 0x93, 5, 0x84, 2, 0x18, 20, 0x9f, 0x18, 10, 0x18, 10,
               0x93, 0, 0x18, 40, 0, 160, 0, 80, 0x85, 0x9e, 0x19, 1, 0x80});
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   const MidiSequence midi = renderMidiSequence(performance);
   const auto heldNote = std::ranges::find_if(midi.tracks.front().events, [](const MidiEvent& event) {
     const auto* note = std::get_if<NoteDuration>(&event.payload);
@@ -438,32 +423,32 @@ void restsPreserveTheKeyedVoice() {
 
   const PerformanceSequence releasedRest =
       render({0xa2, 1, 120, 1, 120, 1, 120, 14, 0x93, 0, 0x18, 20, 0x93, 5, 0, 20, 0x80});
-  const auto expression = events<ExpressionPerformanceEvent>(releasedRest.tracks.front());
+  const auto expression = eventsOfType<ExpressionPerformanceEvent>(releasedRest.tracks.front());
   expect(std::ranges::any_of(expression, [](const auto* event) { return event->header.tick == 35; }),
          "rest durations should schedule software release just like note durations");
 }
 
 void durationModesLegatoAndRepeatsAreStateful() {
   const PerformanceSequence repeated = render({0x86, 4, 0x84, 2, 1, 0x85, 0x9f, 2, 0x80});
-  const auto notes = events<NotePerformanceEvent>(repeated.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(repeated.tracks.front());
   expect(repeated.diagnostics.empty() && notes.size() == 3 && notes[0]->header.tick == 0 &&
              notes[1]->header.tick == 4 && notes[2]->header.tick == 8 && !notes[2]->restartsEnvelope,
          "persistent duration, repeat-stack counts, and retrigger suppression should share runtime state");
 
   const PerformanceSequence wrappedRepeat = render({0x86, 1, 0x84, 0, 1, 0x85, 0x80});
   expect(wrappedRepeat.diagnostics.empty() &&
-             events<NotePerformanceEvent>(wrappedRepeat.tracks.front()).size() == 256,
+             eventsOfType<NotePerformanceEvent>(wrappedRepeat.tracks.front()).size() == 256,
          "a zero repeat byte should wrap through all 256 SPC700 counter values");
 
   const PerformanceSequence perNote =
       render({0x86, 3, 0xbf, 0, 0x20, 1, 0x40, 0xc0, 2, 0x80}, Version::V6);
-  expect(perNote.diagnostics.empty() && events<NotePerformanceEvent>(perNote.tracks.front()).size() == 2 &&
-             !events<StereoBalancePerformanceEvent>(perNote.tracks.front()).empty(),
+  expect(perNote.diagnostics.empty() && eventsOfType<NotePerformanceEvent>(perNote.tracks.front()).size() == 2 &&
+             !eventsOfType<StereoBalancePerformanceEvent>(perNote.tracks.front()).empty(),
          "late per-note volume mode should consume a suffix on rests and notes and affect the mixer");
 
   const PerformanceSequence polymorphicTail =
       render({0x84, 2, 0, 1, 0xbf, 0x86, 1, 1, 0x40, 0x86, 0, 0x85, 0x80}, Version::V6);
-  const auto polymorphicNotes = events<NotePerformanceEvent>(polymorphicTail.tracks.front());
+  const auto polymorphicNotes = eventsOfType<NotePerformanceEvent>(polymorphicTail.tracks.front());
   expect(polymorphicTail.diagnostics.empty() &&
              std::ranges::count_if(polymorphicNotes, [](const auto* note) { return !note->extendsPrevious; }) == 2,
          "a byte that becomes a per-note suffix on a later pass should retain both control-flow interpretations");
@@ -477,14 +462,14 @@ void durationModesLegatoAndRepeatsAreStateful() {
   repeatedCalls[60] = 0x80;
   writeBytes(repeatedCalls, subroutine - 0x1000, {0x32, 1, 0x83});
   const PerformanceSequence manyCalls = render(repeatedCalls, Version::V7);
-  expect(manyCalls.diagnostics.empty() && events<NotePerformanceEvent>(manyCalls.tracks.front()).size() == 20,
+  expect(manyCalls.diagnostics.empty() && eventsOfType<NotePerformanceEvent>(manyCalls.tracks.front()).size() == 20,
          "repeated calls to one pattern should decode every return continuation");
 }
 
 void finiteRepeatsAreNotSongLoops() {
   const PerformanceSequence performance = render(
       {0x86, 1, 0x84, 4, 0x82, 0x0d, 0x10, 0x85, 2, 0x81, 0x08, 0x10, 0x80, 1, 0x83});
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && performance.tracks.front().endTick == 5 && notes.size() == 5,
          "finite SoftCreatSnes repeats should remain distinct from the following infinite song loop");
 }
@@ -492,8 +477,8 @@ void finiteRepeatsAreNotSongLoops() {
 void perNoteVolumePrecedesLiteralDuration() {
   const PerformanceSequence performance =
       render({0xb9, 0x19, 100, 12, 0x80}, Version::V6c);
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
-  const auto balance = events<StereoBalancePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
+  const auto balance = eventsOfType<StereoBalancePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->durationTicks == 12 &&
              balance.size() == 1 && std::abs(balance.front()->rightGain - 100.0 / 256.0) < 0.000001,
          "per-note mode should read volume before a literal duration, matching the SPC700 driver");
@@ -501,12 +486,12 @@ void perNoteVolumePrecedesLiteralDuration() {
 
 void pitchEffectsRetainPhysicalTiming() {
   const PerformanceSequence detuned = render({0x8d, 10, 0x34, 1, 0x80});
-  const auto detuneBends = events<PitchBendPerformanceEvent>(detuned.tracks.front());
+  const auto detuneBends = eventsOfType<PitchBendPerformanceEvent>(detuned.tracks.front());
   expect(detuneBends.size() == 1 && detuneBends.front()->semitones > 0.0 && detuneBends.front()->semitones < 0.2,
          "detune should carry from the DSP pitch low byte into its high byte");
 
   const PerformanceSequence repeatedInstrument = render({0x89, 25, 0x32, 1, 0x89, 25, 0x32, 1, 0x80});
-  expect(events<InstrumentPerformanceEvent>(repeatedInstrument.tracks.front()).size() == 2,
+  expect(eventsOfType<InstrumentPerformanceEvent>(repeatedInstrument.tracks.front()).size() == 2,
          "selecting the current SRCN should not emit another program change");
 
   const PerformanceSequence portamento = render({0x86, 4, 0x32, 0x90, 0x40, 0x3e, 0x80});
@@ -530,7 +515,7 @@ void pitchEffectsRetainPhysicalTiming() {
          "a new attack should cancel the preceding legato portamento instead of bending the fresh note");
 
   const PerformanceSequence trill = render({0x86, 8, 0x96, 12, 2, 3, 0x32, 0x80});
-  const auto bends = events<PitchBendPerformanceEvent>(trill.tracks.front());
+  const auto bends = eventsOfType<PitchBendPerformanceEvent>(trill.tracks.front());
   expect(trill.diagnostics.empty() && std::ranges::any_of(bends, [](const auto* event) {
            return event->header.tick == 3 && event->semitones > 11.9;
          }),

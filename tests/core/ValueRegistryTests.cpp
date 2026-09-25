@@ -4,11 +4,14 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "ValueTestSupport.h"
+#include "../TestSupport.h"
+#include "SessionTestSupport.h"
 
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/session/Session.h"
+
+using namespace vgmtrans::core;
 
 namespace {
 
@@ -43,50 +46,39 @@ void formatRegistryStoresCopyableModulesAtomically() {
   expect(copy.findModule("Missing") == nullptr, "format registry should report missing modules");
   expect(copy.extractors().size() == 1 && copy.extractors().front().name == "DynamicExtractor",
          "format registry should copy source extractor values");
-  bool threw = false;
-  try {
-    registry.add(FormatModule{.name = "Broken"});
-  } catch (const std::invalid_argument&) {
-    threw = true;
-  }
-  expect(threw, "format registry should reject incomplete module values");
+  expectThrows<std::invalid_argument>([&] { registry.add(FormatModule{.name = "Broken"}); },
+                                      "format registry should reject incomplete module values");
 
-  threw = false;
-  try {
-    registry.add(FormatModule{
-        .name = "DuplicateAcceptedFormat",
-        .acceptedFormats = {"same", "same"},
-        .scan = scanProbeSequence,
-    });
-  } catch (const std::invalid_argument&) {
-    threw = true;
-  }
-  expect(threw && registry.modules().size() == 2,
-         "format registry should reject duplicate accepted formats without partially registering a module");
+  expectThrows<std::invalid_argument>(
+      [&] {
+        registry.add(FormatModule{
+            .name = "DuplicateAcceptedFormat",
+            .acceptedFormats = {"same", "same"},
+            .scan = scanProbeSequence,
+        });
+      },
+      "format registry should reject duplicate accepted formats without partially registering a module");
+  expect(registry.modules().size() == 2, "failed registration must leave the module list unchanged");
 
-  threw = false;
-  try {
-    registry.add(FormatModule{
-        .name = "ProbeSequence",
-        .scan = scanProbeSequence,
-    });
-  } catch (const std::invalid_argument&) {
-    threw = true;
-  }
-  expect(threw && registry.modules().size() == 2,
-         "format registry should reject duplicate module names without partially registering a module");
+  expectThrows<std::invalid_argument>(
+      [&] {
+        registry.add(FormatModule{
+            .name = "ProbeSequence",
+            .scan = scanProbeSequence,
+        });
+      },
+      "format registry should reject duplicate module names without partially registering a module");
+  expect(registry.modules().size() == 2, "failed registration must leave the module list unchanged");
 
-  threw = false;
-  try {
-    registry.add(SourceExtractor{
-        .name = "DynamicExtractor",
-        .extract = [](const ExtractionInput&) { return ExtractionResult{}; },
-    });
-  } catch (const std::invalid_argument&) {
-    threw = true;
-  }
-  expect(threw && registry.extractors().size() == 1,
-         "format registry should reject duplicate extractor names without partially registering an extractor");
+  expectThrows<std::invalid_argument>(
+      [&] {
+        registry.add(SourceExtractor{
+            .name = "DynamicExtractor",
+            .extract = [](const ExtractionInput&) { return ExtractionResult{}; },
+        });
+      },
+      "format registry should reject duplicate extractor names without partially registering an extractor");
+  expect(registry.extractors().size() == 1, "failed registration must leave the extractor list unchanged");
 
   FormatRegistry binderRegistry;
   binderRegistry.add(FormatModule{
@@ -97,19 +89,17 @@ void formatRegistryStoresCopyableModulesAtomically() {
   });
   expect(static_cast<bool>(binderRegistry.collectionBinderForFormat("FirstBinder")),
          "format lookup should find a binder whose resolver id differs from its module name");
-  threw = false;
-  try {
-    binderRegistry.add(FormatModule{
-        .name = "SecondBinder",
-        .scan = scanProbeSequence,
-        .collectionResolverId = "SharedResolver",
-        .bindCollection = [](CollectionBindingContext&) {},
-    });
-  } catch (const std::invalid_argument&) {
-    threw = true;
-  }
-  expect(threw && binderRegistry.modules().size() == 1,
-         "format registry should allow only one collection binder per effective resolver id");
+  expectThrows<std::invalid_argument>(
+      [&] {
+        binderRegistry.add(FormatModule{
+            .name = "SecondBinder",
+            .scan = scanProbeSequence,
+            .collectionResolverId = "SharedResolver",
+            .bindCollection = [](CollectionBindingContext&) {},
+        });
+      },
+      "format registry should allow only one collection binder per effective resolver id");
+  expect(binderRegistry.modules().size() == 1, "failed registration must leave the module list unchanged");
 
   FormatRegistry resolverRegistry;
   resolverRegistry.add(FormatModule{
@@ -118,27 +108,17 @@ void formatRegistryStoresCopyableModulesAtomically() {
       .collectionResolverId = "SharedResolver",
       .resolveCollections = [](const CollectionDiscoveryContext&) { return std::vector<DesiredCollection>{}; },
   });
-  threw = false;
-  try {
-    resolverRegistry.add(FormatModule{
-        .name = "SecondResolver",
-        .scan = scanProbeSequence,
-        .collectionResolverId = "SharedResolver",
-        .resolveCollections = [](const CollectionDiscoveryContext&) { return std::vector<DesiredCollection>{}; },
-    });
-  } catch (const std::invalid_argument&) {
-    threw = true;
-  }
-  expect(threw && resolverRegistry.modules().size() == 1,
-         "format registry should allow only one collection resolver owner per effective resolver id");
-}
-
-void sessionRegistersOneFormatModuleAtTheAuthoringSurface() {
-  Session session;
-  session.registerFormat(probeSequenceModule());
-
-  expect(session.formats().modules().size() == 1 && session.formats().modules()[0].name == "ProbeSequence",
-         "format module should register its scanner");
+  expectThrows<std::invalid_argument>(
+      [&] {
+        resolverRegistry.add(FormatModule{
+            .name = "SecondResolver",
+            .scan = scanProbeSequence,
+            .collectionResolverId = "SharedResolver",
+            .resolveCollections = [](const CollectionDiscoveryContext&) { return std::vector<DesiredCollection>{}; },
+        });
+      },
+      "format registry should allow only one collection resolver owner per effective resolver id");
+  expect(resolverRegistry.modules().size() == 1, "failed registration must leave the module list unchanged");
 }
 
 void scanResultBuilderCoversCommonScannerPlumbing() {
@@ -157,13 +137,8 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
   auto sequence = out.sequence("Builder Sequence", wholeSource)
                       .data(BuilderPrivateData{.value = 11})
                       .program(probeSequenceProgram());
-  bool rejectedSecondData = false;
-  try {
-    sequence.data(BuilderPrivateData{.value = 99});
-  } catch (const std::logic_error&) {
-    rejectedSecondData = true;
-  }
-  expect(rejectedSecondData, "scan result builder should reject a second private data value for one asset");
+  expectThrows<std::logic_error>([&] { sequence.data(BuilderPrivateData{.value = 99}); },
+                                 "scan result builder should reject a second private data value for one asset");
   const auto bank = out.soundBank("Builder Bank", input.reader.range(0, 1)).data(BuilderPrivateData{.value = 22});
   auto samplePool = out.samplePool("Builder Samples", input.reader.range(1, 2));
   samplePool.data(BuilderPrivateData{.value = 33});
@@ -297,22 +272,12 @@ void scanResultBuilderChecksAllDraftsBeforeConsumingValues() {
   auto misc = out.misc("Incomplete Misc", input.reader.range(0, 1));
   out.collection("Broken").sequence(sequence);
 
-  bool threw = false;
-  try {
-    static_cast<void>(out.finish());
-  } catch (const std::logic_error&) {
-    threw = true;
-  }
-  expect(threw, "scan result builder should reject a sequence draft that was never given a program");
+  expectThrows<std::logic_error>([&] { static_cast<void>(out.finish()); },
+                                 "scan result builder should reject a sequence draft that was never given a program");
 
   sequence.program(SequenceProgram{.tracks = {TrackProgram{.name = "Retained Track"}}});
-  threw = false;
-  try {
-    static_cast<void>(out.finish());
-  } catch (const std::logic_error&) {
-    threw = true;
-  }
-  expect(threw, "scan result builder should reject a misc draft that was never given a payload");
+  expectThrows<std::logic_error>([&] { static_cast<void>(out.finish()); },
+                                 "scan result builder should reject a misc draft that was never given a payload");
 
   misc.payload({});
   const auto result = out.finish();
@@ -352,7 +317,7 @@ void scanResultBuilderCursorReportsMalformedFields() {
   RecordReader validCursor(input.reader, 1, 3, &out.diagnostics(), false);
   const auto value = validCursor.u16leAt(0, "probe value");
   expect(value && *value == 0xccbb, "parse cursor should return parsed field values");
-  expect(sameRange(value.range, SourceRange{.source = source, .offset = 1, .size = 2}),
+  expect(value.range == SourceRange{.source = source, .offset = 1, .size = 2},
          "parse cursor should return parsed field ranges");
   out.sourceMap().header("Probe Header", input.reader.range(1, 2)).field("probe_value", value);
 
@@ -365,7 +330,7 @@ void scanResultBuilderCursorReportsMalformedFields() {
   const auto& header = result.sourceMap.get(headerIds[0]);
   expect(header.fields.size() == 1 && header.fields[0].name == "probe_value" &&
              std::get<u64>(header.fields[0].value) == 0xccbb &&
-             sameRange(header.fields[0].range, SourceRange{.source = source, .offset = 1, .size = 2}),
+             header.fields[0].range == SourceRange{.source = source, .offset = 1, .size = 2},
          "annotation fields should use the parsed value range");
   expect(result.diagnostics.size() == 1, "parse cursor should report malformed fields as diagnostics");
   expect(result.diagnostics[0].message == "Truncated field 'probe field'",
@@ -376,7 +341,6 @@ void scanResultBuilderCursorReportsMalformedFields() {
 
 void runValueRegistryTests() {
   formatRegistryStoresCopyableModulesAtomically();
-  sessionRegistersOneFormatModuleAtTheAuthoringSurface();
   scanResultBuilderCoversCommonScannerPlumbing();
   scanResultBuilderNamesSourceCollections();
   scanResultBuilderInfersSequenceRangesUnlessExplicit();

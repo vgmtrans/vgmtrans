@@ -4,14 +4,21 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "ValueTestSupport.h"
+#include "../TestSupport.h"
 
+#include "value/export/synth/SynthExportData.h"
 #include "value/formats/Akao/Akao.h"
 #include "value/formats/SuzukiPS1/SuzukiPS1.h"
+#include "value/synth/SampleDecoder.h"
 #include "value/synth/SampleFiltering.h"
 #include "value/synth/SnesDsp.h"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
+#include <limits>
+
+using namespace vgmtrans::core;
 
 namespace {
 
@@ -38,6 +45,102 @@ constexpr double kPi = 3.14159265358979323846;
     outputPower += static_cast<double>(sample.pcm[i]) * sample.pcm[i];
   }
   return std::sqrt(outputPower / inputPower);
+}
+
+void snesBrrDecoderProducesPcm() {
+  const std::vector<u8> sourceBytes{0x01, 0, 0, 0, 0, 0, 0, 0, 0};
+  const Sample sample{
+      .name = "zero",
+      .codec = AudioCodec::SnesBrr,
+      .encodedData = SourceRange{.source = SourceId{0}, .offset = 0, .size = sourceBytes.size()},
+      .sampleRate = 32000,
+  };
+
+  const auto decoded = decodeSample(sample, sourceBytes);
+  expect(decoded.has_value(), "BRR decoder should decode a valid sample");
+  expect(decoded->sampleRate == 32000, "decoded sample should preserve sample rate");
+  expect(decoded->pcm.size() == 16, "one BRR block should decode to 16 samples");
+  expect(std::ranges::all_of(decoded->pcm, [](s16 sample) { return sample == 0; }),
+         "zero BRR block should decode to silence");
+
+  const Sample invalidRange = Sample{
+      .name = "invalid",
+      .codec = AudioCodec::SnesBrr,
+      .encodedData = SourceRange{.source = SourceId{0}, .offset = 8, .size = 9},
+  };
+  expect(!decodeSample(invalidRange, sourceBytes).has_value(), "BRR decoder should reject invalid source ranges");
+}
+
+void snesDspNoiseDecoderMatchesHardwareSequence() {
+  Sample sample{
+      .codec = AudioCodec::SnesDspNoise,
+      .sampleRate = kSnesDspSampleRate,
+      .loop = Loop{.enabled = true, .length = 4},
+      .codecParameter = 31,
+  };
+  const auto fastest = decodeSample(sample, {});
+  sample.codecParameter = 30;
+  const auto halfRate = decodeSample(sample, {});
+
+  expect(fastest && fastest->pcm == std::vector<s16>({16384, 8192, 4096, 2048}) && halfRate &&
+             halfRate->pcm == std::vector<s16>({-32768, 16384, 16384, 8192}),
+         "SNES noise should use the DSP's LFSR values and FLG counter periods");
+}
+
+void snesGainEvaluationHandlesLongIntervals() {
+  const double large = std::numeric_limits<double>::max();
+  for (u8 mode = 4; mode < 8; ++mode) {
+    for (u8 rate = 0; rate < 32; ++rate) {
+      const auto gain = static_cast<u8>((mode << 5) | rate);
+      const s16 expected = rate == 0 ? 0x321 : (mode < 6 ? 0 : 0x7ff);
+      expect(snesDspGainEnvelopeValue(gain, 0x321, large) == expected,
+             "long finite GAIN intervals must reach the endpoint or retain a stopped counter's value");
+    }
+  }
+  expect(snesDspGainEnvelopeValue(0x9f, 0x7ff, 0.5 / kSnesDspSampleRate) == 0x7ff &&
+             snesDspGainEnvelopeValue(0x9f, 0x7ff, 1.0 / kSnesDspSampleRate) == 0x7df,
+         "GAIN evaluation must still wait for a complete hardware counter period before stepping");
+}
+
+void ndsImaAdpcmDecoderValidatesItsPredictorHeader() {
+  Sample sample{
+      .name = "adpcm",
+      .codec = AudioCodec::NdsImaAdpcm,
+      .encodedData = SourceRange{.source = SourceId{0}, .offset = 0, .size = 5},
+      .sampleRate = 32768,
+  };
+
+  const std::vector<u8> validMaxIndex{0x00, 0x00, 0x58, 0x00, 0x00};
+  const auto decoded = decodeSample(sample, validMaxIndex);
+  expect(decoded && decoded->pcm == std::vector<s16>({0, 4095, 7819}),
+         "NDS IMA ADPCM decoder should accept initial predictor index 88");
+
+  const std::vector<u8> invalidIndex{0x00, 0x00, 0x59, 0x00, 0x00};
+  expect(!decodeSample(sample, invalidIndex).has_value(),
+         "NDS IMA ADPCM decoder should reject initial predictor indexes outside the step table");
+  sample.encodedData.size = 3;
+  expect(!decodeSample(sample, validMaxIndex), "the encoded range must contain the whole predictor header");
+  sample.encodedData.size = 4;
+  const auto predictorOnly = decodeSample(sample, validMaxIndex);
+  expect(predictorOnly && predictorOnly->pcm == std::vector<s16>{0},
+         "a predictor-only stream should emit its initial PCM value");
+}
+
+void pcm16DecoderHonorsExplicitByteOrder() {
+  const Sample littleEndian{
+      .codec = AudioCodec::PcmS16,
+      .encodedData = SourceRange{.source = SourceId{0}, .offset = 0, .size = 4},
+  };
+  Sample bigEndian = littleEndian;
+  bigEndian.bigEndian = true;
+
+  const std::vector<u8> bytes{0x12, 0x34, 0xfe, 0xdc};
+  const auto little = decodeSample(littleEndian, bytes);
+  const auto big = decodeSample(bigEndian, bytes);
+  expect(little && little->pcm == std::vector<s16>({0x3412, -8962}),
+         "PCM16 should retain the default little-endian decoding");
+  expect(big && big->pcm == std::vector<s16>({0x1234, -292}),
+         "PCM16 should honor source-declared big-endian byte order");
 }
 
 void sampleFiltersMatchHardwareTone() {
@@ -155,7 +258,12 @@ void psxFormatsPreferSpuFiltering() {
 
 }  // namespace
 
-void runSampleFilteringTests() {
+void runValueSampleTests() {
+  snesBrrDecoderProducesPcm();
+  snesDspNoiseDecoderMatchesHardwareSequence();
+  snesGainEvaluationHandlesLongIntervals();
+  ndsImaAdpcmDecoderValidatesItsPredictorHeader();
+  pcm16DecoderHonorsExplicitByteOrder();
   sampleFiltersMatchHardwareTone();
   sampleFilteringWrapsLoopHistory();
   synthSampleFilteringHonorsPolicyAndFormat();

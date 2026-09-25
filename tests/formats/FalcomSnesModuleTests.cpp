@@ -4,8 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/FalcomSnes/FalcomSnes.h"
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
 
+#include "value/formats/FalcomSnes/FalcomSnes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 #include "value/synth/SnesDsp.h"
@@ -24,26 +26,9 @@ using namespace vgmtrans::formats::falcom_snes;
 
 namespace {
 
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
-
-template <class Event>
-std::vector<const Event*> events(const PerformanceTrack& track) {
-  std::vector<const Event*> result;
-  for (const PerformanceEvent& event : track.events) {
-    if (const auto* typed = std::get_if<Event>(&event)) {
-      result.push_back(typed);
-    }
-  }
-  return result;
-}
-
 std::vector<const ModulationPerformanceEvent*> modulationEvents(const PerformanceTrack& track,
                                                                 ModulationPerformanceTarget target) {
-  auto result = events<ModulationPerformanceEvent>(track);
+  auto result = eventsOfType<ModulationPerformanceEvent>(track);
   std::erase_if(result, [=](const ModulationPerformanceEvent* event) { return event->target != target; });
   return result;
 }
@@ -126,21 +111,21 @@ void layoutAndScannerBuildTheCompleteYsVCollection() {
 void noteTimingLegatoAndMixerStateMatchTheDriver() {
   const PerformanceSequence performance =
       render({0xd2, 0xd8, 3, 0xde, 0x7f, 0xe7, 0x40, 0xdd, 0x80, 0x08, 8, 0x00, 8, 0xfc, 0, 0});
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 2 && notes[0]->header.tick == 3 &&
              std::abs(notes[0]->key - 48.0) < 0.000001 && notes[0]->durationTicks == 8 && notes[1]->header.tick == 11 &&
              notes[1]->durationTicks == 4 && notes[1]->extendsPrevious,
          "octave, first-program startup delay, slur ties, and quantized key-off timing should match the SPC700");
 
-  const auto levels = events<LevelPerformanceEvent>(performance.tracks.front());
-  const auto balances = events<StereoBalancePerformanceEvent>(performance.tracks.front());
+  const auto levels = eventsOfType<LevelPerformanceEvent>(performance.tracks.front());
+  const auto balances = eventsOfType<StereoBalancePerformanceEvent>(performance.tracks.front());
   expect(!levels.empty() && std::abs(levels.back()->linearGain - 1.0) < 0.000001 && !balances.empty() &&
              std::abs(balances.back()->leftGain - 63.0 / 127.0) < 0.000001 &&
              std::abs(balances.back()->rightGain - 63.0 / 127.0) < 0.000001,
          "deferred volume and pan writes should be applied with Ys V's exact linear DSP balance table on attack");
 
   const PerformanceSequence adsrFirst = render({0xf2, 0x8f, 0xe0, 0x00, 1, 0xfc, 0, 0});
-  const auto adsrFirstNotes = events<NotePerformanceEvent>(adsrFirst.tracks.front());
+  const auto adsrFirstNotes = eventsOfType<NotePerformanceEvent>(adsrFirst.tracks.front());
   expect(adsrFirst.diagnostics.empty() && adsrFirstNotes.size() == 1 && adsrFirstNotes.front()->header.tick == 3,
          "F2 should pass through the same one-shot startup latch as the D8 instrument command");
 }
@@ -164,19 +149,19 @@ void modulationDynamicAdsrAndEchoRemainPhysical() {
              panRate[0]->context.cyclesPerTick == 0.03125,
          "vibrato and pan LFO events should retain the driver's integer waveforms, delay, depth, and tick rates");
 
-  const auto envelopes = events<EnvelopePerformanceEvent>(track);
+  const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(track);
   const auto dynamic = std::ranges::find_if(
       envelopes, [](const EnvelopePerformanceEvent* event) { return event->update.values.has_value(); });
   expect(dynamic != envelopes.end() && (*dynamic)->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
              (*dynamic)->update.values->releaseSeconds == snesDspEnvelope(0x8f, 0xe0, 0).releaseSeconds,
          "F2 should immediately replace the active voice ADSR and retain it for future attacks");
 
-  const auto bends = events<PitchBendPerformanceEvent>(track);
+  const auto bends = eventsOfType<PitchBendPerformanceEvent>(track);
   expect(bends.size() >= 2 && std::abs(bends[0]->semitones - 0.5) < 0.000001 &&
              std::abs(bends[1]->semitones - 1.0) < 0.000001,
          "the repeating pitch envelope should apply its unsigned 8.8 step at the signed interval");
 
-  const auto reverbs = events<ReverbPerformanceEvent>(track);
+  const auto reverbs = eventsOfType<ReverbPerformanceEvent>(track);
   const ReverbPerformanceEvent* echo = reverbs.empty() ? nullptr : reverbs.back();
   expect(echo != nullptr && echo->voiceMask == 1 && echo->delayMilliseconds == 112.0 && echo->feedback == -0.5 &&
              echo->filterIndex == 2 && echo->leftGain == 0.25 && echo->rightGain == -0.25 &&
@@ -203,14 +188,14 @@ void loopsAndMutableFirPresetsFollowDriverMemory() {
       0,
       0,
   });
-  const auto loopNotes = events<NotePerformanceEvent>(loop.tracks.front());
+  const auto loopNotes = eventsOfType<NotePerformanceEvent>(loop.tracks.front());
   expect(loop.diagnostics.empty() && loopNotes.size() == 3,
          "repeat counters and the final-iteration break should follow the driver's writable counter cell");
 
   const PerformanceSequence fir = render({
       0xfa, 2, 1, 2, 3, 4, 5, 6, 7, 8, 0xf7, 1, 0, 2, 0xf4, 0x1f, 0xf5, 1, 0xfc, 0, 0,
   });
-  const auto reverbs = events<ReverbPerformanceEvent>(fir.tracks.front());
+  const auto reverbs = eventsOfType<ReverbPerformanceEvent>(fir.tracks.front());
   expect(fir.diagnostics.empty() && !reverbs.empty() && !reverbs.back()->filterIndex,
          "an overwritten FIR preset must not be mislabeled as one of the driver's immutable built-in filters");
 }

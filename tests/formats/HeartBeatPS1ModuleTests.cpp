@@ -4,12 +4,14 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/HeartBeatPS1/HeartBeatPS1.h"
 #include "../MidiTestSupport.h"
-#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
 
-#include "value/session/Session.h"
+#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/formats/HeartBeatPS1/HeartBeatPS1.h"
 #include "value/sequence/SequenceVm.h"
+#include "value/session/Session.h"
 #include "value/synth/PsxSpu.h"
 
 #include <algorithm>
@@ -24,12 +26,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::heartbeat_ps1;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void le16(std::vector<u8>& bytes, size_t offset, u16 value) {
   bytes[offset] = static_cast<u8>(value);
@@ -123,17 +119,6 @@ std::vector<u8> heartBeatFixture(bool hasProgramTone = true, std::vector<u8> eve
   bytes[qQesOffset + 15] = 1;
   std::ranges::copy(events, bytes.begin() + qQesOffset + 0x10);
   return bytes;
-}
-
-template <class Event>
-std::vector<const Event*> eventsOfType(const PerformanceTrack& track) {
-  std::vector<const Event*> events;
-  for (const auto& value : track.events) {
-    if (const auto* event = std::get_if<Event>(&value)) {
-      events.push_back(event);
-    }
-  }
-  return events;
 }
 
 void sequenceModelsAuditedDriverFeatures() {

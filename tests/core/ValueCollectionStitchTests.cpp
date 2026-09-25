@@ -4,12 +4,18 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "ValueTestSupport.h"
-
+#include "../TestSupport.h"
 #include "SessionSnapshotBuilder.h"
-#include "value/export/CollectionStitch.h"
+#include "SessionTestSupport.h"
+#include "SynthExportTestSupport.h"
 
+#include "value/export/CollectionStitch.h"
+#include "value/export/midi/PerformanceMidiRenderer.h"
+
+#include <array>
 #include <set>
+
+using namespace vgmtrans::core;
 
 namespace {
 
@@ -100,8 +106,8 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
     TrackProgram track{.streams = {{.channels = {index}}}, .startAddress = Address{0}};
     const std::array<u8, 3> note{0x90, static_cast<u8>(0x3c + index), 0x04};
     const std::array<u8, 1> end{0xff};
-    addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(index * 4, note.size()), note);
-    addProbeCommand<ProbeEndCommand>(track, config, Address{3}, probeRange(index * 4 + 3, end.size()), end);
+    addProbeCommand(track, Address{0}, probeRange(index * 4, note.size()), note);
+    addProbeCommand(track, Address{3}, probeRange(index * 4 + 3, end.size()), end);
 
     const AssetId sequenceId{index * 3};
     const AssetId instrumentId{index * 3 + 1};
@@ -247,11 +253,11 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
       containsAscii(result.soundFont.bytes, "Used Sample 0") && containsAscii(result.soundFont.bytes, "Used Sample 1"),
       "collection-relative sample references should remain bound to their original sample banks");
   expect(chunkSize(result.soundFont.bytes, "phdr") == 7 * 38 && chunkSize(result.soundFont.bytes, "shdr") == 5 * 46 &&
-             soundFontPgenContainsAmount(result.soundFont.bytes, 34, 30368),
+             soundFontGeneratorContains(result.soundFont.bytes, "pgen", 34, 30368),
          "instrument-variant policy should express dynamic ADSR differences on shared SoundFont presets");
   expect(chunkSize(restricted.soundFont.bytes, "phdr") == 3 * 38 &&
              chunkSize(restricted.soundFont.bytes, "shdr") == 3 * 46 &&
-             soundFontIgenContainsAmount(restricted.soundFont.bytes, 34, -2400) &&
+             soundFontGeneratorContains(restricted.soundFont.bytes, "igen", 34, -2400) &&
              !containsAscii(restricted.soundFont.bytes, "Unused Sample"),
          "used-only stitching should keep only the selected dynamic variants and their referenced samples");
 }

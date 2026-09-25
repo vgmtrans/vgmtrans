@@ -4,11 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/extractors/MameRomSetExtractor.h"
 #include "../MidiTestSupport.h"
+#include "../TestSupport.h"
+
 #include "value/export/InstrumentVariants.h"
 #include "value/export/SequenceModulationProfile.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/extractors/MameRomSetExtractor.h"
 #include "value/formats/KonamiArcade/KonamiArcade.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/SampleDecoder.h"
@@ -28,12 +30,6 @@ using namespace vgmtrans::formats;
 using namespace vgmtrans::formats::konami_arcade;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void writeLe16(std::vector<u8>& bytes, size_t offset, u16 value) {
   bytes[offset] = static_cast<u8>(value);
@@ -973,4 +969,16 @@ void konamiArcadeAdpcmDecoderSupportsForwardAndReverseSamples() {
   const auto reverse = decodeSample(sample, bytes);
   expect(reverse && reverse->pcm.size() == 4 && reverse->pcm[0] == 2048 && reverse->pcm[1] == 3072,
          "reverse K054539 samples should walk encoded bytes backward without copying source data");
+}
+
+void runKonamiArcadeModuleTests() {
+  mameRomDatabaseAndGroupAssemblyAreValueOriented();
+  konamiArcadeModuleBuildsSequencesSynthAndCollections();
+  konamiArcadeGxLfosMatchDriverState();
+  konamiArcadeGxDriverQuirksRemainRepresented();
+  konamiArcadeExpressionPersistsThroughSoftwareRelease();
+  konamiArcadeZeroReleaseUsesHardwareVoiceLifetime();
+  konamiArcadeTempoSlidesAreCanceledAcrossTracks();
+  konamiArcadeMysticDrumPitchSlidesUseTablePitch();
+  konamiArcadeAdpcmDecoderSupportsForwardAndReverseSamples();
 }

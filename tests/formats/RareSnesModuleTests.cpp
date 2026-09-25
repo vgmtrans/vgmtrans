@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/RareSnes/RareSnes.h"
 #include "../MidiTestSupport.h"
+#include "../TestSupport.h"
 
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/formats/RareSnes/RareSnes.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
@@ -22,12 +23,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::rare_snes;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void writeBytes(std::vector<u8>& bytes, u32 offset, std::initializer_list<u8> values) {
   std::ranges::copy(values, bytes.begin() + offset);
@@ -493,4 +488,13 @@ void rareSnesCallsConditionalBranchesAndLongDurationsExecuteSourceFree() {
          "DKC conditional jump should select the indexed destination at runtime (notes=" +
              std::to_string(branchNotes.size()) + ", tick=" + std::to_string(branched.tracks.front().endTick) +
              ", diagnostics=" + std::to_string(branched.diagnostics.size()) + ")");
+}
+
+void runRareSnesModuleTests() {
+  rareSnesLayoutsDifferentiateDriverFamilies();
+  rareSnesProfilesDecodeTheirDistinctOpcodeTails();
+  rareSnesSignedStereoVolumesPreserveDriverRelativeLevels();
+  rareSnesPhysicalLfosAndPitchEnvelopesUseTimerClock();
+  rareSnesPitchEnvelopeInvertsOnlyItsInitialSteps();
+  rareSnesCallsConditionalBranchesAndLongDurationsExecuteSourceFree();
 }

@@ -4,8 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/GraphResSnes/GraphResSnes.h"
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
 
+#include "value/formats/GraphResSnes/GraphResSnes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 
@@ -21,23 +23,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::graph_res_snes;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
-
-template <class Event>
-std::vector<const Event*> events(const PerformanceTrack& track) {
-  std::vector<const Event*> result;
-  for (const PerformanceEvent& event : track.events) {
-    if (const auto* typed = std::get_if<Event>(&event)) {
-      result.push_back(typed);
-    }
-  }
-  return result;
-}
 
 class DriverFixture {
 public:
@@ -152,12 +137,12 @@ void dynamicDriverFeaturesRenderAtTheirTrueTiming() {
   SequenceParse parsed = parse(fixture);
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
   const PerformanceTrack& track = performance.tracks.front();
-  const auto notes = events<NotePerformanceEvent>(track);
-  const auto envelopes = events<EnvelopePerformanceEvent>(track);
-  const auto bends = events<PitchBendPerformanceEvent>(track);
-  const auto reverbs = events<ReverbPerformanceEvent>(track);
-  const auto levels = events<LevelPerformanceEvent>(track);
-  const auto balances = events<StereoBalancePerformanceEvent>(track);
+  const auto notes = eventsOfType<NotePerformanceEvent>(track);
+  const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(track);
+  const auto bends = eventsOfType<PitchBendPerformanceEvent>(track);
+  const auto reverbs = eventsOfType<ReverbPerformanceEvent>(track);
+  const auto levels = eventsOfType<LevelPerformanceEvent>(track);
+  const auto balances = eventsOfType<StereoBalancePerformanceEvent>(track);
 
   expect(performance.diagnostics.empty() && notes.size() == 3 && notes[0]->durationTicks == 8 &&
              notes[1]->header.tick == 8 && notes[1]->durationTicks == 4 && !notes[1]->restartsEnvelope &&
@@ -189,7 +174,7 @@ void nestedRepeatsAndBreaksFollowDriverState() {
   DriverFixture fixture;
   fixture.commands({0xfd, 0x04, 0xec, 0x04, 0xea, 0x00, 0xe9, 0xeb, 0x03, 0xfe, 0xff, 0xff});
   const PerformanceSequence performance = render(fixture);
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 3 && notes[0]->header.tick == 0 &&
              notes[1]->header.tick == 4 && notes[2]->header.tick == 8 && notes[0]->durationTicks == 2,
          "EA/EB nesting and E9 last-pass breaks should preserve repeat counts and EC gate timing");
@@ -210,15 +195,15 @@ void startupShadowsMatchClearedDriverRam() {
   DriverFixture fixture;
   fixture.commands({0x00, 0xff});
   const PerformanceSequence performance = render(fixture);
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
-  const auto masters = events<MasterLevelPerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
+  const auto masters = eventsOfType<MasterLevelPerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->durationTicks == 255 &&
              masters.size() == 1 && std::abs(masters.front()->linearGain - 127.0 / 128.0) < 0.000001,
          "cleared FD length should mean 256 ticks while the driver's MVOL shadow starts at $7F");
 
   DriverFixture staccato;
   staccato.commands({0xec, 0x00, 0x10, 0x08, 0xff});
-  const auto staccatoNotes = events<NotePerformanceEvent>(render(staccato).tracks.front());
+  const auto staccatoNotes = eventsOfType<NotePerformanceEvent>(render(staccato).tracks.front());
   expect(staccatoNotes.size() == 1 && staccatoNotes.front()->durationTicks == 1,
          "duration rate zero should key off when the decremented counter falls below its threshold");
 }

@@ -4,12 +4,14 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/SuzukiSnes/SuzukiSnes.h"
 #include "../MidiTestSupport.h"
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
 
 #include "value/export/InstrumentVariants.h"
 #include "value/export/SequenceModulationProfile.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/formats/SuzukiSnes/SuzukiSnes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 #include "value/synth/SnesDsp.h"
@@ -25,12 +27,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::suzuki_snes;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void writeBytes(std::vector<u8>& bytes, u32 offset, std::initializer_list<u8> values) {
   std::ranges::copy(values, bytes.begin() + offset);
@@ -197,17 +193,6 @@ std::vector<u8> laterFixture(bool smr) {
   return bytes;
 }
 
-template <class Event>
-std::vector<const Event*> events(const PerformanceTrack& track) {
-  std::vector<const Event*> result;
-  for (const PerformanceEvent& event : track.events) {
-    if (const auto* typed = std::get_if<Event>(&event)) {
-      result.push_back(typed);
-    }
-  }
-  return result;
-}
-
 PerformanceSequence render(Version version, std::vector<u8> bytes) {
   const auto& config = sequenceConfig();
   SequenceProgram program{
@@ -266,9 +251,9 @@ void playbackUsesAuditedGatingPitchAndLoops() {
                                                                          0xef,
                                                                          0xd0,
                                                                      });
-  const auto notes = events<NotePerformanceEvent>(gated.tracks.front());
-  const auto tunings = events<TuningPerformanceEvent>(gated.tracks.front());
-  const auto instruments = events<InstrumentPerformanceEvent>(gated.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(gated.tracks.front());
+  const auto tunings = eventsOfType<TuningPerformanceEvent>(gated.tracks.front());
+  const auto instruments = eventsOfType<InstrumentPerformanceEvent>(gated.tracks.front());
   expect(
       gated.diagnostics.empty() && notes.size() == 1 && notes.front()->key == 60.0 && notes.front()->durationTicks == 2,
       "duration rate 8 should gate a three-tick percussion note after two ticks");
@@ -288,7 +273,7 @@ void playbackUsesAuditedGatingPitchAndLoops() {
                                                                             0xd5,
                                                                             0xd0,
                                                                         });
-  const auto repeatedNotes = events<NotePerformanceEvent>(repeated.tracks.front());
+  const auto repeatedNotes = eventsOfType<NotePerformanceEvent>(repeated.tracks.front());
   expect(repeated.diagnostics.empty() && repeatedNotes.size() == 2 && repeatedNotes[0]->key == 72.0 &&
              repeatedNotes[1]->key == 72.0,
          "repeat break should branch only on the final pass and repeat end should restore the saved octave");
@@ -308,9 +293,9 @@ void driverDefaultsAndPitchTransitionsAreVersioned() {
   };
   for (const ExpectedDefaults expected : expectedDefaults) {
     const PerformanceSequence performance = render(expected.version, {0xa8, 0xd0});
-    const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
-    const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks.front());
-    const auto levels = events<LevelPerformanceEvent>(performance.tracks.front());
+    const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
+    const auto instruments = eventsOfType<InstrumentPerformanceEvent>(performance.tracks.front());
+    const auto levels = eventsOfType<LevelPerformanceEvent>(performance.tracks.front());
     expect(notes.size() == 1 && notes.front()->durationTicks == expected.duration,
            "the profile-specific initial duration rate should match the driver reset state");
     expect(
@@ -334,7 +319,7 @@ void driverDefaultsAndPitchTransitionsAreVersioned() {
   // And my Name's Booster, track 0 at ARAM $2035 and $203B: each E5 precedes the note it bends.
   const PerformanceSequence booster =
       render(Version::SuperMarioRpg, {0xc6, 0x05, 0xe5, 0x18, 0x02, 0x38, 0x41, 0xd7, 0xe5, 0x24, 0x02, 0x21, 0xd0});
-  const auto boosterNotes = events<NotePerformanceEvent>(booster.tracks.front());
+  const auto boosterNotes = eventsOfType<NotePerformanceEvent>(booster.tracks.front());
   const auto& boosterAutomations = booster.tracks.front().automations;
   const auto* firstBoosterSlide =
       boosterAutomations.empty() ? nullptr : pitchTransitionIntent(boosterAutomations.front());
@@ -355,7 +340,7 @@ void driverDefaultsAndPitchTransitionsAreVersioned() {
          "each SMR E5 should slide the note immediately following it upward by two semitones");
 
   const PerformanceSequence automatic = render(Version::BahamutLagoon, {0xa8, 0xf6, 0x04, 0xaa, 0xd0});
-  const auto automaticNotes = events<NotePerformanceEvent>(automatic.tracks.front());
+  const auto automaticNotes = eventsOfType<NotePerformanceEvent>(automatic.tracks.front());
   const auto* automaticSlide = automatic.tracks.front().automations.empty()
                                    ? nullptr
                                    : pitchTransitionIntent(automatic.tracks.front().automations.front());
@@ -382,7 +367,7 @@ void smrBowserPitchSlideContinuesAcrossTies() {
   // volume fade E4 90 00, then tie 1B.
   const PerformanceSequence performance =
       render(Version::SuperMarioRpg, {0x3c, 0x6f, 0xe5, 0xc0, 0xfe, 0x29, 0xe4, 0x90, 0x00, 0x1b, 0xd0});
-  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   const auto& automations = performance.tracks.front().automations;
   const auto slide = std::ranges::find_if(automations, [](const PerformanceAutomation& automation) {
     return pitchTransitionIntent(automation) != nullptr;
@@ -412,7 +397,7 @@ void laterE0UsesTheSustainRateAsAGatedRelease() {
   // The Road is Full of Dangers, track 0 at ARAM $2033: E0 1B. The later
   // driver clears SR at note attack and restores 1B only when the gate ends.
   const PerformanceSequence performance = render(Version::SuperMarioRpg, {0xde, 0x1e, 0xe0, 0x1b, 0x85, 0xd0});
-  const auto envelopes = events<EnvelopePerformanceEvent>(performance.tracks.front());
+  const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(performance.tracks.front());
   expect(envelopes.size() == 1 && envelopes.front()->update.values &&
              envelopes.front()->update.fields == (EnvelopeFields::SecondDecay | EnvelopeFields::Release) &&
              envelopes.front()->update.values->secondDecaySeconds &&
@@ -437,7 +422,7 @@ void laterE0UsesTheSustainRateAsAGatedRelease() {
   }};
   const auto materialized =
       materializeInstrumentVariants(performance, sets, InstrumentVariantOptions{.dynamicEnvelopes = true});
-  const auto notes = events<NotePerformanceEvent>(materialized.performance.tracks.front());
+  const auto notes = eventsOfType<NotePerformanceEvent>(materialized.performance.tracks.front());
   expect(notes.size() == 1 && notes.front()->instrumentAddress,
          "E0 should select a materialized envelope variant for the following attack");
   const auto variant = std::ranges::find_if(sets.front().instruments, [&](const Instrument& instrument) {
@@ -452,7 +437,7 @@ void laterE0UsesTheSustainRateAsAGatedRelease() {
          "the generated E0 variant must not decay toward silence from the start of the note");
 
   const PerformanceSequence normalSustain = render(Version::SuperMarioRpg, {0xe0, 0x1b, 0xdc, 0x08, 0x85, 0xd0});
-  const auto restored = events<EnvelopePerformanceEvent>(normalSustain.tracks.front());
+  const auto restored = eventsOfType<EnvelopePerformanceEvent>(normalSustain.tracks.front());
   expect(restored.size() == 3 && restored[1]->update.fields == EnvelopeFields::SecondDecay &&
              restored[2]->update.fields == EnvelopeFields::Release && !restored[2]->update.values,
          "DC should disable E0's gated release while installing its ordinary sustain rate");

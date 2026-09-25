@@ -4,8 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/AsciiShuichiSnes/AsciiShuichiSnes.h"
+#include "../PerformanceTestSupport.h"
+#include "../TestSupport.h"
 
+#include "value/formats/AsciiShuichiSnes/AsciiShuichiSnes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 #include "value/synth/SnesDsp.h"
@@ -23,23 +25,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::ascii_shuichi_snes;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
-
-template <class Event>
-std::vector<const Event*> events(const PerformanceTrack& track) {
-  std::vector<const Event*> result;
-  for (const PerformanceEvent& event : track.events) {
-    if (const auto* typed = std::get_if<Event>(&event)) {
-      result.push_back(typed);
-    }
-  }
-  return result;
-}
 
 class DriverFixture {
 public:
@@ -123,10 +108,10 @@ void laterCommandsKeepAuditedOperandLengthsAndEffects() {
                  0x9c, 1, 0xa2, 0x7f, 0, 0, 0, 0, 0, 0, 0, 0x9f, 8, 0x80});
   const PerformanceSequence performance = render(fixture);
   const PerformanceTrack& track = performance.tracks.front();
-  const auto notes = events<NotePerformanceEvent>(track);
-  const auto envelopes = events<EnvelopePerformanceEvent>(track);
-  const auto modulation = events<ModulationPerformanceEvent>(track);
-  const auto reverb = events<ReverbPerformanceEvent>(track);
+  const auto notes = eventsOfType<NotePerformanceEvent>(track);
+  const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(track);
+  const auto modulation = eventsOfType<ModulationPerformanceEvent>(track);
+  const auto reverb = eventsOfType<ReverbPerformanceEvent>(track);
   expect(performance.diagnostics.empty() && notes.size() == 2 && !track.automations.empty(),
          "three-operand inline pitch slides and ties should decode without desynchronizing the track");
   expect(notes[0]->durationTicks == 8 && notes[1]->durationTicks == 6,
@@ -142,7 +127,8 @@ void laterCommandsKeepAuditedOperandLengthsAndEffects() {
   expect(reverb.size() == 5, "initial echo state and all four echo commands should emit reverb state");
   expect(reverb.back()->filterIndex == 0 && reverb.back()->voiceMask == 1,
          "echo voice mask and custom FIR identity should survive conversion");
-  expect(events<LevelPerformanceEvent>(track).size() >= 5 && events<StereoBalancePerformanceEvent>(track).size() >= 2,
+  expect(eventsOfType<LevelPerformanceEvent>(track).size() >= 5 &&
+             eventsOfType<StereoBalancePerformanceEvent>(track).size() >= 2,
          "volume and pan fades should execute at their driver tick intervals");
 }
 
@@ -152,10 +138,11 @@ void earlyCommandsUseTheirDistinctTable() {
                  0x9a, 0, 4, 0xa4, 0x9b, 8, 0x9e, 0x7f, 0, 0, 0, 0, 0, 0, 0, 0x9f});
   const PerformanceSequence performance = render(fixture);
   const PerformanceTrack& track = performance.tracks.front();
-  expect(performance.diagnostics.empty() && events<NotePerformanceEvent>(track).size() == 1 &&
+  expect(performance.diagnostics.empty() && eventsOfType<NotePerformanceEvent>(track).size() == 1 &&
              !track.automations.empty(),
          "the early A0-note driver should decode its three-operand slide without losing synchronization");
-  expect(events<MasterLevelPerformanceEvent>(track).size() == 2 && events<ReverbPerformanceEvent>(track).size() == 2,
+  expect(eventsOfType<MasterLevelPerformanceEvent>(track).size() == 2 &&
+             eventsOfType<ReverbPerformanceEvent>(track).size() == 2,
          "the early driver should retain its distinct master-volume and FIR opcodes");
 }
 

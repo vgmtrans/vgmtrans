@@ -4,19 +4,27 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "ValueTestSupport.h"
-
+#include "../TestSupport.h"
+#include "DiagnosticTestSupport.h"
 #include "SessionSnapshotBuilder.h"
+#include "SessionTestSupport.h"
 
 #include "value/scan/BytePattern.h"
 #include "value/session/SessionState.h"
 #include "value/validation/ScanValidation.h"
 
+#include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <filesystem>
+#include <fstream>
+#include <limits>
 #include <mutex>
 #include <thread>
+
+using namespace vgmtrans::core;
 
 namespace {
 
@@ -540,21 +548,10 @@ void sessionRemovesSourceFamilyAndDiscoveredData() {
   expect(session.sources().sourceCount() == 0, "source store should count only active sources");
   expect(!session.sources().contains(source), "removed source should no longer be readable");
 
-  bool readRemovedSourceFailed = false;
-  try {
-    static_cast<void>(session.sources().bytes(source));
-  } catch (const std::out_of_range&) {
-    readRemovedSourceFailed = true;
-  }
-  expect(readRemovedSourceFailed, "removed source bytes should be inaccessible");
+  expectThrows<std::out_of_range>([&] { static_cast<void>(session.sources().bytes(source)); },
+                                  "removed source bytes should be inaccessible");
 
-  bool scanRemovedSourceFailed = false;
-  try {
-    session.scanSource(source);
-  } catch (const std::out_of_range&) {
-    scanRemovedSourceFailed = true;
-  }
-  expect(scanRemovedSourceFailed, "removed sources should not be scannable");
+  expectThrows<std::out_of_range>([&] { session.scanSource(source); }, "removed sources should not be scannable");
 
   const auto replacement = session.addSource(SourceFile{.name = "replacement.probe"}, {0xaa});
   expect(replacement == SourceId{2}, "source ids should not be reused after removing a source family");
@@ -737,24 +734,14 @@ void sessionRejectsLateRegistryMutation() {
 
   session.addSource(SourceFile{.name = "sealed.probe"}, {0xaa});
 
-  bool formatFailed = false;
-  try {
-    session.registerFormat(probeMiscModule());
-  } catch (const std::logic_error&) {
-    formatFailed = true;
-  }
-  expect(formatFailed, "format registry should be sealed after session mutation starts");
+  expectThrows<std::logic_error>([&] { session.registerFormat(probeMiscModule()); },
+                                 "format registry should be sealed after session mutation starts");
 
   Session scannedEmptySession;
   scannedEmptySession.scanPendingSources();
 
-  bool emptyScanSealed = false;
-  try {
-    scannedEmptySession.registerFormat(probeSequenceModule());
-  } catch (const std::logic_error&) {
-    emptyScanSealed = true;
-  }
-  expect(emptyScanSealed, "format registry should also be sealed by an explicit scan");
+  expectThrows<std::logic_error>([&] { scannedEmptySession.registerFormat(probeSequenceModule()); },
+                                 "format registry should also be sealed by an explicit scan");
 }
 
 void sessionRejectsInvalidAssetIdsAtAdmission() {
@@ -1174,18 +1161,17 @@ void sourceStoreRejectsMissingOrRemovedDerivedParents() {
 
   const auto rejectParent = [&](SourceId parent) {
     for (const bool derived : {false, true}) {
-      bool failed = false;
-      try {
-        SourceFile child{.parent = parent};
-        if (derived) {
-          static_cast<void>(store.addDerived(std::move(child), {0xbb}, parent));
-        } else {
-          static_cast<void>(store.add(std::move(child), {0xbb}));
-        }
-      } catch (const std::invalid_argument&) {
-        failed = true;
-      }
-      expect(failed && store.sourceCount() == 1, "both insertion paths require an existing active parent");
+      expectThrows<std::invalid_argument>(
+          [&] {
+            SourceFile child{.parent = parent};
+            if (derived) {
+              static_cast<void>(store.addDerived(std::move(child), {0xbb}, parent));
+            } else {
+              static_cast<void>(store.add(std::move(child), {0xbb}));
+            }
+          },
+          "both insertion paths require an existing active parent");
+      expect(store.sourceCount() == 1, "both insertion paths require an existing active parent");
     }
   };
   rejectParent(SourceId{99});

@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "../TestSupport.h"
+
 #include "value/scan/CollectionDiscovery.h"
 
 #include <stdexcept>
@@ -14,15 +16,34 @@ using namespace vgmtrans::core;
 
 namespace {
 
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
-
 struct ProbeData {
   u32 value = 0;
 };
+
+void collectionIssuesDeriveImpact() {
+  const CollectionIssue missingSequence = missingSequenceIssue();
+  expect(missingSequence.impact == CollectionIssueImpact::Incomplete && missingSequence.severity == Severity::Warning &&
+             missingSequence.code == "missing-sequence",
+         "missing sequence helper should create a warning issue");
+  const std::vector<CollectionIssue> missingIssues{missingSequence};
+  expect(Collection{.issues = missingIssues}.issueImpact() == CollectionIssueImpact::Incomplete,
+         "missing issues should make a collection incomplete");
+
+  const CollectionIssue missingInstrument = missingSoundBankIssue(AssetId{7});
+  expect(missingInstrument.severity == Severity::Error && missingInstrument.asset == AssetId{7},
+         "missing instrument helper should preserve a broken asset reference");
+
+  const CollectionIssue ambiguous = ambiguousMatchIssue("multiple banks match");
+  const std::vector<CollectionIssue> ambiguousIssues{ambiguous};
+  expect(Collection{.issues = ambiguousIssues}.issueImpact() == CollectionIssueImpact::Ambiguous,
+         "ambiguous match issue should make a collection ambiguous");
+  expect(Collection{.issues = {missingSequence, ambiguous}}.issueImpact() == CollectionIssueImpact::Ambiguous,
+         "ambiguity should take precedence when a collection is also incomplete");
+
+  const Collection incomplete{.issues = {missingSamplePoolIssue()}};
+  expect(incomplete.issueImpact() == CollectionIssueImpact::Incomplete,
+         "collection impact should be derived from its issues");
+}
 
 void matchingKeepsTiesAndRejectsIncompatibleCandidates() {
   const std::vector<int> scores{-2, 0, 2, 1, 2, -1};
@@ -84,6 +105,7 @@ void discoveryExposesTypedAssetDataAndSources() {
 }  // namespace
 
 void runValueCollectionDiscoveryTests() {
+  collectionIssuesDeriveImpact();
   matchingKeepsTiesAndRejectsIncompatibleCandidates();
   discoveryExposesTypedAssetDataAndSources();
 }

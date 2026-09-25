@@ -4,17 +4,18 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/extractors/MameRomSetExtractor.h"
 #include "../MidiTestSupport.h"
+#include "../TestSupport.h"
+#include "ValueFormatTestSupport.h"
+
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/export/midi/PitchTransitionMidiLowering.h"
 #include "value/export/synth/SynthExportData.h"
+#include "value/extractors/MameRomSetExtractor.h"
 #include "value/formats/CPS/Cps.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/SampleDecoder.h"
 #include "value/validation/ScanValidation.h"
-
-#include "ValueFormatTestSupport.h"
 
 #include <algorithm>
 #include <array>
@@ -30,12 +31,6 @@ using namespace vgmtrans::formats;
 using namespace vgmtrans::formats::cps;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 void bytesAt(std::vector<u8>& bytes, size_t offset, std::initializer_list<u8> values) {
   std::ranges::copy(values, bytes.begin() + static_cast<std::ptrdiff_t>(offset));
@@ -1120,4 +1115,21 @@ void cpsLateControlFlowOffsetsFollowEachDriver() {
   expect(cps3Branch != cps3Commands.end() &&
              linksTo(commandAnnotation(cps3Result.sourceMap, *cps3Branch), SourceLinkRole::JumpTarget, 0x921),
          "CPS3 CD should preserve the driver's independent sign extension of its low displacement byte");
+}
+
+void runCpsModuleTests() {
+  cps3MameDecryptionUsesDriverAddressMask();
+  kabukiMameDecryptionUsesDataAddressPath();
+  cps1ModuleRetainsYm2151AndOkiDomains();
+  cps1V1DefaultsAndPitchWrappingMatchLegacyDriver();
+  cps2EarlyModuleUsesPhysicalModulation();
+  cps2ShortEnvelopeIncludesItsCompletionTick();
+  cps2EarlyZeroRateSlursRemainLinked();
+  cps2EarlyPortamentoStartsOnFirstTiedNote();
+  cps2LateDriverSemanticsRemainProfileSpecific();
+  cps3ModuleDecodesDelayPrefixesLegatoAndRegions();
+  cps3HeldNotesRetargetOneVoiceWithoutLosingPitch();
+  cpsLateRepeatBreakUsesEndOfCommandBase();
+  cps3TerminalMaxRepeatActsAsPracticalLoop();
+  cpsLateControlFlowOffsetsFollowEachDriver();
 }

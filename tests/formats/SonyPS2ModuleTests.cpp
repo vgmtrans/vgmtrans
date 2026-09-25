@@ -4,13 +4,15 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "../TestSupport.h"
+
 #include "value/export/CollectionBinding.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/export/synth/SynthExportData.h"
 #include "value/extractors/PsfExtractor.h"
 #include "value/formats/SonyPS2/SonyPS2.h"
-#include "value/session/Session.h"
 #include "value/sequence/SequenceVm.h"
+#include "value/session/Session.h"
 
 #include <algorithm>
 #include <array>
@@ -27,12 +29,6 @@ using namespace vgmtrans::core;
 using namespace vgmtrans::formats::sony_ps2;
 
 namespace {
-
-void expect(bool condition, const std::string& message) {
-  if (!condition) {
-    throw std::runtime_error(message);
-  }
-}
 
 bool near(double actual, double expected) {
   return std::abs(actual - expected) < 0.000001;
