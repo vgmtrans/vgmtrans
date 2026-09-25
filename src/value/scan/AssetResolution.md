@@ -55,6 +55,12 @@ an intentional ordered group. Both accept asset views or `DependencyTarget` valu
 with native placement data. Sony PS1 uses the latter to retain the possible
 starting positions of a bank's sample table within one or more pools.
 
+`bestMatches(context.candidates<SoundBankAsset, BankData>(), score)` returns
+copies of the highest-scoring candidate views in input order. Negative scores
+reject candidates; zero is a valid fallback. These small views borrow the
+catalog's assets, data, and sources, so temporary candidate lists are safe and
+matching can compose directly with `selectOne` or `selectAll`.
+
 A selection has a typed `ResolutionStatus`: `Resolved`, `Incomplete`, `Ambiguous`,
 or `Failed`. Empty selections are incomplete. `incomplete(message)` records
 missing coverage, including when some useful providers were selected.

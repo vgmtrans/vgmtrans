@@ -73,7 +73,7 @@ void collectionStatusControlsPreparationIndependentlyOfDiagnostics() {
 
 void matchingKeepsTiesAndRejectsIncompatibleCandidates() {
   const std::vector<int> scores{-2, 0, 2, 1, 2, -1};
-  expect(bestMatches(scores, [](int score) { return score; }) == std::vector<const int*>{&scores[2], &scores[4]},
+  expect(bestMatches(scores, [](int score) { return score; }) == std::vector{2, 2},
          "a stronger match should replace weaker candidates and retain every tie in input order");
   expect(bestMatches(scores, [](int) { return -1; }).empty(), "negative scores should reject all candidates");
   expect(bestMatches(scores, [](int) { return 0; }).size() == scores.size(),
@@ -126,6 +126,16 @@ void discoveryExposesTypedAssetDataAndSources() {
              context.asset<SamplePoolAsset>(samplesId) != nullptr &&
              context.assetsWithData<SamplePoolAsset, ProbeData>().empty(),
          "collection discovery should provide typed id lookup and omit assets without the requested private data");
+
+  const auto matches = bestMatches(context.assetsWithData<SequenceProgramAsset, ProbeData>(),
+                                   [](const auto& candidate) { return candidate.data->value; });
+  expect(
+      std::ranges::equal(matches, sequences,
+                         [](const auto& match, const auto& original) {
+                           return match.asset == original.asset && match.data == original.data &&
+                                  match.source == original.source;
+                         }),
+      "matching a temporary candidate list must preserve tie order and borrow the original assets, data, and sources");
 }
 
 struct PoolData {};

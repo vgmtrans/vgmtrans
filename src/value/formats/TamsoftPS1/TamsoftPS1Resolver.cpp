@@ -72,12 +72,12 @@ DependencySelection BankRequest::operator()(const DependencyContext& context) co
   if (matches.empty() && generation == Generation::Ps2) {
     const auto sameGeneration = [&](const BankEntry& bank) { return bank.data->generation == generation; };
     if (std::ranges::count_if(banks, sameGeneration) == 1) {
-      matches.push_back(&*std::ranges::find_if(banks, sameGeneration));
+      matches.push_back(*std::ranges::find_if(banks, sameGeneration));
     }
   }
   DependencySelection result;
   if (!matches.empty()) {
-    result.add(matches.front()->id());
+    result.add(matches.front().id());
   }
   if (matches.size() > 1) {
     result.ambiguous(dependencyTargets(matches), "Tamsoft TSQ matches multiple TVB banks equally well");

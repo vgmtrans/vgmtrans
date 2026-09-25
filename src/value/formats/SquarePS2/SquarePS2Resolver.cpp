@@ -42,8 +42,7 @@ using BankEntry = AssetWithData<SoundBankAsset, SoundBankData>;
 }  // namespace
 
 DependencySelection WdBankId::operator()(const DependencyContext& context) const {
-  const auto banks = context.candidates<SoundBankAsset, SoundBankData>();
-  const auto matches = bestMatches(banks, [&](const BankEntry& bank) {
+  const auto matches = bestMatches(context.candidates<SoundBankAsset, SoundBankData>(), [&](const BankEntry& bank) {
     return bank.data->bankId == value ? sourceAffinity(context.source(), bank.source) : -1;
   });
   auto selected = selectAll(matches);

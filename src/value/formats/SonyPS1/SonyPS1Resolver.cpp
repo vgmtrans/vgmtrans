@@ -52,20 +52,20 @@ struct SamplePosition {
   return !a.empty() && !b.empty() && a.parent_path() == b.parent_path() && a.stem() == b.stem();
 }
 
-[[nodiscard]] std::vector<const InstrumentEntry*> chooseInstruments(
+[[nodiscard]] std::vector<InstrumentEntry> chooseInstruments(
     const SequenceProgramAsset& sequence, const SourceFile* sequenceFile,
     const std::vector<const SequenceProgramAsset*>& sequenceEntries, const std::vector<InstrumentEntry>& banks) {
   const SourceId source = sequence.metadata.range.source;
   const u32 offset = static_cast<u32>(sequence.metadata.range.offset);
-  std::vector<const InstrumentEntry*> selected;
+  std::vector<InstrumentEntry> selected;
   for (const auto& bank : banks) {
     if (source.valid() && source == bank.sourceId()) {
-      selected.push_back(&bank);
+      selected.push_back(bank);
     }
   }
   if (!selected.empty()) {
-    std::ranges::sort(selected, [](const InstrumentEntry* left, const InstrumentEntry* right) {
-      return left->asset->metadata.range.offset > right->asset->metadata.range.offset;
+    std::ranges::sort(selected, [](const InstrumentEntry& left, const InstrumentEntry& right) {
+      return left.asset->metadata.range.offset > right.asset->metadata.range.offset;
     });
     const size_t rank = std::ranges::count_if(sequenceEntries, [&](const SequenceProgramAsset* candidate) {
       return candidate->metadata.range.source == source && static_cast<u32>(candidate->metadata.range.offset) > offset;
@@ -74,11 +74,11 @@ struct SamplePosition {
   }
   for (const auto& bank : banks) {
     if (sameDirectory(sequenceFile, bank.source)) {
-      selected.push_back(&bank);
+      selected.push_back(bank);
     }
   }
   if (selected.empty() && banks.size() == 1) {
-    selected.push_back(&banks.front());
+    selected.push_back(banks.front());
   }
   return selected;
 }
@@ -107,10 +107,10 @@ void applySampleBinding(BankPreparationContext& context, const SonyPs1BankLayout
 }  // namespace
 
 DependencySelection selectSonyPs1Banks(const DependencyContext& context) {
-  const auto banks = context.candidates<SoundBankAsset, SonyPs1BankLayout>();
-  const auto sequences = context.catalog().assets<SequenceProgramAsset>(kSonyPs1FormatName);
   const auto* sequence = context.catalog().asset<SequenceProgramAsset>(context.metadata().id);
-  return selectAll(chooseInstruments(*sequence, context.source(), sequences, banks));
+  return selectAll(chooseInstruments(*sequence, context.source(),
+                                     context.catalog().assets<SequenceProgramAsset>(kSonyPs1FormatName),
+                                     context.candidates<SoundBankAsset, SonyPs1BankLayout>()));
 }
 
 DependencySelection selectSonyPs1Samples(const DependencyContext& context) {

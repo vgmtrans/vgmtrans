@@ -20,10 +20,10 @@ namespace vgmtrans::core {
 
 // Negative scores reject a candidate; zero is a valid fallback. Retain every
 // highest-scoring candidate in input order so formats can report ambiguity.
-// Returned pointers borrow the caller's candidate vector.
+// Copy the candidate views so the input vector need not outlive the result.
 template <class Candidate, class Score>
-[[nodiscard]] std::vector<const Candidate*> bestMatches(const std::vector<Candidate>& candidates, Score score) {
-  std::vector<const Candidate*> selected;
+[[nodiscard]] std::vector<Candidate> bestMatches(const std::vector<Candidate>& candidates, Score score) {
+  std::vector<Candidate> selected;
   int best = 0;
   for (const auto& candidate : candidates) {
     const int rank = score(candidate);
@@ -34,17 +34,15 @@ template <class Candidate, class Score>
       best = rank;
       selected.clear();
     }
-    selected.push_back(&candidate);
+    selected.push_back(candidate);
   }
   return selected;
 }
 
-template <class Candidate, class Score>
-std::vector<const Candidate*> bestMatches(const std::vector<Candidate>&&, Score) = delete;
-
 // One format-owned value joined to its asset at the heterogeneous asset
-// boundary. This borrowed view is valid only during selection; recipes and
-// resolved dependencies retain stable IDs and owned values instead.
+// boundary. Copies borrow the catalog's assets, data, and sources, independently
+// of the candidate list. Recipes and resolved dependencies retain stable IDs
+// and owned values instead.
 template <class AssetT, class DataT>
 struct AssetWithData {
   const AssetT* asset = nullptr;
@@ -56,8 +54,8 @@ struct AssetWithData {
 };
 
 // Session-wide, read-only input to format-owned collection discovery. It owns a
-// cheap shared asset view so pointers returned from a temporary context remain
-// valid for the context's lifetime.
+// cheap shared asset view and source metadata. Candidate views remain valid
+// while their catalog is alive.
 class AssetCatalog {
 public:
   AssetCatalog(const SourceStore& sources, SharedSequence<Asset> assets)

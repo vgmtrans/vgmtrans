@@ -249,16 +249,15 @@ void bindBody(BankPreparationContext& context, const SoundBankData& data, const 
 DependencySelection BankRequest::operator()(const DependencyContext& context) const {
   const auto banks = context.candidates<SoundBankAsset, SoundBankData>();
   if (!member.empty()) {
-    const auto matches = bestMatches(banks, [&](const BankEntry& bank) {
+    return selectOne(bestMatches(banks, [&](const BankEntry& bank) {
       return context.source() != nullptr && bank.source != nullptr && context.source()->parent == bank.source->parent &&
                      selectedMember(*bank.source, member)
                  ? 0
                  : -1;
-    });
-    return selectOne(matches);
+    }));
   }
   auto matches = bestMatches(banks, [&](const BankEntry& bank) { return affinity(context.source(), bank.source); });
-  if (matches.size() > 1 && affinity(context.source(), matches.front()->source) < 4) {
+  if (matches.size() > 1 && affinity(context.source(), matches.front().source) < 4) {
     matches.clear();
   }
   auto result = selectAll(matches);
@@ -271,8 +270,7 @@ DependencySelection BankRequest::operator()(const DependencyContext& context) co
 DependencySelection selectSonyPs2Samples(const DependencyContext& context) {
   const auto& bank = *context.catalog().asset<SoundBankAsset>(context.metadata().id);
   const auto& data = context.data<SoundBankData>();
-  const auto bodies = context.candidates<SamplePoolAsset, SampleBodyData>();
-  return selectOne(bestMatches(bodies, [&](const BodyEntry& body) {
+  return selectOne(bestMatches(context.candidates<SamplePoolAsset, SampleBodyData>(), [&](const BodyEntry& body) {
     if (!compatible(bank, data, *body.data)) {
       return kNoAffinity;
     }
