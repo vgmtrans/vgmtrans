@@ -53,7 +53,7 @@ DependencySelection WdBankId::operator()(const DependencyContext& context) const
   return selected;
 }
 
-void prepareSequence(SequencePreparationContext& context, const SequenceData& sequence) {
+SequenceRuntime prepareSequence(SequencePreparationContext& context, const SequenceData& sequence) {
   RuntimeConfig config{.defaultBank = sequence.waveBankId};
   const SoundBankData* selected = nullptr;
   for (const auto& bank : context.banks<SoundBankData>(kSquarePs2FormatName)) {
@@ -62,7 +62,6 @@ void prepareSequence(SequencePreparationContext& context, const SequenceData& se
     }
     if (selected != nullptr) {
       context.fail("SquarePS2 collection contains multiple WD banks with the requested driver ID");
-      return;
     }
     selected = &bank.data;
   }
@@ -71,7 +70,7 @@ void prepareSequence(SequencePreparationContext& context, const SequenceData& se
   } else {
     config.envelopes = selected->envelopes;
   }
-  static_cast<void>(context.replaceSequenceRuntime(sequenceRuntime(std::move(config))));
+  return sequenceRuntime(std::move(config));
 }
 
 }  // namespace vgmtrans::formats::square_ps2

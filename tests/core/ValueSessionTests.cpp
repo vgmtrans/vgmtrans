@@ -461,6 +461,7 @@ void sessionCreatesUserCollectionsFromDetectedAssets() {
     for (auto& asset : result.assets) {
       std::get<SequenceProgramAsset>(asset).prepare = [](SequencePreparationContext& context) {
         context.warning("user collection bound");
+        return std::nullopt;
       };
     }
     return result;

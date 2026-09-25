@@ -9,6 +9,7 @@
 #include "value/model/CollectionModel.h"
 
 #include <functional>
+#include <optional>
 #include <string>
 #include <utility>
 #include <variant>
@@ -20,7 +21,9 @@ class DependencyContext;
 class BankAssignmentContext;
 struct BankPreparationContext;
 struct SequencePreparationContext;
-using SequencePreparer = std::function<void(SequencePreparationContext&)>;
+struct SequenceRuntime;
+// Return a configured runtime, or nullopt to keep the scanned runtime.
+using SequencePreparer = std::function<std::optional<SequenceRuntime>(SequencePreparationContext&)>;
 
 class DependencySelection {
 public:

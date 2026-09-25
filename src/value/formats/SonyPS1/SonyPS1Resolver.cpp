@@ -94,12 +94,10 @@ void applySampleBinding(BankPreparationContext& context, const SonyPs1BankLayout
       const u32 index = region.sample.index();
       if (index >= sizes.size() || sizes[index] == 0) {
         context.fail("Sony PS1 sound bank refers outside its external sample pool", region.range);
-        return;
       }
       const u32 sample = firstSample + index - static_cast<u32>(std::count(sizes.begin(), sizes.begin() + index, 0));
       if (sample >= pool.pool.samples.size()) {
         context.fail("Sony PS1 sound bank refers outside its external sample pool", region.range);
-        return;
       }
       region.sample = SampleRef::resolved(pool.metadata.id, sample);
     }
@@ -149,12 +147,8 @@ void prepareSonyPs1Bank(BankPreparationContext& context, const SonyPs1BankLayout
   if (!needsExternalSamples(context.bank)) {
     return;
   }
-  const auto samples = context.samples<SonyPs1SampleBodyLayout>();
-  if (samples.size() != 1) {
-    context.fail("Sony PS1 sound bank has no unambiguous external sample pool");
-    return;
-  }
-  const auto& sample = samples.front();
+  const auto sample =
+      context.sample<SonyPs1SampleBodyLayout>("Sony PS1 sound bank has no unambiguous external sample pool");
   const auto* position = sample.placement.get<SamplePosition>();
   applySampleBinding(context, layout, sample.asset, position != nullptr ? position->firstSample : 0);
 }

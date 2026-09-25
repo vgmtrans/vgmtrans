@@ -140,7 +140,6 @@ void prepareAkaoBank(BankPreparationContext& context, const AkaoSoundBankData& d
   }
   if (!applyAkaoArticulations(context.bank, data.binding, articulations)) {
     context.fail("Akao retained instrument recipe does not match its structural bank");
-    return;
   }
 
   std::set<u32> missing;

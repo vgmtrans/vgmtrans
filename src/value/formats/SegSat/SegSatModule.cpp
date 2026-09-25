@@ -138,13 +138,13 @@ void prepareSegSatBank(BankPreparationContext& context, const SegSatBankBindingD
   }
 }
 
-void prepareSegSatSequence(SequencePreparationContext& context, const SegSatSequenceBindingData& sequence) {
+std::optional<SequenceRuntime> prepareSegSatSequence(SequencePreparationContext& context,
+                                                     const SegSatSequenceBindingData& sequence) {
   std::vector<SegSatVelocityBank> velocityBanks;
   for (const auto& bank : context.banks<SegSatBankBindingData>(kSegSatFormatName)) {
     const auto* use = bank.placement.get<SegSatBankUse>();
     if (use == nullptr) {
       context.fail("SegSat bank is missing its logical bank assignment", bank.asset.metadata.range);
-      return;
     }
     auto runtime = bank.data;
     runtime.sourceBank = use->logicalBank;
@@ -152,14 +152,13 @@ void prepareSegSatSequence(SequencePreparationContext& context, const SegSatSequ
   }
   if (velocityBanks.empty() && !sequence.referencedBanks.empty()) {
     context.fail("SegSat collection does not contain a retained SegSat instrument bank");
-    return;
   }
-  if (!velocityBanks.empty()) {
-    static_cast<void>(context.replaceSequenceRuntime(
-        segSatSequenceRuntime(SegSatRuntimeConfig{.velocityBanks = std::move(velocityBanks),
-                                                  .volumeModel = sequence.volumeModel,
-                                                  .controllerChanges = sequence.controllerChanges})));
+  if (velocityBanks.empty()) {
+    return std::nullopt;
   }
+  return segSatSequenceRuntime(SegSatRuntimeConfig{.velocityBanks = std::move(velocityBanks),
+                                                   .volumeModel = sequence.volumeModel,
+                                                   .controllerChanges = sequence.controllerChanges});
 }
 
 FormatModule segSatModule() {

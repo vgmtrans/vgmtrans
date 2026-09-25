@@ -94,9 +94,7 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
   config96.timebase.ppqn = 96;
   const SequencePreparer binder = [](SequencePreparationContext& context) {
     const bool leaveDirtyMidiState = context.sequence.metadata.name == "Part 0";
-    if (!context.replaceSequenceRuntime(makeCompiledRuntime<ProbePlayback, StitchProgramState>(leaveDirtyMidiState))) {
-      return;
-    }
+    return makeCompiledRuntime<ProbePlayback, StitchProgramState>(leaveDirtyMidiState);
   };
 
   test::SessionSnapshotBuilder builder;

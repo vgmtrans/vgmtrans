@@ -181,7 +181,8 @@ struct SegSatBankUse {
 
 void assignSegSatBanks(core::BankAssignmentContext& context);
 void prepareSegSatBank(core::BankPreparationContext& context, const SegSatBankBindingData& data);
-void prepareSegSatSequence(core::SequencePreparationContext& context, const SegSatSequenceBindingData& sequence);
+std::optional<core::SequenceRuntime> prepareSegSatSequence(core::SequencePreparationContext& context,
+                                                           const SegSatSequenceBindingData& sequence);
 [[nodiscard]] core::FormatModule segSatModule();
 
 }  // namespace vgmtrans::formats::segsat

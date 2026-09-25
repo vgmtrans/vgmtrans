@@ -177,7 +177,7 @@ struct BankRequest {
 [[nodiscard]] bool selectedMember(const core::SourceFile& source, std::string_view selected);
 [[nodiscard]] core::DependencySelection selectSonyPs2Samples(const core::DependencyContext& context);
 void prepareSonyPs2Bank(core::BankPreparationContext& context, const SoundBankData& data);
-void prepareSonyPs2Sequence(core::SequencePreparationContext& context);
+core::SequenceRuntime prepareSonyPs2Sequence(core::SequencePreparationContext& context);
 [[nodiscard]] core::FormatModule module();
 
 }  // namespace vgmtrans::formats::sony_ps2

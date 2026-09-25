@@ -55,7 +55,11 @@ void collectionStatusControlsPreparationIndependentlyOfDiagnostics() {
       bool prepared = false;
       test::SessionSnapshotBuilder builder;
       builder.assets = {SequenceProgramAsset{.metadata = {.id = AssetId{1}},
-                                             .prepare = [&](SequencePreparationContext&) { prepared = true; }},
+                                             .prepare =
+                                                 [&](SequencePreparationContext&) {
+                                                   prepared = true;
+                                                   return std::nullopt;
+                                                 }},
                         SoundBankAsset{.metadata = {.id = AssetId{2}}}};
       builder.collections = {collection};
       const auto bound = bindCollection(builder.finish(), collection.id);
@@ -148,9 +152,7 @@ void dependenciesPreserveSharingPlacementsAndPrivatePreparation() {
         .recipe = {.samples = {exact(poolId, position)}},
         .prepare =
             [](BankPreparationContext& context) {
-              const auto inputs = context.samples<PoolData>();
-              expect(inputs.size() == 1, "each bank must receive exactly its own selected input");
-              const auto& input = inputs.front();
+              const auto input = context.sample<PoolData>();
               const auto position = *input.placement.get<u32>();
               context.bank.instruments.front().regions.front().sample =
                   SampleRef::resolved(input.asset.metadata.id, position);
@@ -174,7 +176,8 @@ void dependenciesPreserveSharingPlacementsAndPrivatePreparation() {
                                  .members = desired.members,
                                  .issues = desired.issues,
                                  .dependencies = desired.dependencies});
-  const auto snapshot = builder.finish();
+  auto validBuilder = builder;
+  const auto snapshot = validBuilder.finish();
   const auto prepared = bindCollection(snapshot, CollectionId{1});
   expect(prepared.collection.has_value(), "cross-format banks should prepare through their own asset hooks");
   const auto& banks = prepared.collection->soundBanks();
@@ -188,6 +191,32 @@ void dependenciesPreserveSharingPlacementsAndPrivatePreparation() {
   expect(standalone.collection &&
              standalone.collection->soundBanks().front().instruments.front().explicitAddress->bank == 0,
          "standalone bank preparation should resolve its samples and assign its own bank slot");
+
+  const SourceRange failureRange{.source = SourceId{1}, .offset = 24, .size = 4};
+  bool continued = false;
+  const BankPreparer failBank = [&](BankPreparationContext& context) {
+    context.bank.instruments.clear();
+    context.warning("earlier warning");
+    context.fail("region preparation failed", failureRange);
+  };
+  std::get<SoundBankAsset>(builder.assets[1]).prepare = [&](BankPreparationContext& context) {
+    failBank(context);
+    continued = true;
+  };
+  std::get<SoundBankAsset>(builder.assets[2]).prepare = [&](BankPreparationContext&) { continued = true; };
+  std::get<SequenceProgramAsset>(builder.assets[0]).prepare = [&](SequencePreparationContext&) {
+    continued = true;
+    return std::nullopt;
+  };
+  const auto failedSnapshot = builder.finish();
+  const auto failed = bindCollection(failedSnapshot, CollectionId{1});
+  expect(!failed.collection && !continued && failedSnapshot.asset<SoundBankAsset>(firstBank)->instruments.size() == 1,
+         "a nested failure must stop its caller and later hooks without publishing or mutating durable assets");
+  expect(failed.diagnostics.size() == 2 && failed.diagnostics[0].severity == Severity::Warning &&
+             failed.diagnostics[0].message == "earlier warning" && failed.diagnostics[1].severity == Severity::Error &&
+             failed.diagnostics[1].message == "region preparation failed" &&
+             failed.diagnostics[1].range == failureRange,
+         "preparation must retain preceding warnings and report the failure once at its supplied range");
 }
 
 void manualChoicesOverrideSequenceRequestsAndConstrainBankInputs() {
@@ -389,6 +418,7 @@ void sequencePreparationValidatesOnlyTheRequestedFormat() {
                                    expect(bank.placement.empty(), "unassigned banks should have an empty placement");
                                  }
                                  context.warning("sequence warning");
+                                 return std::nullopt;
                                }},
       SoundBankAsset{.metadata = {.id = AssetId{2}, .format = "Bank"},
                      .privateData = AssetPrivateData::make(ProbeData{20})},
@@ -412,10 +442,45 @@ void sequencePreparationValidatesOnlyTheRequestedFormat() {
     auto invalidBuilder = builder;
     std::get<SoundBankAsset>(invalidBuilder.assets[3]).privateData = missing;
     const auto invalid = bindCollection(invalidBuilder.finish(), CollectionId{1});
-    expect(!invalid.collection && observed.empty() && invalid.diagnostics.front().severity == Severity::Error &&
+    expect(!invalid.collection && observed.empty() && invalid.diagnostics.size() == 1 &&
+               invalid.diagnostics.front().severity == Severity::Error &&
                invalid.diagnostics.front().range == bankRange &&
                invalid.diagnostics.front().message == "Sequence bank input is missing its retained format data",
-           "a matching bank with absent or wrong data must fail at the bank's range, not disappear from preparation");
+           "absent or wrong bank data must abort preparation at the bank's range without a misleading warning");
+  }
+}
+
+void singleSampleInputRejectsInvalidSelections() {
+  const SourceRange bankRange{.source = SourceId{1}, .offset = 4, .size = 4};
+  const auto poolData = AssetPrivateData::make(PoolData{});
+  const DependencyTarget first{AssetId{2}, {}}, second{AssetId{3}, {}};
+  const struct {
+    std::vector<DependencyRequest> inputs;
+    AssetPrivateData data;
+    std::string_view error;
+  } cases[] = {
+      {{}, poolData, "expected one sample body"},
+      {{first, second}, poolData, "expected one sample body"},
+      {{first}, AssetPrivateData::make(u32{42}), "Bank sample input is missing its retained format data"},
+  };
+  for (const auto& entry : cases) {
+    test::SessionSnapshotBuilder builder;
+    builder.assets = {
+        SoundBankAsset{.metadata = {.id = AssetId{1}, .range = bankRange},
+                       .recipe = {.samples = entry.inputs},
+                       .prepare =
+                           [](BankPreparationContext& context) {
+                             static_cast<void>(context.sample<PoolData>("expected one sample body"));
+                             context.warning("unexpected continuation");
+                           }},
+        SamplePoolAsset{.metadata = {.id = first.asset}, .privateData = entry.data},
+        SamplePoolAsset{.metadata = {.id = second.asset}, .privateData = poolData},
+    };
+    const auto result = bindSoundBank(builder.finish(), AssetId{1});
+    expect(!result.collection && result.diagnostics.size() == 1 &&
+               result.diagnostics.front().severity == Severity::Error &&
+               result.diagnostics.front().range == bankRange && result.diagnostics.front().message == entry.error,
+           "invalid sample inputs must stop preparation with one specific error at the bank's range");
   }
 }
 
@@ -444,6 +509,7 @@ void bankAssignmentsBelongToEachSequenceAndRespectManualSelection() {
               const auto* address = bank.placement.get<u32>();
               expect(address && bank.asset.instruments.front().explicitAddress->bank == *address,
                      "sequence preparation must observe the bank's applied relationship assignment");
+              return std::nullopt;
             },
     };
   };
@@ -495,7 +561,10 @@ void bankAssignmentsBelongToEachSequenceAndRespectManualSelection() {
     throw std::runtime_error("assignment failed after changing placement");
   };
   bool prepared = false;
-  failing.prepare = [&](SequencePreparationContext&) { prepared = true; };
+  failing.prepare = [&](SequencePreparationContext&) {
+    prepared = true;
+    return std::nullopt;
+  };
   test::SessionSnapshotBuilder rejected;
   rejected.assets = {failing, *snapshot.asset<SoundBankAsset>(bankId)};
   const auto unresolved = dependencyCollections(AssetCatalog{sources, SharedSequence<Asset>{rejected.assets}});
@@ -516,6 +585,7 @@ void bankAssignmentsBelongToEachSequenceAndRespectManualSelection() {
 }  // namespace
 
 void runValueAssetResolutionTests() {
+  singleSampleInputRejectsInvalidSelections();
   sequencePreparationValidatesOnlyTheRequestedFormat();
   combinedRequestsPreserveUnresolvedOutcomes();
   resolutionStatusAndAlternativePlacementsSurvivePublication();

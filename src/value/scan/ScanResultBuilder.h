@@ -185,9 +185,8 @@ ScanSequenceDraft& ScanSequenceDraft::prepare(Prepare callback) {
     const auto* data = context.sequence.privateData.template get<Data>();
     if (data == nullptr) {
       context.fail("Sequence is missing its preparation data");
-      return;
     }
-    callback(context, *data);
+    return callback(context, *data);
   });
 }
 
@@ -197,7 +196,6 @@ ScanSoundBankDraft& ScanSoundBankDraft::prepare(Prepare callback) {
     const auto* data = context.bank.privateData.template get<Data>();
     if (data == nullptr) {
       context.fail("Bank is missing its preparation data");
-      return;
     }
     callback(context, *data);
   });

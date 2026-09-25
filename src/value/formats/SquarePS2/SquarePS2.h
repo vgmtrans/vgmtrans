@@ -97,7 +97,7 @@ struct WdBankId {
   u16 value;
   [[nodiscard]] core::DependencySelection operator()(const core::DependencyContext& context) const;
 };
-void prepareSequence(core::SequencePreparationContext& context, const SequenceData& sequence);
+core::SequenceRuntime prepareSequence(core::SequencePreparationContext& context, const SequenceData& sequence);
 [[nodiscard]] core::FormatModule module();
 
 }  // namespace vgmtrans::formats::square_ps2

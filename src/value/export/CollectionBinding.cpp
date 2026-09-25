@@ -168,16 +168,25 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
         BankPreparationContext context{
             bank, index, inputs, samplePools, diagnostics, use == bankUses.end() ? AssetPrivateData{} : use->placement};
         prepare(context);
-        if (context.failed) {
-          failed = true;
-          break;
+      }
+      if (sequence != nullptr && sequence->prepare) {
+        SequencePreparationContext context{*sequence, soundBanks, diagnostics, bankUses};
+        if (auto replacement = sequence->prepare(context)) {
+          if (!sequenceRuntime.valid()) {
+            context.fail("Collection binding cannot replace a sequence runtime with no executor");
+          }
+          if (!replacement->valid()) {
+            context.fail("Collection binding produced a replacement sequence runtime with no executor");
+          }
+          if (sequenceRuntime.execute != replacement->execute) {
+            context.fail("Collection binding produced an incompatible sequence runtime family");
+          }
+          sequenceRuntime = std::move(*replacement);
         }
       }
-      if (!failed && sequence != nullptr && sequence->prepare) {
-        SequencePreparationContext context{*sequence, sequenceRuntime, soundBanks, diagnostics, bankUses};
-        sequence->prepare(context);
-        failed = context.failed;
-      }
+    } catch (detail::PreparationFailure& failure) {
+      diagnostics.push_back(std::move(failure.diagnostic));
+      failed = true;
     } catch (const std::exception& error) {
       diagnostics.push_back(exportError(std::string("Asset preparation failed: ") + error.what()));
       failed = true;

@@ -96,6 +96,11 @@ knowing how Sony prepares samples. `bankIndex` gives the bank's ordinal among
 selected banks of the same format. A shared sample pool can have different
 placements in each bank's inputs.
 
+When a bank needs exactly one pool, `context.sample<SampleData>()` returns that
+input directly. It fails if the selection is empty, has multiple inputs, or lacks
+the requested data. An optional message describes the format's single-input
+requirement.
+
 Some sequences also assign logical meanings to their selected banks. Register
 `sequence.assignBanks(assignBanks)` for that case. It runs after automatic or
 manual selection and can attach native placement values to the sequence-to-bank
@@ -117,12 +122,12 @@ read-only prepared banks. Like `samples<Data>()`, `banks<Data>(format)` presents
 each input's `asset`, retained `data`, and `placement` together:
 
 ```cpp
-void prepareSequence(SequencePreparationContext& context) {
+SequenceRuntime prepareSequence(SequencePreparationContext& context) {
   RuntimeConfig config;
   for (const auto& bank : context.banks<BankData>(kFormatName)) {
     appendPrograms(config, bank.data);
   }
-  static_cast<void>(context.replaceSequenceRuntime(sequenceRuntime(std::move(config))));
+  return sequenceRuntime(std::move(config));
 }
 ```
 
@@ -133,7 +138,18 @@ reference to the sequence being prepared. Both preparation contexts default
 diagnostics to their owner's source range. Supplemental assets remain available
 through collection inspection, outside the audio preparation interface.
 
-Runtime replacement must retain the executor family.
+The core validates and installs the returned runtime; both the original and the
+replacement must have an executor from the same family. A hook that sometimes
+leaves the runtime unchanged returns `std::optional<SequenceRuntime>`, using
+`std::nullopt` for that case.
+
+In either preparation context, `warning(message, range)` records a diagnostic and
+continues. `fail(message, range)` stops preparation immediately, including any
+calling helpers and later hooks. Typed input validation uses the same failure
+path. Formats do not need to propagate failure flags or write `return` after
+`fail()`. The core catches the failure at the collection boundary, preserves
+earlier warnings, reports the error once, and discards partial changes.
+
 Different sequences can assign different logical addresses to the same durable
 bank. Standalone bank preparation has no sequence assignment.
 
@@ -184,7 +200,9 @@ Core tests exercise automatic publication, persistent opt-outs, identity across
 renaming and reordering, direct and deferred requests, typed failure status independent
 of diagnostic codes, ambiguous positions within one pool, manual ordering and
 confinement, container scope, provider type validation, standalone preparation,
-and copy isolation. Shared-bank tests cover different logical assignments across
+and copy isolation. Preparation tests cover immediate failure across nested
+helpers, single-input validation, and returned-runtime validation and retention.
+Shared-bank tests cover different logical assignments across
 sequences, overlapping requests, assignment failures, and assignments to a manually
 substituted bank. Format tests cover
 native matching, sample positions, Akao coverage, PSF2 manifests, and SegSat shared

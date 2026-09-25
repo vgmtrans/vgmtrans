@@ -442,12 +442,10 @@ struct ForeignRuntimeTrackState {};
 
 struct ForeignRuntimePlayback : SequencePlayback<ForeignRuntimeTrackState> {};
 
-void bindPerformanceRuntime(SequencePreparationContext& context) {
+SequenceRuntime bindPerformanceRuntime(SequencePreparationContext& context) {
   const bool fail = context.sequence.metadata.name == "Failing Sequence";
-  if (!context.replaceSequenceRuntime(makeCompiledRuntime<ProbePlayback, PreparedProbeProgramState>(fail))) {
-    return;
-  }
   context.warning("Collection binding warning");
+  return makeCompiledRuntime<ProbePlayback, PreparedProbeProgramState>(fail);
 }
 
 void collectionBindingAppliesToWholeExport() {
@@ -511,18 +509,6 @@ void collectionBindingAppliesToWholeExport() {
   failingCollection.id = CollectionId{1};
   failingCollection.members.sequence = failingSequence.metadata.id;
   builder.collections.push_back(std::move(failingCollection));
-  auto mismatchedCollection = builder.collections.front();
-  mismatchedCollection.id = CollectionId{2};
-  auto mismatchedSequence = sequence;
-  mismatchedSequence.metadata.id = AssetId{4};
-  mismatchedSequence.prepare = [](SequencePreparationContext& context) {
-    if (!context.replaceSequenceRuntime(makeCompiledRuntime<ForeignRuntimePlayback>())) {
-      return;
-    }
-  };
-  builder.assets.emplace_back(mismatchedSequence);
-  mismatchedCollection.members.sequence = mismatchedSequence.metadata.id;
-  builder.collections.push_back(std::move(mismatchedCollection));
 
   const SessionSnapshot snapshot = builder.finish();
   const CollectionPlayback playback = prepareCollectionPlayback(snapshot, sources, CollectionId{0}, PlaybackRequest{});
@@ -571,10 +557,48 @@ void collectionBindingAppliesToWholeExport() {
   expect(failed.size() == 1, "a failing collection performance finalizer should produce one MIDI artifact");
   diagnosticWithMessage(failed.front().diagnostics, "Collection binding warning");
   diagnosticWithMessage(failed.front().diagnostics, "Sequence rendering failed: test finalizer failure");
+}
 
-  const auto mismatched = bindCollection(snapshot, CollectionId{2});
-  expect(!mismatched.collection, "an incompatible runtime should fail at collection binding before VM execution");
-  diagnosticWithMessage(mismatched.diagnostics, "Collection binding produced an incompatible sequence runtime family");
+void sequencePreparationValidatesRuntimeReplacement() {
+  const SourceRange sequenceRange{.source = SourceId{1}, .offset = 16, .size = 8};
+  const auto bind = [&](SequenceRuntime runtime, SequencePreparer prepare) {
+    test::SessionSnapshotBuilder builder;
+    builder.assets = {SequenceProgramAsset{.metadata = {.id = AssetId{1}, .range = sequenceRange},
+                                           .program = {.runtime = std::move(runtime)},
+                                           .prepare = std::move(prepare)}};
+    builder.collections = {{.id = CollectionId{1}, .members = {.sequence = AssetId{1}}}};
+    return bindCollection(builder.finish(), CollectionId{1});
+  };
+  const auto unchanged = [](SequencePreparationContext&) { return std::nullopt; };
+  bool createdOriginalState = false;
+  auto original = probeSequenceRuntime();
+  original.createProgramState = [factory = original.createProgramState,
+                                 &createdOriginalState](const SequenceProgram& program) {
+    createdOriginalState = true;
+    return factory(program);
+  };
+  const auto kept = bind(original, unchanged);
+  expect(kept.collection && renderCollection(*kept.collection, {}).performance && createdOriginalState,
+         "returning nullopt must retain the scanned runtime's state factory");
+  expect(bind({}, unchanged).collection.has_value(), "a no-change hook must not require an executable runtime");
+
+  const struct {
+    SequenceRuntime original;
+    SequenceRuntime replacement;
+    std::string_view error;
+  } cases[] = {
+      {original, {}, "Collection binding produced a replacement sequence runtime with no executor"},
+      {{}, original, "Collection binding cannot replace a sequence runtime with no executor"},
+      {original, makeCompiledRuntime<ForeignRuntimePlayback>(),
+       "Collection binding produced an incompatible sequence runtime family"},
+  };
+  for (const auto& entry : cases) {
+    const auto result = bind(entry.original, [&](SequencePreparationContext&) { return entry.replacement; });
+    expect(!result.collection && result.diagnostics.size() == 1 &&
+               result.diagnostics.front().severity == Severity::Error &&
+               result.diagnostics.front().range == sequenceRange && result.diagnostics.front().message == entry.error,
+           "invalid runtime replacement must fail once at the sequence range with the specific cause");
+  }
 }
 
 void collectionBindingProducesAnImmutableInstrumentView() {
@@ -656,16 +680,6 @@ void collectionBindingProducesAnImmutableInstrumentView() {
   expect(usedOnly.size() == 1 && usedOnly.front().bytes.empty(),
          "used-instrument export should still require a sequence even for bank-only collections");
   diagnosticWithMessage(usedOnly.front().diagnostics, "Collection does not reference a sequence asset");
-
-  const auto failed = bindCollection(snapshotWithBinder([](BankPreparationContext& context) {
-                                       context.bank.instruments.front().name = "Partially Bound";
-                                       context.fail("expected binding failure");
-                                     }),
-                                     CollectionId{0});
-  expect(!failed.collection &&
-             snapshot.asset<SoundBankAsset>(durable.metadata.id)->instruments.front().name == "Durable Instrument",
-         "an explicit binding failure should publish neither a partial collection nor durable mutations");
-  diagnosticWithMessage(failed.diagnostics, "expected binding failure");
 
   const auto threw = bindCollection(snapshotWithBinder([](BankPreparationContext& context) {
                                       context.bank.instruments.front().name = "Partially Bound";
@@ -1119,6 +1133,7 @@ void runValueCollectionExportTests() {
   sampleReferenceValidationEnforcesOwnership();
   collectionSynthExportsCanExportOnlyUsedInstruments();
   collectionBindingAppliesToWholeExport();
+  sequencePreparationValidatesRuntimeReplacement();
   collectionBindingProducesAnImmutableInstrumentView();
   synthOnlyExportRendersSequencesWithoutOriginalModulation();
   exportDiagnosticsPreserveSourceRanges();
