@@ -434,21 +434,21 @@ void sessionClosesSourceFamiliesWhenScansFindNoAssets() {
          "an individual scan should also close a source family without detected assets");
 }
 
-void sessionKeepsScannerKnownCollectionsWithoutResolver() {
+void sessionPublishesDeclaredSequenceCollections() {
   Session session;
-  session.registerFormat(probeExplicitCollectionModule());
+  session.registerFormat(probeDeclaredCollectionModule());
 
-  const auto source = session.addSource(SourceFile{.name = "explicit.probe"}, {0xab});
+  const auto source = session.addSource(SourceFile{.name = "declared.probe"}, {0xab});
   session.scanSource(source);
   SessionSnapshot project = session.snapshot();
-  expect(project.collections().size() == 1, "explicit scanner-known collection should be published");
-  expect(project.collections()[0].key && project.collections()[0].key->resolver == "ProbeExplicit",
-         "explicit scanner-known collection should use its scanner resolver key");
+  expect(project.collections().size() == 1, "declared sequence collection should be published");
+  expect(project.collections()[0].key && project.collections()[0].key->resolver == "ProbeDeclared",
+         "declared sequence collection should use its scanner resolver key");
 
   session.removeSource(source);
 
   project = session.snapshot();
-  expect(project.collections().empty(), "explicit scanner-known collection should disappear with its source");
+  expect(project.collections().empty(), "declared sequence collection should disappear with its source");
 }
 
 void sessionCreatesUserCollectionsFromDetectedAssets() {
@@ -492,6 +492,13 @@ void sessionCreatesUserCollectionsFromDetectedAssets() {
   expect(collection->members.sequence == members.sequence && collection->members.soundBanks == members.soundBanks,
          "manual collection should preserve the selected asset ids");
   expect(!collection->dependencies.empty(), "manual collection should retain its resolved asset dependencies");
+
+  const auto unrelated = session.addSource(SourceFile{.name = "unrelated.seq"}, {0xcc, 9});
+  session.scanPendingSources();
+  session.removeSource(unrelated);
+  expect(session.snapshot().collection(created) != nullptr &&
+             session.snapshot().collection(before.collections().front().id) != nullptr,
+         "rebuilding discovered collections must preserve manual collections and existing collection identities");
 
   session.removeSource(instrumentSource);
   const SessionSnapshot removed = session.snapshot();
@@ -678,7 +685,7 @@ void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
   expect(project.collections().empty(), "resolver-owned discovered collection should disappear when no assets remain");
 }
 
-void sessionResolverFailureKeepsExplicitCollections() {
+void sessionDependencyFailureKeepsSequenceCollections() {
   Session session;
   auto module = probeSequenceModule();
   module.scan = [](const ScanInput& input) {
@@ -694,7 +701,7 @@ void sessionResolverFailureKeepsExplicitCollections() {
   const auto source = session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
   session.scanSource(source);
   auto project = session.snapshot();
-  expect(project.collections().size() == 1, "selector failure must preserve the explicit collection");
+  expect(project.collections().size() == 1, "selector failure must preserve the sequence collection");
   expect(project.collections().front().issues.front().code == "dependency-resolution-failed",
          "selector exceptions should become an issue on the affected collection");
   const auto id = project.collections().front().id;
@@ -1072,22 +1079,51 @@ void sessionReportsDesiredCollectionMissingAssetReferences() {
   }
 }
 
+void sessionKeepsSequenceCollectionsWhenSupplementalAssetsDisappear() {
+  Session session;
+  session.registerFormat(FormatModule{
+      .name = "Supplemental", .scan = [](const ScanInput& input) {
+        ScanResultBuilder out(input, "Supplemental");
+        auto sequence = out.sequence("Song").program(probeSequenceProgram());
+        auto misc = out.misc("Table", input.reader.range(0, 1)).payload({0});
+        sequence.collection().includeMisc(misc).includeMisc(sequence.id());
+        out.sourceMap().header("Sequence", input.reader.range(0, 1)).owner(ObjectRefs::sequence(sequence.id()));
+        out.sourceMap().header("Table", input.reader.range(0, 1)).owner(ObjectRefs::misc(misc.id()));
+        return out.finish();
+      }});
+  session.addSource(SourceFile{.name = "supplemental.bin"}, {0});
+  session.scanPendingSources();
+  const auto before = session.snapshot();
+  const auto& collection = before.collections().front();
+  expect(collection.members.miscAssets.size() == 1 && collection.issues.front().code == "wrong-type-misc",
+         "supplemental references must reject an asset of the wrong type");
+  session.removeAssets(collection.members.miscAssets);
+  const auto after = session.snapshot();
+  const auto* updated = after.collection(collection.id);
+  expect(updated != nullptr && updated->members.sequence == collection.members.sequence &&
+             updated->members.miscAssets.empty() && updated->issues.front().code == "missing-misc",
+         "removing an inspection asset must retain the sequence's identity and report the missing reference");
+  expect(collection.members.miscAssets.size() == 1, "earlier snapshots must retain their supplemental membership");
+}
+
 void sessionReportsDuplicateDesiredCollectionKeys() {
   Session session;
   auto module = probeSequenceModule();
   module.scan = [](const ScanInput& input) {
-    auto result = scanProbeSequence(input);
-    auto duplicate = result.explicitCollections.front();
-    duplicate.name = "Duplicate";
-    result.explicitCollections.push_back(duplicate);
-    return result;
+    ScanResultBuilder out(input, "ProbeSequence");
+    for (const auto name : {"First", "Duplicate"}) {
+      auto sequence = out.sequence(name).program(probeSequenceProgram()).collection({.value = "duplicate"});
+      out.sourceMap().header(name, input.reader.range(0, 1)).owner(ObjectRefs::sequence(sequence.id()));
+    }
+    return out.finish();
   };
   session.registerFormat(std::move(module));
   session.addSource(SourceFile{.name = "duplicate-keys.probe"}, {0xaa});
   session.scanPendingSources();
   const auto project = session.snapshot();
-  expect(project.collections().size() <= 1, "duplicate scanner collection keys must not publish duplicate collections");
-  expect(!project.diagnostics().empty(), "duplicate scanner keys should report a diagnostic");
+  expect(project.collections().size() == 1, "duplicate scanner collection keys must not publish duplicate collections");
+  diagnosticWithMessage(project.diagnostics(),
+                        "Collection resolver 'ProbeSequence' returned duplicate collection key 'duplicate'");
 }
 
 void retainedSourceOwnsStableCopiedBytes() {
@@ -1162,9 +1198,9 @@ void sessionStateRebuildsLookupIndexAfterRemoval() {
               .range = SourceRange{.source = SourceId{0}, .offset = 1, .size = 1},
           },
   });
-  state.appendScan(SourceId{0}, ScanResult{
-                                    .assets = std::move(firstSourceAssets),
-                                });
+  state.appendScan(ScanResult{
+      .assets = std::move(firstSourceAssets),
+  });
 
   std::vector<Asset> secondSourceAssets;
   secondSourceAssets.emplace_back(SamplePoolAsset{
@@ -1176,9 +1212,9 @@ void sessionStateRebuildsLookupIndexAfterRemoval() {
               .range = SourceRange{.source = SourceId{1}, .offset = 0, .size = 1},
           },
   });
-  state.appendScan(SourceId{1}, ScanResult{
-                                    .assets = std::move(secondSourceAssets),
-                                });
+  state.appendScan(ScanResult{
+      .assets = std::move(secondSourceAssets),
+  });
 
   expect(state.asset<SamplePoolAsset>(AssetId{2}) == std::get_if<SamplePoolAsset>(&state.assets()[2]),
          "session state should look up assets by id before removal");
@@ -1328,7 +1364,7 @@ void sessionExportsASequenceWithoutACollection() {
   const auto scan = format.scan;
   format.scan = [scan](const ScanInput& input) {
     auto result = scan(input);
-    result.explicitCollections.clear();
+    std::get<SequenceProgramAsset>(result.assets.front()).collection.reset();
     return result;
   };
   session.registerFormat(std::move(format));
@@ -1379,13 +1415,13 @@ void runValueSessionTests() {
   sessionReportsMissingSequenceRuntime();
   sessionScansIndividualSourcesWithoutDuplicating();
   sessionClosesSourceFamiliesWhenScansFindNoAssets();
-  sessionKeepsScannerKnownCollectionsWithoutResolver();
+  sessionPublishesDeclaredSequenceCollections();
   sessionCreatesUserCollectionsFromDetectedAssets();
   sessionMatchesCollectionsAcrossSeparateSourceScans();
   sessionRemovesSourceFamilyAndDiscoveredData();
   sessionRemovesSourceFamilyWithItsLastAsset();
   sessionRemovalUpdatesCrossSourceCollectionLifecycle();
-  sessionResolverFailureKeepsExplicitCollections();
+  sessionDependencyFailureKeepsSequenceCollections();
   sessionRejectsLateRegistryMutation();
   sessionRejectsInvalidAssetIdsAtAdmission();
   sessionRejectsExtractedSourcesWithMissingParents();
@@ -1395,6 +1431,7 @@ void runValueSessionTests() {
   scanValidationRejectsRangeLessSourceAnnotations();
   scanValidationRejectsDanglingSourceAnnotationReferences();
   sessionReportsDesiredCollectionMissingAssetReferences();
+  sessionKeepsSequenceCollectionsWhenSupplementalAssetsDisappear();
   sessionReportsDuplicateDesiredCollectionKeys();
   retainedSourceOwnsStableCopiedBytes();
   sourceStoreRejectsMissingOrRemovedDerivedParents();

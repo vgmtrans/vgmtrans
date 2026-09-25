@@ -195,7 +195,6 @@ template <class Range>
 
 void resolveDependencies(const AssetCatalog& assets, DesiredCollection& collection,
                          ResolutionMode mode = ResolutionMode::Automatic);
-[[nodiscard]] std::vector<std::pair<std::string, DesiredCollection>> dependencyCollections(
-    const AssetCatalog& assets, std::span<const AssetId> explicitRoots = {});
+[[nodiscard]] std::vector<DesiredCollection> dependencyCollections(const AssetCatalog& assets);
 
 }  // namespace vgmtrans::core

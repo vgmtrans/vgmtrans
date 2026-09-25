@@ -43,15 +43,8 @@ struct ScanInput {
   [[nodiscard]] RetainedSource retain() const { return retained ? retained : RetainedSource::copyOf(reader); }
 };
 
-struct ExplicitCollection {
-  CollectionKey key;
-  std::string name;
-  CollectionMembers members;
-};
-
 struct ScanResult {
   std::vector<Asset> assets;
-  std::vector<ExplicitCollection> explicitCollections;
   SourceMap sourceMap;
   std::vector<Diagnostic> diagnostics;
 };

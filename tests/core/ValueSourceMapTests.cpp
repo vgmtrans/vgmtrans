@@ -171,11 +171,11 @@ void annotationViewsOutliveJoinedSourceMaps() {
   {
     SessionState state;
     for (u32 id : {1u, 2u}) {
-      state.appendScan(SourceId{id}, ScanResult{.sourceMap = SourceMap{{SourceAnnotation{
-          .id = SourceAnnotationId{id},
-          .range = SourceRange{.source = SourceId{id}, .size = 1},
-          .label = std::to_string(id),
-      }}}});
+      state.appendScan(ScanResult{.sourceMap = SourceMap{{SourceAnnotation{
+                                      .id = SourceAnnotationId{id},
+                                      .range = SourceRange{.source = SourceId{id}, .size = 1},
+                                      .label = std::to_string(id),
+                                  }}}});
     }
     retained = state.sourceMap().annotations();
     first = state.sourceMap().find(SourceAnnotationId{1});
@@ -186,23 +186,23 @@ void annotationViewsOutliveJoinedSourceMaps() {
 
 void sessionStateRejectsCrossScanAnnotationIdCollisions() {
   SessionState state;
-  state.appendScan(SourceId{1}, ScanResult{
-                                    .sourceMap = SourceMap{{SourceAnnotation{
-                                        .id = SourceAnnotationId{7},
-                                        .range = SourceRange{.source = SourceId{1}, .offset = 0, .size = 1},
-                                        .label = "First",
-                                    }}},
-                                });
+  state.appendScan(ScanResult{
+      .sourceMap = SourceMap{{SourceAnnotation{
+          .id = SourceAnnotationId{7},
+          .range = SourceRange{.source = SourceId{1}, .offset = 0, .size = 1},
+          .label = "First",
+      }}},
+  });
 
   expectThrows<std::invalid_argument>(
       [&] {
-        state.appendScan(SourceId{2}, ScanResult{
-                                          .sourceMap = SourceMap{{SourceAnnotation{
-                                              .id = SourceAnnotationId{7},
-                                              .range = SourceRange{.source = SourceId{2}, .offset = 0, .size = 1},
-                                              .label = "Second",
-                                          }}},
-                                      });
+        state.appendScan(ScanResult{
+            .sourceMap = SourceMap{{SourceAnnotation{
+                .id = SourceAnnotationId{7},
+                .range = SourceRange{.source = SourceId{2}, .offset = 0, .size = 1},
+                .label = "Second",
+            }}},
+        });
       },
       "session state should reject annotation ids already owned by another scan");
   expect(state.sourceMap().annotations().size() == 1,
@@ -211,13 +211,13 @@ void sessionStateRejectsCrossScanAnnotationIdCollisions() {
 
 void sessionStatePreflightsSourceAnnotationIdCollisions() {
   SessionState state;
-  state.appendScan(SourceId{1}, ScanResult{
-                                    .sourceMap = SourceMap{{SourceAnnotation{
-                                        .id = SourceAnnotationId{7},
-                                        .range = SourceRange{.source = SourceId{1}, .offset = 0, .size = 1},
-                                        .label = "Existing",
-                                    }}},
-                                });
+  state.appendScan(ScanResult{
+      .sourceMap = SourceMap{{SourceAnnotation{
+          .id = SourceAnnotationId{7},
+          .range = SourceRange{.source = SourceId{1}, .offset = 0, .size = 1},
+          .label = "Existing",
+      }}},
+  });
 
   ScanResult result{
       .assets = {MiscAsset{.metadata = AssetMetadata{.id = AssetId{3}, .name = "Uncommitted"}}},
@@ -228,7 +228,7 @@ void sessionStatePreflightsSourceAnnotationIdCollisions() {
       }}},
   };
 
-  expectThrows<std::invalid_argument>([&] { state.appendScan(SourceId{2}, std::move(result)); },
+  expectThrows<std::invalid_argument>([&] { state.appendScan(std::move(result)); },
                                       "session state should reject source annotation ids owned by an earlier scan");
   expect(state.assets().empty(), "source annotation collision should be rejected before scan assets are published");
   expect(state.sourceMap().annotations().size() == 1,
@@ -244,10 +244,10 @@ void sessionStateReleasesAnnotationIdsWithRemovedSources() {
                       }}}};
   };
 
-  state.appendScan(SourceId{1}, scan(SourceId{1}));
+  state.appendScan(scan(SourceId{1}));
   const std::array removedSources{SourceId{1}};
   state.removeSources(removedSources);
-  state.appendScan(SourceId{2}, scan(SourceId{2}));
+  state.appendScan(scan(SourceId{2}));
   expect(state.sourceMap().annotations().size() == 1,
          "an annotation id should be reusable after its source has been removed");
 }
@@ -256,37 +256,34 @@ void sessionStateScrubsCrossSourceObjectLinks() {
   SessionState state;
   const SourceId firstSource{1};
   const SourceId secondSource{2};
-  state.appendScan(firstSource,
-                   ScanResult{
-                       .assets = {MiscAsset{.metadata =
-                                                AssetMetadata{
-                                                    .id = AssetId{1},
-                                                    .range = SourceRange{.source = firstSource, .offset = 0, .size = 1},
-                                                }}},
-                       .sourceMap = SourceMap{{SourceAnnotation{
-                           .id = SourceAnnotationId{1},
-                           .range = SourceRange{.source = firstSource, .offset = 0, .size = 1},
-                           .owner = ObjectRefs::misc(AssetId{1}),
-                       }}},
-                   });
-  state.appendScan(
-      secondSource,
-      ScanResult{
-          .assets = {MiscAsset{.metadata =
-                                   AssetMetadata{
-                                       .id = AssetId{2},
-                                       .range = SourceRange{.source = secondSource, .offset = 0, .size = 1},
-                                   }}},
-          .sourceMap = SourceMap{{SourceAnnotation{
-              .id = SourceAnnotationId{2},
-              .range = SourceRange{.source = secondSource, .offset = 0, .size = 1},
-              .owner = ObjectRefs::misc(AssetId{2}),
-              .links = {SourceLink{
-                  .role = SourceLinkRole::Related,
-                  .target = ObjectRefs::misc(AssetId{1}),
-              }},
-          }}},
-      });
+  state.appendScan(ScanResult{
+      .assets = {MiscAsset{.metadata =
+                               AssetMetadata{
+                                   .id = AssetId{1},
+                                   .range = SourceRange{.source = firstSource, .offset = 0, .size = 1},
+                               }}},
+      .sourceMap = SourceMap{{SourceAnnotation{
+          .id = SourceAnnotationId{1},
+          .range = SourceRange{.source = firstSource, .offset = 0, .size = 1},
+          .owner = ObjectRefs::misc(AssetId{1}),
+      }}},
+  });
+  state.appendScan(ScanResult{
+      .assets = {MiscAsset{.metadata =
+                               AssetMetadata{
+                                   .id = AssetId{2},
+                                   .range = SourceRange{.source = secondSource, .offset = 0, .size = 1},
+                               }}},
+      .sourceMap = SourceMap{{SourceAnnotation{
+          .id = SourceAnnotationId{2},
+          .range = SourceRange{.source = secondSource, .offset = 0, .size = 1},
+          .owner = ObjectRefs::misc(AssetId{2}),
+          .links = {SourceLink{
+              .role = SourceLinkRole::Related,
+              .target = ObjectRefs::misc(AssetId{1}),
+          }},
+      }}},
+  });
 
   const SourceMap before = state.sourceMap();
   const auto beforeAssets = state.assets();
@@ -492,7 +489,7 @@ void diagnosticsCanReferenceSourceAnnotationsAndObjects() {
 
 void sessionSnapshotCarriesScannerSourceMap() {
   Session session;
-  session.registerFormat(probeExplicitCollectionModule());
+  session.registerFormat(probeDeclaredCollectionModule());
 
   const auto source = session.addSource(SourceFile{.name = "annotated.probe"}, {0xab, 0x01, 0x02});
   session.scanSource(source);

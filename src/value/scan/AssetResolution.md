@@ -27,8 +27,8 @@ pool dependencies from the bank's regions.
 publication is an explicit optional descriptor on the sequence, independent of
 its dependency requests. The default name comes from the sequence; its stable
 identity comes from its asset ID. `collection(key, name)` can override either.
-All format scanners use these declarations. The explicit collection builder
-remains available for custom groupings such as several collections per sequence.
+All discovered collections use these declarations. User-created collections
+remain a separate session operation with explicitly chosen members.
 
 For assets that arrive separately, use a small callable request with owned values:
 
@@ -112,10 +112,12 @@ bank. Standalone bank preparation has no sequence assignment.
   providers leave an incomplete root.
 - Banks and sample pools remain assets without generating synthetic collections.
   `bindSoundBank` resolves and prepares a standalone bank's own dependencies.
-- Explicit collection members seed dependency expansion and suppress duplicate
-  automatic roots for the same sequence.
-- Flattened membership deduplicates assets while recorded dependencies retain
-  their ordered targets, placements, alternatives, and resolution status.
+- Each owner has one ordered input list for its dependency role. Multiple requests
+  combine into that list, preserving unresolved outcomes and alternatives. Bank
+  inputs deduplicate assets; sample inputs preserve distinct placements within
+  the same pool. Flattened collection membership deduplicates both.
+- Bank assignment writes directly to the recorded inputs. Preparation borrows
+  those same lists from the collection; it does not reconstruct relationships.
 - Automatic candidates cannot cross independent container roots. Standalone
   files remain available to native ID, path, and compatibility rules. Exact
   references supplied by a scanner are authoritative.
@@ -145,7 +147,8 @@ Core tests exercise direct and deferred requests, typed failure status independe
 of diagnostic codes, ambiguous positions within one pool, manual ordering and
 confinement, container scope, provider type validation, standalone preparation,
 and copy isolation. Shared-bank tests cover different logical assignments across
-sequences and assignments to a manually substituted bank. Format tests cover
+sequences, overlapping requests, assignment failures, and assignments to a manually
+substituted bank. Format tests cover
 native matching, sample positions, Akao coverage, PSF2 manifests, and SegSat logical
 addressing and velocity behavior.
 

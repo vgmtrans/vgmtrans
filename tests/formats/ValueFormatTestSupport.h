@@ -126,10 +126,5 @@ inline void expectScanSharesPlaybackSource(const vgmtrans::core::FormatModule& f
 // session or reopening the fixture's sources. Deferred matching uses Session tests.
 inline std::vector<vgmtrans::core::DesiredCollection> resolvedScanCollections(const vgmtrans::core::ScanResult& scan) {
   using namespace vgmtrans::core;
-  std::vector<DesiredCollection> result;
-  for (auto& [name, collection] :
-       dependencyCollections(AssetCatalog{std::vector<SourceFile>{}, SharedSequence<Asset>{scan.assets}})) {
-    result.push_back(std::move(collection));
-  }
-  return result;
+  return dependencyCollections(AssetCatalog{std::vector<SourceFile>{}, SharedSequence<Asset>{scan.assets}});
 }

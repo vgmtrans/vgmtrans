@@ -127,30 +127,9 @@ private:
   AssetId id_;
 };
 
-// Explicit grouping for callers that need several collections per sequence or
-// a collection without a sequence. Ordinary scanners declare dependencies on
-// the sequence and bank drafts instead.
-class ScanCollectionBuilder {
-public:
-  ScanCollectionBuilder(ScanResultBuilder& out, size_t index);
-
-  ScanCollectionBuilder& sequence(AssetId asset);
-  ScanCollectionBuilder& sequence(const ScanSequenceDraft& asset) { return sequence(asset.id()); }
-  ScanCollectionBuilder& soundBank(AssetId asset);
-  ScanCollectionBuilder& soundBank(const ScanSoundBankDraft& asset) { return soundBank(asset.id()); }
-  ScanCollectionBuilder& samplePool(AssetId asset);
-  ScanCollectionBuilder& samplePool(const ScanSamplePoolDraft& asset) { return samplePool(asset.id()); }
-  ScanCollectionBuilder& misc(AssetId asset);
-  ScanCollectionBuilder& misc(const ScanMiscDraft& asset) { return misc(asset.id()); }
-
-private:
-  ScanResultBuilder& out_;
-  size_t index_ = 0;
-};
-
 // Convenience wrapper for the normal scanner path. It still produces ordinary
 // ScanResult values, but keeps format modules away from repetitive ID allocation,
-// asset metadata setup, diagnostics, and scanner-known collections.
+// asset metadata setup, and diagnostics.
 class ScanResultBuilder {
 public:
   ScanResultBuilder(ScanInput input, std::string format, std::string collectionNamespace = {});
@@ -172,11 +151,6 @@ public:
   [[nodiscard]] ScanSamplePoolDraft samplePool(std::string name, SourceRange range = {});
   [[nodiscard]] ScanMiscDraft misc(std::string name, SourceRange range);
 
-  [[nodiscard]] ScanCollectionBuilder collection(std::string name, CollectionKey key = {});
-  // Use when a scanner produces one collection per source and its display name
-  // should not affect collection identity.
-  [[nodiscard]] ScanCollectionBuilder sourceCollection(std::string name);
-
   void diagnostic(Diagnostic diagnostic);
   void warning(std::string message, SourceRange range);
   void error(std::string message, SourceRange range);
@@ -184,14 +158,12 @@ public:
   [[nodiscard]] ScanResult finish();
 
 private:
-  friend class ScanCollectionBuilder;
   friend class ScanSequenceDraft;
   friend class ScanSoundBankDraft;
   friend class ScanSamplePoolDraft;
   friend class ScanMiscDraft;
 
   [[nodiscard]] AssetMetadata metadata(AssetId id, std::string name, SourceRange range) const;
-  [[nodiscard]] ExplicitCollection& explicitCollection(size_t index);
 
   void setPrivateData(size_t slot, AssetPrivateData data);
   void setSequencePreparer(size_t slot, SequencePreparer prepare);

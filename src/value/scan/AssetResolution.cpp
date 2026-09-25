@@ -18,78 +18,49 @@ public:
   void resolve() {
     if (result_.members.sequence) {
       if (const auto* sequence = assets_.asset<SequenceProgramAsset>(*result_.members.sequence)) {
+        ResolvedDependency banks{.owner = sequence->metadata.id, .role = DependencyRole::SoundBank};
         if (mode_ == ResolutionMode::Manual) {
           // A manual selection replaces all sequence requests, including exact
           // scanner-known references, with one ordered set of banks.
           if (!sequence->recipe.banks.empty() || !selected_.soundBanks.empty()) {
-            accept(sequence->metadata, DependencyRole::SoundBank, selectAll(selected_.soundBanks));
+            accept(sequence->metadata, banks, selectAll(selected_.soundBanks));
           }
         } else {
-          requests(sequence->metadata, DependencyRole::SoundBank, sequence->recipe.banks);
+          requests(sequence->metadata, banks, sequence->recipe.banks);
         }
-        assignBanks(*sequence);
+        assignBanks(*sequence, banks);
+        if (!sequence->recipe.banks.empty() || sequence->recipe.assignBanks || !banks.targets.empty()) {
+          result_.dependencies.push_back(std::move(banks));
+        }
       }
     }
     // The domain has two dependency levels. A bank can only request samples;
     // wrong-type providers are rejected without following another graph edge.
     for (auto id : result_.members.soundBanks) {
       if (const auto* bank = assets_.asset<SoundBankAsset>(id)) {
-        requests(bank->metadata, DependencyRole::SamplePool, bank->recipe.samples);
-        concreteSamples(*bank);
+        ResolvedDependency samples{.owner = id, .role = DependencyRole::SamplePool};
+        requests(bank->metadata, samples, bank->recipe.samples);
+        concreteSamples(*bank, samples);
+        if (!bank->recipe.samples.empty() || !samples.targets.empty()) {
+          result_.dependencies.push_back(std::move(samples));
+        }
       }
     }
   }
 
 private:
-  void assignBanks(const SequenceProgramAsset& sequence) {
+  void assignBanks(const SequenceProgramAsset& sequence, ResolvedDependency& banks) {
     if (!sequence.recipe.assignBanks) {
       return;
     }
-    // One use per selected bank, including explicit collection seeds. Keep
-    // placements on the recorded requests; membership remains unchanged.
-    std::vector<DependencyTarget> uses;
-    for (const auto id : result_.members.soundBanks) {
-      DependencyTarget use{id, {}};
-      for (const auto& dependency : result_.dependencies) {
-        if (dependency.owner == sequence.metadata.id && dependency.role == DependencyRole::SoundBank) {
-          const auto found = std::ranges::find(dependency.targets, id, &DependencyTarget::asset);
-          if (found != dependency.targets.end()) {
-            use.placement = found->placement;
-            break;
-          }
-        }
-      }
-      uses.push_back(std::move(use));
-    }
     try {
-      BankAssignmentContext context{assets_, sequence, uses, result_.issues};
+      BankAssignmentContext context{assets_, sequence, banks.targets, result_.issues};
       sequence.recipe.assignBanks(context);
     } catch (const std::exception& error) {
-      accept(sequence.metadata, DependencyRole::SoundBank,
+      accept(sequence.metadata, banks,
              DependencySelection::failed(std::string("Bank assignment failed: ") + error.what()));
-      return;
     } catch (...) {
-      accept(sequence.metadata, DependencyRole::SoundBank, DependencySelection::failed("Bank assignment failed"));
-      return;
-    }
-    // Requests retain their status and alternatives. Attach assignments to the
-    // selected targets and add an edge for an explicit seed without a request.
-    for (const auto& use : uses) {
-      bool found = false;
-      for (auto& dependency : result_.dependencies) {
-        if (dependency.owner == sequence.metadata.id && dependency.role == DependencyRole::SoundBank) {
-          for (auto& target : dependency.targets) {
-            if (target.asset == use.asset) {
-              target.placement = use.placement;
-              found = true;
-            }
-          }
-        }
-      }
-      if (!found) {
-        result_.dependencies.push_back(
-            {.owner = sequence.metadata.id, .role = DependencyRole::SoundBank, .targets = {use}});
-      }
+      accept(sequence.metadata, banks, DependencySelection::failed("Bank assignment failed"));
     }
   }
 
@@ -101,7 +72,8 @@ private:
     return role == DependencyRole::SoundBank ? selected_.soundBanks : selected_.samplePools;
   }
 
-  void requests(const AssetMetadata& owner, DependencyRole role, const std::vector<DependencyRequest>& requests) {
+  void requests(const AssetMetadata& owner, ResolvedDependency& resolved,
+                const std::vector<DependencyRequest>& requests) {
     for (const auto& request : requests) {
       DependencySelection selection;
       try {
@@ -109,18 +81,18 @@ private:
           selection.add(direct->asset, direct->placement);
         } else {
           selection = std::get<DependencySelector>(request)(
-              DependencyContext{assets_, *assets_.asset(owner.id), mode_, selected(role)});
+              DependencyContext{assets_, *assets_.asset(owner.id), mode_, selected(resolved.role)});
         }
       } catch (const std::exception& error) {
         selection = DependencySelection::failed(std::string("Asset dependency resolution failed: ") + error.what());
       } catch (...) {
         selection = DependencySelection::failed("Asset dependency resolution failed");
       }
-      accept(owner, role, selection);
+      accept(owner, resolved, selection);
     }
   }
 
-  void concreteSamples(const SoundBankAsset& bank) {
+  void concreteSamples(const SoundBankAsset& bank, ResolvedDependency& resolved) {
     DependencySelection samples;
     for (const auto& instrument : bank.instruments) {
       for (const auto& region : instrument.regions) {
@@ -129,21 +101,18 @@ private:
           continue;
         }
         const auto linked = [&](const DependencyTarget& target) { return target.asset == owner; };
-        const bool declared = std::ranges::any_of(result_.dependencies, [&](const ResolvedDependency& dependency) {
-          return dependency.owner == bank.metadata.id && dependency.role == DependencyRole::SamplePool &&
-                 std::ranges::any_of(dependency.targets, linked);
-        });
-        if (!declared && !std::ranges::any_of(samples.targets(), linked)) {
+        if (!std::ranges::any_of(resolved.targets, linked) && !std::ranges::any_of(samples.targets(), linked)) {
           samples.add(owner);
         }
       }
     }
     if (!samples.targets().empty()) {
-      accept(bank.metadata, DependencyRole::SamplePool, samples);
+      accept(bank.metadata, resolved, samples);
     }
   }
 
-  void accept(const AssetMetadata& owner, DependencyRole role, const DependencySelection& selection) {
+  void accept(const AssetMetadata& owner, ResolvedDependency& resolved, const DependencySelection& selection) {
+    const auto role = resolved.role;
     for (auto diagnostic : selection.issues()) {
       if (!diagnostic.asset) {
         diagnostic.asset = owner.id;
@@ -159,12 +128,16 @@ private:
       missing.range = owner.range;
       result_.issues.push_back(std::move(missing));
     }
-    ResolvedDependency resolved{.owner = owner.id,
-                                .role = role,
-                                .status = selection.status(),
-                                .targets = selection.targets(),
-                                .alternatives = selection.alternatives()};
-    for (const auto& target : resolved.targets) {
+    resolved.status = std::max(resolved.status, selection.status());
+    resolved.alternatives.insert(resolved.alternatives.end(), selection.alternatives().begin(),
+                                 selection.alternatives().end());
+    for (const auto& target : selection.targets()) {
+      // A sequence uses each bank once. Sample inputs may use the same pool at
+      // several placements, so those relationships retain every target.
+      if (role == DependencyRole::SamplePool ||
+          std::ranges::find(resolved.targets, target.asset, &DependencyTarget::asset) == resolved.targets.end()) {
+        resolved.targets.push_back(target);
+      }
       const bool correctType = role == DependencyRole::SoundBank
                                    ? assets_.asset<SoundBankAsset>(target.asset) != nullptr
                                    : assets_.asset<SamplePoolAsset>(target.asset) != nullptr;
@@ -187,7 +160,6 @@ private:
         providers.push_back(target.asset);
       }
     }
-    result_.dependencies.push_back(std::move(resolved));
   }
 
   const AssetCatalog& assets_;
@@ -202,22 +174,21 @@ void resolveDependencies(const AssetCatalog& assets, DesiredCollection& collecti
   Resolver(assets, collection, mode).resolve();
 }
 
-std::vector<std::pair<std::string, DesiredCollection>> dependencyCollections(const AssetCatalog& assets,
-                                                                             std::span<const AssetId> explicitRoots) {
-  std::vector<std::pair<std::string, DesiredCollection>> result;
+std::vector<DesiredCollection> dependencyCollections(const AssetCatalog& assets) {
+  std::vector<DesiredCollection> result;
   for (const auto* sequence : assets.assets<SequenceProgramAsset>()) {
-    if (!sequence->collection || std::ranges::find(explicitRoots, sequence->metadata.id) != explicitRoots.end()) {
+    if (!sequence->collection) {
       continue;
     }
     const auto& descriptor = *sequence->collection;
-    DesiredCollection collection{.localKey = descriptor.key.value.empty()
-                                                 ? "asset:" + std::to_string(sequence->metadata.id.value)
-                                                 : descriptor.key.value,
-                                 .name = descriptor.name.empty() ? sequence->metadata.name : descriptor.name,
-                                 .members = {.sequence = sequence->metadata.id, .miscAssets = descriptor.miscAssets}};
+    DesiredCollection collection{
+        .key = {.resolver = descriptor.key.resolver.empty() ? sequence->metadata.format : descriptor.key.resolver,
+                .value = descriptor.key.value.empty() ? "asset:" + std::to_string(sequence->metadata.id.value)
+                                                      : descriptor.key.value},
+        .name = descriptor.name.empty() ? sequence->metadata.name : descriptor.name,
+        .members = {.sequence = sequence->metadata.id, .miscAssets = descriptor.miscAssets}};
     resolveDependencies(assets, collection);
-    result.emplace_back(descriptor.key.resolver.empty() ? sequence->metadata.format : descriptor.key.resolver,
-                        std::move(collection));
+    result.push_back(std::move(collection));
   }
   return result;
 }

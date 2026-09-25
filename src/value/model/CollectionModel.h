@@ -61,6 +61,9 @@ struct DependencyTarget {
   AssetPrivateData placement;
 };
 
+// One ordered input list per owner and role. Status combines all requests;
+// diagnostics and alternatives retain unresolved choices. Bank targets are
+// unique by asset; sample targets may repeat an asset at different placements.
 struct ResolvedDependency {
   AssetId owner;
   DependencyRole role = DependencyRole::SoundBank;
@@ -79,9 +82,7 @@ struct SequenceCollection {
 };
 
 struct DesiredCollection {
-  // Stable identity within the resolver that produced this collection. The
-  // session supplies the resolver namespace during reconciliation.
-  std::string localKey;
+  CollectionKey key;
   std::string name;
   CollectionMembers members;
   std::vector<CollectionIssue> issues;

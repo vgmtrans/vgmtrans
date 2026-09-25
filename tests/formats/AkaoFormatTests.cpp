@@ -782,11 +782,7 @@ void akaoSampleSelectionUsesPlayableArticulations() {
     candidates.emplace_back(samples(localSamplesId, sequenceSource, 7, std::move(local)));
     candidates.emplace_back(samples(unrelatedSamplesId, unrelatedSource, unrelatedSet, std::move(unrelated)));
     const AssetCatalog context(sources, SharedSequence<Asset>{std::move(candidates)});
-    std::vector<DesiredCollection> collections;
-    for (auto& [format, collection] : dependencyCollections(context, {})) {
-      collections.push_back(std::move(collection));
-    }
-    return collections;
+    return dependencyCollections(context);
   };
   const AkaoArticulation localFive{.articulationId = 5, .sample = SampleRef::resolved(localSamplesId, 0)};
   const AkaoArticulation localNine{.articulationId = 9, .sample = SampleRef::resolved(localSamplesId, 1)};

@@ -99,7 +99,7 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
                       .program(probeSequenceProgram());
   expectThrows<std::logic_error>([&] { sequence.data(BuilderPrivateData{.value = 99}); },
                                  "scan result builder should reject a second private data value for one asset");
-  const auto bank = out.soundBank("Builder Bank", input.reader.range(0, 1)).data(BuilderPrivateData{.value = 22});
+  auto bank = out.soundBank("Builder Bank", input.reader.range(0, 1)).data(BuilderPrivateData{.value = 22});
   auto samplePool = out.samplePool("Builder Samples", input.reader.range(1, 2));
   samplePool.data(BuilderPrivateData{.value = 33});
   auto& samples = samplePool.samples();
@@ -113,11 +113,8 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
   const auto misc =
       out.misc("Builder Misc", input.reader.range(0, 1)).data(BuilderPrivateData{.value = 44}).payload({0xaa});
 
-  out.collection("Builder Song", CollectionKey{.resolver = "ProbeBuilder", .value = "song:1"})
-      .sequence(sequence)
-      .soundBank(bank)
-      .samplePool(samplePool)
-      .misc(misc);
+  sequence.collection(CollectionKey{.value = "song:1"}, "Builder Song").useBank(bank).includeMisc(misc);
+  bank.useSamples(samplePool);
   out.warning("builder warning", input.reader.range(0, 1));
 
   ScanResult result = out.finish();
@@ -136,14 +133,15 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
              miscData->value == 44 &&
              std::get<SamplePoolAsset>(result.assets[2]).privateData.get<std::string>() == nullptr,
          "every asset draft should retain an immutable typed private payload");
-  expect(result.explicitCollections.size() == 1, "scan result builder should emit one explicit collection");
-  expect(result.explicitCollections[0].members.sequence == sequence.id(),
+  const auto collections = dependencyCollections(AssetCatalog{sources, SharedSequence<Asset>{result.assets}});
+  expect(collections.size() == 1, "scan result builder should declare one sequence collection");
+  expect(collections[0].members.sequence == sequence.id(),
          "scan result builder should preserve the collection sequence");
-  expect(result.explicitCollections[0].members.soundBanks == std::vector<AssetId>{bank.id()},
+  expect(collections[0].members.soundBanks == std::vector<AssetId>{bank.id()},
          "scan result builder should preserve the collection instrument set");
-  expect(result.explicitCollections[0].members.samplePools == std::vector<AssetId>{samplePool.id()},
+  expect(collections[0].members.samplePools == std::vector<AssetId>{samplePool.id()},
          "scan result builder should preserve the collection sample collection");
-  expect(result.explicitCollections[0].members.miscAssets == std::vector<AssetId>{misc.id()},
+  expect(collections[0].members.miscAssets == std::vector<AssetId>{misc.id()},
          "scan result builder should preserve the collection misc asset");
   expect(result.diagnostics.size() == 1 && result.diagnostics[0].message == "builder warning",
          "scan result builder should preserve diagnostics");
@@ -178,7 +176,7 @@ void sessionStoresTheOwningFormatsPreferredSampleFilter() {
          "sample assets should retain their owning format's preferred export filter");
 }
 
-void scanResultBuilderNamesSourceCollections() {
+void scanResultBuilderNamesSequenceCollections() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "fallback.spc", .title = "Tagged Song"}, {0xaa});
   ScanIdAllocator ids;
@@ -190,13 +188,16 @@ void scanResultBuilderNamesSourceCollections() {
 
   ScanResultBuilder out(input, "ProbeBuilder");
   expect(out.sourceDisplayName() == "Tagged Song", "source display name should prefer source metadata");
-  static_cast<void>(out.sourceCollection(out.sourceDisplayName()));
+  const auto sequence =
+      out.sequence("Sequence").program(probeSequenceProgram()).collection({}, out.sourceDisplayName());
 
   const ScanResult result = out.finish();
-  expect(result.explicitCollections.size() == 1, "source collection helper should create one collection");
-  expect(result.explicitCollections[0].key.resolver == "ProbeBuilder" &&
-             result.explicitCollections[0].key.value == "source:" + std::to_string(source.value),
-         "source collection identity should not depend on its display name");
+  const auto collections = dependencyCollections(AssetCatalog{sources, SharedSequence<Asset>{result.assets}});
+  expect(collections.size() == 1 && collections[0].name == "Tagged Song",
+         "a sequence collection can use a source title independently of the sequence name");
+  expect(collections[0].key.resolver == "ProbeBuilder" &&
+             collections[0].key.value == "asset:" + std::to_string(sequence.id().value),
+         "sequence collection identity should not depend on its display name");
 }
 
 void scanResultBuilderInfersSequenceRangesUnlessExplicit() {
@@ -230,7 +231,7 @@ void scanResultBuilderChecksAllDraftsBeforeConsumingValues() {
   bank.instruments().append(Instrument{.name = "Retained Instrument"});
   auto sequence = out.sequence("Incomplete Sequence");
   auto misc = out.misc("Incomplete Misc", input.reader.range(0, 1));
-  out.collection("Broken").sequence(sequence);
+  sequence.collection({}, "Broken");
 
   expectThrows<std::logic_error>([&] { static_cast<void>(out.finish()); },
                                  "scan result builder should reject a sequence draft that was never given a program");
@@ -302,7 +303,7 @@ void scanResultBuilderCursorReportsMalformedFields() {
 void runValueRegistryTests() {
   formatRegistryStoresCopyableModulesAtomically();
   scanResultBuilderCoversCommonScannerPlumbing();
-  scanResultBuilderNamesSourceCollections();
+  scanResultBuilderNamesSequenceCollections();
   scanResultBuilderInfersSequenceRangesUnlessExplicit();
   scanResultBuilderChecksAllDraftsBeforeConsumingValues();
   scanResultBuilderPublishesEmptySynthDrafts();

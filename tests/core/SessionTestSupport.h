@@ -64,20 +64,13 @@ namespace {
               .range = assetRange,
           },
       .program = probeSequenceProgram(),
+      .collection = SequenceCollection{.key = {.resolver = "ProbeSequence",
+                                               .value = "source:" + std::to_string(input.source.id.value)}},
   };
 
   ScanResult result;
   result.assets.emplace_back(std::move(sequence));
   result.sourceMap = sourceMap.finish();
-  result.explicitCollections.push_back(ExplicitCollection{
-      .key =
-          CollectionKey{
-              .resolver = "ProbeSequence",
-              .value = "source:" + std::to_string(input.source.id.value),
-          },
-      .name = input.source.name,
-      .members = {.sequence = assetId},
-  });
   result.diagnostics.push_back(Diagnostic{
       .severity = Severity::Info,
       .message = "probe sequence scanned",
@@ -113,13 +106,13 @@ namespace {
   };
 }
 
-[[nodiscard]] ScanResult scanProbeExplicitCollection(const ScanInput& input) {
+[[nodiscard]] ScanResult scanProbeDeclaredCollection(const ScanInput& input) {
   if (!hasProbeMagic(input, 0xab)) {
     return {};
   }
 
-  ScanResultBuilder out(input, "ProbeExplicit");
-  const auto sequence = out.sequence("Explicit Sequence", input.reader.range(0, 1)).program(probeSequenceProgram());
+  ScanResultBuilder out(input, "ProbeDeclared");
+  auto sequence = out.sequence("Declared Sequence", input.reader.range(0, 1)).program(probeSequenceProgram());
   out.sourceMap()
       .header("Probe Header", input.reader.range(0, 1))
       .owner(ObjectRefs::sequence(sequence.id()))
@@ -129,16 +122,14 @@ namespace {
         .annotation(SourceRole::Payload, "Probe Payload", input.reader.range(1, input.reader.size() - 1))
         .owner(ObjectRefs::sequence(sequence.id()));
   }
-  out.collection(input.source.name,
-                 CollectionKey{.resolver = "ProbeExplicit", .value = "source:" + std::to_string(input.source.id.value)})
-      .sequence(sequence);
+  sequence.collection(CollectionKey{.value = "source:" + std::to_string(input.source.id.value)}, input.source.name);
   return out.finish();
 }
 
-[[nodiscard]] FormatModule probeExplicitCollectionModule() {
+[[nodiscard]] FormatModule probeDeclaredCollectionModule() {
   return FormatModule{
-      .name = "ProbeExplicit",
-      .scan = scanProbeExplicitCollection,
+      .name = "ProbeDeclared",
+      .scan = scanProbeDeclaredCollection,
   };
 }
 

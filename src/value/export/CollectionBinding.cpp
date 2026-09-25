@@ -21,6 +21,14 @@ namespace vgmtrans::core {
 
 namespace {
 
+[[nodiscard]] std::span<const DependencyTarget> inputsFor(const Collection& collection, AssetId owner,
+                                                          DependencyRole role) {
+  const auto found = std::ranges::find_if(collection.dependencies, [&](const auto& dependency) {
+    return dependency.owner == owner && dependency.role == role;
+  });
+  return found == collection.dependencies.end() ? std::span<const DependencyTarget>{} : found->targets;
+}
+
 [[nodiscard]] RenderedCollection renderSequence(const SequenceProgramAsset& sequence, const SequenceRuntime& runtime,
                                                 const SequenceRenderOptions& options) {
   if (!runtime.valid()) {
@@ -147,24 +155,16 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
   }
   if (!failed) {
     try {
-      std::vector<DependencyTarget> bankUses;
-      for (const auto& dependency : collection->dependencies) {
-        if (dependency.role == DependencyRole::SoundBank) {
-          bankUses.insert(bankUses.end(), dependency.targets.begin(), dependency.targets.end());
-        }
-      }
+      const auto bankUses = sequence == nullptr
+                                ? std::span<const DependencyTarget>{}
+                                : inputsFor(*collection, sequence->metadata.id, DependencyRole::SoundBank);
       for (size_t i = 0; i < soundBanks.size(); ++i) {
         auto& bank = soundBanks[i];
         const auto& prepare = snapshot.asset<SoundBankAsset>(members.soundBanks[i])->prepare;
         if (!prepare) {
           continue;
         }
-        std::vector<DependencyTarget> inputs;
-        for (const auto& dependency : collection->dependencies) {
-          if (dependency.owner == bank.metadata.id && dependency.role == DependencyRole::SamplePool) {
-            inputs.insert(inputs.end(), dependency.targets.begin(), dependency.targets.end());
-          }
-        }
+        const auto inputs = inputsFor(*collection, bank.metadata.id, DependencyRole::SamplePool);
         const u32 index =
             static_cast<u32>(std::count_if(soundBanks.begin(), soundBanks.begin() + i, [&](const auto& previous) {
               return previous.metadata.format == bank.metadata.format;

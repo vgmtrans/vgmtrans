@@ -15,10 +15,6 @@ namespace vgmtrans::core {
 
 namespace {
 
-[[nodiscard]] std::string namedSourceCollectionKey(SourceId source, std::string_view name) {
-  return "source:" + std::to_string(source.value) + ":collection:" + std::string(name);
-}
-
 struct PendingSequence {
   AssetId id;
   std::string name;
@@ -210,29 +206,6 @@ ScanMiscDraft& ScanMiscDraft::payload(std::vector<u8> payload) {
   return *this;
 }
 
-ScanCollectionBuilder::ScanCollectionBuilder(ScanResultBuilder& out, size_t index) : out_(out), index_(index) {
-}
-
-ScanCollectionBuilder& ScanCollectionBuilder::sequence(AssetId asset) {
-  out_.explicitCollection(index_).members.sequence = asset;
-  return *this;
-}
-
-ScanCollectionBuilder& ScanCollectionBuilder::soundBank(AssetId asset) {
-  out_.explicitCollection(index_).members.soundBanks.push_back(asset);
-  return *this;
-}
-
-ScanCollectionBuilder& ScanCollectionBuilder::samplePool(AssetId asset) {
-  out_.explicitCollection(index_).members.samplePools.push_back(asset);
-  return *this;
-}
-
-ScanCollectionBuilder& ScanCollectionBuilder::misc(AssetId asset) {
-  out_.explicitCollection(index_).members.miscAssets.push_back(asset);
-  return *this;
-}
-
 ScanResultBuilder::ScanResultBuilder(ScanInput input, std::string format, std::string collectionNamespace)
     : input_(std::move(input)), format_(std::move(format)),
       collectionNamespace_(collectionNamespace.empty() ? format_ : std::move(collectionNamespace)),
@@ -293,28 +266,6 @@ ScanMiscDraft ScanResultBuilder::misc(std::string name, SourceRange range) {
   const size_t slot = drafts_.size();
   drafts_.push_back(std::make_unique<DraftSlot>(PendingMisc{.id = id, .name = std::move(name), .range = range}));
   return ScanMiscDraft(*this, slot, id);
-}
-
-ScanCollectionBuilder ScanResultBuilder::collection(std::string name, CollectionKey key) {
-  if (key.resolver.empty()) {
-    key.resolver = collectionNamespace_;
-  }
-  if (key.value.empty()) {
-    key.value = namedSourceCollectionKey(input_.source.id, name);
-  }
-  const size_t index = result_.explicitCollections.size();
-  result_.explicitCollections.push_back(ExplicitCollection{
-      .key = std::move(key),
-      .name = std::move(name),
-  });
-  return ScanCollectionBuilder(*this, index);
-}
-
-ScanCollectionBuilder ScanResultBuilder::sourceCollection(std::string name) {
-  CollectionKey key{
-      .value = "source:" + std::to_string(input_.source.id.value),
-  };
-  return collection(std::move(name), std::move(key));
 }
 
 void ScanResultBuilder::diagnostic(Diagnostic diagnostic) {
@@ -420,10 +371,6 @@ AssetMetadata ScanResultBuilder::metadata(AssetId id, std::string name, SourceRa
       .name = std::move(name),
       .range = range,
   };
-}
-
-ExplicitCollection& ScanResultBuilder::explicitCollection(size_t index) {
-  return result_.explicitCollections.at(index);
 }
 
 }  // namespace vgmtrans::core

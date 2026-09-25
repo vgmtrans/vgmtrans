@@ -471,7 +471,7 @@ void Session::scanOneSource(const SourceFile& source, std::vector<SourceId>& que
       addValidationFailure(module.name, "scan", std::move(validation));
       continue;
     }
-    state_->appendScan(source.id, std::move(scan.result));
+    state_->appendScan(std::move(scan.result));
   }
 
   if (source.knownFormat && !acceptsKnownFormat) {
@@ -492,26 +492,8 @@ void Session::removeSourceFamily(SourceId source, std::vector<SourceId>& removed
   removedSources.insert(removedSources.end(), family.begin(), family.end());
 }
 
-// Expand asset dependencies, then reconcile the derived and explicit collections.
 void Session::rebuildCollections() {
-  const AssetCatalog context{sources_, state_->assets()};
-
-  auto desiredByResolver = state_->desiredCollectionsByResolver();
-  std::vector<AssetId> explicitRoots;
-  for (auto& [resolver, collections] : desiredByResolver) {
-    for (auto& collection : collections) {
-      if (collection.members.sequence) {
-        explicitRoots.push_back(*collection.members.sequence);
-      }
-      resolveDependencies(context, collection);
-    }
-  }
-  for (auto& [resolver, collection] : dependencyCollections(context, explicitRoots)) {
-    desiredByResolver[resolver].push_back(std::move(collection));
-  }
-  for (auto& [resolverId, desiredCollections] : desiredByResolver) {
-    state_->reconcileCollections(resolverId, std::move(desiredCollections));
-  }
+  state_->reconcileCollections(dependencyCollections(AssetCatalog{sources_, state_->assets()}));
 }
 
 }  // namespace vgmtrans::core

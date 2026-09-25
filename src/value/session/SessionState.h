@@ -9,7 +9,6 @@
 #include "value/model/SessionSnapshot.h"
 #include "value/scan/ScanTypes.h"
 
-#include <map>
 #include <memory>
 #include <span>
 #include <string>
@@ -39,7 +38,7 @@ public:
   }
 
   [[nodiscard]] ScanIdAllocator& scanIds() noexcept { return scanIds_; }
-  void appendScan(SourceId origin, ScanResult result);
+  void appendScan(ScanResult result);
 
   [[nodiscard]] bool removeAssets(std::span<const AssetId> assets);
   void removeSources(std::span<const SourceId> sources);
@@ -52,8 +51,7 @@ public:
 
   [[nodiscard]] const SourceMap& sourceMap() const noexcept { return sourceMap_; }
   [[nodiscard]] SourceMap sourceMapForAsset(AssetId asset) const;
-  [[nodiscard]] std::map<std::string, std::vector<DesiredCollection>> desiredCollectionsByResolver() const;
-  void reconcileCollections(std::string_view resolver, std::vector<DesiredCollection> desired);
+  void reconcileCollections(std::vector<DesiredCollection> desired);
 
 private:
   struct ScanChunk {
@@ -63,13 +61,8 @@ private:
     [[nodiscard]] bool empty() const noexcept { return assets->empty() && sourceMap.empty(); }
   };
 
-  struct ExplicitCollectionEntry {
-    SourceId origin;
-    ExplicitCollection collection;
-  };
-
   void removeDiscoveredData(const std::unordered_set<u32>& sourceIds, const std::unordered_set<u32>& assetIds);
-  void validateCollectionAssetReferences(std::string_view resolver, DesiredCollection& desired);
+  void validateMiscAssets(DesiredCollection& desired);
   void rebuildViews();
   void rebuildIndexes();
 
@@ -78,7 +71,6 @@ private:
   std::vector<ScanChunk> scanChunks_;
   SharedSequence<Asset> assets_;
   SourceMap sourceMap_;
-  std::vector<ExplicitCollectionEntry> explicitCollections_;
   std::vector<Collection> collections_;
   std::vector<Diagnostic> diagnostics_;
 

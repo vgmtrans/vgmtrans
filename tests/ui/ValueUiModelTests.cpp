@@ -5,6 +5,7 @@
  */
 
 #include "../TestSupport.h"
+#include "../core/SequenceTestSupport.h"
 
 #include "application/WorkspaceController.h"
 #include "models/ValueModels.h"
@@ -34,9 +35,9 @@ ScanResult scanUiProbe(const ScanInput& input) {
 
   // Like several sequence formats, metadata identifies only a header while the
   // owned annotation graph describes the full decoded source extent.
-  const auto misc = result.misc("Probe asset", input.reader.range(0, 1)).payload({0x01, 0x02});
+  auto sequence = result.sequence("Probe asset", input.reader.range(0, 1)).program(probeSequenceProgram());
   const auto section =
-      result.sourceMap().section("Probe section", input.reader.range(0, 1)).owner(ObjectRefs::asset(misc.id()));
+      result.sourceMap().section("Probe section", input.reader.range(0, 1)).owner(ObjectRefs::sequence(sequence.id()));
   result.sourceMap()
       .annotation(SourceRole::Field, "Magic", input.reader.range(0, 1))
       .parent(section.id())
@@ -47,7 +48,7 @@ ScanResult scanUiProbe(const ScanInput& input) {
       .annotation(SourceRole::Payload, "Payload", input.reader.range(1, 2))
       .parent(section.id())
       .field("first", input.reader.range(1, 1), 1);
-  result.sourceCollection("Probe collection").misc(misc);
+  sequence.collection({}, "Probe collection");
   result.warning("Probe warning", input.reader.range(0, 1));
   return result.finish();
 }

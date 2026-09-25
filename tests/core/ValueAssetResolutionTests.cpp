@@ -150,9 +150,9 @@ void dependenciesPreserveSharingPlacementsAndPrivatePreparation() {
   const AssetCatalog catalog(sources, SharedSequence<Asset>{builder.assets});
   auto roots = dependencyCollections(catalog);
   expect(roots.size() == 1, "one requesting sequence should derive one collection");
-  const auto& desired = roots.front().second;
+  const auto& desired = roots.front();
   expect(desired.members.soundBanks == std::vector{firstBank, secondBank} &&
-             desired.members.samplePools == std::vector{poolId} && desired.dependencies.size() == 4,
+             desired.members.samplePools == std::vector{poolId} && desired.dependencies.size() == 3,
          "membership should deduplicate shared samples while keeping both banks' relationships");
   builder.collections.push_back({.id = CollectionId{1},
                                  .members = desired.members,
@@ -172,8 +172,6 @@ void dependenciesPreserveSharingPlacementsAndPrivatePreparation() {
   expect(standalone.collection &&
              standalone.collection->soundBanks().front().instruments.front().explicitAddress->bank == 0,
          "standalone bank preparation should resolve its samples and assign its own bank slot");
-  expect(dependencyCollections(catalog, std::array{sequenceId}).empty(),
-         "an explicit collection should suppress a duplicate automatic root");
 }
 
 void manualChoicesOverrideSequenceRequestsAndConstrainBankInputs() {
@@ -232,7 +230,7 @@ void dependencyFailuresAreLocalAndAmbiguityRetainsAlternatives() {
     return dependencyCollections(AssetCatalog{sources, SharedSequence<Asset>{std::move(assets)}});
   };
   const auto ambiguous = resolve({sequence, first, second});
-  const auto& choice = ambiguous.front().second;
+  const auto& choice = ambiguous.front();
   expect(choice.members.soundBanks.empty() && choice.dependencies.front().status == ResolutionStatus::Ambiguous &&
              choice.dependencies.front().alternatives.size() == 2 &&
              choice.dependencies.front().alternatives[0].asset == AssetId{2} &&
@@ -243,12 +241,12 @@ void dependencyFailuresAreLocalAndAmbiguityRetainsAlternatives() {
   sequence.recipe.banks.front() = exact(first.metadata.id);
   first.recipe.samples.push_back(DependencyTarget{second.metadata.id, {}});
   const auto invalid = resolve({sequence, first, second});
-  expect(invalid.front().second.dependencies.back().status == ResolutionStatus::Failed &&
-             invalid.front().second.issues.front().code == "invalid-dependency",
+  expect(invalid.front().dependencies.back().status == ResolutionStatus::Failed &&
+             invalid.front().issues.front().code == "invalid-dependency",
          "banks can only depend on sample pools; a bank-to-bank request must fail without traversal");
   first.recipe.samples.front() = [](const DependencyContext&) -> DependencySelection { throw 7; };
   const auto threw = resolve({sequence, first, second});
-  expect(threw.front().second.issues.front().code == "dependency-resolution-failed",
+  expect(threw.front().issues.front().code == "dependency-resolution-failed",
          "nonstandard selector exceptions must also remain local to the affected collection");
 }
 
@@ -268,7 +266,7 @@ void automaticCandidatesRespectContainerBoundaries() {
   SoundBankAsset bank{.metadata = {.id = AssetId{2}, .range = sources.reader(bankFile).range(0, 1)}};
   const AssetCatalog catalog(sources, SharedSequence<Asset>{std::vector<Asset>{sequence, bank}});
   const auto automatic = dependencyCollections(catalog);
-  expect(automatic.front().second.members.soundBanks.empty(),
+  expect(automatic.front().members.soundBanks.empty(),
          "an incomplete container must not borrow another container's sole bank");
   DesiredCollection manual{.members = {.sequence = AssetId{1}, .soundBanks = {AssetId{2}}}};
   resolveDependencies(catalog, manual, ResolutionMode::Manual);
@@ -295,6 +293,17 @@ void resolutionStatusAndAlternativePlacementsSurvivePublication() {
              *selection.alternatives[1].placement.get<u32>() == 12,
          "ambiguity must preserve distinct placements within the same provider");
 
+  bank.recipe.samples = {exact(AssetId{2}, 4), exact(AssetId{2}, 12)};
+  bank.prepare = [](BankPreparationContext& context) {
+    expect(context.inputs.size() == 2 && *context.inputs[0].placement.get<u32>() == 4 &&
+               *context.inputs[1].placement.get<u32>() == 12,
+           "preparation must retain distinct sample placements across requests for the same pool");
+  };
+  test::SessionSnapshotBuilder placed;
+  placed.assets = {bank, samples};
+  expect(bindSoundBank(placed.finish(), bank.metadata.id).collection.has_value(),
+         "a bank may use the same pool at several positions");
+
   bank.recipe.samples.front() = [](const DependencyContext&) {
     return DependencySelection::failed("the native sample request failed");
   };
@@ -314,12 +323,43 @@ void resolutionStatusAndAlternativePlacementsSurvivePublication() {
   expect(!bindCollection(builder.finish(), CollectionId{1}).collection,
          "fatal resolution status must block preparation independently of diagnostic codes");
 
-  bank.recipe.samples.front() = [](const DependencyContext&) { return DependencySelection{}; };
+  bank.recipe.samples = {[](const DependencyContext&) { return DependencySelection{}; }};
   desired = {.members = {.soundBanks = {bank.metadata.id}}};
   resolveDependencies(AssetCatalog{sources, SharedSequence<Asset>{std::vector<Asset>{bank}}}, desired);
   expect(desired.dependencies.front().status == ResolutionStatus::Incomplete &&
              desired.issues.front().impact == CollectionIssueImpact::Incomplete,
          "a missing provider is explicitly incomplete, rather than a fatal selector failure");
+}
+
+void combinedRequestsPreserveUnresolvedOutcomes() {
+  SourceStore sources;
+  for (const auto status : {ResolutionStatus::Incomplete, ResolutionStatus::Ambiguous, ResolutionStatus::Failed}) {
+    SequenceProgramAsset sequence{
+        .metadata = {.id = AssetId{1}},
+        .collection = SequenceCollection{},
+        .recipe = {.banks = {exact(AssetId{2}),
+                             [status](const DependencyContext&) {
+                               if (status == ResolutionStatus::Failed) {
+                                 return DependencySelection::failed("failed request");
+                               }
+                               DependencySelection selection;
+                               if (status == ResolutionStatus::Ambiguous) {
+                                 selection.ambiguous({{AssetId{3}, {}}}, "unresolved choice");
+                               }
+                               return selection;
+                             },
+                             exact(AssetId{2})}},
+    };
+    const auto collections = dependencyCollections(AssetCatalog{
+        sources, SharedSequence<Asset>{std::vector<Asset>{sequence, SoundBankAsset{.metadata = {.id = AssetId{2}}}}}});
+    const auto& result = collections.front();
+    expect(
+        result.dependencies.size() == 1 && result.dependencies.front().status == status &&
+            result.dependencies.front().targets.size() == 1 && !result.issues.empty(),
+        "successful and duplicate requests must not hide another request's incomplete, ambiguous, or failed outcome");
+    expect(result.dependencies.front().alternatives.size() == (status == ResolutionStatus::Ambiguous ? 1 : 0),
+           "combining requests must preserve unresolved alternatives");
+  }
 }
 
 void bankAssignmentsBelongToEachSequenceAndRespectManualSelection() {
@@ -330,9 +370,11 @@ void bankAssignmentsBelongToEachSequenceAndRespectManualSelection() {
         .metadata = {.id = AssetId{id}, .format = "Sequence"},
         .privateData = AssetPrivateData::make(ProbeData{address}),
         .collection = SequenceCollection{},
-        .recipe = {.banks = {DependencyTarget{bankId, {}}},
+        .recipe = {.banks = {DependencyTarget{bankId, {}}, DependencyTarget{bankId, {}}},
                    .assignBanks =
                        [](BankAssignmentContext& context) {
+                         expect(context.banks<ProbeData>().size() == 1,
+                                "overlapping requests must assign each selected bank exactly once");
                          for (auto& bank : context.banks<ProbeData>()) {
                            bank.placement =
                                AssetPrivateData::make(context.sequence.privateData.get<ProbeData>()->value);
@@ -361,7 +403,7 @@ void bankAssignmentsBelongToEachSequenceAndRespectManualSelection() {
   test::SessionSnapshotBuilder builder;
   builder.assets = {makeSequence(1, 7), makeSequence(2, 11), bank};
   const AssetCatalog catalog{sources, SharedSequence<Asset>{builder.assets}};
-  for (auto& [name, desired] : dependencyCollections(catalog)) {
+  for (auto& desired : dependencyCollections(catalog)) {
     builder.collections.push_back({.id = CollectionId{static_cast<u32>(builder.collections.size())},
                                    .members = desired.members,
                                    .issues = desired.issues,
@@ -388,11 +430,35 @@ void bankAssignmentsBelongToEachSequenceAndRespectManualSelection() {
              manual.dependencies.front().targets.front().asset == AssetId{4} &&
              *manual.dependencies.front().targets.front().placement.get<u32>() == 7,
          "assignments must apply to the user's chosen bank, not the sequence's automatic provider");
+
+  auto failing = makeSequence(1, 7);
+  failing.recipe.assignBanks = [](BankAssignmentContext& context) {
+    context.banks<ProbeData>().front().placement = AssetPrivateData::make(u32{99});
+    throw std::runtime_error("assignment failed after changing placement");
+  };
+  bool prepared = false;
+  failing.prepare = [&](SequencePreparationContext&) { prepared = true; };
+  test::SessionSnapshotBuilder rejected;
+  rejected.assets = {failing, *snapshot.asset<SoundBankAsset>(bankId)};
+  const auto unresolved = dependencyCollections(AssetCatalog{sources, SharedSequence<Asset>{rejected.assets}});
+  const auto& failed = unresolved.front();
+  rejected.collections = {
+      {.id = CollectionId{0}, .members = failed.members, .issues = failed.issues, .dependencies = failed.dependencies}};
+  expect(failed.dependencies.front().status == ResolutionStatus::Failed &&
+             !bindCollection(rejected.finish(), CollectionId{0}).collection && !prepared,
+         "an assignment exception must block preparation even after a placement was written");
+  expect(bindCollection(snapshot, CollectionId{0})
+                 .collection->soundBanks()
+                 .front()
+                 .instruments.front()
+                 .explicitAddress->bank == 7,
+         "a failed reassignment must not alter an earlier snapshot's placements");
 }
 
 }  // namespace
 
 void runValueAssetResolutionTests() {
+  combinedRequestsPreserveUnresolvedOutcomes();
   resolutionStatusAndAlternativePlacementsSurvivePublication();
   bankAssignmentsBelongToEachSequenceAndRespectManualSelection();
   automaticCandidatesRespectContainerBoundaries();

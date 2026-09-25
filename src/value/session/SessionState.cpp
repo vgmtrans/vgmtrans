@@ -49,14 +49,6 @@ template <typename T, typename Predicate>
          std::ranges::any_of(members.samplePools, matches) || std::ranges::any_of(members.miscAssets, matches);
 }
 
-[[nodiscard]] DesiredCollection desiredCollection(const ExplicitCollection& collection) {
-  return DesiredCollection{
-      .localKey = collection.key.value,
-      .name = collection.name,
-      .members = collection.members,
-  };
-}
-
 }  // namespace
 
 bool SessionState::containsAsset(AssetId id) const noexcept {
@@ -71,7 +63,7 @@ const Asset* SessionState::asset(AssetId id) const noexcept {
   return found != assetsById_.end() ? found->second : nullptr;
 }
 
-void SessionState::appendScan(SourceId origin, ScanResult result) {
+void SessionState::appendScan(ScanResult result) {
   // validateScanResult() has already admitted asset IDs. Annotation IDs need a
   // separate cross-scan check because validation does not see session annotations.
   for (const auto& annotation : result.sourceMap.annotations()) {
@@ -98,13 +90,6 @@ void SessionState::appendScan(SourceId origin, ScanResult result) {
     rebuildViews();
   }
 
-  explicitCollections_.reserve(explicitCollections_.size() + result.explicitCollections.size());
-  for (auto& collection : result.explicitCollections) {
-    explicitCollections_.push_back(ExplicitCollectionEntry{
-        .origin = origin,
-        .collection = std::move(collection),
-    });
-  }
   diagnostics_.insert(diagnostics_.end(), std::make_move_iterator(result.diagnostics.begin()),
                       std::make_move_iterator(result.diagnostics.end()));
 }
@@ -208,39 +193,26 @@ SourceMap SessionState::sourceMapForAsset(AssetId asset) const {
   return SourceMap{std::move(selected)};
 }
 
-std::map<std::string, std::vector<DesiredCollection>> SessionState::desiredCollectionsByResolver() const {
-  std::map<std::string, std::vector<DesiredCollection>> grouped;
-  for (const auto& collection : collections_) {
-    if (collection.key) {
-      grouped.try_emplace(collection.key->resolver);
-    }
-  }
-  for (const auto& entry : explicitCollections_) {
-    if (!entry.collection.key.resolver.empty()) {
-      grouped[entry.collection.key.resolver].push_back(desiredCollection(entry.collection));
-    }
-  }
-  return grouped;
-}
-
-void SessionState::reconcileCollections(std::string_view resolver, std::vector<DesiredCollection> desired) {
-  std::set<std::string> seenKeys;
+void SessionState::reconcileCollections(std::vector<DesiredCollection> desired) {
+  std::ranges::stable_sort(desired, {}, [](const auto& candidate) { return candidate.key.resolver; });
+  std::set<std::pair<std::string, std::string>> seenKeys;
   for (auto& candidate : desired) {
-    if (candidate.localKey.empty()) {
+    const auto& resolver = candidate.key.resolver;
+    if (candidate.key.value.empty()) {
       addError("Collection resolver '" + std::string(resolver) + "' returned a collection with an empty key");
       continue;
     }
 
-    if (!seenKeys.insert(candidate.localKey).second) {
+    if (!seenKeys.emplace(resolver, candidate.key.value).second) {
       addError("Collection resolver '" + std::string(resolver) + "' returned duplicate collection key '" +
-               candidate.localKey + "'");
+               candidate.key.value + "'");
       continue;
     }
 
-    validateCollectionAssetReferences(resolver, candidate);
+    validateMiscAssets(candidate);
     Collection collection{
         .name = std::move(candidate.name),
-        .key = CollectionKey{.resolver = std::string(resolver), .value = std::move(candidate.localKey)},
+        .key = std::move(candidate.key),
         .members = std::move(candidate.members),
         .issues = std::move(candidate.issues),
         .dependencies = std::move(candidate.dependencies),
@@ -255,7 +227,7 @@ void SessionState::reconcileCollections(std::string_view resolver, std::vector<D
   }
 
   std::erase_if(collections_, [&](const Collection& collection) {
-    return collection.key && collection.key->resolver == resolver && !seenKeys.contains(collection.key->value);
+    return collection.key && !seenKeys.contains({collection.key->resolver, collection.key->value});
   });
 }
 
@@ -299,10 +271,6 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
     return removedSource || removedObject || removedAnnotation;
   };
 
-  std::erase_if(explicitCollections_, [&](const ExplicitCollectionEntry& entry) {
-    return sourceIds.contains(entry.origin.value) || referencesAnyAsset(entry.collection.members, assetIds);
-  });
-
   for (auto& chunk : scanChunks_) {
     chunk.assets = without(chunk.assets, removesAsset);
 
@@ -338,59 +306,26 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
   rebuildIndexes();
 }
 
-void SessionState::validateCollectionAssetReferences(std::string_view resolver, DesiredCollection& desired) {
-  const auto addMissing = [&](AssetId id, std::string_view role) {
-    addError("Collection resolver '" + std::string(resolver) + "' returned " + std::string(role) + " asset id " +
-             std::to_string(id.value) + " that does not exist");
-    if (role == "sequence") {
-      desired.issues.push_back(missingSequenceIssue(id));
-    } else if (role == "sound-bank") {
-      desired.issues.push_back(missingSoundBankIssue(id));
-    } else if (role == "sample-pool") {
-      desired.issues.push_back(missingSamplePoolIssue(id));
-    } else {
-      desired.issues.push_back(CollectionIssue{
-          .impact = CollectionIssueImpact::Incomplete,
-          .severity = Severity::Error,
-          .code = "missing-" + std::string(role),
-          .message = "Collection references missing " + std::string(role) + " asset " + std::to_string(id.value),
-          .asset = id,
-      });
+void SessionState::validateMiscAssets(DesiredCollection& desired) {
+  // Resolution already validates the sequence and audio providers. Supplemental
+  // inspection assets are direct scanner references and can disappear separately.
+  std::erase_if(desired.members.miscAssets, [&](AssetId id) {
+    if (asset<MiscAsset>(id) != nullptr) {
+      return false;
     }
-  };
-  const auto addWrongType = [&](AssetId id, std::string_view role) {
-    addError("Collection resolver '" + std::string(resolver) + "' returned " + std::string(role) + " asset id " +
-             std::to_string(id.value) + " that is not a " + std::string(role) + " asset");
+    const bool missing = !containsAsset(id);
+    addError("Collection resolver '" + desired.key.resolver + "' returned misc asset id " + std::to_string(id.value) +
+             (missing ? " that does not exist" : " that is not a misc asset"));
     desired.issues.push_back(CollectionIssue{
         .impact = CollectionIssueImpact::Incomplete,
         .severity = Severity::Error,
-        .code = "wrong-type-" + std::string(role),
-        .message = "Collection references wrong-type " + std::string(role) + " asset " + std::to_string(id.value),
+        .code = missing ? "missing-misc" : "wrong-type-misc",
+        .message = "Collection references " + std::string(missing ? "missing" : "wrong-type") + " misc asset " +
+                   std::to_string(id.value),
         .asset = id,
     });
-  };
-
-  const auto invalid = [&](AssetId id, std::string_view role, bool hasExpectedType) {
-    if (!containsAsset(id)) {
-      addMissing(id, role);
-      return true;
-    }
-    if (!hasExpectedType) {
-      addWrongType(id, role);
-      return true;
-    }
-    return false;
-  };
-  auto& members = desired.members;
-  if (members.sequence &&
-      invalid(*members.sequence, "sequence", asset<SequenceProgramAsset>(*members.sequence) != nullptr)) {
-    members.sequence.reset();
-  }
-  std::erase_if(members.soundBanks,
-                [&](AssetId id) { return invalid(id, "sound-bank", asset<SoundBankAsset>(id) != nullptr); });
-  std::erase_if(members.samplePools,
-                [&](AssetId id) { return invalid(id, "sample-pool", asset<SamplePoolAsset>(id) != nullptr); });
-  std::erase_if(members.miscAssets, [&](AssetId id) { return invalid(id, "misc", asset<MiscAsset>(id) != nullptr); });
+    return true;
+  });
 }
 
 void SessionState::rebuildViews() {
