@@ -669,7 +669,6 @@ void ndsSequenceModelsNitroLfoRegisters() {
 }
 
 void ndsSynthModulatorsUseSequenceLfoRanges() {
-  expect(!ndsModule().bindCollection, "NDS modulation should not require format-specific collection binding");
   const SequenceProgram program = decodeTestSequenceProgram({
       0xcb,
       0x20,  // speed 32 -> 12 Hz

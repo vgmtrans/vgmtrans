@@ -67,15 +67,11 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
     std::ranges::sort(parsed.analysis.requiredArticulations);
     parsed.analysis.requiredArticulations.erase(std::ranges::unique(parsed.analysis.requiredArticulations).begin(),
                                                 parsed.analysis.requiredArticulations.end());
-    sequence
-        .data(AkaoSequenceData{
-            .sequenceId = parsed.analysis.header.sequenceId,
-            .sampleSetId = parsed.analysis.header.sampleSetId,
-            .requiredArticulations = parsed.analysis.requiredArticulations,
-            .structuralInstrumentSet = bank.id(),
-        })
-        .program(std::move(parsed.program));
-    bank.data(AkaoSoundBankData{.binding = std::move(built.binding)});
+    sequence.useBank(bank).program(std::move(parsed.program));
+    bank.data(AkaoSoundBankData{.binding = std::move(built.binding)})
+        .useSamples(AkaoSamples{.sampleSetId = parsed.analysis.header.sampleSetId,
+                                .requiredArticulations = std::move(parsed.analysis.requiredArticulations)})
+        .prepare<AkaoSoundBankData>(prepareAkaoBank);
   }
 }
 
@@ -100,9 +96,6 @@ FormatModule akaoModule() {
       .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
       .acceptedFormats = {source_formats::kPlayStationRam},
       .scan = scanAkao,
-      .collectionResolverId = std::string(kAkaoCollectionResolver),
-      .resolveCollections = resolveAkaoCollections,
-      .bindCollection = bindAkaoCollection,
   };
 }
 

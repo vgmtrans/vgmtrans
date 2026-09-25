@@ -46,9 +46,8 @@ namespace {
   }
   // A TSQ is loaded as one driver bank. Mixed files such as C13BGM therefore
   // use BGM.TVB for every song entry, including embedded sound effects.
-  const bool usesMusicBank = std::ranges::any_of(sequences, [](const SequenceLayout& layout) {
-    return layout.type == 0;
-  });
+  const bool usesMusicBank =
+      std::ranges::any_of(sequences, [](const SequenceLayout& layout) { return layout.type == 0; });
   if (bank && !addBank(result, *bank, stem)) {
     result.warning("Tamsoft TVB was recognized, but no playable instruments were found",
                    input.reader.range(0, kBankHeaderSize));
@@ -56,11 +55,9 @@ namespace {
   for (const auto& layout : sequences) {
     const std::string name = fmt::format("{} ({})", stem, layout.song);
     auto sequence = result.sequence(name, input.reader.range(0, input.reader.size()));
-    sequence
-        .program(parseSequence(input.reader, sequence.id(), layout, &result.sourceMap(), &result.diagnostics()))
-        .data(SequenceData{
+    sequence.program(parseSequence(input.reader, sequence.id(), layout, &result.sourceMap(), &result.diagnostics()))
+        .useBanks(BankRequest{
             .stem = stem,
-            .song = layout.song,
             .generation = layout.generation,
             .usesMusicBank = usesMusicBank,
         });
@@ -75,7 +72,6 @@ FormatModule module() {
       .name = std::string(kFormatName),
       .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
       .scan = scan,
-      .resolveCollections = resolveCollections,
   };
 }
 

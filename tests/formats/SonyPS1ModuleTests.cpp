@@ -6,6 +6,7 @@
 
 #include "../PerformanceTestSupport.h"
 #include "../TestSupport.h"
+#include "../core/SessionSnapshotBuilder.h"
 
 #include "value/export/CollectionBinding.h"
 #include "value/formats/SonyPS1/SonyPS1.h"
@@ -134,14 +135,12 @@ std::vector<u8> vabFixture(u32 version, bool body) {
 }
 
 bool diagnosticContains(const std::vector<Diagnostic>& diagnostics, std::string_view text) {
-  return std::ranges::any_of(diagnostics, [&](const Diagnostic& diagnostic) {
-    return diagnostic.message.find(text) != std::string::npos;
-  });
+  return std::ranges::any_of(
+      diagnostics, [&](const Diagnostic& diagnostic) { return diagnostic.message.find(text) != std::string::npos; });
 }
 
 Session sonyPs1CollectionSession(std::initializer_list<std::string_view> banks,
-                                 std::initializer_list<std::string_view> pools,
-                                 FormatModule module = sonyPs1Module()) {
+                                 std::initializer_list<std::string_view> pools, FormatModule module = sonyPs1Module()) {
   Session session;
   session.registerFormat(std::move(module));
   const auto add = [&](std::string name, std::vector<u8> bytes) {
@@ -443,6 +442,13 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
                                 [](const Asset& asset) { return std::holds_alternative<SamplePoolAsset>(asset); }) == 1,
       "split VH/VB scanning should still publish the bank and sample assets");
 
+  for (const auto& asset : splitSnapshot.assets()) {
+    if (const auto* bank = std::get_if<SoundBankAsset>(&asset)) {
+      const auto artifact = split.exportSoundBank(bank->metadata.id, SynthExportFormat::SoundFont2, ExportRequest{});
+      expect(!artifact.bytes.empty(), "a standalone VH should resolve its VB and export without a sequence collection");
+    }
+  }
+
   const auto bankBytes = vabFixture(7, true);
   const auto sequenceBytes = sequenceFixture({0x00, 0xff, 0x2f, 0x00});
   const u32 secondBank = static_cast<u32>(bankBytes.size() + 0x100);
@@ -476,32 +482,25 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
   };
   expect(bankForSequence(secondSequence) == secondBank && bankForSequence(firstSequence) == 0,
          "same-source SonyPS1 sequences and VABs should pair in descending offset order");
-  const auto* sequence = pairedSnapshot.asset<SequenceProgramAsset>(*latestCollection->members.sequence);
-  SequenceRuntime runtime = sequence->program.runtime;
   const SoundBankAsset foreignBank{
       .metadata = AssetMetadata{.id = AssetId{999}, .format = "Foreign", .name = "Foreign Bank"},
-      .instruments = {Instrument{
-          .explicitAddress = InstrumentAddress{.bank = 42, .program = 7},
-          .name = "Foreign Instrument",
-      }},
+      .instruments = {Instrument{.explicitAddress = InstrumentAddress{.bank = 42, .program = 7}}},
   };
-  std::vector<SoundBankAsset> resolvedInstruments{
-      foreignBank,
-      *pairedSnapshot.asset<SoundBankAsset>(latestCollection->members.soundBanks.front()),
-  };
-  std::vector<const SamplePoolAsset*> resolvedSamples;
-  std::vector<Diagnostic> bindingDiagnostics;
-  CollectionBindingContext binding{
-      sequence, runtime, resolvedInstruments, resolvedSamples, {}, bindingDiagnostics,
-  };
-  bindSonyPs1Collection(binding);
-  expect(resolvedInstruments.size() == 2 && resolvedInstruments.front().metadata.id == foreignBank.metadata.id &&
-             resolvedInstruments.front().instruments.front().explicitAddress ==
-                 InstrumentAddress{.bank = 42, .program = 7},
-         "SonyPS1 binding should preserve foreign banks and their addresses");
-  const auto& instrument = resolvedInstruments.back().instruments.front();
-  expect(instrument.explicitAddress && instrument.explicitAddress->bank == 0,
-         "the selected VAB should be rebased among Sony banks without foreign members shifting its slot");
+  test::SessionSnapshotBuilder builder;
+  for (const auto& asset : pairedSnapshot.assets()) {
+    builder.assets.push_back(asset);
+  }
+  builder.assets.push_back(foreignBank);
+  auto collection = *latestCollection;
+  collection.members.soundBanks.insert(collection.members.soundBanks.begin(), foreignBank.metadata.id);
+  builder.collections.push_back(collection);
+  const auto binding = bindCollection(builder.finish(), collection.id);
+  expect(binding.collection.has_value(), "SonyPS1 banks should prepare with foreign collection members");
+  const auto& resolvedInstruments = binding.collection->soundBanks();
+  expect(resolvedInstruments.front().instruments.front().explicitAddress == InstrumentAddress{.bank = 42, .program = 7},
+         "SonyPS1 preparation should preserve foreign banks and their addresses");
+  expect(resolvedInstruments.back().instruments.front().explicitAddress->bank == 0,
+         "foreign members must not shift the Sony bank's slot");
 }
 
 void sonyPs1RawSamplesSupportManualCollections() {
@@ -577,57 +576,59 @@ void runSonyPs1CollectionBindingTests() {
     expect(resolved.collection && usesPool(*resolved.collection),
            "a discovered SonyPS1 collection should preserve both edges to one deduplicated pool");
 
-    const CollectionId manualId = session.createUserCollection(
-        "Manual Sony Collection",
-        CollectionMembers{
-            .sequence = collection.members.sequence,
-            .soundBanks = collection.members.soundBanks,
-            .samplePools = collection.members.samplePools,
-        });
+    const CollectionId manualId =
+        session.createUserCollection("Manual Sony Collection", CollectionMembers{
+                                                                   .sequence = collection.members.sequence,
+                                                                   .soundBanks = collection.members.soundBanks,
+                                                                   .samplePools = collection.members.samplePools,
+                                                               });
     const auto manual = bindCollection(session.snapshot(), manualId);
     expect(manual.collection && usesPool(*manual.collection),
            "a user-created SonyPS1 collection should reuse one uniquely compatible pool for both banks");
 
-    const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.members.sequence);
-    std::vector<SoundBankAsset> banks;
-    for (const AssetId id : collection.members.soundBanks) {
-      banks.push_back(*snapshot.asset<SoundBankAsset>(id));
-    }
-    std::vector<const SamplePoolAsset*> pools{snapshot.asset<SamplePoolAsset>(poolId)};
-    const auto rejects = [&](std::vector<SoundBankAsset> selectedBanks,
-                             std::vector<const SamplePoolAsset*> selectedPools, std::string_view message) {
-      SequenceRuntime runtime = sequence->program.runtime;
-      std::vector<Diagnostic> diagnostics;
-      CollectionBindingContext context{sequence, runtime, selectedBanks, selectedPools, {}, diagnostics};
-      collection.binder(context);
-      expect(context.failed && diagnosticContains(diagnostics, message),
-             "SonyPS1 binding should reject an invalid captured relationship");
+    const auto rejects = [&](bool removePool, bool invalidIndex) {
+      test::SessionSnapshotBuilder builder;
+      for (const auto& asset : snapshot.assets()) {
+        builder.assets.push_back(asset);
+      }
+      auto broken = collection;
+      if (removePool) {
+        broken.members.samplePools.clear();
+      } else if (!invalidIndex) {
+        broken.members.soundBanks.erase(broken.members.soundBanks.begin());
+      }
+      if (invalidIndex) {
+        for (auto& asset : builder.assets) {
+          if (auto* bank = std::get_if<SoundBankAsset>(&asset)) {
+            bank->instruments.front().regions.front().sample = SampleRef::unbound(1);
+          }
+        }
+      }
+      builder.collections.push_back(broken);
+      expect(!bindCollection(builder.finish(), broken.id).collection,
+             "invalid membership or sample placement must prevent preparation");
     };
-    rejects({banks.front()}, pools, "missing sound bank");
-    rejects(banks, {}, "missing sample pool");
-    banks.front().instruments.front().regions.front().sample = SampleRef::unbound(1);
-    rejects(banks, pools, "outside its external sample pool");
+    rejects(false, false);
+    rejects(true, false);
+    rejects(false, true);
   }
 
   {
-    FormatModule module = sonyPs1Module();
-    auto resolver = module.resolveCollections;
-    module.resolveCollections = [resolver = std::move(resolver)](const CollectionDiscoveryContext& context) {
-      auto collections = resolver(context);
-      for (auto& collection : collections) {
-        std::ranges::reverse(collection.members.samplePools);
-      }
-      return collections;
-    };
-    Session session = sonyPs1CollectionSession({"A.VH", "B.VH"}, {"A.VB", "B.VB"}, std::move(module));
+    Session session = sonyPs1CollectionSession({"A.VH", "B.VH"}, {"A.VB", "B.VB"});
     const SessionSnapshot snapshot = session.snapshot();
-    const Collection& collection = sonyPs1Collection(snapshot, 2, 2);
-    const auto binding = bindCollection(snapshot, collection.id);
-    expect(binding.collection.has_value(), "SonyPS1 binding should not depend on pool member order");
+    auto collection = sonyPs1Collection(snapshot, 2, 2);
+    std::ranges::reverse(collection.members.samplePools);
+    test::SessionSnapshotBuilder builder;
+    for (const auto& asset : snapshot.assets()) {
+      builder.assets.push_back(asset);
+    }
+    builder.collections.push_back(collection);
+    const auto binding = bindCollection(builder.finish(), collection.id);
+    expect(binding.collection.has_value(), "SonyPS1 preparation should not depend on pool member order");
     const auto& banks = binding.collection->soundBanks();
     expect(banks[0].instruments.front().regions.front().sample.owner() == collection.members.samplePools[1] &&
                banks[1].instruments.front().regions.front().sample.owner() == collection.members.samplePools[0],
-           "each SonyPS1 bank should bind to its resolver-selected pool ID after member reordering");
+           "each SonyPS1 bank should use its recorded dependency after member reordering");
   }
 
   {

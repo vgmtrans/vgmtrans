@@ -6,11 +6,12 @@
 
 #include "../MidiTestSupport.h"
 #include "../TestSupport.h"
+#include "value/export/CollectionBinding.h"
 #include "ValueFormatTestSupport.h"
 
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/formats/Akao/Akao.h"
-#include "value/scan/CollectionDiscovery.h"
+#include "value/scan/AssetResolution.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 
@@ -195,7 +196,7 @@ void akaoSequenceAnalysisUsesSemanticOperands() {
          "Akao analysis should collect individual articulation ids from semantic operands");
   SoundBankAsset bank;
   const AkaoInstrumentSetBindingData recipe{.usesIndividualArticulations = true,
-                                           .noAttackArticulationIds = analysis.references.noAttackArticulationIds};
+                                            .noAttackArticulationIds = analysis.references.noAttackArticulationIds};
   expect(applyAkaoArticulations(bank, recipe, {{9, {.loopPoint = 32, .sample = SampleRef::resolved(AssetId{1}, 0)}}}) &&
              bank.instruments.size() == 2 && bank.instruments[0].regions[0].sampleStartFrame == 0 &&
              bank.instruments[1].regions[0].sampleStartFrame == 56 && bank.instruments[1].explicitAddress->bank == 2,
@@ -203,8 +204,7 @@ void akaoSequenceAnalysisUsesSemanticOperands() {
 }
 
 void akaoPointerInstrumentsSelectTheirExportedPrograms() {
-  for (const auto version : {AkaoPs1Version::Version1_1, AkaoPs1Version::Version1_2,
-                             AkaoPs1Version::Version2}) {
+  for (const auto version : {AkaoPs1Version::Version1_1, AkaoPs1Version::Version1_2, AkaoPs1Version::Version2}) {
     std::vector<u8> bytes(0x90, 0xa0);
     u32 position = 0x20;
     // Select the higher table first: program numbers follow table order, not
@@ -570,15 +570,15 @@ void akaoPitchSlideAppliesOnceToTheNextNote() {
   expect(std::ranges::count_if(
              midi.tracks[0].events,
              [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event.payload); }) == 2 &&
-          std::ranges::any_of(midi.tracks[0].events,
-                              [](const MidiEvent& event) {
+             std::ranges::any_of(midi.tracks[0].events,
+                                 [](const MidiEvent& event) {
                                    const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
                                    return bend != nullptr && event.tick <= 0x24 && bend->value > 0;
-                              }) &&
+                                 }) &&
              std::ranges::none_of(
                  midi.tracks[0].events,
                  [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }),
-      "Akao A4 should bend the original attack without creating a destination-note attack or portamento event");
+         "Akao A4 should bend the original attack without creating a destination-note attack or portamento event");
 }
 
 void akaoPortamentoRetainsPitchTransitionIntent() {
@@ -752,18 +752,21 @@ void akaoSampleSelectionUsesPlayableArticulations() {
                                 .format = std::string(kAkaoFormatName),
                                 .name = "Sequence",
                                 .range = sources.reader(sequenceSource).range(10, 20)},
-      .privateData = AssetPrivateData::make(AkaoSequenceData{
-          .sequenceId = 1,
-          .sampleSetId = 7,
-          .requiredArticulations = {5, 9},
-          .structuralInstrumentSet = bankId,
-      }),
+      .recipe = {.collectionNamespace = std::string(kAkaoCollectionResolver),
+                 .dependencies = {{.select =
+                                       [bankId](const DependencyContext&) {
+                                         DependencySelection selection;
+                                         selection.add(bankId);
+                                         return selection;
+                                       }}}},
   });
   assets.emplace_back(SoundBankAsset{
       .metadata = AssetMetadata{.id = bankId,
                                 .format = std::string(kAkaoFormatName),
                                 .name = "Bank",
                                 .range = sources.reader(sequenceSource).range(40, 20)},
+      .recipe = {.dependencies = {{.role = DependencyRole::SamplePool,
+                                   .select = AkaoSamples{.sampleSetId = 7, .requiredArticulations = {5, 9}}}}},
   });
   const auto samples = [&](AssetId id, SourceId source, u16 sampleSet, std::vector<AkaoArticulation> articulations) {
     return SamplePoolAsset{
@@ -784,8 +787,12 @@ void akaoSampleSelectionUsesPlayableArticulations() {
     auto candidates = assets;
     candidates.emplace_back(samples(localSamplesId, sequenceSource, 7, std::move(local)));
     candidates.emplace_back(samples(unrelatedSamplesId, unrelatedSource, unrelatedSet, std::move(unrelated)));
-    const CollectionDiscoveryContext context(sources, SharedSequence<Asset>{std::move(candidates)});
-    return resolveAkaoCollections(context);
+    const AssetCatalog context(sources, SharedSequence<Asset>{std::move(candidates)});
+    std::vector<DesiredCollection> collections;
+    for (auto& [format, collection] : dependencyCollections(context, {})) {
+      collections.push_back(std::move(collection));
+    }
+    return collections;
   };
   const AkaoArticulation localFive{.articulationId = 5, .sample = SampleRef::resolved(localSamplesId, 0)};
   const AkaoArticulation localNine{.articulationId = 9, .sample = SampleRef::resolved(localSamplesId, 1)};
@@ -962,38 +969,13 @@ void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView() {
          "an articulation with an incomplete sample must not bind to sample zero");
 
   const auto* sequence = project.asset<SequenceProgramAsset>(sequenceId);
-  const auto* sequenceData = sequence->privateData.get<AkaoSequenceData>();
-  expect(sequenceData != nullptr && sequenceData->requiredArticulations == std::vector<u32>{5},
-         "Akao articulation requirements should remain typed sequence data");
-  SequenceRuntime runtime = sequence->program.runtime;
-  const SoundBankAsset foreignBank{
-      .metadata = AssetMetadata{.id = AssetId{999}, .format = "Foreign", .name = "Foreign Bank"},
-      .instruments = {Instrument{
-          .explicitAddress = InstrumentAddress{.bank = 42, .program = 7},
-          .name = "Foreign Instrument",
-      }},
-  };
-  std::vector<SoundBankAsset> boundInstruments{
-      foreignBank,
-      *project.asset<SoundBankAsset>(collection.members.soundBanks.front()),
-  };
-  std::vector<const SamplePoolAsset*> boundSamples;
-  for (const AssetId id : collection.members.samplePools) {
-    boundSamples.push_back(project.asset<SamplePoolAsset>(id));
-  }
-  std::vector<Diagnostic> bindingDiagnostics;
-  CollectionBindingContext binding{
-      sequence, runtime, boundInstruments, boundSamples, {}, bindingDiagnostics,
-  };
-  bindAkaoCollection(binding);
-  expect(boundInstruments.size() == 2 && boundInstruments.front().metadata.id == foreignBank.metadata.id &&
-             boundInstruments.front().instruments.front().name == "Foreign Instrument" &&
-             boundInstruments.back().metadata.id == collection.members.soundBanks.front() &&
-             boundInstruments.back().instruments.size() == 1 &&
-             boundInstruments.back().instruments.front().regions.size() == 1 &&
-             boundInstruments.back().instruments.front().regions.front().sample.owner() ==
+  expect(sequence->recipe.dependencies.size() == 1 && detectedInstrumentSet->recipe.dependencies.size() == 1,
+         "Akao sequence should name its bank, whose recipe owns sample requirements");
+  const auto prepared = bindCollection(project, collection.id);
+  expect(prepared.collection && prepared.collection->soundBanks().size() == 1 &&
+             prepared.collection->soundBanks().front().instruments.front().regions.front().sample.owner() ==
                  collection.members.samplePools.front(),
-         "Akao binding should locate its exact structural bank, preserve foreign members, and connect its samples");
+         "Akao bank preparation should connect the structural instrument regions to its selected samples");
 
   const auto artifacts = session.exportCollection(collection.id, ExportRequest{.kinds = {ExportKind::Dls}});
   expect(artifacts.size() == 1 && !artifacts[0].bytes.empty(),

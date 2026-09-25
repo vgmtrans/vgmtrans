@@ -64,7 +64,7 @@ struct BankAssets {
         parseSegSatSequence(input.reader, sequenceDraft.id(), sequence, &result.sourceMap(), &result.diagnostics());
     const std::vector<u8> referencedBanks =
         sequence.referencedBanks.empty() ? std::vector<u8>{0} : sequence.referencedBanks;
-    sequenceDraft
+    sequenceDraft.prepare(bindSegSatCollection)
         .data(SegSatSequenceBindingData{
             .volumeModel = volumeModel,
             .referencedBanks = referencedBanks,
@@ -98,7 +98,7 @@ struct BankAssets {
 
 }  // namespace
 
-void bindSegSatCollection(CollectionBindingContext& context) {
+void bindSegSatCollection(SequencePreparationContext& context) {
   const auto* sequence = context.sequence;
   if (sequence == nullptr) {
     return;
@@ -186,8 +186,6 @@ FormatModule segSatModule() {
       .name = std::string(kSegSatFormatName),
       .acceptedFormats = {source_formats::kSaturnRam},
       .scan = scanSegSat,
-      .collectionResolverId = std::string(kSegSatCollectionResolver),
-      .bindCollection = bindSegSatCollection,
   };
 }
 

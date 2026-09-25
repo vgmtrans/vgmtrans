@@ -5,6 +5,7 @@
  */
 
 #include "../TestSupport.h"
+#include "value/export/CollectionBinding.h"
 #include "DiagnosticTestSupport.h"
 #include "SessionSnapshotBuilder.h"
 #include "SessionTestSupport.h"
@@ -70,9 +71,9 @@ void sessionScansValuesAndDerivedSources() {
   expect(snapshot.sources().size() == 2, "scan should include extracted derived source");
   expect(snapshot.source(sourceId) == &snapshot.sources()[0], "session snapshot should find a source by stable id");
   expect(snapshot.source(SourceId{99}) == nullptr, "session snapshot should return null for a missing source id");
-  expect(!snapshot.sources()[0].derived() && snapshot.sources()[1].derived() &&
-             snapshot.sources()[1].parent == sourceId,
-         "only extracted sources should have a parent and be classified as derived");
+  expect(
+      !snapshot.sources()[0].derived() && snapshot.sources()[1].derived() && snapshot.sources()[1].parent == sourceId,
+      "only extracted sources should have a parent and be classified as derived");
   expect(snapshot.sources()[1].origin.has_value() && snapshot.sources()[1].origin->source == sourceId &&
              snapshot.sources()[1].origin->offset == 0 && snapshot.sources()[1].origin->size == 1,
          "extracted derived source should preserve its origin range");
@@ -220,25 +221,26 @@ void sessionScansApplicableFormatsConcurrently() {
   const auto module = [&](std::string name, u8 payload) {
     return FormatModule{
         .name = name,
-        .scan = [&, name = std::move(name), payload](const ScanInput& input) {
-          if (parallelExecutionAvailable) {
-            std::unique_lock lock(scannerMutex);
-            ++activeScanners;
-            if (activeScanners > 1) {
-              scannersOverlapped = true;
-              scannerStarted.notify_all();
-            } else {
-              scannerStarted.wait_for(lock, std::chrono::seconds(1), [&] { return scannersOverlapped; });
-            }
-            --activeScanners;
-          }
-          ScanResultBuilder out(input, name);
-          const SourceRange range = input.reader.range(0, 1);
-          const auto asset = out.misc(name, range).payload({payload});
-          out.sourceMap().annotation(SourceRole::Payload, name, range).owner(ObjectRefs::misc(asset.id()));
-          completed.fetch_add(1, std::memory_order_relaxed);
-          return out.finish();
-        },
+        .scan =
+            [&, name = std::move(name), payload](const ScanInput& input) {
+              if (parallelExecutionAvailable) {
+                std::unique_lock lock(scannerMutex);
+                ++activeScanners;
+                if (activeScanners > 1) {
+                  scannersOverlapped = true;
+                  scannerStarted.notify_all();
+                } else {
+                  scannerStarted.wait_for(lock, std::chrono::seconds(1), [&] { return scannersOverlapped; });
+                }
+                --activeScanners;
+              }
+              ScanResultBuilder out(input, name);
+              const SourceRange range = input.reader.range(0, 1);
+              const auto asset = out.misc(name, range).payload({payload});
+              out.sourceMap().annotation(SourceRole::Payload, name, range).owner(ObjectRefs::misc(asset.id()));
+              completed.fetch_add(1, std::memory_order_relaxed);
+              return out.finish();
+            },
     };
   };
 
@@ -248,8 +250,7 @@ void sessionScansApplicableFormatsConcurrently() {
   session.scanPendingSources();
 
   const SessionSnapshot snapshot = session.snapshot();
-  expect(completed.load(std::memory_order_relaxed) == 2,
-         "parallel scanning should execute every applicable format");
+  expect(completed.load(std::memory_order_relaxed) == 2, "parallel scanning should execute every applicable format");
   expect(!parallelExecutionAvailable || scannersOverlapped,
          "applicable formats should scan concurrently when multiple workers are available");
   expect(snapshot.assets().size() == 2, "parallel scanning should admit every applicable format result");
@@ -454,9 +455,15 @@ void sessionCreatesUserCollectionsFromDetectedAssets() {
   Session session;
   auto sequenceModule = probeBankSequenceModule();
   sequenceModule.name = "ProbeBank";
-  sequenceModule.collectionResolverId = "probe-bank";
-  sequenceModule.resolveCollections = resolveProbeBankCollections;
-  sequenceModule.bindCollection = [](CollectionBindingContext& context) { context.warning("user collection bound"); };
+  sequenceModule.scan = [](const ScanInput& input) {
+    auto result = scanProbeBankSequence(input);
+    for (auto& asset : result.assets) {
+      std::get<SequenceProgramAsset>(asset).prepare = [](SequencePreparationContext& context) {
+        context.warning("user collection bound");
+      };
+    }
+    return result;
+  };
   session.registerFormat(std::move(sequenceModule));
   session.registerFormat(probeBankInstrumentModule());
 
@@ -484,7 +491,7 @@ void sessionCreatesUserCollectionsFromDetectedAssets() {
          "manual collection should preserve its name and user-created origin");
   expect(collection->members.sequence == members.sequence && collection->members.soundBanks == members.soundBanks,
          "manual collection should preserve the selected asset ids");
-  expect(static_cast<bool>(collection->binder), "manual collection should retain its sequence format's binder");
+  expect(!collection->dependencies.empty(), "manual collection should retain its resolved asset dependencies");
 
   session.removeSource(instrumentSource);
   const SessionSnapshot removed = session.snapshot();
@@ -502,19 +509,13 @@ void sessionMatchesCollectionsAcrossSeparateSourceScans() {
   session.scanSource(instrument);
   SessionSnapshot project = session.snapshot();
   expect(project.assets().size() == 1, "instrument scan should add its asset immediately");
-  expect(project.collections().size() == 1, "resolver should keep an incomplete collection for a partial match");
-  expect(project.collections()[0].issueImpact() == CollectionIssueImpact::Incomplete,
-         "instrument-only bank collection should be marked incomplete");
-  expect(project.collections()[0].members.soundBanks.size() == 1,
-         "instrument-only bank collection should reference the instrument set");
-  const CollectionId bankCollection = project.collections()[0].id;
+  expect(project.collections().empty(), "banks should remain standalone assets until a sequence requests them");
 
   const auto sequence = session.addSource(SourceFile{.name = "bank-7.seq"}, {0xcc, 7});
   session.scanSource(sequence);
   project = session.snapshot();
   expect(project.assets().size() == 2, "second source scan should add the matching sequence asset");
   expect(project.collections().size() == 1, "typed asset data should update the existing bank collection");
-  expect(project.collections()[0].id == bankCollection, "resolver update should preserve the collection id");
   expect(project.collections()[0].issueImpact() == CollectionIssueImpact::None,
          "bank collection should become complete when sequence and instruments are both present");
   expect(project.collections()[0].members.sequence.has_value(),
@@ -679,53 +680,32 @@ void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
 
 void sessionResolverFailureKeepsExplicitCollections() {
   Session session;
-  session.registerFormat(fragileProbeSequenceModule());
-
-  const auto first = session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
-  session.scanSource(first);
-  SessionSnapshot project = session.snapshot();
-  expect(project.collections().size() == 2,
-         "initial scan should create scanner-supplied and resolver-supplied collections");
-  const auto originalExplicit = std::ranges::find_if(project.collections(), [](const Collection& collection) {
-    return collection.key && collection.key->value.starts_with("source:");
-  });
-  expect(originalExplicit != project.collections().end(), "initial scan should publish its explicit collection");
-  const CollectionId originalExplicitId = originalExplicit->id;
-
+  auto module = probeSequenceModule();
+  module.scan = [](const ScanInput& input) {
+    auto result = scanProbeSequence(input);
+    for (auto& asset : result.assets) {
+      auto& sequence = std::get<SequenceProgramAsset>(asset);
+      sequence.recipe.dependencies.push_back({.select = [](const DependencyContext&) -> DependencySelection {
+        throw std::runtime_error("selector exploded");
+      }});
+    }
+    return result;
+  };
+  session.registerFormat(std::move(module));
+  const auto source = session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
+  session.scanSource(source);
+  auto project = session.snapshot();
+  expect(project.collections().size() == 1, "selector failure must preserve the explicit collection");
+  expect(project.collections().front().issues.front().code == "dependency-resolution-failed",
+         "selector exceptions should become an issue on the affected collection");
+  const auto id = project.collections().front().id;
   session.addSource(SourceFile{.name = "second.probe"}, {0xaa});
   session.scanPendingSources();
   project = session.snapshot();
-  expect(project.collections().size() == 2,
-         "resolver failure should not discard collections supplied directly by scanners");
-  expect(std::ranges::find(project.collections(), originalExplicitId, &Collection::id) != project.collections().end(),
-         "an existing scanner-supplied collection should keep its id");
-  expect(std::ranges::none_of(project.collections(),
-                              [](const Collection& collection) {
-                                return collection.key && collection.key->value == "dynamic";
-                              }),
-         "a resolver failure should remove its previous dynamic collection");
-  static_cast<void>(diagnosticWithMessage(project.diagnostics(),
-                                          "ProbeSequenceFragileResolver resolveCollections failed: resolver exploded"));
-}
-
-void sessionResolverFailureDropsRemovedCollections() {
-  Session session;
-  session.registerFormat(fragileProbeSequenceModule());
-
-  const auto source = session.addSource(SourceFile{.name = "removed-on-failure.probe"}, {0xaa});
-  session.scanSource(source);
-  SessionSnapshot project = session.snapshot();
-  expect(project.collections().size() == 2,
-         "initial scan should create scanner-supplied and resolver-supplied collections");
+  expect(project.collections().size() == 2 && project.collection(id) != nullptr,
+         "dependency failures should remain local and preserve stable collection ids");
   session.removeSource(source);
-
-  project = session.snapshot();
-  expect(project.sources().empty(), "failed reconcile after removal should still remove sources");
-  expect(project.assets().empty(), "failed reconcile after removal should still remove assets");
-  expect(project.collections().empty(),
-         "a removed scanner-supplied collection should not survive a later resolver failure");
-  static_cast<void>(diagnosticWithMessage(project.diagnostics(),
-                                          "ProbeSequenceFragileResolver resolveCollections failed: resolver exploded"));
+  expect(session.snapshot().collection(id) == nullptr, "a dependency failure must not keep a removed collection alive");
 }
 
 void sessionRejectsLateRegistryMutation() {
@@ -769,8 +749,7 @@ void sessionRejectsInvalidAssetIdsAtAdmission() {
     expect(diagnosticWithMessage(project.diagnostics(), message).code ==
                (missingId ? "scan.asset.missing-id" : "scan.asset.duplicate-id"),
            "session admission should preserve structured validation diagnostics");
-    expectDiagnosticRange(project.diagnostics(), message,
-                          SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
+    expectDiagnosticRange(project.diagnostics(), message, SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
   }
 }
 
@@ -1066,74 +1045,50 @@ void scanValidationRejectsDanglingSourceAnnotationReferences() {
 }
 
 void sessionReportsDesiredCollectionMissingAssetReferences() {
-  Session session;
-  session.registerFormat(missingAssetCollectionResolverModule());
-
-  session.addSource(SourceFile{.name = "missing-refs.probe"}, {0x00});
-  session.scanPendingSources();
-  const SessionSnapshot project = session.snapshot();
-  expect(project.collections().size() == 1, "resolver should still publish the collection shell");
-  expect(project.collections()[0].issueImpact() == CollectionIssueImpact::Incomplete,
-         "collection with missing asset references should be incomplete");
-  expect(!project.collections()[0].members.sequence, "missing sequence reference should be stripped");
-  expect(project.collections()[0].members.soundBanks.empty(), "missing instrument reference should be stripped");
-  expect(project.collections()[0].members.samplePools.empty(), "missing sample reference should be stripped");
-  expect(project.collections()[0].members.miscAssets.empty(), "missing misc reference should be stripped");
-  expect(project.collections()[0].issues.size() == 4, "missing references should be recorded as collection issues");
-  static_cast<void>(diagnosticWithMessage(
-      project.diagnostics(),
-      "Collection resolver 'ProbeMissingRefs' returned sequence asset id 99 that does not exist"));
-  static_cast<void>(diagnosticWithMessage(project.diagnostics(),
-                                          "Collection resolver 'ProbeMissingRefs' returned sound-bank asset id 98 "
-                                          "that does not exist"));
-  static_cast<void>(diagnosticWithMessage(
-      project.diagnostics(), "Collection resolver 'ProbeMissingRefs' returned sample-pool asset id 97 that does "
-                             "not exist"));
-  static_cast<void>(diagnosticWithMessage(
-      project.diagnostics(), "Collection resolver 'ProbeMissingRefs' returned misc asset id 96 that does not exist"));
-}
-
-void sessionReportsDesiredCollectionWrongTypeReferences() {
-  Session session;
-  session.registerFormat(probeSequenceModule());
-  session.registerFormat(wrongTypeCollectionResolverModule());
-
-  session.addSource(SourceFile{.name = "wrong-type.probe"}, {0xaa});
-  session.scanPendingSources();
-  const SessionSnapshot project = session.snapshot();
-  const auto found = std::ranges::find_if(project.collections(), [](const Collection& collection) {
-    return collection.key && collection.key->resolver == "ProbeWrongTypeRefs";
-  });
-  expect(found != project.collections().end(), "wrong-type resolver should publish a collection shell");
-  expect(found->issueImpact() == CollectionIssueImpact::Incomplete,
-         "collection with wrong-type references should be incomplete");
-  expect(found->members.soundBanks.empty(), "wrong-type instrument reference should be stripped");
-  expect(found->members.samplePools.empty(), "wrong-type sample reference should be stripped");
-  expect(found->members.miscAssets.empty(), "wrong-type misc reference should be stripped");
-  expect(found->issues.size() == 3, "wrong-type references should be recorded as collection issues");
-
-  static_cast<void>(diagnosticWithMessage(project.diagnostics(),
-                                          "Collection resolver 'ProbeWrongTypeRefs' returned sound-bank asset id 0 "
-                                          "that is not a sound-bank asset"));
-  static_cast<void>(diagnosticWithMessage(
-      project.diagnostics(), "Collection resolver 'ProbeWrongTypeRefs' returned sample-pool asset id 0 that is not a "
-                             "sample-pool asset"));
-  static_cast<void>(diagnosticWithMessage(project.diagnostics(),
-                                          "Collection resolver 'ProbeWrongTypeRefs' returned misc asset id 0 that is "
-                                          "not a misc asset"));
+  for (const bool wrongType : {false, true}) {
+    Session session;
+    auto module = probeSequenceModule();
+    module.scan = [wrongType](const ScanInput& input) {
+      auto result = scanProbeSequence(input);
+      for (auto& asset : result.assets) {
+        auto& sequence = std::get<SequenceProgramAsset>(asset);
+        const auto target = wrongType ? sequence.metadata.id : AssetId{99};
+        sequence.recipe.dependencies.push_back({.select = [target](const DependencyContext&) {
+          DependencySelection selected;
+          selected.add(target);
+          return selected;
+        }});
+      }
+      return result;
+    };
+    session.registerFormat(std::move(module));
+    session.addSource(SourceFile{.name = "invalid-dependency.probe"}, {0xaa});
+    session.scanPendingSources();
+    const auto snapshot = session.snapshot();
+    const auto& collection = snapshot.collections().front();
+    expect(collection.members.soundBanks.empty() && collection.issues.front().code == "invalid-dependency",
+           "missing and wrong-type dependency targets must not enter collection membership");
+    expect(!bindCollection(snapshot, collection.id).collection,
+           "invalid dependencies must prevent publication of a prepared collection");
+  }
 }
 
 void sessionReportsDuplicateDesiredCollectionKeys() {
   Session session;
-  session.registerFormat(duplicateKeyCollectionResolverModule());
-
-  session.addSource(SourceFile{.name = "duplicate-keys.probe"}, {0x00});
+  auto module = probeSequenceModule();
+  module.scan = [](const ScanInput& input) {
+    auto result = scanProbeSequence(input);
+    auto duplicate = result.explicitCollections.front();
+    duplicate.name = "Duplicate";
+    result.explicitCollections.push_back(duplicate);
+    return result;
+  };
+  session.registerFormat(std::move(module));
+  session.addSource(SourceFile{.name = "duplicate-keys.probe"}, {0xaa});
   session.scanPendingSources();
-  const SessionSnapshot project = session.snapshot();
-  expect(project.collections().size() == 1, "duplicate resolver keys should keep the first collection only");
-  expect(project.collections()[0].name == "First", "first duplicate-key collection should be preserved");
-  static_cast<void>(diagnosticWithMessage(
-      project.diagnostics(), "Collection resolver 'ProbeDuplicateKeys' returned duplicate collection key 'same-key'"));
+  const auto project = session.snapshot();
+  expect(project.collections().size() <= 1, "duplicate scanner collection keys must not publish duplicate collections");
+  expect(!project.diagnostics().empty(), "duplicate scanner keys should report a diagnostic");
 }
 
 void retainedSourceOwnsStableCopiedBytes() {
@@ -1180,8 +1135,9 @@ void sourceStoreRejectsMissingOrRemovedDerivedParents() {
   const auto parent = store.add(SourceFile{.name = "parent"}, {0xaa});
   const SharedSourceBytes retainedBytes = store.sharedBytes(parent);
   static_cast<void>(store.removeFamily(parent));
-  expect(!store.contains(parent) && store.sourceCount() == 1 && retainedBytes && *retainedBytes == std::vector<u8>{0xaa},
-         "retained inspection bytes should survive removal without keeping the source active");
+  expect(
+      !store.contains(parent) && store.sourceCount() == 1 && retainedBytes && *retainedBytes == std::vector<u8>{0xaa},
+      "retained inspection bytes should survive removal without keeping the source active");
 
   rejectParent(parent);
 }
@@ -1311,8 +1267,9 @@ void sessionAddsSourceFromPath() {
   });
   const auto resolved = redirected.addSourceFromPath(alias);
   const auto& resolvedFile = redirected.sources().source(resolved);
-  expect(resolvedFile.name == "Resolved source" && resolvedFile.path == path && resolvedFile.knownFormat == "probe-path",
-         "path resolution should preserve the returned source metadata");
+  expect(
+      resolvedFile.name == "Resolved source" && resolvedFile.path == path && resolvedFile.knownFormat == "probe-path",
+      "path resolution should preserve the returned source metadata");
   expect(std::ranges::equal(redirected.sources().bytes(resolved), expectedBytes),
          "path resolution must happen before opening the original path");
   redirected.addSource(SourceFile{.path = alias}, {0xaa});
@@ -1333,9 +1290,9 @@ void sessionAddsSourceFromPath() {
   }
   const auto reloaded = session.addSourceFromPath(path);
   session.scanSource(reloaded);
-  expect(reloaded != sourceId && session.sources().reader(reloaded).size() == 2 &&
-             session.snapshot().assets().size() == 1,
-         "removing a source should allow reopening and scanning the current file bytes");
+  expect(
+      reloaded != sourceId && session.sources().reader(reloaded).size() == 2 && session.snapshot().assets().size() == 1,
+      "removing a source should allow reopening and scanning the current file bytes");
   std::filesystem::remove(path);
 }
 
@@ -1430,7 +1387,6 @@ void runValueSessionTests() {
   sessionRemovesSourceFamilyWithItsLastAsset();
   sessionRemovalUpdatesCrossSourceCollectionLifecycle();
   sessionResolverFailureKeepsExplicitCollections();
-  sessionResolverFailureDropsRemovedCollections();
   sessionRejectsLateRegistryMutation();
   sessionRejectsInvalidAssetIdsAtAdmission();
   sessionRejectsExtractedSourcesWithMissingParents();
@@ -1440,7 +1396,6 @@ void runValueSessionTests() {
   scanValidationRejectsRangeLessSourceAnnotations();
   scanValidationRejectsDanglingSourceAnnotationReferences();
   sessionReportsDesiredCollectionMissingAssetReferences();
-  sessionReportsDesiredCollectionWrongTypeReferences();
   sessionReportsDuplicateDesiredCollectionKeys();
   retainedSourceOwnsStableCopiedBytes();
   sourceStoreRejectsMissingOrRemovedDerivedParents();

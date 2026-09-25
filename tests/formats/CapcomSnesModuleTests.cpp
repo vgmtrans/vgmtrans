@@ -6,6 +6,7 @@
 
 #include "../MidiTestSupport.h"
 #include "../TestSupport.h"
+#include "../core/SessionSnapshotBuilder.h"
 #include "ValueFormatTestSupport.h"
 
 #include "value/export/Export.h"
@@ -643,8 +644,20 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
       session.exportSoundBank(instruments->metadata.id, SynthExportFormat::SoundFont2, ExportRequest{});
   const Artifact individualDls =
       session.exportSoundBank(instruments->metadata.id, SynthExportFormat::Dls, ExportRequest{});
-  expect(individualSf2.bytes == sf2Artifacts[0].bytes && individualDls.bytes == dlsArtifacts[0].bytes,
-         "individual instrument export should use its first collection's complete synth context");
+  test::SessionSnapshotBuilder standaloneBuilder;
+  for (const auto& asset : project.assets()) {
+    standaloneBuilder.assets.push_back(asset);
+  }
+  standaloneBuilder.sources = project.sources();
+  const auto standalone = standaloneBuilder.finish();
+  expect(!individualSf2.bytes.empty() && !individualDls.bytes.empty() &&
+             individualSf2.bytes == exportSoundBank(standalone, session.sources(), instruments->metadata.id,
+                                                    SynthExportFormat::SoundFont2, ExportRequest{})
+                                        .bytes &&
+             individualDls.bytes == exportSoundBank(standalone, session.sources(), instruments->metadata.id,
+                                                    SynthExportFormat::Dls, ExportRequest{})
+                                        .bytes,
+         "full-bank export should prepare identically with or without a containing sequence collection");
   expect(instruments->instruments.size() == 1, "instrument set should parse one valid instrument");
   const auto& instrument = instruments->instruments[0];
   expect(instrument.identity == InstrumentIdentity{.domain = std::string(kCapcomSnesInstrumentDomain), .key = 0},

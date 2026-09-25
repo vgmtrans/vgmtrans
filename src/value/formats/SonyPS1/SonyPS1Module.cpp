@@ -68,8 +68,8 @@ namespace {
                                  ? fmt::format("{} SEP Sequence {}", result.sourceDisplayName(), layout.sequenceId)
                                  : fmt::format("{} SEQ {:X}", result.sourceDisplayName(), layout.offset);
     auto sequence = result.sequence(name, input.reader.range(layout.offset, layout.length));
-    sequence.program(
-        parseSonyPs1Sequence(input.reader, sequence.id(), layout, &result.sourceMap(), &result.diagnostics()));
+    sequence.useBanks(selectSonyPs1Banks)
+        .program(parseSonyPs1Sequence(input.reader, sequence.id(), layout, &result.sourceMap(), &result.diagnostics()));
   }
   return result.finish();
 }
@@ -82,9 +82,6 @@ FormatModule sonyPs1Module() {
       .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
       .acceptedFormats = {source_formats::kPlayStationRam},
       .scan = scanSonyPs1,
-      .collectionResolverId = std::string(kSonyPs1CollectionResolver),
-      .resolveCollections = resolveSonyPs1Collections,
-      .bindCollection = bindSonyPs1Collection,
   };
 }
 

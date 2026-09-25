@@ -93,8 +93,11 @@ struct RuntimeConfig {
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
 
 [[nodiscard]] std::optional<core::ScanSoundBankDraft> addWd(core::ScanResultBuilder& result, const WdLayout& layout);
-[[nodiscard]] std::vector<core::DesiredCollection> resolveCollections(const core::CollectionDiscoveryContext& context);
-void bindCollection(core::CollectionBindingContext& context);
+struct WdBankId {
+  u16 value;
+  [[nodiscard]] core::DependencySelection operator()(const core::DependencyContext& context) const;
+};
+void prepareSequence(core::SequencePreparationContext& context, const SequenceData& sequence);
 [[nodiscard]] core::FormatModule module();
 
 }  // namespace vgmtrans::formats::square_ps2

@@ -7,6 +7,7 @@
 #pragma once
 
 #include "value/model/InstrumentIdentity.h"
+#include "value/model/AssetRecipe.h"
 #include "value/model/MetadataModel.h"
 #include "value/model/SourceMap.h"
 #include "value/sequence/SequenceExecution.h"
@@ -48,12 +49,12 @@ struct SequenceRuntime {
                             VmApi& vm) = nullptr;
   // The typed executor identifies the Playback/ProgramState family even when
   // state factories capture different immutable settings.
-  Effects (*execute)(const SourceCommand&, std::any& programState, std::any& trackState,
-                     PerformanceEmitter& out, VmApi& vm) = nullptr;
-  bool (*readyDuringWait)(const SourceCommand&, std::any& programState, std::any& trackState,
-                          PerformanceEmitter& out, VmApi& vm) = nullptr;
-  void (*tick)(const SourceCommand&, std::any& programState, std::any& trackState,
-                PerformanceEmitter& out, VmApi& vm) = nullptr;
+  Effects (*execute)(const SourceCommand&, std::any& programState, std::any& trackState, PerformanceEmitter& out,
+                     VmApi& vm) = nullptr;
+  bool (*readyDuringWait)(const SourceCommand&, std::any& programState, std::any& trackState, PerformanceEmitter& out,
+                          VmApi& vm) = nullptr;
+  void (*tick)(const SourceCommand&, std::any& programState, std::any& trackState, PerformanceEmitter& out,
+               VmApi& vm) = nullptr;
   void (*finishPrepass)(std::any& programState) = nullptr;
   void (*finalizePerformance)(std::any& programState, PerformanceSequence& performance) = nullptr;
 
@@ -338,6 +339,8 @@ struct SequenceProgramAsset {
   AssetMetadata metadata;
   SequenceProgram program;
   AssetPrivateData privateData;
+  AssetRecipe recipe;
+  SequencePreparer prepare;
 };
 
 }  // namespace vgmtrans::core

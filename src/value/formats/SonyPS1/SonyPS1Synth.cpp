@@ -61,7 +61,8 @@ void addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLayout& layout, 
   const ByteReader reader = result.reader();
   const std::string name = fmt::format("Sony PS1 VAB {}", bank);
   auto bankDraft = result.soundBank(name);
-  bankDraft.data(layout);
+  bankDraft.data(layout).prepare<SonyPs1BankLayout>(prepareSonyPs1Bank);
+  bool externalSamples = false;
   auto& instruments = bankDraft.instruments();
   auto& samples = bankDraft.localSamples();
 
@@ -167,6 +168,7 @@ void addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLayout& layout, 
       }
       const u32 sampleIndex = static_cast<u32>(vag - 1);
       SampleRef sample = SampleRef::unbound(sampleIndex);
+      externalSamples |= !layout.hasSampleBody;
       if (layout.hasSampleBody) {
         const auto found = samples.find(sampleIndex);
         if (!found) {
@@ -203,6 +205,9 @@ void addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLayout& layout, 
           .field("vag", reader.range(toneOffset + 0x16, 2), vag)
           .parent(toneRoot);
     }
+  }
+  if (externalSamples) {
+    bankDraft.useSamples(selectSonyPs1Samples);
   }
 }
 

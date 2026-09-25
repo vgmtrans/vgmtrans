@@ -143,7 +143,9 @@ void SessionState::removeSources(std::span<const SourceId> sources) {
   removeDiscoveredData(sourceIds, removedAssets);
 }
 
-CollectionId SessionState::createUserCollection(std::string name, CollectionMembers members, CollectionBinder binder) {
+CollectionId SessionState::createUserCollection(std::string name, CollectionMembers members,
+                                                std::vector<ResolvedDependency> dependencies,
+                                                std::vector<CollectionIssue> issues) {
   if (name.empty()) {
     throw std::invalid_argument("A user-created collection must have a name");
   }
@@ -176,8 +178,9 @@ CollectionId SessionState::createUserCollection(std::string name, CollectionMemb
   collections_.push_back(Collection{
       .id = id,
       .name = std::move(name),
-      .binder = std::move(binder),
       .members = std::move(members),
+      .issues = std::move(issues),
+      .dependencies = std::move(dependencies),
   });
   return id;
 }
@@ -220,8 +223,7 @@ std::map<std::string, std::vector<DesiredCollection>> SessionState::desiredColle
   return grouped;
 }
 
-void SessionState::reconcileCollections(std::string_view resolver, std::vector<DesiredCollection> desired,
-                                        CollectionBinder binder) {
+void SessionState::reconcileCollections(std::string_view resolver, std::vector<DesiredCollection> desired) {
   std::set<std::string> seenKeys;
   for (auto& candidate : desired) {
     if (candidate.localKey.empty()) {
@@ -239,9 +241,9 @@ void SessionState::reconcileCollections(std::string_view resolver, std::vector<D
     Collection collection{
         .name = std::move(candidate.name),
         .key = CollectionKey{.resolver = std::string(resolver), .value = std::move(candidate.localKey)},
-        .binder = candidate.binder ? std::move(candidate.binder) : binder,
         .members = std::move(candidate.members),
         .issues = std::move(candidate.issues),
+        .dependencies = std::move(candidate.dependencies),
     };
     if (auto found = std::ranges::find(collections_, collection.key, &Collection::key); found != collections_.end()) {
       collection.id = found->id;
@@ -384,12 +386,10 @@ void SessionState::validateCollectionAssetReferences(std::string_view resolver, 
       invalid(*members.sequence, "sequence", asset<SequenceProgramAsset>(*members.sequence) != nullptr)) {
     members.sequence.reset();
   }
-  std::erase_if(members.soundBanks, [&](AssetId id) {
-    return invalid(id, "sound-bank", asset<SoundBankAsset>(id) != nullptr);
-  });
-  std::erase_if(members.samplePools, [&](AssetId id) {
-    return invalid(id, "sample-pool", asset<SamplePoolAsset>(id) != nullptr);
-  });
+  std::erase_if(members.soundBanks,
+                [&](AssetId id) { return invalid(id, "sound-bank", asset<SoundBankAsset>(id) != nullptr); });
+  std::erase_if(members.samplePools,
+                [&](AssetId id) { return invalid(id, "sample-pool", asset<SamplePoolAsset>(id) != nullptr); });
   std::erase_if(members.miscAssets, [&](AssetId id) { return invalid(id, "misc", asset<MiscAsset>(id) != nullptr); });
 }
 

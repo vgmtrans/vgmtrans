@@ -6,7 +6,7 @@
 
 #include "value/formats/SquarePS2/SquarePS2.h"
 
-#include "value/scan/CollectionDiscovery.h"
+#include "value/scan/AssetResolution.h"
 
 #include <string>
 #include <utility>
@@ -18,7 +18,6 @@ using namespace core;
 
 namespace {
 
-using SequenceEntry = AssetWithData<SequenceProgramAsset, SequenceData>;
 using BankEntry = AssetWithData<SoundBankAsset, SoundBankData>;
 
 [[nodiscard]] int sourceAffinity(const SourceFile* sequence, const SourceFile* bank) {
@@ -40,53 +39,22 @@ using BankEntry = AssetWithData<SoundBankAsset, SoundBankData>;
   return 0;
 }
 
-[[nodiscard]] std::vector<const BankEntry*> matchingBanks(const SequenceEntry& sequence,
-                                                          const std::vector<BankEntry>& banks) {
-  return bestMatches(banks, [&](const BankEntry& bank) {
-    return bank.data->bankId == sequence.data->waveBankId ? sourceAffinity(sequence.source, bank.source) : -1;
-  });
-}
-
 }  // namespace
 
-std::vector<DesiredCollection> resolveCollections(const CollectionDiscoveryContext& context) {
-  const auto sequences = context.assetsWithData<SequenceProgramAsset, SequenceData>();
-  const auto banks = context.assetsWithData<SoundBankAsset, SoundBankData>();
-
-  std::vector<DesiredCollection> collections;
-  for (const auto& sequence : sequences) {
-    const auto matches = matchingBanks(sequence, banks);
-    if (matches.empty()) {
-      continue;
-    }
-    CollectionAssembly collection(
-        "source:" + std::to_string(sequence.source == nullptr ? 0 : sequence.source->id.value) +
-            ":sequence:" + std::to_string(sequence.asset->metadata.range.offset),
-        sequence.asset->metadata.name);
-    collection.sequence(sequence.id());
-    for (const auto* bank : matches) {
-      collection.soundBank(bank->id());
-    }
-    if (matches.size() > 1) {
-      collection.ambiguous("SquarePS2 BGM matches multiple WD banks with the same driver ID", sequence.id(),
-                           sequence.asset->metadata.range);
-    }
-    collections.push_back(std::move(collection).finish());
+DependencySelection WdBankId::operator()(const DependencyContext& context) const {
+  const auto banks = context.candidates<SoundBankAsset, SoundBankData>();
+  const auto matches = bestMatches(banks, [&](const BankEntry& bank) {
+    return bank.data->bankId == value ? sourceAffinity(context.source(), bank.source) : -1;
+  });
+  auto selected = selectAll(matches);
+  if (matches.size() > 1) {
+    selected.issues.push_back(ambiguousMatchIssue("SquarePS2 BGM matches multiple WD banks with the same driver ID"));
   }
-  return collections;
+  return selected;
 }
 
-void bindCollection(CollectionBindingContext& context) {
-  if (context.sequence == nullptr || context.sequence->metadata.format != kSquarePs2FormatName) {
-    return;
-  }
-  const auto* sequence = context.sequence->privateData.get<SequenceData>();
-  if (sequence == nullptr) {
-    context.fail("SquarePS2 sequence is missing retained bank binding data", context.sequence->metadata.range);
-    return;
-  }
-
-  RuntimeConfig config{.defaultBank = sequence->waveBankId};
+void prepareSequence(SequencePreparationContext& context, const SequenceData& sequence) {
+  RuntimeConfig config{.defaultBank = sequence.waveBankId};
   const SoundBankData* selected = nullptr;
   for (const auto& bank : context.soundBanks) {
     if (bank.metadata.format != kSquarePs2FormatName) {
@@ -97,7 +65,7 @@ void bindCollection(CollectionBindingContext& context) {
       context.fail("SquarePS2 WD bank is missing retained envelope data", bank.metadata.range);
       return;
     }
-    if (data->bankId != sequence->waveBankId) {
+    if (data->bankId != sequence.waveBankId) {
       continue;
     }
     if (selected != nullptr) {

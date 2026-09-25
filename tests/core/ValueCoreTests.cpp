@@ -9,7 +9,7 @@
 
 void runValueRegistryTests();
 void runValueCompilerCursorTests();
-void runValueCollectionDiscoveryTests();
+void runValueAssetResolutionTests();
 void runValueCollectionStitchTests();
 void runValueInstrumentVariantTests();
 void runValueSequenceModelTests();
@@ -32,7 +32,7 @@ int main() {
   try {
     runValueRegistryTests();
     runValueCompilerCursorTests();
-    runValueCollectionDiscoveryTests();
+    runValueAssetResolutionTests();
     runValueCollectionStitchTests();
     runValueInstrumentVariantTests();
     runValueSequenceModelTests();

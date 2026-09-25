@@ -43,25 +43,6 @@ void FormatRegistry::add(FormatModule module) {
   if (std::ranges::find(modules_, module.name, &FormatModule::name) != modules_.end()) {
     throw std::invalid_argument(fmt::format("Duplicate FormatModule name: {}", module.name));
   }
-  if (module.resolveCollections) {
-    const auto duplicate = std::ranges::find_if(modules_, [&](const FormatModule& registered) {
-      return registered.resolveCollections && registered.collectionResolver() == module.collectionResolver();
-    });
-    if (duplicate != modules_.end()) {
-      throw std::invalid_argument(fmt::format("Duplicate collection resolver for {}: {} and {}",
-                                              module.collectionResolver(), duplicate->name, module.name));
-    }
-  }
-  if (module.bindCollection) {
-    const auto duplicate = std::ranges::find_if(modules_, [&](const FormatModule& registered) {
-      return registered.bindCollection && registered.collectionResolver() == module.collectionResolver();
-    });
-    if (duplicate != modules_.end()) {
-      throw std::invalid_argument(fmt::format("Duplicate collection binder for resolver {}: {} and {}",
-                                              module.collectionResolver(), duplicate->name, module.name));
-    }
-  }
-
   validateAcceptedFormats(module.name, module.acceptedFormats);
   modules_.push_back(std::move(module));
 }
@@ -87,18 +68,6 @@ void FormatRegistry::seal() noexcept {
 const FormatModule* FormatRegistry::findModule(std::string_view name) const {
   const auto found = std::ranges::find(modules_, name, &FormatModule::name);
   return found != modules_.end() ? &*found : nullptr;
-}
-
-CollectionBinder FormatRegistry::collectionBinder(std::string_view resolver) const {
-  const auto found = std::ranges::find_if(modules_, [&](const FormatModule& module) {
-    return module.bindCollection && module.collectionResolver() == resolver;
-  });
-  return found != modules_.end() ? found->bindCollection : CollectionBinder{};
-}
-
-CollectionBinder FormatRegistry::collectionBinderForFormat(std::string_view format) const {
-  const auto* module = findModule(format);
-  return module != nullptr ? collectionBinder(module->collectionResolver()) : CollectionBinder{};
 }
 
 }  // namespace vgmtrans::core

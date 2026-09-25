@@ -11,6 +11,7 @@
 #include "SynthExportTestSupport.h"
 
 #include "value/export/CollectionBinding.h"
+#include "value/export/AssetPreparation.h"
 #include "value/export/Export.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
@@ -87,7 +88,7 @@ void standaloneSynthExportsKeepNativeModulation() {
                                                 SynthExportFormat::SoundFont2, ExportRequest{});
   expect(wrongOwnerExport.bytes.empty(), "standalone export should reject a sample owner of another asset type");
   diagnosticWithMessage(wrongOwnerExport.diagnostics,
-                        "Synth region sample owner is not a selected external sample pool");
+                        "Asset dependency refers to a missing or wrong-type provider");
 
   auto selfContained = instruments;
   selfContained.metadata.id = AssetId{4};
@@ -277,16 +278,6 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
       Collection{
           .id = CollectionId{1},
           .name = "Other Usage",
-          .binder =
-              [pool = otherSamples.metadata.id](CollectionBindingContext& context) {
-                auto& bank = context.soundBanks.front();
-                for (auto& instrument : bank.instruments) {
-                  instrument.explicitAddress->bank = 7;
-                  for (auto& region : instrument.regions) {
-                    region.sample = SampleRef::resolved(pool, region.sample.index());
-                  }
-                }
-              },
           .members =
               {
                   .sequence = sequence.metadata.id,
@@ -412,9 +403,9 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   }
 }
 
-void bindInstrumentSet(CollectionBindingContext& context) {
-  const AssetId samples = context.samplePools.front()->metadata.id;
-  auto& instruments = context.soundBanks.front();
+void bindInstrumentSet(BankPreparationContext& context) {
+  const AssetId samples = context.inputs.front().asset;
+  auto& instruments = context.bank;
   instruments.instruments = {Instrument{
       .name = "Prepared Instrument",
       .regions = {Region{.sample = SampleRef::resolved(samples, 0)}},
@@ -451,7 +442,7 @@ struct ForeignRuntimeTrackState {};
 
 struct ForeignRuntimePlayback : SequencePlayback<ForeignRuntimeTrackState> {};
 
-void bindPerformanceRuntime(CollectionBindingContext& context) {
+void bindPerformanceRuntime(SequencePreparationContext& context) {
   const auto* sequence = context.sequence;
   const bool fail = sequence != nullptr && sequence->metadata.name == "Failing Sequence";
   if (!context.replaceSequenceRuntime(makeCompiledRuntime<ProbePlayback, PreparedProbeProgramState>(fail))) {
@@ -470,7 +461,7 @@ void collectionBindingAppliesToWholeExport() {
   addProbeCommand(track, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
   addProbeCommand(track, Address{3}, probeRange(3, endBytes.size()), endBytes);
 
-  const SequenceProgramAsset sequence{
+  SequenceProgramAsset sequence{
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "Performance Finalizer", .name = "Sequence"},
       .program =
           SequenceProgram{
@@ -498,6 +489,7 @@ void collectionBindingAppliesToWholeExport() {
                              .sampleRate = 16000,
                          }}},
   };
+  sequence.prepare = bindPerformanceRuntime;
   test::SessionSnapshotBuilder builder;
   builder.assets.emplace_back(sequence);
   builder.assets.emplace_back(instruments);
@@ -506,7 +498,6 @@ void collectionBindingAppliesToWholeExport() {
       .id = CollectionId{0},
       .name = "Performance Finalizer",
       .key = CollectionKey{.resolver = "Performance Finalizer", .value = "one"},
-      .binder = bindPerformanceRuntime,
       .members =
           {
               .sequence = sequence.metadata.id,
@@ -526,11 +517,15 @@ void collectionBindingAppliesToWholeExport() {
   auto mismatchedCollection = builder.collections.front();
   mismatchedCollection.id = CollectionId{2};
   mismatchedCollection.key->value = "runtime-mismatch";
-  mismatchedCollection.binder = [](CollectionBindingContext& context) {
+  auto mismatchedSequence = sequence;
+  mismatchedSequence.metadata.id = AssetId{4};
+  mismatchedSequence.prepare = [](SequencePreparationContext& context) {
     if (!context.replaceSequenceRuntime(makeCompiledRuntime<ForeignRuntimePlayback>())) {
       return;
     }
   };
+  builder.assets.emplace_back(mismatchedSequence);
+  mismatchedCollection.members.sequence = mismatchedSequence.metadata.id;
   builder.collections.push_back(std::move(mismatchedCollection));
 
   const SessionSnapshot snapshot = builder.finish();
@@ -625,11 +620,14 @@ void collectionBindingProducesAnImmutableInstrumentView() {
               .samplePools = {samples.metadata.id},
               .miscAssets = {manifest.metadata.id},
           },
+      .dependencies = {{.owner = durable.metadata.id,
+                        .role = DependencyRole::SamplePool,
+                        .targets = {{samples.metadata.id, {}}}}},
   });
 
-  const auto snapshotWithBinder = [&](CollectionBinder binder) {
+  const auto snapshotWithBinder = [&](BankPreparer binder) {
     auto copy = builder;
-    copy.collections.front().binder = std::move(binder);
+    std::get<SoundBankAsset>(copy.assets.front()).prepare = std::move(binder);
     return copy.finish();
   };
   const SessionSnapshot snapshot = snapshotWithBinder(bindInstrumentSet);
@@ -640,17 +638,19 @@ void collectionBindingProducesAnImmutableInstrumentView() {
              snapshot.asset<SoundBankAsset>(durable.metadata.id)->instruments.front().name == "Durable Instrument",
          "collection binding should preserve selected asset identity without mutating durable assets");
 
-  const auto miscBinding =
-      bindCollection(snapshotWithBinder([id = manifest.metadata.id](CollectionBindingContext& context) {
-                       const auto* selected = context.misc(id);
-                       if (selected == nullptr || selected->privateData.get<u32>() == nullptr ||
-                           *selected->privateData.get<u32>() != 42) {
-                         context.fail("miscellaneous asset was not available during binding");
-                       }
-                     }),
-                     CollectionId{0});
+  auto miscBuilder = builder;
+  SequenceProgramAsset miscSequence{.metadata = {.id = AssetId{4}}};
+  miscSequence.prepare = [id = manifest.metadata.id](SequencePreparationContext& context) {
+    const auto* selected = context.misc(id);
+    if (selected == nullptr || selected->privateData.get<u32>() == nullptr || *selected->privateData.get<u32>() != 42) {
+      context.fail("miscellaneous asset was not available during preparation");
+    }
+  };
+  miscBuilder.assets.emplace_back(miscSequence);
+  miscBuilder.collections.front().members.sequence = miscSequence.metadata.id;
+  const auto miscBinding = bindCollection(miscBuilder.finish(), CollectionId{0});
   expect(miscBinding.collection && miscBinding.diagnostics.empty(),
-         "collection binding should expose selected typed miscellaneous assets to the binder");
+         "sequence preparation should expose selected miscellaneous assets");
   const auto artifacts =
       exportCollection(snapshot, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Dls}});
 
@@ -667,8 +667,8 @@ void collectionBindingProducesAnImmutableInstrumentView() {
          "used-instrument export should still require a sequence even for bank-only collections");
   diagnosticWithMessage(usedOnly.front().diagnostics, "Collection does not reference a sequence asset");
 
-  const auto failed = bindCollection(snapshotWithBinder([](CollectionBindingContext& context) {
-                                       context.soundBanks.front().instruments.front().name = "Partially Bound";
+  const auto failed = bindCollection(snapshotWithBinder([](BankPreparationContext& context) {
+                                       context.bank.instruments.front().name = "Partially Bound";
                                        context.fail("expected binding failure");
                                      }),
                                      CollectionId{0});
@@ -677,41 +677,40 @@ void collectionBindingProducesAnImmutableInstrumentView() {
          "an explicit binding failure should publish neither a partial collection nor durable mutations");
   diagnosticWithMessage(failed.diagnostics, "expected binding failure");
 
-  const auto threw = bindCollection(snapshotWithBinder([](CollectionBindingContext& context) {
-                                      context.soundBanks.front().instruments.front().name = "Partially Bound";
+  const auto threw = bindCollection(snapshotWithBinder([](BankPreparationContext& context) {
+                                      context.bank.instruments.front().name = "Partially Bound";
                                       throw std::runtime_error("expected binding exception");
                                     }),
                                     CollectionId{0});
   expect(!threw.collection,
          "an exception should abort collection binding instead of publishing the callback's partial changes");
-  diagnosticWithMessage(threw.diagnostics, "Prepared Probe collection binding failed: expected binding exception");
+  diagnosticWithMessage(threw.diagnostics, "Asset preparation failed: expected binding exception");
 
-  const auto changedIdentity = bindCollection(snapshotWithBinder([](CollectionBindingContext& context) {
-                                                context.soundBanks.front().metadata.id = AssetId{99};
-                                                context.soundBanks.front().metadata.format = "Changed";
+  const auto changedIdentity = bindCollection(snapshotWithBinder([](BankPreparationContext& context) {
+                                                context.bank.metadata.id = AssetId{99};
+                                                context.bank.metadata.format = "Changed";
                                               }),
                                               CollectionId{0});
   expect(!changedIdentity.collection,
          "collection binding should reject changes to selected instrument identity or order");
-  diagnosticWithMessage(changedIdentity.diagnostics,
-                        "Collection binding changed sound bank identity, format, or order");
+  diagnosticWithMessage(changedIdentity.diagnostics, "Asset preparation changed sound bank identity, format, or order");
 
   auto missingPoolBuilder = builder;
   missingPoolBuilder.collections.front().members.samplePools.clear();
   const auto missingPool = bindCollection(missingPoolBuilder.finish(), CollectionId{0});
   expect(!missingPool.collection, "collection binding should reject an external pool outside its membership");
-  diagnosticWithMessage(missingPool.diagnostics, "Synth region sample owner is not a selected external sample pool");
+  diagnosticWithMessage(missingPool.diagnostics, "Dependency provider is not a selected collection member");
 
-  const auto unresolved = bindCollection(snapshotWithBinder([](CollectionBindingContext& context) {
-                                           context.soundBanks.front().instruments.front().regions.front().sample =
+  const auto unresolved = bindCollection(snapshotWithBinder([](BankPreparationContext& context) {
+                                           context.bank.instruments.front().regions.front().sample =
                                                SampleRef::unbound(0);
                                          }),
                                          CollectionId{0});
   expect(!unresolved.collection, "collection binding should reject an unresolved reference left by its binder");
   diagnosticWithMessage(unresolved.diagnostics, "Synth region has an unresolved sample reference");
 
-  const auto malformed = bindCollection(snapshotWithBinder([](CollectionBindingContext& context) {
-                                          context.soundBanks.front().instruments.front().regions.front().pan =
+  const auto malformed = bindCollection(snapshotWithBinder([](BankPreparationContext& context) {
+                                          context.bank.instruments.front().regions.front().pan =
                                               std::numeric_limits<double>::quiet_NaN();
                                         }),
                                         CollectionId{0});

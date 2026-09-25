@@ -123,13 +123,11 @@ struct AkaoSequenceParse {
   AkaoSequenceAnalysis analysis;
 };
 
-// The one format-owned value retained on a sequence. Collection discovery and
-// binding read the same data instead of maintaining parallel matching records.
-struct AkaoSequenceData {
-  u32 sequenceId = 0;
+// Sample requirements belong to the bank built from the sequence's instrument table.
+struct AkaoSamples {
   std::optional<u16> sampleSetId;
   std::vector<u32> requiredArticulations;
-  core::AssetId structuralInstrumentSet;
+  [[nodiscard]] core::DependencySelection operator()(const core::DependencyContext& context) const;
 };
 
 struct AkaoRegionBindingData {
@@ -216,9 +214,7 @@ struct AkaoInstrumentSetBuild {
 [[nodiscard]] bool applyAkaoArticulations(core::SoundBankAsset& instruments, const AkaoInstrumentSetBindingData& recipe,
                                           const AkaoArticulationMap& articulations);
 
-[[nodiscard]] std::vector<core::DesiredCollection> resolveAkaoCollections(
-    const core::CollectionDiscoveryContext& context);
-void bindAkaoCollection(core::CollectionBindingContext& context);
+void prepareAkaoBank(core::BankPreparationContext& context, const AkaoSoundBankData& data);
 
 [[nodiscard]] core::FormatModule akaoModule();
 

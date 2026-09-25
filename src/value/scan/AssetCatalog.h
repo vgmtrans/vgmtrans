@@ -43,8 +43,8 @@ template <class Candidate, class Score>
 std::vector<const Candidate*> bestMatches(const std::vector<Candidate>&&, Score) = delete;
 
 // One format-owned value joined to its asset at the heterogeneous asset
-// boundary. This borrowed view is valid only during discovery; durable binders
-// capture stable IDs or owned values instead.
+// boundary. This borrowed view is valid only during selection; recipes and
+// resolved dependencies retain stable IDs and owned values instead.
 template <class AssetT, class DataT>
 struct AssetWithData {
   const AssetT* asset = nullptr;
@@ -58,10 +58,13 @@ struct AssetWithData {
 // Session-wide, read-only input to format-owned collection discovery. It owns a
 // cheap shared asset view so pointers returned from a temporary context remain
 // valid for the context's lifetime.
-class CollectionDiscoveryContext {
+class AssetCatalog {
 public:
-  CollectionDiscoveryContext(const SourceStore& sources, SharedSequence<Asset> assets);
+  AssetCatalog(const SourceStore& sources, SharedSequence<Asset> assets)
+      : AssetCatalog(sources.sourceFiles(), std::move(assets)) {}
+  AssetCatalog(std::vector<SourceFile> sources, SharedSequence<Asset> assets);
 
+  [[nodiscard]] SourceId sourceRoot(SourceId source) const noexcept;
   [[nodiscard]] const SourceFile* sourceFor(const AssetMetadata& metadata) const noexcept;
   [[nodiscard]] const Asset* asset(AssetId id) const noexcept;
 
@@ -100,36 +103,10 @@ public:
   }
 
 private:
-  const SourceStore& sources_;
+  std::vector<SourceFile> sources_;
+  std::unordered_map<u32, size_t> sourcesById_;
   SharedSequence<Asset> assets_;
   std::unordered_map<u32, const Asset*> assetsById_;
-};
-
-// Small mutable helper for building one DesiredCollection deterministically.
-// It owns duplicate suppression and common missing-role issues, while the
-// resolver remains responsible for format-specific matching policy.
-class CollectionAssembly {
-public:
-  CollectionAssembly(std::string localKey, std::string name);
-
-  CollectionAssembly& sequence(AssetId id);
-  CollectionAssembly& soundBank(AssetId id);
-  CollectionAssembly& samplePool(AssetId id);
-  CollectionAssembly& misc(AssetId id);
-  CollectionAssembly& incomplete(CollectionIssue issue);
-  // The binder outlives discovery. Capture only stable IDs and owned values,
-  // then recover current collection members through CollectionBindingContext.
-  CollectionAssembly& bind(CollectionBinder binder);
-  CollectionAssembly& ambiguous(std::string message, std::optional<AssetId> asset = std::nullopt,
-                                SourceRange range = {});
-  CollectionAssembly& requireSoundBank();
-
-  [[nodiscard]] DesiredCollection finish() &&;
-
-private:
-  void addUnique(std::vector<AssetId>& ids, AssetId id);
-
-  DesiredCollection collection_;
 };
 
 }  // namespace vgmtrans::core

@@ -8,7 +8,7 @@
 
 #include "value/base/Source.h"
 #include "value/model/InstrumentIdentity.h"
-#include "value/scan/CollectionDiscovery.h"
+#include "value/scan/AssetCatalog.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceProgramConfig.h"
@@ -90,8 +90,7 @@ struct Tone {
                                                            core::SourceMapBuilder* sourceMap = nullptr,
                                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& konamiPs1SequenceConfig();
-[[nodiscard]] std::vector<core::DesiredCollection> resolveKonamiPs1Collections(
-    const core::CollectionDiscoveryContext& context);
+[[nodiscard]] core::DependencySelection selectKonamiPs1Banks(const core::DependencyContext& context);
 [[nodiscard]] core::FormatModule konamiPs1Module();
 
 }  // namespace vgmtrans::formats::konami_ps1

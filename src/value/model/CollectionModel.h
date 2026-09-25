@@ -7,6 +7,7 @@
 #pragma once
 
 #include "value/base/CoreTypes.h"
+#include "value/model/MetadataModel.h"
 
 #include <functional>
 #include <optional>
@@ -14,9 +15,6 @@
 #include <vector>
 
 namespace vgmtrans::core {
-
-struct CollectionBindingContext;
-using CollectionBinder = std::function<void(CollectionBindingContext&)>;
 
 struct CollectionKey {
   // Stable identity for a resolved collection. The same key updates the same
@@ -50,6 +48,23 @@ struct CollectionIssue {
   SourceRange range;
 };
 
+enum class DependencyRole { SoundBank, SamplePool, Misc };
+
+// A selected provider and optional format-owned placement within it. Two banks
+// may use the same pool at different positions; membership alone cannot express
+// that relationship. Placements own values, never discovery-time pointers.
+struct DependencyTarget {
+  AssetId asset;
+  AssetPrivateData placement;
+};
+
+struct ResolvedDependency {
+  AssetId owner;
+  DependencyRole role = DependencyRole::SoundBank;
+  std::vector<DependencyTarget> targets;
+  std::vector<AssetId> alternatives;
+};
+
 struct DesiredCollection {
   // Stable identity within the resolver that produced this collection. The
   // session supplies the resolver namespace during reconciliation.
@@ -57,10 +72,7 @@ struct DesiredCollection {
   std::string name;
   CollectionMembers members;
   std::vector<CollectionIssue> issues;
-  // Preserves resolver-specific decisions that member lists cannot express.
-  // Reconciliation uses the resolver's default binder when this is empty. The
-  // closure outlives discovery and must capture only stable IDs or owned values.
-  CollectionBinder binder;
+  std::vector<ResolvedDependency> dependencies;
 };
 
 [[nodiscard]] CollectionIssue missingSequenceIssue(std::optional<AssetId> asset = std::nullopt);

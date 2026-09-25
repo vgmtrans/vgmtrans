@@ -6,7 +6,7 @@
 
 #include "value/formats/SonyPS2/SonyPS2.h"
 
-#include "value/scan/CollectionDiscovery.h"
+#include "value/scan/AssetResolution.h"
 #include "value/synth/PsxAdpcm.h"
 #include "value/synth/PsxSpu.h"
 
@@ -29,14 +29,8 @@ namespace {
 
 constexpr int kNoAffinity = -2;
 
-using SequenceEntry = AssetWithData<SequenceProgramAsset, SequenceData>;
 using BankEntry = AssetWithData<SoundBankAsset, SoundBankData>;
 using BodyEntry = AssetWithData<SamplePoolAsset, SampleBodyData>;
-
-struct SampleBinding {
-  AssetId bank;
-  AssetId body;
-};
 
 struct BodyAddressing {
   bool omittedLeadingBlock = false;
@@ -95,8 +89,7 @@ struct BodyAddressing {
   return {.omittedLeadingBlock = !startsWithSilence};
 }
 
-[[nodiscard]] bool compatible(const SoundBankAsset& bank, const SoundBankData& bankData,
-                              const SampleBodyData& body) {
+[[nodiscard]] bool compatible(const SoundBankAsset& bank, const SoundBankData& bankData, const SampleBodyData& body) {
   if (!body.source) {
     return false;
   }
@@ -116,12 +109,6 @@ struct BodyAddressing {
   });
 }
 
-[[nodiscard]] std::vector<const BodyEntry*> chooseBodies(const BankEntry& bank, const std::vector<BodyEntry>& bodies) {
-  return bestMatches(bodies, [&](const BodyEntry& body) {
-    return compatible(*bank.asset, *bank.data, *body.data) ? affinity(bank.source, body.source) : kNoAffinity;
-  });
-}
-
 [[nodiscard]] u32 sampleBoundary(const SoundBankData& bank, BodyAddressing addressing, u32 bodyOffset, u32 bodyBytes) {
   u32 boundary = bodyBytes;
   for (const auto& vag : bank.vags) {
@@ -135,34 +122,6 @@ struct BodyAddressing {
   return boundary;
 }
 
-[[nodiscard]] std::vector<const BankEntry*> chooseBanks(const SequenceEntry& sequence,
-                                                        const std::vector<BankEntry>& banks) {
-  auto selected = bestMatches(banks, [&](const BankEntry& bank) { return affinity(sequence.source, bank.source); });
-  if (selected.size() > 1 && affinity(sequence.source, selected.front()->source) < 4) {
-    selected.clear();
-  }
-  return selected;
-}
-
-void attachBank(CollectionAssembly& collection, const BankEntry& bank, const std::vector<BodyEntry>& bodies,
-                std::vector<SampleBinding>& bindings) {
-  collection.soundBank(bank.id());
-  const auto matches = chooseBodies(bank, bodies);
-  if (matches.size() == 1) {
-    collection.samplePool(matches.front()->id());
-    bindings.push_back(SampleBinding{.bank = bank.id(), .body = matches.front()->id()});
-  } else if (matches.empty()) {
-    collection.incomplete(CollectionIssue{
-        .severity = Severity::Warning,
-        .code = "missing-sample-body",
-        .message = "SonyPS2 HD has no compatible BD sample body",
-        .asset = bank.id(),
-    });
-  } else {
-    collection.ambiguous("SonyPS2 HD matches multiple compatible BD sample bodies", bank.id());
-  }
-}
-
 struct BoundSample {
   SampleRef reference;
   bool loops = false;
@@ -170,7 +129,7 @@ struct BoundSample {
 
 class BodyBinder {
 public:
-  BodyBinder(CollectionBindingContext& context, SoundBankAsset& bank, const SamplePoolAsset& body,
+  BodyBinder(BankPreparationContext& context, SoundBankAsset& bank, const SamplePoolAsset& body,
              const SoundBankData& bankData, const SampleBodyData& bodyData, BodyAddressing addressing)
       : context_(context), bank_(bank), body_(body), bankData_(bankData), bodyData_(bodyData), addressing_(addressing) {
   }
@@ -253,7 +212,7 @@ private:
     return true;
   }
 
-  CollectionBindingContext& context_;
+  BankPreparationContext& context_;
   SoundBankAsset& bank_;
   const SamplePoolAsset& body_;
   const SoundBankData& bankData_;
@@ -262,19 +221,11 @@ private:
   std::unordered_map<u32, u32> localSamples_;
 };
 
-[[nodiscard]] bool bindBody(CollectionBindingContext& context, const SampleBinding& binding) {
-  auto* bank = context.soundBank(binding.bank);
-  const auto* body = context.samplePool(binding.body);
-  if (bank == nullptr || body == nullptr) {
-    context.fail("SonyPS2 collection contains an invalid HD/BD binding");
-    return false;
-  }
-  const auto* bankData = bank->privateData.get<SoundBankData>();
-  const auto* bodyData = body->privateData.get<SampleBodyData>();
-  if (bankData == nullptr || bodyData == nullptr) {
-    context.fail("SonyPS2 HD/BD binding metadata is missing", bank->metadata.range);
-    return false;
-  }
+void bindBody(BankPreparationContext& context, const SoundBankData& data, const SampleInput<SampleBodyData>& input) {
+  auto* bank = &context.bank;
+  const auto* body = &input.asset;
+  const auto* bankData = &data;
+  const auto* bodyData = &input.data;
   const BodyAddressing addressing = bodyAddressing(*bankData, *bodyData);
   if (addressing.omittedLeadingBlock) {
     // Some PSF2 rips discarded the bank's initial silent block but kept the
@@ -297,137 +248,93 @@ private:
   for (auto& instrument : bank->instruments) {
     for (auto& region : instrument.regions) {
       if (!binder.bind(region)) {
-        return false;
+        return;
       }
     }
   }
-  return true;
 }
 
-[[nodiscard]] bool assignProgramAddresses(CollectionBindingContext& context,
-                                          std::vector<ProgramRuntimeInfo>& runtimePrograms) {
-  u16 bankNumber = 0;
-  for (auto& bank : context.soundBanks) {
+}  // namespace
+
+DependencySelection BankRequest::operator()(const DependencyContext& context) const {
+  const auto banks = context.candidates<SoundBankAsset, SoundBankData>();
+  if (!member.empty()) {
+    const auto matches = bestMatches(banks, [&](const BankEntry& bank) {
+      return context.source() != nullptr && bank.source != nullptr && context.source()->parent == bank.source->parent &&
+                     selectedMember(*bank.source, member)
+                 ? 0
+                 : -1;
+    });
+    return selectOne(matches);
+  }
+  auto matches = bestMatches(banks, [&](const BankEntry& bank) { return affinity(context.source(), bank.source); });
+  if (matches.size() > 1 && affinity(context.source(), matches.front()->source) < 4) {
+    matches.clear();
+  }
+  auto result = selectAll(matches);
+  if (matches.size() > 1) {
+    result.issues.push_back(ambiguousMatchIssue("SonyPS2 SQ matches multiple HD banks with equal source affinity"));
+  }
+  return result;
+}
+
+DependencySelection selectSonyPs2Samples(const DependencyContext& context) {
+  const auto& bank = *context.catalog().asset<SoundBankAsset>(context.metadata().id);
+  const auto& data = context.data<SoundBankData>();
+  const auto bodies = context.candidates<SamplePoolAsset, SampleBodyData>();
+  return selectOne(bestMatches(bodies, [&](const BodyEntry& body) {
+    if (!compatible(bank, data, *body.data)) {
+      return kNoAffinity;
+    }
+    if (context.manual()) {
+      return 0;
+    }
+    if (!data.sampleBodyMember.empty()) {
+      return context.source() != nullptr && body.source != nullptr && context.source()->parent == body.source->parent &&
+                     selectedMember(*body.source, data.sampleBodyMember)
+                 ? 0
+                 : -1;
+    }
+    return affinity(context.source(), body.source);
+  }));
+}
+
+void prepareSonyPs2Bank(BankPreparationContext& context, const SoundBankData& data) {
+  for (auto& instrument : context.bank.instruments) {
+    if (!instrument.identity || instrument.identity->domain != kInstrumentDomain) {
+      continue;
+    }
+    const u32 program = instrument.identity->key & 0xff;
+    instrument.explicitAddress = InstrumentAddress{.bank = context.bankIndex, .program = program};
+    instrument.identity = instrumentIdentity(static_cast<u16>(context.bankIndex), static_cast<u8>(program));
+  }
+  const auto bodies = context.samples<SampleBodyData>();
+  if (bodies.size() != 1) {
+    context.fail("SonyPS2 HD has no unambiguous compatible BD sample body");
+    return;
+  }
+  bindBody(context, data, bodies.front());
+}
+
+void prepareSonyPs2Sequence(SequencePreparationContext& context) {
+  std::vector<ProgramRuntimeInfo> programs;
+  u32 bankNumber = 0;
+  for (const auto& bank : context.soundBanks) {
     if (bank.metadata.format != kFormatName) {
       continue;
     }
     const auto* data = bank.privateData.get<SoundBankData>();
     if (data == nullptr) {
-      context.fail("SonyPS2 HD is missing retained Vagi binding data", bank.metadata.range);
-      return false;
-    }
-    for (auto& instrument : bank.instruments) {
-      if (!instrument.identity || instrument.identity->domain != kInstrumentDomain) {
-        continue;
-      }
-      const u32 program = instrument.identity->key & 0xff;
-      instrument.explicitAddress = InstrumentAddress{.bank = bankNumber, .program = program};
-      instrument.identity = instrumentIdentity(bankNumber, static_cast<u8>(program));
+      context.fail("SonyPS2 HD is missing retained program data", bank.metadata.range);
+      return;
     }
     for (auto program : data->runtimePrograms) {
-      program.bank = static_cast<u8>(std::min<u16>(bankNumber, 255));
-      runtimePrograms.push_back(program);
+      program.bank = static_cast<u8>(std::min<u32>(bankNumber, 255));
+      programs.push_back(program);
     }
     ++bankNumber;
   }
-  return true;
-}
-
-void applyBindings(CollectionBindingContext& context, const std::vector<SampleBinding>& bindings) {
-  std::vector<ProgramRuntimeInfo> runtimePrograms;
-  if (!assignProgramAddresses(context, runtimePrograms)) {
-    return;
-  }
-
-  for (const auto& binding : bindings) {
-    if (!bindBody(context, binding)) {
-      return;
-    }
-  }
-
-  if (context.sequence != nullptr && context.sequence->metadata.format == kFormatName) {
-    static_cast<void>(
-        context.replaceSequenceRuntime(sequenceRuntime(RuntimeConfig{.programs = std::move(runtimePrograms)})));
-  }
-}
-
-[[nodiscard]] CollectionBinder binder(std::vector<SampleBinding> bindings) {
-  return [bindings = std::move(bindings)](CollectionBindingContext& context) { applyBindings(context, bindings); };
-}
-
-}  // namespace
-
-std::vector<DesiredCollection> resolveCollections(const CollectionDiscoveryContext& context) {
-  const auto sequences = context.assetsWithData<SequenceProgramAsset, SequenceData>();
-  const auto banks = context.assetsWithData<SoundBankAsset, SoundBankData>();
-  const auto bodies = context.assetsWithData<SamplePoolAsset, SampleBodyData>();
-  std::vector<DesiredCollection> collections;
-  std::unordered_set<u32> pairedBanks;
-  for (const auto& sequence : sequences) {
-    CollectionAssembly collection(
-        "source:" + std::to_string(sequence.source == nullptr ? 0 : sequence.source->id.value) +
-            ":sequence:" + std::to_string(sequence.asset->metadata.id.value),
-        sequence.asset->metadata.name);
-    collection.sequence(sequence.id());
-    std::vector<SampleBinding> bindings;
-    const auto matches = chooseBanks(sequence, banks);
-    for (const auto* bank : matches) {
-      attachBank(collection, *bank, bodies, bindings);
-      pairedBanks.insert(bank->id().value);
-    }
-    if (matches.empty()) {
-      collection.requireSoundBank();
-    } else if (matches.size() > 1) {
-      collection.ambiguous("SonyPS2 SQ matches multiple HD banks with equal source affinity", sequence.id());
-    }
-    collection.bind(binder(std::move(bindings)));
-    collections.push_back(std::move(collection).finish());
-  }
-  for (const auto& bank : banks) {
-    if (pairedBanks.contains(bank.id().value)) {
-      continue;
-    }
-    CollectionAssembly collection("source:" + std::to_string(bank.source == nullptr ? 0 : bank.source->id.value) +
-                                      ":bank:" + std::to_string(bank.asset->metadata.id.value),
-                                  bank.asset->metadata.name);
-    std::vector<SampleBinding> bindings;
-    attachBank(collection, bank, bodies, bindings);
-    collection.bind(binder(std::move(bindings)));
-    collections.push_back(std::move(collection).finish());
-  }
-  return collections;
-}
-
-void bindCollection(CollectionBindingContext& context) {
-  std::vector<SampleBinding> bindings;
-  for (const auto& bank : context.soundBanks) {
-    if (bank.metadata.format != kFormatName) {
-      continue;
-    }
-    const auto* bankData = bank.privateData.get<SoundBankData>();
-    if (bankData == nullptr) {
-      context.fail("SonyPS2 HD is missing retained Vagi binding data", bank.metadata.range);
-      return;
-    }
-    const SamplePoolAsset* selected = nullptr;
-    for (const auto* body : context.samplePools) {
-      const auto* bodyData = body->privateData.get<SampleBodyData>();
-      if (body->metadata.format != kFormatName || bodyData == nullptr || !compatible(bank, *bankData, *bodyData)) {
-        continue;
-      }
-      if (selected != nullptr) {
-        context.fail("SonyPS2 HD matches multiple compatible BD sample bodies", bank.metadata.range);
-        return;
-      }
-      selected = body;
-    }
-    if (selected == nullptr) {
-      context.fail("SonyPS2 HD has no compatible BD sample body", bank.metadata.range);
-      return;
-    }
-    bindings.push_back(SampleBinding{.bank = bank.metadata.id, .body = selected->metadata.id});
-  }
-  applyBindings(context, bindings);
+  static_cast<void>(context.replaceSequenceRuntime(sequenceRuntime(RuntimeConfig{.programs = std::move(programs)})));
 }
 
 }  // namespace vgmtrans::formats::sony_ps2

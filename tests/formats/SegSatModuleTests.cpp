@@ -577,6 +577,7 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "SegSat", .name = "Sequence"},
       .program = std::move(parsedSequence.program),
   };
+  sequence.prepare = bindSegSatCollection;
   sequence.privateData = AssetPrivateData::make(SegSatSequenceBindingData{
       .volumeModel = SegSatVolumeModel::V1_33,
       .referencedBanks = {4, 6},
@@ -626,7 +627,6 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
   const Collection collection{
       .id = CollectionId{0},
       .name = "Multi-source SegSat",
-      .binder = bindSegSatCollection,
       .members =
           {
               .sequence = sequence.metadata.id,

@@ -79,46 +79,6 @@ void formatRegistryStoresCopyableModulesAtomically() {
       },
       "format registry should reject duplicate extractor names without partially registering an extractor");
   expect(registry.extractors().size() == 1, "failed registration must leave the extractor list unchanged");
-
-  FormatRegistry binderRegistry;
-  binderRegistry.add(FormatModule{
-      .name = "FirstBinder",
-      .scan = scanProbeSequence,
-      .collectionResolverId = "SharedResolver",
-      .bindCollection = [](CollectionBindingContext&) {},
-  });
-  expect(static_cast<bool>(binderRegistry.collectionBinderForFormat("FirstBinder")),
-         "format lookup should find a binder whose resolver id differs from its module name");
-  expectThrows<std::invalid_argument>(
-      [&] {
-        binderRegistry.add(FormatModule{
-            .name = "SecondBinder",
-            .scan = scanProbeSequence,
-            .collectionResolverId = "SharedResolver",
-            .bindCollection = [](CollectionBindingContext&) {},
-        });
-      },
-      "format registry should allow only one collection binder per effective resolver id");
-  expect(binderRegistry.modules().size() == 1, "failed registration must leave the module list unchanged");
-
-  FormatRegistry resolverRegistry;
-  resolverRegistry.add(FormatModule{
-      .name = "FirstResolver",
-      .scan = scanProbeSequence,
-      .collectionResolverId = "SharedResolver",
-      .resolveCollections = [](const CollectionDiscoveryContext&) { return std::vector<DesiredCollection>{}; },
-  });
-  expectThrows<std::invalid_argument>(
-      [&] {
-        resolverRegistry.add(FormatModule{
-            .name = "SecondResolver",
-            .scan = scanProbeSequence,
-            .collectionResolverId = "SharedResolver",
-            .resolveCollections = [](const CollectionDiscoveryContext&) { return std::vector<DesiredCollection>{}; },
-        });
-      },
-      "format registry should allow only one collection resolver owner per effective resolver id");
-  expect(resolverRegistry.modules().size() == 1, "failed registration must leave the module list unchanged");
 }
 
 void scanResultBuilderCoversCommonScannerPlumbing() {

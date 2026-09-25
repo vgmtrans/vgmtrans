@@ -7,6 +7,7 @@
 #pragma once
 
 #include "value/model/EnvelopeModel.h"
+#include "value/model/AssetRecipe.h"
 #include "value/model/InstrumentIdentity.h"
 #include "value/model/MetadataModel.h"
 #include "value/model/ModulationModel.h"
@@ -187,6 +188,8 @@ struct SoundBankAsset {
   std::vector<Instrument> instruments;
   SamplePool localSamples;
   AssetPrivateData privateData;
+  AssetRecipe recipe;
+  BankPreparer prepare;
 };
 
 struct SamplePoolAsset {

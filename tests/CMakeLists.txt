@@ -24,7 +24,7 @@ function(add_value_format_test target source suite)
 endfunction()
 
 add_value_test(vgmtrans-value-core-tests
-  core/ValueCollectionDiscoveryTests.cpp
+  core/ValueAssetResolutionTests.cpp
   core/ValueCollectionStitchTests.cpp
   core/ValueCompilerCursorTests.cpp
   core/ValueInstrumentVariantTests.cpp

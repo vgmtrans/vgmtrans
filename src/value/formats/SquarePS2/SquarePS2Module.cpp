@@ -35,6 +35,8 @@ namespace {
     const std::string name = fmt::format("{} BGM {}", result.sourceDisplayName(), bgm.sequenceId);
     auto sequence = result.sequence(name, input.reader.range(bgm.offset, bgm.length));
     sequence.data(SequenceData{.waveBankId = bgm.waveBankId})
+        .useBanks(WdBankId{bgm.waveBankId})
+        .prepare<SequenceData>(prepareSequence)
         .program(parseBgm(input.reader, sequence.id(), bgm, &result.sourceMap(), &result.diagnostics()));
   }
   return result.finish();
@@ -47,8 +49,6 @@ FormatModule module() {
       .name = std::string(kSquarePs2FormatName),
       .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
       .scan = scanSquarePs2,
-      .resolveCollections = resolveCollections,
-      .bindCollection = bindCollection,
   };
 }
 

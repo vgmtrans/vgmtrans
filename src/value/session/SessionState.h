@@ -43,7 +43,9 @@ public:
 
   [[nodiscard]] bool removeAssets(std::span<const AssetId> assets);
   void removeSources(std::span<const SourceId> sources);
-  [[nodiscard]] CollectionId createUserCollection(std::string name, CollectionMembers members, CollectionBinder binder);
+  [[nodiscard]] CollectionId createUserCollection(std::string name, CollectionMembers members,
+                                                  std::vector<ResolvedDependency> dependencies = {},
+                                                  std::vector<CollectionIssue> issues = {});
 
   void addError(std::string message, SourceRange range = {});
   void addDiagnostics(std::vector<Diagnostic> diagnostics);
@@ -51,7 +53,7 @@ public:
   [[nodiscard]] const SourceMap& sourceMap() const noexcept { return sourceMap_; }
   [[nodiscard]] SourceMap sourceMapForAsset(AssetId asset) const;
   [[nodiscard]] std::map<std::string, std::vector<DesiredCollection>> desiredCollectionsByResolver() const;
-  void reconcileCollections(std::string_view resolver, std::vector<DesiredCollection> desired, CollectionBinder binder);
+  void reconcileCollections(std::string_view resolver, std::vector<DesiredCollection> desired);
 
 private:
   struct ScanChunk {

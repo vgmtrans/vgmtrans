@@ -40,8 +40,9 @@ namespace {
         layout.hasKdt2Header ? fmt::format("{} KDT {}", result.sourceDisplayName(), layout.sequenceId)
                              : fmt::format("{} KDT{} {:X}", result.sourceDisplayName(), layout.version, layout.offset);
     auto sequence = result.sequence(name, input.reader.range(layout.containerOffset, layout.containerLength));
-    sequence.program(parseKonamiPs1Sequence(input.reader, sequence.id(), layout, *rootCounterTarget, tones,
-                                            &result.sourceMap(), &result.diagnostics()));
+    sequence.useBanks(selectKonamiPs1Banks)
+        .program(parseKonamiPs1Sequence(input.reader, sequence.id(), layout, *rootCounterTarget, tones,
+                                        &result.sourceMap(), &result.diagnostics()));
   }
   return result.finish();
 }
@@ -54,9 +55,6 @@ FormatModule konamiPs1Module() {
       .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
       .acceptedFormats = {source_formats::kPlayStationRam},
       .scan = scanKonamiPs1,
-      .collectionResolverId = std::string(kKonamiPs1CollectionResolver),
-      .resolveCollections = resolveKonamiPs1Collections,
-      .bindCollection = sony_ps1::bindSonyPs1Collection,
   };
 }
 

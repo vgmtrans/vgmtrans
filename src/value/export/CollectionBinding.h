@@ -36,7 +36,7 @@ public:
   [[nodiscard]] const std::vector<const SamplePoolAsset*>& samplePools() const noexcept { return samplePools_; }
 
 private:
-  friend CollectionBindingResult bindCollection(const SessionSnapshot&, CollectionId);
+  friend CollectionBindingResult prepareCollection(const SessionSnapshot&, const Collection&);
   friend RenderedCollection renderCollection(const BoundCollection&, const SequenceRenderOptions&);
   friend class CollectionWorkspace;
 
@@ -94,6 +94,8 @@ public:
 };
 
 [[nodiscard]] CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, CollectionId collection);
+// Resolve and prepare a bank's own dependencies without inventing a sequence collection.
+[[nodiscard]] CollectionBindingResult bindSoundBank(const SessionSnapshot& snapshot, AssetId bank);
 [[nodiscard]] RenderedCollection renderSequence(const SequenceProgramAsset& sequence,
                                                 const SequenceRenderOptions& options);
 [[nodiscard]] RenderedCollection renderCollection(const BoundCollection& collection,

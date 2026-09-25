@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/TamsoftPS1/TamsoftPS1.h"
+#include "value/scan/AssetResolution.h"
 
 #include <algorithm>
 #include <cctype>
@@ -18,7 +19,6 @@ using namespace core;
 
 namespace {
 
-using SequenceEntry = AssetWithData<SequenceProgramAsset, SequenceData>;
 using BankEntry = AssetWithData<SoundBankAsset, BankData>;
 
 [[nodiscard]] std::string uppercase(std::string value) {
@@ -34,22 +34,22 @@ using BankEntry = AssetWithData<SoundBankAsset, BankData>;
   return path.parent_path().lexically_normal();
 }
 
-[[nodiscard]] int matchScore(const SequenceEntry& sequence, const BankEntry& bank) {
-  if (sequence.data->generation != bank.data->generation) {
+[[nodiscard]] int matchScore(const BankRequest& sequence, const SourceFile* source, const BankEntry& bank) {
+  if (sequence.generation != bank.data->generation) {
     return -1;
   }
-  const std::string sequenceStem = uppercase(sequence.data->stem);
+  const std::string sequenceStem = uppercase(sequence.stem);
   const std::string bankStem = uppercase(bank.data->stem);
 
-  if (sequence.data->generation == Generation::Ps1) {
+  if (sequence.generation == Generation::Ps1) {
     // Wonderful uses the shared SYS/BGM.TVB across directories for music TSQs.
-    if (sequence.data->usesMusicBank) {
+    if (sequence.usesMusicBank) {
       return bankStem == "BGM" ? 30 : -1;
     }
-    return sequenceStem == bankStem && sourceDirectory(sequence.source) == sourceDirectory(bank.source) ? 30 : -1;
+    return sequenceStem == bankStem && sourceDirectory(source) == sourceDirectory(bank.source) ? 30 : -1;
   }
 
-  if (sourceDirectory(sequence.source) != sourceDirectory(bank.source)) {
+  if (sourceDirectory(source) != sourceDirectory(bank.source)) {
     return -1;
   }
   if (sequenceStem == bankStem) {
@@ -66,40 +66,26 @@ using BankEntry = AssetWithData<SoundBankAsset, BankData>;
 
 }  // namespace
 
-std::vector<DesiredCollection> resolveCollections(const CollectionDiscoveryContext& context) {
-  const auto sequences = context.assetsWithData<SequenceProgramAsset, SequenceData>();
-  const auto banks = context.assetsWithData<SoundBankAsset, BankData>();
-  std::vector<DesiredCollection> collections;
-  collections.reserve(sequences.size());
-
-  for (const auto& sequence : sequences) {
-    auto matches = bestMatches(banks, [&](const BankEntry& bank) { return matchScore(sequence, bank); });
-    if (matches.empty() && sequence.data->generation == Generation::Ps2) {
-      const auto sameGeneration = [&](const BankEntry& bank) {
-        return bank.data->generation == sequence.data->generation;
-      };
-      if (std::ranges::count_if(banks, sameGeneration) == 1) {
-        matches.push_back(&*std::ranges::find_if(banks, sameGeneration));
-      }
+DependencySelection BankRequest::operator()(const DependencyContext& context) const {
+  const auto banks = context.candidates<SoundBankAsset, BankData>();
+  auto matches = bestMatches(banks, [&](const BankEntry& bank) { return matchScore(*this, context.source(), bank); });
+  if (matches.empty() && generation == Generation::Ps2) {
+    const auto sameGeneration = [&](const BankEntry& bank) { return bank.data->generation == generation; };
+    if (std::ranges::count_if(banks, sameGeneration) == 1) {
+      matches.push_back(&*std::ranges::find_if(banks, sameGeneration));
     }
-
-    CollectionAssembly collection(
-        "source:" + std::to_string(sequence.source == nullptr ? 0 : sequence.source->id.value) +
-            ":song:" + std::to_string(sequence.data->song),
-        sequence.asset->metadata.name);
-    collection.sequence(sequence.id());
-    if (!matches.empty()) {
-      collection.soundBank(matches.front()->id());
-      if (matches.size() > 1) {
-        collection.ambiguous("Tamsoft TSQ matches multiple TVB banks equally well", sequence.id(),
-                             sequence.asset->metadata.range);
-      }
-    } else {
-      collection.requireSoundBank();
-    }
-    collections.push_back(std::move(collection).finish());
   }
-  return collections;
+  DependencySelection result;
+  if (!matches.empty()) {
+    result.add(matches.front()->id());
+  }
+  if (matches.size() > 1) {
+    for (const auto* match : matches) {
+      result.alternatives.push_back(match->id());
+    }
+    result.issues.push_back(ambiguousMatchIssue("Tamsoft TSQ matches multiple TVB banks equally well"));
+  }
+  return result;
 }
 
 }  // namespace vgmtrans::formats::tamsoft_ps1

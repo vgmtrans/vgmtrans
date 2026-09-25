@@ -8,7 +8,7 @@
 
 #include "value/base/Source.h"
 #include "value/model/InstrumentIdentity.h"
-#include "value/scan/CollectionDiscovery.h"
+#include "value/scan/AssetCatalog.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceProgramConfig.h"
@@ -62,11 +62,11 @@ struct BankLayout {
   Generation generation = Generation::Ps1;
 };
 
-struct SequenceData {
+struct BankRequest {
   std::string stem;
-  u32 song = 0;
   Generation generation = Generation::Ps1;
   bool usesMusicBank = false;
+  [[nodiscard]] core::DependencySelection operator()(const core::DependencyContext& context) const;
 };
 
 struct BankData {
@@ -81,8 +81,6 @@ struct BankData {
                                                   core::SourceMapBuilder* sourceMap = nullptr,
                                                   std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] bool addBank(core::ScanResultBuilder& result, const BankLayout& layout, std::string_view name);
-[[nodiscard]] std::vector<core::DesiredCollection> resolveCollections(
-    const core::CollectionDiscoveryContext& context);
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
 [[nodiscard]] core::FormatModule module();
 

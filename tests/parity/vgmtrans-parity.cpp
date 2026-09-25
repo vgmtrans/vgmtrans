@@ -18,6 +18,7 @@
 #include "conversion/SF2File.h"
 #include "formats/NDS/NDSInstrSet.h"
 #include "value/export/ExportTypes.h"
+#include "value/export/CollectionBinding.h"
 #include "value/export/SequenceModulationProfile.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/synth/ModulationScaling.h"
@@ -1598,30 +1599,14 @@ AkaoSummary valueAkaoSummary(const std::filesystem::path& path, std::ostream& di
         .soundBankCount = static_cast<u32>(collection.members.soundBanks.size()),
         .samplePoolCount = static_cast<u32>(collection.members.samplePools.size()),
     };
-    SequenceRuntime runtime = sequence->program.runtime;
-    std::vector<SoundBankAsset> resolvedInstruments;
-    for (const AssetId id : collection.members.soundBanks) {
-      if (const auto* instruments = project.asset<SoundBankAsset>(id)) {
-        resolvedInstruments.push_back(*instruments);
-      }
-    }
-    std::vector<const SamplePoolAsset*> resolvedSamples;
-    for (const AssetId id : collection.members.samplePools) {
-      if (const auto* samples = project.asset<SamplePoolAsset>(id)) {
-        resolvedSamples.push_back(samples);
-      }
-    }
-    std::vector<Diagnostic> bindingDiagnostics;
-    CollectionBindingContext binding{
-        sequence, runtime, resolvedInstruments, resolvedSamples, {}, bindingDiagnostics,
-    };
-    vgmtrans::formats::akao::bindAkaoCollection(binding);
-    for (const auto& diagnostic : bindingDiagnostics) {
+    const auto binding = bindCollection(project, collection.id);
+    for (const auto& diagnostic : binding.diagnostics) {
       diagnostics << "value binding diagnostic: " << diagnostic.message << "\n";
     }
-    if (resolvedInstruments.empty()) {
-      throw std::runtime_error("Akao collection binding did not provide resolved instrument sets");
+    if (!binding.collection || binding.collection->soundBanks().empty()) {
+      throw std::runtime_error("Akao collection preparation did not provide resolved instrument sets");
     }
+    const auto& resolvedInstruments = binding.collection->soundBanks();
     const auto detailed = valueCapcomSnesSummary(project, session.sources(), collection, resolvedInstruments);
     shape.sampleCount = static_cast<u32>(detailed.samples.size());
     shape.samples = detailed.samples;

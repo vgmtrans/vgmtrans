@@ -140,14 +140,13 @@ struct ProgramRuntimeInfo {
 };
 
 struct SoundBankData {
+  std::string sampleBodyMember;
   u32 expectedBodyBytes = 0;
   u32 reverbType = 5;
   u32 reverbDepth = 0x3fff;
   std::vector<std::optional<VagInfo>> vags;
   std::vector<ProgramRuntimeInfo> runtimePrograms;
 };
-
-struct SequenceData {};
 
 struct RuntimeConfig {
   std::vector<ProgramRuntimeInfo> programs;
@@ -172,8 +171,14 @@ void addSoundBank(core::ScanResultBuilder& result, u32 offset, SoundBankData lay
 [[nodiscard]] core::SequenceRuntime sequenceRuntime(RuntimeConfig config = {});
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
 
-[[nodiscard]] std::vector<core::DesiredCollection> resolveCollections(const core::CollectionDiscoveryContext& context);
-void bindCollection(core::CollectionBindingContext& context);
+struct BankRequest {
+  std::string member;
+  [[nodiscard]] core::DependencySelection operator()(const core::DependencyContext& context) const;
+};
+[[nodiscard]] bool selectedMember(const core::SourceFile& source, std::string_view selected);
+[[nodiscard]] core::DependencySelection selectSonyPs2Samples(const core::DependencyContext& context);
+void prepareSonyPs2Bank(core::BankPreparationContext& context, const SoundBankData& data);
+void prepareSonyPs2Sequence(core::SequencePreparationContext& context);
 [[nodiscard]] core::FormatModule module();
 
 }  // namespace vgmtrans::formats::sony_ps2

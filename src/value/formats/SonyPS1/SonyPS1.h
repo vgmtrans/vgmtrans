@@ -101,8 +101,7 @@ struct SonyPs1SampleBodyLayout {
 [[nodiscard]] std::optional<SonyPs1SampleBodyLayout> readSonyPs1RawSampleBody(core::ByteReader reader);
 [[nodiscard]] std::vector<u32> findSonyPs1SampleStarts(const SonyPs1SampleBodyLayout& body,
                                                        const std::vector<u32>& sizes);
-[[nodiscard]] bool matchesSonyPs1SampleBodyAt(core::ByteReader reader, u32 offset,
-                                               const std::vector<u32>& sampleSizes);
+[[nodiscard]] bool matchesSonyPs1SampleBodyAt(core::ByteReader reader, u32 offset, const std::vector<u32>& sampleSizes);
 [[nodiscard]] std::optional<u32> matchSonyPs1SampleBody(core::ByteReader reader, u32 preferredOffset,
                                                         const std::vector<u32>& sampleSizes, bool forceSingle = false);
 
@@ -113,9 +112,9 @@ void addSonyPs1Bank(core::ScanResultBuilder& result, const SonyPs1BankLayout& la
                                                          core::SourceMapBuilder* sourceMap = nullptr,
                                                          std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& sonyPs1SequenceConfig();
-[[nodiscard]] std::vector<core::DesiredCollection> resolveSonyPs1Collections(
-    const core::CollectionDiscoveryContext& context);
-void bindSonyPs1Collection(core::CollectionBindingContext& context);
+[[nodiscard]] core::DependencySelection selectSonyPs1Banks(const core::DependencyContext& context);
+[[nodiscard]] core::DependencySelection selectSonyPs1Samples(const core::DependencyContext& context);
+void prepareSonyPs1Bank(core::BankPreparationContext& context, const SonyPs1BankLayout& layout);
 [[nodiscard]] core::FormatModule sonyPs1Module();
 
 }  // namespace vgmtrans::formats::sony_ps1

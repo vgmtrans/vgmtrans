@@ -1127,7 +1127,7 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
                        "sony-ps2-setb");
     addSetbDefinitions(instruments, reader, layout, definition, warnings);
   }
-  bank.data(std::move(layout));
+  bank.data(std::move(layout)).useSamples(selectSonyPs2Samples).prepare<SoundBankData>(prepareSonyPs2Bank);
 }
 
 }  // namespace vgmtrans::formats::sony_ps2

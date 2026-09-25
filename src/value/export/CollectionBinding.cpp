@@ -7,8 +7,9 @@
 #include "value/export/CollectionBinding.h"
 
 #include "value/export/ExportDiagnostics.h"
+#include "value/export/AssetPreparation.h"
 #include "value/export/InstrumentVariants.h"
-#include "value/scan/FormatModule.h"
+#include "value/scan/AssetResolution.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/validation/SynthValidation.h"
 
@@ -63,13 +64,9 @@ BoundCollection::BoundCollection(SessionSnapshot snapshot, CollectionId id, std:
       samplePools_(std::move(samplePools)) {
 }
 
-CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, CollectionId collectionId) {
+CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const Collection& selected) {
+  const auto* collection = &selected;
   std::vector<Diagnostic> diagnostics;
-  const Collection* collection = snapshot.collection(collectionId);
-  if (collection == nullptr) {
-    diagnostics.push_back(exportError("CollectionId was not found in the SessionSnapshot"));
-    return CollectionBindingResult{.diagnostics = std::move(diagnostics)};
-  }
   for (const auto& issue : collection->issues) {
     diagnostics.push_back(Diagnostic{
         .severity = issue.severity,
@@ -88,6 +85,12 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
   const SequenceProgramAsset* sequence = nullptr;
   SequenceRuntime sequenceRuntime;
   bool failed = false;
+  for (const auto& issue : collection->issues) {
+    if (issue.severity == Severity::Error &&
+        (issue.code.starts_with("dependency-") || issue.code == "invalid-dependency")) {
+      failed = true;
+    }
+  }
   if (members.sequence) {
     sequence = snapshot.asset<SequenceProgramAsset>(*members.sequence);
     if (sequence == nullptr) {
@@ -129,29 +132,71 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
     }
   }
 
-  if (!failed && collection->binder) {
-    const std::string bindingName = collection->key       ? collection->key->resolver
-                                    : sequence != nullptr ? sequence->metadata.format
-                                                          : "Collection";
+  for (const auto& dependency : collection->dependencies) {
+    const bool ownerSelected = members.sequence == dependency.owner ||
+                               std::ranges::find(members.soundBanks, dependency.owner) != members.soundBanks.end();
+    if (!ownerSelected) {
+      diagnostics.push_back(exportError("Dependency owner is not a selected sequence or sound bank"));
+      failed = true;
+    }
+    const auto& providers = dependency.role == DependencyRole::SoundBank    ? members.soundBanks
+                            : dependency.role == DependencyRole::SamplePool ? members.samplePools
+                                                                            : members.miscAssets;
+    for (const auto& target : dependency.targets) {
+      if (std::ranges::find(providers, target.asset) == providers.end()) {
+        diagnostics.push_back(exportError("Dependency provider is not a selected collection member"));
+        failed = true;
+      }
+    }
+  }
+  if (!failed) {
     try {
-      CollectionBindingContext context{sequence, sequenceRuntime, soundBanks, samplePools, miscAssets, diagnostics};
-      collection->binder(context);
-      failed = context.failed;
-      for (size_t index = 0; index < soundBanks.size(); ++index) {
-        const auto& metadata = soundBanks[index].metadata;
-        const auto* original = snapshot.asset<SoundBankAsset>(members.soundBanks[index]);
-        if (original == nullptr || metadata.id != original->metadata.id || metadata.format != original->metadata.format) {
-          diagnostics.push_back(exportError("Collection binding changed sound bank identity, format, or order"));
+      for (size_t i = 0; i < soundBanks.size(); ++i) {
+        auto& bank = soundBanks[i];
+        const auto& prepare = snapshot.asset<SoundBankAsset>(members.soundBanks[i])->prepare;
+        if (!prepare) {
+          continue;
+        }
+        std::vector<DependencyTarget> inputs;
+        for (const auto& dependency : collection->dependencies) {
+          if (dependency.owner == bank.metadata.id && dependency.role == DependencyRole::SamplePool) {
+            inputs.insert(inputs.end(), dependency.targets.begin(), dependency.targets.end());
+          }
+        }
+        const u32 index =
+            static_cast<u32>(std::count_if(soundBanks.begin(), soundBanks.begin() + i, [&](const auto& previous) {
+              return previous.metadata.format == bank.metadata.format;
+            }));
+        BankPreparationContext context{bank, index, inputs, samplePools, diagnostics};
+        prepare(context);
+        if (context.failed) {
           failed = true;
           break;
         }
       }
+      if (!failed && sequence != nullptr && sequence->prepare) {
+        SequencePreparationContext context{sequence, sequenceRuntime, soundBanks, samplePools, miscAssets, diagnostics};
+        sequence->prepare(context);
+        failed = context.failed;
+      }
     } catch (const std::exception& error) {
-      diagnostics.push_back(exportError(bindingName + " collection binding failed: " + error.what()));
+      diagnostics.push_back(exportError(std::string("Asset preparation failed: ") + error.what()));
       failed = true;
     } catch (...) {
-      diagnostics.push_back(exportError(bindingName + " collection binding failed"));
+      diagnostics.push_back(exportError("Asset preparation failed"));
       failed = true;
+    }
+  }
+
+  if (!failed) {
+    for (size_t index = 0; index < soundBanks.size(); ++index) {
+      const auto& metadata = soundBanks[index].metadata;
+      const auto* original = snapshot.asset<SoundBankAsset>(members.soundBanks[index]);
+      if (original == nullptr || metadata.id != original->metadata.id || metadata.format != original->metadata.format) {
+        diagnostics.push_back(exportError("Asset preparation changed sound bank identity, format, or order"));
+        failed = true;
+        break;
+      }
     }
   }
   if (!failed) {
@@ -172,6 +217,27 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
                                     std::move(soundBanks), std::move(samplePools)),
       .diagnostics = std::move(diagnostics),
   };
+}
+
+CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, CollectionId collectionId) {
+  const auto* collection = snapshot.collection(collectionId);
+  if (collection == nullptr) {
+    return {.diagnostics = {exportError("CollectionId was not found in the SessionSnapshot")}};
+  }
+  return prepareCollection(snapshot, *collection);
+}
+
+CollectionBindingResult bindSoundBank(const SessionSnapshot& snapshot, AssetId id) {
+  const auto* bank = snapshot.asset<SoundBankAsset>(id);
+  if (bank == nullptr) {
+    return {.diagnostics = {exportError("Sound bank asset was not found")}};
+  }
+  DesiredCollection selected{.name = bank->metadata.name, .members = {.soundBanks = {id}}};
+  resolveDependencies(AssetCatalog{snapshot.sources(), snapshot.assets()}, selected);
+  return prepareCollection(snapshot, Collection{.name = std::move(selected.name),
+                                                .members = std::move(selected.members),
+                                                .issues = std::move(selected.issues),
+                                                .dependencies = std::move(selected.dependencies)});
 }
 
 RenderedCollection renderSequence(const SequenceProgramAsset& sequence, const SequenceRenderOptions& options) {

@@ -175,7 +175,7 @@ void finalizeSegSatPerformance(core::PerformanceSequence& performance, std::span
                                                       core::SourceMapBuilder* sourceMap = nullptr,
                                                       std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& segSatSequenceConfig();
-void bindSegSatCollection(core::CollectionBindingContext& context);
+void bindSegSatCollection(core::SequencePreparationContext& context);
 [[nodiscard]] core::FormatModule segSatModule();
 
 }  // namespace vgmtrans::formats::segsat

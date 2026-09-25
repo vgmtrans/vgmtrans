@@ -113,7 +113,11 @@ vgmtrans_enable_project_warnings(vgmtransvaluecore)
 target_sources(vgmtransvaluecore
   PRIVATE
     ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionDiscovery.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/AssetCatalog.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/AssetResolution.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/AssetResolution.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/AssetPreparation.h
+    ${PROJECT_SOURCE_DIR}/src/value/model/AssetRecipe.h
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.h
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/PitchTransitionMidiLowering.cpp
@@ -190,7 +194,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/base/RecordReader.h
       ${PROJECT_SOURCE_DIR}/src/value/platform/SnesSampleDirectory.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/BytePattern.h
-      ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionDiscovery.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/AssetCatalog.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatModule.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.h
       ${PROJECT_SOURCE_DIR}/src/value/base/LevelScale.h

@@ -9,6 +9,7 @@
 #include "value/scan/ScanTypes.h"
 #include "value/model/SourceMap.h"
 #include "value/synth/SynthBuilder.h"
+#include "value/export/AssetPreparation.h"
 
 #include <cstddef>
 #include <memory>
@@ -21,6 +22,8 @@
 namespace vgmtrans::core {
 
 class ScanResultBuilder;
+class ScanSoundBankDraft;
+class ScanSamplePoolDraft;
 
 // Drafts are lightweight views into result-owned pending assets. Creating a
 // draft is the publication decision: ScanResultBuilder::finish() materializes
@@ -30,6 +33,13 @@ public:
   [[nodiscard]] AssetId id() const noexcept { return id_; }
   ScanSequenceDraft& range(SourceRange range);
   ScanSequenceDraft& program(SequenceProgram program);
+  ScanSequenceDraft& useBank(AssetId bank);
+  ScanSequenceDraft& useBank(const ScanSoundBankDraft& bank);
+  ScanSequenceDraft& useBanks(DependencySelector select);
+  ScanSequenceDraft& prepare(SequencePreparer prepare);
+
+  template <class Data, class Prepare>
+  ScanSequenceDraft& prepare(Prepare prepare);
 
   template <typename T>
   ScanSequenceDraft& data(T value);
@@ -50,6 +60,13 @@ public:
 
   [[nodiscard]] InstrumentSetBuilder& instruments();
   [[nodiscard]] SamplePoolBuilder& localSamples();
+  ScanSoundBankDraft& useSamples(AssetId samples);
+  ScanSoundBankDraft& useSamples(const ScanSamplePoolDraft& samples);
+  ScanSoundBankDraft& useSamples(DependencySelector select);
+  ScanSoundBankDraft& prepare(BankPreparer prepare);
+
+  template <class Data, class Prepare>
+  ScanSoundBankDraft& prepare(Prepare prepare);
 
   template <typename T>
   ScanSoundBankDraft& data(T value);
@@ -127,7 +144,7 @@ private:
 // asset metadata setup, diagnostics, and scanner-known collections.
 class ScanResultBuilder {
 public:
-  ScanResultBuilder(ScanInput input, std::string format, std::string collectionResolver = {});
+  ScanResultBuilder(ScanInput input, std::string format, std::string collectionNamespace = {});
   ~ScanResultBuilder();
 
   [[nodiscard]] SourceId source() const noexcept { return input_.source.id; }
@@ -168,10 +185,13 @@ private:
   [[nodiscard]] ExplicitCollection& explicitCollection(size_t index);
 
   void setPrivateData(size_t slot, AssetPrivateData data);
+  void addDependency(size_t slot, AssetDependency dependency, bool root);
+  void setSequencePreparer(size_t slot, SequencePreparer prepare);
+  void setBankPreparer(size_t slot, BankPreparer prepare);
 
   ScanInput input_;
   std::string format_;
-  std::string collectionResolver_;
+  std::string collectionNamespace_;
   ScanResult result_;
   SourceMapBuilder sourceMap_;
 
@@ -180,6 +200,30 @@ private:
   // a stable address even while the list of published drafts grows.
   std::vector<std::unique_ptr<DraftSlot>> drafts_;
 };
+
+template <class Data, class Prepare>
+ScanSequenceDraft& ScanSequenceDraft::prepare(Prepare callback) {
+  return prepare([callback = std::move(callback)](SequencePreparationContext& context) {
+    const auto* data = context.sequence == nullptr ? nullptr : context.sequence->privateData.template get<Data>();
+    if (data == nullptr) {
+      context.fail("Sequence is missing its preparation data");
+      return;
+    }
+    callback(context, *data);
+  });
+}
+
+template <class Data, class Prepare>
+ScanSoundBankDraft& ScanSoundBankDraft::prepare(Prepare callback) {
+  return prepare([callback = std::move(callback)](BankPreparationContext& context) {
+    const auto* data = context.bank.privateData.template get<Data>();
+    if (data == nullptr) {
+      context.fail("Bank is missing its preparation data");
+      return;
+    }
+    callback(context, *data);
+  });
+}
 
 template <typename T>
 ScanSequenceDraft& ScanSequenceDraft::data(T value) {

@@ -92,7 +92,7 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
   const SequenceProgramConfig config48 = probeSequenceConfig();
   SequenceProgramConfig config96 = config48;
   config96.timebase.ppqn = 96;
-  const CollectionBinder binder = [](CollectionBindingContext& context) {
+  const SequencePreparer binder = [](SequencePreparationContext& context) {
     const auto* sequence = context.sequence;
     const bool leaveDirtyMidiState = sequence != nullptr && sequence->metadata.name == "Part 0";
     if (!context.replaceSequenceRuntime(makeCompiledRuntime<ProbePlayback, StitchProgramState>(leaveDirtyMidiState))) {
@@ -121,6 +121,7 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
                 .behavior = config.behavior,
                 .tracks = {track},
             },
+        .prepare = binder,
     });
     builder.assets.emplace_back(SoundBankAsset{
         .metadata = AssetMetadata{.id = instrumentId, .format = "Probe"},
@@ -163,7 +164,6 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
         .id = CollectionId{index},
         .name = "Part " + std::to_string(index),
         .key = CollectionKey{.resolver = "ProbeSequence"},
-        .binder = binder,
         .members =
             {
                 .sequence = sequenceId,

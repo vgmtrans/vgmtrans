@@ -9,7 +9,8 @@
 #include "value/export/CollectionStitch.h"
 #include "value/export/Export.h"
 #include "value/model/SessionSnapshotAccess.h"
-#include "value/scan/CollectionDiscovery.h"
+#include "value/scan/AssetCatalog.h"
+#include "value/scan/AssetResolution.h"
 #include "value/scan/FormatModule.h"
 #include "value/session/SessionState.h"
 #include "value/validation/ScanValidation.h"
@@ -224,14 +225,10 @@ void Session::removeAssets(std::span<const AssetId> assets) {
 
 CollectionId Session::createUserCollection(std::string name, CollectionMembers members) {
   sealFormats();
-  CollectionBinder binder;
-  if (members.sequence) {
-    const auto* sequence = state_->asset<SequenceProgramAsset>(*members.sequence);
-    if (sequence != nullptr) {
-      binder = formats_.collectionBinderForFormat(sequence->metadata.format);
-    }
-  }
-  const CollectionId id = state_->createUserCollection(std::move(name), std::move(members), std::move(binder));
+  DesiredCollection selection{.members = std::move(members)};
+  resolveDependencies(AssetCatalog{sources_, state_->assets()}, selection, ResolutionMode::Manual);
+  const CollectionId id = state_->createUserCollection(std::move(name), std::move(selection.members),
+                                                       std::move(selection.dependencies), std::move(selection.issues));
   invalidateSnapshot();
   return id;
 }
@@ -495,30 +492,25 @@ void Session::removeSourceFamily(SourceId source, std::vector<SourceId>& removed
   removedSources.insert(removedSources.end(), family.begin(), family.end());
 }
 
-// Ask registered formats which collections should exist for the current assets,
-// then merge those answers into the session.
+// Expand asset dependencies, then reconcile the derived and explicit collections.
 void Session::rebuildCollections() {
-  const CollectionDiscoveryContext context{sources_, state_->assets()};
+  const AssetCatalog context{sources_, state_->assets()};
 
   auto desiredByResolver = state_->desiredCollectionsByResolver();
-  for (const auto& module : formats_.modules()) {
-    if (!module.resolveCollections) {
-      continue;
-    }
-
-    const std::string resolverId(module.collectionResolver());
-    auto& desiredCollections = desiredByResolver[resolverId];
-    try {
-      auto desired = module.resolveCollections(context);
-      desiredCollections.insert(desiredCollections.end(), std::make_move_iterator(desired.begin()),
-                                std::make_move_iterator(desired.end()));
-    } catch (const std::exception& ex) {
-      state_->addError(std::string(module.name) + " resolveCollections failed: " + ex.what());
+  std::vector<AssetId> explicitRoots;
+  for (auto& [resolver, collections] : desiredByResolver) {
+    for (auto& collection : collections) {
+      if (collection.members.sequence) {
+        explicitRoots.push_back(*collection.members.sequence);
+      }
+      resolveDependencies(context, collection);
     }
   }
-
+  for (auto& [resolver, collection] : dependencyCollections(context, explicitRoots)) {
+    desiredByResolver[resolver].push_back(std::move(collection));
+  }
   for (auto& [resolverId, desiredCollections] : desiredByResolver) {
-    state_->reconcileCollections(resolverId, std::move(desiredCollections), formats_.collectionBinder(resolverId));
+    state_->reconcileCollections(resolverId, std::move(desiredCollections));
   }
 }
 

@@ -57,17 +57,6 @@ struct Psf2Selection {
   return slash == std::string_view::npos ? path : path.substr(slash + 1);
 }
 
-[[nodiscard]] bool selectedMember(const SourceFile& source, std::string_view selected) {
-  const auto member = source.attribute("container-member");
-  if (!member) {
-    return true;
-  }
-  const std::string actualPath = normalizedPath(*member);
-  const std::string selectedPath = normalizedPath(selected);
-  return selectedPath.find('/') == std::string::npos ? baseName(actualPath) == selectedPath
-                                                     : actualPath == selectedPath;
-}
-
 [[nodiscard]] std::vector<std::string> commandWords(std::string_view line) {
   std::vector<std::string> words;
   for (size_t cursor = 0; cursor < line.size();) {
@@ -213,7 +202,8 @@ void applySqOption(Psf2Selection& selection, std::string_view word) {
   return banks;
 }
 
-void publishMidiBlock(ScanResultBuilder& result, const MidiBlockLayout& block, u32 initialVolume = 128) {
+void publishMidiBlock(ScanResultBuilder& result, const MidiBlockLayout& block, u32 initialVolume = 128,
+                      std::string bankMember = {}) {
   const ByteReader reader = result.reader();
   auto sequence = result.sequence(fmt::format("{} MIDI {}", result.sourceDisplayName(), block.index),
                                   reader.range(block.offset, block.dataEnd - block.offset));
@@ -221,7 +211,9 @@ void publishMidiBlock(ScanResultBuilder& result, const MidiBlockLayout& block, u
   if (initialVolume != 128) {
     program.behavior.initialMasterLevel = std::min(initialVolume, 128u) / 128.0;
   }
-  sequence.data(SequenceData{}).program(std::move(program));
+  sequence.useBanks(BankRequest{.member = std::move(bankMember)})
+      .prepare(prepareSonyPs2Sequence)
+      .program(std::move(program));
 }
 
 [[nodiscard]] u32 songEntryEnd(const SparseChunkLayout& songs, u32 offset) {
@@ -280,7 +272,7 @@ void publishSongs(ScanResultBuilder& result, const SequenceLayout& layout, const
                                     reader.range(song.offset, song.end - song.offset));
     auto program = parseSongSequence(reader, sequence.id(), layout, song.offset, song.end, &result.sourceMap(),
                                      &result.diagnostics());
-    sequence.data(SequenceData{}).program(std::move(*program));
+    sequence.useBanks(BankRequest{}).prepare(prepareSonyPs2Sequence).program(std::move(*program));
   }
 }
 
@@ -295,7 +287,7 @@ void publishSeSequences(ScanResultBuilder& result, const SequenceLayout& layout)
           result.sequence(fmt::format("{} SeSeq {}:{}", result.sourceDisplayName(), block.set, block.sequence),
                           reader.range(block.offset, block.dataEnd - block.offset));
       auto program = parseSeSequence(reader, sequence.id(), block, &result.sourceMap(), &result.diagnostics());
-      sequence.data(SequenceData{}).program(std::move(*program));
+      sequence.useBanks(BankRequest{}).prepare(prepareSonyPs2Sequence).program(std::move(*program));
     }
     result.warning("SonyPS2 SeSeq notes, jumps, and per-voice pitch slides are playable; volume, pan, and LFO "
                    "automation remain source-only",
@@ -315,7 +307,7 @@ void publishSequenceLayout(ScanResultBuilder& result, const SequenceLayout& layo
   if (selection != nullptr) {
     const auto midi = std::ranges::find(layout.midiBlocks, selection->midi, &MidiBlockLayout::index);
     if (midi != layout.midiBlocks.end()) {
-      publishMidiBlock(result, *midi, selection->volume);
+      publishMidiBlock(result, *midi, selection->volume, selection->header);
     } else {
       result.warning(fmt::format("PSF2 sq.irx selects missing SonyPS2 MIDI block {}", selection->midi),
                      result.reader().range(layout.offset, layout.length));
@@ -365,6 +357,7 @@ void publishSequenceLayout(ScanResultBuilder& result, const SequenceLayout& layo
   }
   for (auto& [offset, bank] : banks) {
     if (selection && extension == ".hd") {
+      bank.sampleBodyMember = selection->body;
       bank.reverbType = selection->reverbType;
       bank.reverbDepth = selection->reverbDepth;
     }
@@ -379,6 +372,17 @@ void publishSequenceLayout(ScanResultBuilder& result, const SequenceLayout& layo
 
 }  // namespace
 
+[[nodiscard]] bool selectedMember(const SourceFile& source, std::string_view selected) {
+  const auto member = source.attribute("container-member");
+  if (!member) {
+    return true;
+  }
+  const std::string actualPath = normalizedPath(*member);
+  const std::string selectedPath = normalizedPath(selected);
+  return selectedPath.find('/') == std::string::npos ? baseName(actualPath) == selectedPath
+                                                     : actualPath == selectedPath;
+}
+
 FormatModule module() {
   // SCE's separate software-synth (SS) format adds oscillator and filter
   // graphs that do not fit value-core's sampled-region model. Do not claim SS
@@ -387,8 +391,6 @@ FormatModule module() {
       .name = std::string(kFormatName),
       .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
       .scan = scan,
-      .resolveCollections = resolveCollections,
-      .bindCollection = bindCollection,
   };
 }
 

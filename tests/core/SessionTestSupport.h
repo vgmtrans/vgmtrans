@@ -8,7 +8,7 @@
 
 #include "SequenceTestSupport.h"
 
-#include "value/scan/CollectionDiscovery.h"
+#include "value/scan/AssetResolution.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/session/Session.h"
 
@@ -163,6 +163,15 @@ struct ProbeBankData {
           },
       .program = probeSequenceProgram(),
       .privateData = AssetPrivateData::make(ProbeBankData{.bank = bank}),
+      .recipe = {.collectionNamespace = "ProbeBank",
+                 .dependencies = {{.select =
+                                       [bank](const DependencyContext& context) {
+                                         auto banks = context.candidates<SoundBankAsset, ProbeBankData>();
+                                         std::erase_if(banks, [bank](const auto& candidate) {
+                                           return candidate.data->bank != bank;
+                                         });
+                                         return selectAll(banks);
+                                       }}}},
   };
 
   ScanResult result;
@@ -205,44 +214,10 @@ struct ProbeBankData {
   return result;
 }
 
-[[nodiscard]] std::vector<DesiredCollection> resolveProbeBankCollections(const CollectionDiscoveryContext& context) {
-  std::vector<DesiredCollection> collections;
-  const auto attach = [&](const auto& entry) {
-    const std::string key = "bank:" + std::to_string(entry.data->bank);
-    auto found = std::ranges::find_if(collections,
-                                      [&](const DesiredCollection& collection) { return collection.localKey == key; });
-    if (found == collections.end()) {
-      collections.push_back(DesiredCollection{
-          .localKey = key,
-          .name = "Probe Bank " + std::to_string(entry.data->bank),
-      });
-      found = std::prev(collections.end());
-    }
-    return found;
-  };
-  for (const auto& sequence : context.assetsWithData<SequenceProgramAsset, ProbeBankData>()) {
-    attach(sequence)->members.sequence = sequence.id();
-  }
-  for (const auto& bank : context.assetsWithData<SoundBankAsset, ProbeBankData>()) {
-    attach(bank)->members.soundBanks.push_back(bank.id());
-  }
-  for (auto& collection : collections) {
-    if (!collection.members.sequence) {
-      collection.issues.push_back(missingSequenceIssue());
-    }
-    if (collection.members.soundBanks.empty()) {
-      collection.issues.push_back(missingSoundBankIssue());
-    }
-  }
-  return collections;
-}
-
 [[nodiscard]] FormatModule probeBankSequenceModule() {
   return FormatModule{
       .name = "ProbeBankSequence",
       .scan = scanProbeBankSequence,
-      .collectionResolverId = "ProbeBank",
-      .resolveCollections = resolveProbeBankCollections,
   };
 }
 
@@ -313,98 +288,6 @@ struct ProbeBankData {
 
 [[nodiscard]] ScanResult scanNothing(const ScanInput&) {
   return {};
-}
-
-[[nodiscard]] std::vector<DesiredCollection> fragileProbeSequenceResolver(const CollectionDiscoveryContext& context) {
-  const auto sequences = context.assets<SequenceProgramAsset>();
-  if (sequences.empty() || sequences.size() > 1) {
-    throw std::runtime_error("resolver exploded");
-  }
-  return {DesiredCollection{
-      .localKey = "dynamic",
-      .name = "Dynamic Probe Collection",
-      .members = {.sequence = sequences.front()->metadata.id},
-  }};
-}
-
-[[nodiscard]] FormatModule fragileProbeSequenceModule() {
-  return FormatModule{
-      .name = "ProbeSequenceFragileResolver",
-      .scan = scanProbeSequence,
-      .collectionResolverId = "ProbeSequence",
-      .resolveCollections = fragileProbeSequenceResolver,
-  };
-}
-
-[[nodiscard]] std::vector<DesiredCollection> missingAssetCollectionResolver(const CollectionDiscoveryContext&) {
-  return {DesiredCollection{
-      .localKey = "missing-assets",
-      .name = "Missing Assets",
-      .members =
-          {
-              .sequence = AssetId{99},
-              .soundBanks = {AssetId{98}},
-              .samplePools = {AssetId{97}},
-              .miscAssets = {AssetId{96}},
-          },
-  }};
-}
-
-[[nodiscard]] FormatModule missingAssetCollectionResolverModule() {
-  return FormatModule{
-      .name = "ProbeMissingRefs",
-      .scan = scanNothing,
-      .resolveCollections = missingAssetCollectionResolver,
-  };
-}
-
-[[nodiscard]] std::vector<DesiredCollection> wrongTypeCollectionResolver(const CollectionDiscoveryContext& context) {
-  std::optional<AssetId> sequence;
-  for (const auto* asset : context.assets<SequenceProgramAsset>()) {
-    sequence = asset->metadata.id;
-    break;
-  }
-  if (!sequence) {
-    return {};
-  }
-
-  return {DesiredCollection{
-      .localKey = "wrong-type-assets",
-      .name = "Wrong Type Assets",
-      .members =
-          {
-              .soundBanks = {*sequence},
-              .samplePools = {*sequence},
-              .miscAssets = {*sequence},
-          },
-  }};
-}
-
-[[nodiscard]] FormatModule wrongTypeCollectionResolverModule() {
-  return FormatModule{
-      .name = "ProbeWrongTypeRefs",
-      .scan = scanNothing,
-      .resolveCollections = wrongTypeCollectionResolver,
-  };
-}
-
-[[nodiscard]] std::vector<DesiredCollection> duplicateKeyCollectionResolver(const CollectionDiscoveryContext&) {
-  return {DesiredCollection{
-              .localKey = "same-key",
-              .name = "First",
-          },
-          DesiredCollection{
-              .localKey = "same-key",
-              .name = "Second",
-          }};
-}
-
-[[nodiscard]] FormatModule duplicateKeyCollectionResolverModule() {
-  return FormatModule{
-      .name = "ProbeDuplicateKeys",
-      .scan = scanNothing,
-      .resolveCollections = duplicateKeyCollectionResolver,
-  };
 }
 
 }  // namespace
