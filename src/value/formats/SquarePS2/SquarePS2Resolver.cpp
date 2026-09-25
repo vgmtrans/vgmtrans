@@ -27,7 +27,7 @@ using BankEntry = AssetWithData<SoundBankAsset, SoundBankData>;
   if (sequence->id == bank->id) {
     return 4;
   }
-  if (sequence->parent && bank->parent && sequence->parent == bank->parent) {
+  if (sameContainer(sequence, bank)) {
     return 3;
   }
   if (!sequence->path.empty() && sequence->path == bank->path) {

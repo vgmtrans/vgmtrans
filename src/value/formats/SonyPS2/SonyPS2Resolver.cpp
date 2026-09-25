@@ -14,7 +14,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <filesystem>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -40,38 +39,25 @@ struct BodyAddressing {
   }
 };
 
-[[nodiscard]] std::filesystem::path path(const SourceFile* source) {
-  if (source == nullptr) {
-    return {};
-  }
-  if (const auto member = source->attribute("container-member")) {
-    return *member;
-  }
-  if (source->derived() && !source->name.empty()) {
-    return source->name;
-  }
-  return source->path.empty() ? std::filesystem::path(source->name) : source->path;
-}
-
 [[nodiscard]] int affinity(const SourceFile* left, const SourceFile* right) {
   if (left != nullptr && right != nullptr && left->parent != right->parent) {
     return kNoAffinity;
   }
-  const auto a = path(left);
-  const auto b = path(right);
+  const auto a = sourcePath(left);
+  const auto b = sourcePath(right);
   if (a.empty() || b.empty()) {
     return 0;
   }
   if (a.parent_path() == b.parent_path() && a.stem() == b.stem()) {
     return 8;
   }
-  if (left->parent && right->parent && left->parent == right->parent && a.stem() == b.stem()) {
+  if (sameContainer(left, right) && a.stem() == b.stem()) {
     return 6;
   }
   if (a.parent_path() == b.parent_path()) {
     return 4;
   }
-  if (left->parent && right->parent && left->parent == right->parent) {
+  if (sameContainer(left, right)) {
     return 2;
   }
   return left->id == right->id ? 1 : 0;

@@ -147,21 +147,10 @@ void applySqOption(Psf2Selection& selection, std::string_view word) {
 }
 
 [[nodiscard]] std::string lowerExtension(const SourceFile& source) {
-  const auto extension = [](const std::filesystem::path& path) {
-    std::string result = path.extension().string();
-    std::ranges::transform(result, result.begin(),
-                           [](unsigned char value) { return static_cast<char>(std::tolower(value)); });
-    return result;
-  };
-  if (const auto member = source.attribute("container-member")) {
-    if (auto result = extension(*member); !result.empty()) {
-      return result;
-    }
-  }
-  if (auto result = extension(source.name); !result.empty()) {
-    return result;
-  }
-  return extension(source.path);
+  std::string extension = source.logicalPath().extension().string();
+  std::ranges::transform(extension, extension.begin(),
+                         [](unsigned char value) { return static_cast<char>(std::tolower(value)); });
+  return extension;
 }
 
 [[nodiscard]] std::optional<u32> trivialSongMidi(const SequenceProgram& program, const SequenceLayout& layout) {
@@ -373,11 +362,10 @@ void publishSequenceLayout(ScanResultBuilder& result, const SequenceLayout& layo
 }  // namespace
 
 [[nodiscard]] bool selectedMember(const SourceFile& source, std::string_view selected) {
-  const auto member = source.attribute("container-member");
-  if (!member) {
+  if (!source.memberPath) {
     return true;
   }
-  const std::string actualPath = normalizedPath(*member);
+  const std::string actualPath = normalizedPath(source.memberPath->generic_string());
   const std::string selectedPath = normalizedPath(selected);
   return selectedPath.find('/') == std::string::npos ? baseName(actualPath) == selectedPath
                                                      : actualPath == selectedPath;

@@ -82,10 +82,21 @@ struct SourceFile {
   std::optional<std::filesystem::path> memberPath;
 
   [[nodiscard]] bool derived() const noexcept { return parent.has_value(); }
+  // Member path, host path, then name. Normalize lexically without filesystem
+  // access; transformed sources without a member path retain their host path.
+  [[nodiscard]] std::filesystem::path logicalPath() const;
   [[nodiscard]] std::optional<std::string_view> attribute(std::string_view key) const noexcept;
   [[nodiscard]] const SourceSegment* segment(std::string_view segmentName) const noexcept;
   [[nodiscard]] std::optional<SourceRange> segmentRange(std::string_view segmentName) const noexcept;
 };
+
+// Nullable source-location facts. Missing paths do not match. Member paths are
+// relative to their immediate container; host paths share the filesystem scope.
+[[nodiscard]] std::filesystem::path sourcePath(const SourceFile* source);
+[[nodiscard]] std::filesystem::path sourceDirectory(const SourceFile* source);
+[[nodiscard]] bool sameContainer(const SourceFile* left, const SourceFile* right) noexcept;
+[[nodiscard]] bool sameDirectory(const SourceFile* left, const SourceFile* right);
+[[nodiscard]] bool sameStem(const SourceFile* left, const SourceFile* right);
 
 class ByteReader {
 public:

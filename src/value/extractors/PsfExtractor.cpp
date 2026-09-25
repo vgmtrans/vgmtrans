@@ -516,9 +516,9 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
           .name = std::filesystem::path(member.path).filename().string(),
           .path = input.source.path,
           .origin = range,
+          .memberPath = member.path,
       };
       file.attributes.emplace("container-format", "PSF2");
-      file.attributes.emplace("container-member", member.path);
       if (ini) {
         file.attributes.emplace(kPsf2IniAttribute, *ini);
       }

@@ -25,6 +25,34 @@ struct ProbeData {
   u32 value = 0;
 };
 
+void sourceLocationsDistinguishHostFilesMembersAndTransformedData() {
+  const SourceFile host{.name = "Display name", .path = "/music/./song.psf2"};
+  const SourceFile transformed{.name = "RAM image", .path = host.path, .parent = SourceId{1}};
+  SourceFile member{.name = "Display name", .path = host.path, .parent = SourceId{1}, .memberPath = "audio\\./song.sq"};
+  SourceFile bank = member;
+  bank.memberPath = "audio/song.hd";
+  expect(host.logicalPath() == "/music/song.psf2" && transformed.logicalPath() == host.logicalPath() &&
+             member.logicalPath() == "audio/song.sq" && SourceFile{.name = "song.sq"}.logicalPath() == "song.sq",
+         "logical paths must prefer members over host paths over names, while RAM images retain their host location");
+  expect(sameDirectory(&host, &transformed) && !sameContainer(&host, &transformed) && sameDirectory(&member, &bank) &&
+             sameStem(&member, &bank) && sameContainer(&member, &bank),
+         "directory, stem, and immediate-container relationships must remain distinct facts");
+  bank.memberPath = "synth/song.hd";
+  expect(!sameDirectory(&member, &bank) && sameStem(&member, &bank) && sameContainer(&member, &bank),
+         "a shared stem or container must not imply a shared directory");
+  bank.memberPath = "audio/song.hd";
+  bank.parent = SourceId{2};
+  expect(!sameDirectory(&member, &bank) && !sameStem(&member, &bank) && !sameContainer(&member, &bank),
+         "member paths in different containers must not share a path namespace");
+  bank = SourceFile{.name = "song.hd", .path = "audio/song.hd"};
+  expect(!sameDirectory(&member, &bank) && !sameStem(&member, &bank),
+         "host paths and member paths must remain separate even when their text matches");
+  const SourceFile unnamed;
+  expect(sourcePath(nullptr).empty() && sourceDirectory(nullptr).empty() && !sameDirectory(&unnamed, &unnamed) &&
+             !sameStem(nullptr, &bank) && !sameContainer(nullptr, nullptr),
+         "missing source locations must remain unknown instead of supplying directory or stem matches");
+}
+
 void collectionStatusControlsPreparationIndependentlyOfDiagnostics() {
   expect(Collection{}.resolutionStatus() == ResolutionStatus::Resolved,
          "a collection with no dependency requests has no unresolved obligations");
@@ -595,6 +623,7 @@ void bankAssignmentsBelongToEachSequenceAndRespectManualSelection() {
 }  // namespace
 
 void runValueAssetResolutionTests() {
+  sourceLocationsDistinguishHostFilesMembersAndTransformedData();
   singleSampleInputRejectsInvalidSelections();
   sequencePreparationValidatesOnlyTheRequestedFormat();
   combinedRequestsPreserveUnresolvedOutcomes();

@@ -24,6 +24,11 @@ std::filesystem::path fileIdentity(const std::filesystem::path& path, bool membe
   return path.empty() ? path : std::filesystem::weakly_canonical(std::filesystem::absolute(path));
 }
 
+bool samePathScope(const SourceFile* left, const SourceFile* right) {
+  return left != nullptr && right != nullptr && left->memberPath.has_value() == right->memberPath.has_value() &&
+         (!left->memberPath || sameContainer(left, right));
+}
+
 }  // namespace
 
 std::vector<u8> readFileBytes(const std::filesystem::path& path) {
@@ -57,6 +62,35 @@ std::optional<std::string_view> SourceSegment::attribute(std::string_view key) c
 std::optional<std::string_view> SourceFile::attribute(std::string_view key) const noexcept {
   const auto found = attributes.find(key);
   return found != attributes.end() ? std::optional<std::string_view>{found->second} : std::nullopt;
+}
+
+std::filesystem::path SourceFile::logicalPath() const {
+  return memberPath ? fileIdentity(*memberPath, true)
+                    : (path.empty() ? std::filesystem::path(name) : path).lexically_normal();
+}
+
+std::filesystem::path sourcePath(const SourceFile* source) {
+  return source != nullptr ? source->logicalPath() : std::filesystem::path{};
+}
+
+std::filesystem::path sourceDirectory(const SourceFile* source) {
+  return sourcePath(source).parent_path();
+}
+
+bool sameContainer(const SourceFile* left, const SourceFile* right) noexcept {
+  return left != nullptr && right != nullptr && left->parent && left->parent == right->parent;
+}
+
+bool sameDirectory(const SourceFile* left, const SourceFile* right) {
+  const auto a = sourcePath(left);
+  const auto b = sourcePath(right);
+  return samePathScope(left, right) && !a.empty() && !b.empty() && a.parent_path() == b.parent_path();
+}
+
+bool sameStem(const SourceFile* left, const SourceFile* right) {
+  const auto a = sourcePath(left);
+  const auto b = sourcePath(right);
+  return samePathScope(left, right) && !a.empty() && !b.empty() && a.stem() == b.stem();
 }
 
 const SourceSegment* SourceFile::segment(std::string_view segmentName) const noexcept {

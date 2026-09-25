@@ -9,7 +9,6 @@
 #include "value/scan/AssetResolution.h"
 
 #include <algorithm>
-#include <filesystem>
 #include <string>
 #include <utility>
 #include <vector>
@@ -31,25 +30,6 @@ struct SamplePosition {
   return std::ranges::any_of(bank.instruments, [](const Instrument& instrument) {
     return std::ranges::any_of(instrument.regions, [](const Region& region) { return region.sample.needsBinding(); });
   });
-}
-
-[[nodiscard]] std::filesystem::path sourcePath(const SourceFile* source) {
-  if (source == nullptr) {
-    return {};
-  }
-  return source->path.empty() ? std::filesystem::path(source->name) : source->path;
-}
-
-[[nodiscard]] bool sameDirectory(const SourceFile* left, const SourceFile* right) {
-  const auto a = sourcePath(left);
-  const auto b = sourcePath(right);
-  return !a.empty() && !b.empty() && a.parent_path() == b.parent_path();
-}
-
-[[nodiscard]] bool sameStem(const SourceFile* left, const SourceFile* right) {
-  const auto a = sourcePath(left);
-  const auto b = sourcePath(right);
-  return !a.empty() && !b.empty() && a.parent_path() == b.parent_path() && a.stem() == b.stem();
 }
 
 [[nodiscard]] std::vector<InstrumentEntry> chooseInstruments(
@@ -121,9 +101,10 @@ DependencySelection selectSonyPs1Samples(const DependencyContext& context) {
       if (body.data->length != bank.expectedSampleBytes) {
         return -1;
       }
-      return (sameStem(context.source(), body.source) ? 4 : 0) +
+      const bool local = sameDirectory(context.source(), body.source);
+      return (local && sameStem(context.source(), body.source) ? 4 : 0) +
              (context.metadata().range.source.valid() && context.metadata().range.source == body.sourceId() ? 2 : 0) +
-             (sameDirectory(context.source(), body.source) ? 1 : 0);
+             (local ? 1 : 0);
     }));
   }
 

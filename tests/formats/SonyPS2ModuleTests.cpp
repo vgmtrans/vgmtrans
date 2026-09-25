@@ -320,43 +320,39 @@ const Collection* firstCollection(const SessionSnapshot& snapshot) {
 }
 
 SourceFile archiveMember(std::string name, std::string_view ini = {}) {
-  SourceFile source{.name = name, .path = std::filesystem::path("/fixture") / name};
+  SourceFile source{.name = name, .memberPath = std::move(name)};
   source.attributes.emplace("container-format", "PSF2");
-  source.attributes.emplace("container-member", std::move(name));
   if (!ini.empty()) {
     source.attributes.emplace(vgmtrans::formats::psf::kPsf2IniAttribute, ini);
   }
   return source;
 }
 
-SourceExtractor archiveFixtureExtractor() {
+SourceExtractor archiveFixtureExtractor(std::vector<ExtractedSource> members) {
   return SourceExtractor{
       .name = "SonyPS2 archive fixture",
-      .extract = [](const ExtractionInput& input) {
-        if (input.source.derived()) {
-          return ExtractionResult{};
-        }
-        ExtractionResult result;
-        const auto add = [&](std::string name, std::vector<u8> bytes) {
-          SourceFile source = archiveMember(std::move(name));
-          source.path = input.source.path;
-          source.origin = input.reader.range(0, input.reader.size());
-          result.sources.push_back(ExtractedSource{.file = std::move(source), .bytes = std::move(bytes)});
-        };
-        add("sequence/music.sq", sqFixture());
-        add("synth/sound.hd", hdFixture());
-        add("synth/sound.bd", bdFixture());
-        return result;
-      },
+      .extract =
+          [members = std::move(members)](const ExtractionInput& input) {
+            if (input.source.derived()) {
+              return ExtractionResult{};
+            }
+            ExtractionResult result{.sources = members};
+            for (auto& member : result.sources) {
+              member.file.path = input.source.path;
+              member.file.origin = input.reader.range(0, input.reader.size());
+            }
+            return result;
+          },
   };
 }
 
 Session fixtureSession(std::vector<u8> sq, std::string_view ini = {}, std::vector<u8> hd = hdFixture()) {
   Session session;
   session.registerFormat(module());
-  session.addSource(archiveMember("music.sq", ini), std::move(sq));
-  session.addSource(archiveMember("music.hd", ini), std::move(hd));
-  session.addSource(archiveMember("music.bd", ini), bdFixture());
+  session.registerExtractor(archiveFixtureExtractor({{archiveMember("music.sq", ini), std::move(sq)},
+                                                     {archiveMember("music.hd", ini), std::move(hd)},
+                                                     {archiveMember("music.bd", ini), bdFixture()}}));
+  session.addSource(SourceFile{.name = "fixture.psf2", .path = "/fixture/fixture.psf2"}, {0});
   session.scanPendingSources();
   return session;
 }
@@ -367,7 +363,9 @@ SessionSnapshot scanFixture(std::vector<u8> sq, std::string_view ini = {}, std::
 
 void psf2ArchivesRemainSeparate() {
   Session session;
-  session.registerExtractor(archiveFixtureExtractor());
+  session.registerExtractor(archiveFixtureExtractor({{archiveMember("sequence/music.sq"), sqFixture()},
+                                                     {archiveMember("synth/sound.hd"), hdFixture()},
+                                                     {archiveMember("synth/sound.bd"), bdFixture()}}));
   session.registerFormat(module());
   const auto load = [&](std::string name) {
     const SourceId source = session.addSource(
@@ -564,7 +562,7 @@ void trivialSongCollapsesToSelectedMidi() {
          "the MIDI selected by a trivial Song wrapper should remain playable");
 
   const auto iniSnapshot = scanFixture(sqFixture(false),
-                                       "sq.irx -s=music.sq -h=music.hd -b=music.bd -n=2 -v=64 -r=3 -d=4096");
+                                       R"(sq.irx -s=cdrom0:\./MUSIC.SQ;1 -h=music.hd -b=music.bd -n=2 -v=64 -r=3 -d=4096)");
   expect(iniSnapshot.collections().size() == 1 && iniSnapshot.collections().front().name == "music MIDI 2",
          "PSF2 sq.irx metadata should publish only the MIDI block the original player selects");
   const auto iniBound = bindCollection(iniSnapshot, iniSnapshot.collections().front().id);

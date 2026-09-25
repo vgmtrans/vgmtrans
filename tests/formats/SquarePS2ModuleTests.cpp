@@ -257,6 +257,13 @@ void syntheticArchiveCoversDriverFeatures() {
                               [](const Diagnostic& diagnostic) { return diagnostic.severity == Severity::Error; }),
          "synthetic SquarePS2 scan should not produce validation errors");
   expect(snapshot.sources().size() == 3, "PSF2 extraction should publish both filesystem members");
+  for (const auto& source : snapshot.sources()) {
+    if (source.derived()) {
+      expect(source.memberPath == source.name && source.path == "/fixture/fixture.psf2" &&
+                 session.sources().findFile(*source.memberPath, source.parent) == source.id,
+             "PSF2 members must retain their host path and use typed member paths for container lookup");
+    }
+  }
   const Collection* collection = squareCollection(snapshot);
   expect(collection != nullptr && collection->members.soundBanks.size() == 1,
          "BGM and WD members should resolve through their driver bank ID");

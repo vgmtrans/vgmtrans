@@ -61,6 +61,21 @@ reject candidates; zero is a valid fallback. These small views borrow the
 catalog's assets, data, and sources, so temporary candidate lists are safe and
 matching can compose directly with `selectOne` or `selectAll`.
 
+Source locations have separate host and member paths. `SourceFile::logicalPath()`
+uses the typed `memberPath` for archive members, otherwise the host `path`, then
+the display `name` when no path is available. It normalizes lexically without
+filesystem access; transformed sources such as PSF RAM keep their host location.
+`sourcePath` and `sourceDirectory` accept nullable source pointers. `sameDirectory`,
+`sameStem`, and `sameContainer` expose relationships without assigning affinity
+scores. Member-path comparisons are scoped to their immediate container.
+
+Formats retain their own priorities and fallbacks. SonyPS1 combines directory
+and stem matches; SonyPS2 also distinguishes shared stems across directories in
+one container. SquarePS2 explicitly compares host paths after source and parent
+identity. Tamsoft retains its case folding, directory fallback, and global BGM
+bank rule. SonyPS2's device prefixes and ISO filename suffixes remain format rules.
+PSF2 publishes `memberPath` like other archives; no string attribute is needed.
+
 A selection has a typed `ResolutionStatus`: `Resolved`, `Incomplete`, `Ambiguous`,
 or `Failed`. Empty selections are incomplete. `incomplete(message)` records
 missing coverage, including when some useful providers were selected.

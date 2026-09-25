@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <cctype>
-#include <filesystem>
 #include <string>
 
 namespace vgmtrans::formats::tamsoft_ps1 {
@@ -25,8 +24,7 @@ namespace {
 }
 
 [[nodiscard]] ScanResult scan(const ScanInput& input) {
-  const std::filesystem::path path =
-      input.source.path.empty() ? std::filesystem::path(input.source.name) : input.source.path;
+  const auto path = input.source.logicalPath();
   const std::string extension = lowercase(path.extension().string());
   const bool sequenceCandidate = extension.empty() || extension == ".tsq";
   const bool bankCandidate = extension.empty() || extension == ".tvb" || extension == ".tvb2";

@@ -9,7 +9,6 @@
 
 #include <algorithm>
 #include <cctype>
-#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -24,14 +23,6 @@ using BankEntry = AssetWithData<SoundBankAsset, BankData>;
 [[nodiscard]] std::string uppercase(std::string value) {
   std::ranges::transform(value, value.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
   return value;
-}
-
-[[nodiscard]] std::filesystem::path sourceDirectory(const SourceFile* source) {
-  if (source == nullptr) {
-    return {};
-  }
-  const std::filesystem::path path = source->path.empty() ? std::filesystem::path(source->name) : source->path;
-  return path.parent_path().lexically_normal();
 }
 
 [[nodiscard]] int matchScore(const BankRequest& sequence, const SourceFile* source, const BankEntry& bank) {
