@@ -40,7 +40,7 @@ namespace {
     auto sequence = result.sequence(name, input.reader.range(layout.offset, layout.length));
     sequence.program(parseSequence(input.reader, sequence.id(), layout, instruments, &result.sourceMap(),
                                    &result.diagnostics()));
-    sequence.collection();
+
     if (bank) {
       sequence.useBank(*bank);
     }

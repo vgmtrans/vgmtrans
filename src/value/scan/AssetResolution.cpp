@@ -176,15 +176,14 @@ void resolveDependencies(const AssetCatalog& assets, DesiredCollection& collecti
 
 std::vector<DesiredCollection> dependencyCollections(const AssetCatalog& assets) {
   std::vector<DesiredCollection> result;
-  for (const auto* sequence : assets.assets<SequenceProgramAsset>()) {
-    if (!sequence->collection) {
+  auto sequences = assets.assets<SequenceProgramAsset>();
+  std::ranges::stable_sort(sequences, {}, [](const auto* sequence) { return sequence->metadata.format; });
+  for (const auto* sequence : sequences) {
+    if (!sequence->collection.enabled) {
       continue;
     }
-    const auto& descriptor = *sequence->collection;
+    const auto& descriptor = sequence->collection;
     DesiredCollection collection{
-        .key = {.resolver = descriptor.key.resolver.empty() ? sequence->metadata.format : descriptor.key.resolver,
-                .value = descriptor.key.value.empty() ? "asset:" + std::to_string(sequence->metadata.id.value)
-                                                      : descriptor.key.value},
         .name = descriptor.name.empty() ? sequence->metadata.name : descriptor.name,
         .members = {.sequence = sequence->metadata.id, .miscAssets = descriptor.miscAssets}};
     resolveDependencies(assets, collection);

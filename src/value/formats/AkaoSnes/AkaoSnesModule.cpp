@@ -32,7 +32,6 @@ using namespace core;
   }
   sequence.program(std::move(program));
 
-  sequence.collection();
 
   const bool hasSynthLayout = layout->spcDirAddress && layout->tuningTableAddress &&
                               (layout->version == AKAOSNES_V1 || layout->adsrTableAddress);

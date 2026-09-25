@@ -29,7 +29,6 @@ namespace {
   sequence.program(
       decodeCapcomSnesSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics()));
 
-  sequence.collection();
 
   if (!layout->instrumentTableAddress || !layout->spcDirAddress) {
     result.warning("CapcomSnes sequence found, but instrument table or SPC DIR address was not detected",

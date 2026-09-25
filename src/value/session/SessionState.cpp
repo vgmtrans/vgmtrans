@@ -8,7 +8,6 @@
 
 #include <algorithm>
 #include <iterator>
-#include <set>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -194,30 +193,22 @@ SourceMap SessionState::sourceMapForAsset(AssetId asset) const {
 }
 
 void SessionState::reconcileCollections(std::vector<DesiredCollection> desired) {
-  std::ranges::stable_sort(desired, {}, [](const auto& candidate) { return candidate.key.resolver; });
-  std::set<std::pair<std::string, std::string>> seenKeys;
+  std::unordered_set<AssetId> sequences;
   for (auto& candidate : desired) {
-    const auto& resolver = candidate.key.resolver;
-    if (candidate.key.value.empty()) {
-      addError("Collection resolver '" + std::string(resolver) + "' returned a collection with an empty key");
-      continue;
-    }
-
-    if (!seenKeys.emplace(resolver, candidate.key.value).second) {
-      addError("Collection resolver '" + std::string(resolver) + "' returned duplicate collection key '" +
-               candidate.key.value + "'");
-      continue;
-    }
-
+    const AssetId sequence = candidate.members.sequence.value();
+    sequences.insert(sequence);
     validateMiscAssets(candidate);
     Collection collection{
         .name = std::move(candidate.name),
-        .key = std::move(candidate.key),
+        .origin = CollectionOrigin::Discovered,
         .members = std::move(candidate.members),
         .issues = std::move(candidate.issues),
         .dependencies = std::move(candidate.dependencies),
     };
-    if (auto found = std::ranges::find(collections_, collection.key, &Collection::key); found != collections_.end()) {
+    const auto found = std::ranges::find_if(collections_, [&](const Collection& existing) {
+      return existing.isDiscovered() && existing.members.sequence == sequence;
+    });
+    if (found != collections_.end()) {
       collection.id = found->id;
       *found = std::move(collection);
     } else {
@@ -227,7 +218,7 @@ void SessionState::reconcileCollections(std::vector<DesiredCollection> desired) 
   }
 
   std::erase_if(collections_, [&](const Collection& collection) {
-    return collection.key && !seenKeys.contains({collection.key->resolver, collection.key->value});
+    return collection.isDiscovered() && !sequences.contains(collection.members.sequence.value());
   });
 }
 
@@ -314,7 +305,7 @@ void SessionState::validateMiscAssets(DesiredCollection& desired) {
       return false;
     }
     const bool missing = !containsAsset(id);
-    addError("Collection resolver '" + desired.key.resolver + "' returned misc asset id " + std::to_string(id.value) +
+    addError("Collection '" + desired.name + "' references misc asset id " + std::to_string(id.value) +
              (missing ? " that does not exist" : " that is not a misc asset"));
     desired.issues.push_back(CollectionIssue{
         .impact = CollectionIssueImpact::Incomplete,

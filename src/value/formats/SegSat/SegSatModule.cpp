@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -25,13 +26,6 @@ struct BankAssets {
   ScanSoundBankDraft bank;
 };
 
-[[nodiscard]] CollectionKey collectionKey(SourceId source, const SegSatSequenceLayout& sequence) {
-  return CollectionKey{
-      .resolver = std::string(kSegSatCollectionResolver),
-      .value = "source:" + std::to_string(source.value) + ":sequence:" + std::to_string(sequence.offset),
-  };
-}
-
 [[nodiscard]] ScanResult scanSegSat(const ScanInput& input) {
   const auto bankLayouts = findSegSatBanks(input.reader);
   const auto sequenceLayouts = findSegSatSequences(input.reader);
@@ -39,7 +33,7 @@ struct BankAssets {
     return {};
   }
 
-  ScanResultBuilder result(input, std::string(kSegSatFormatName), std::string(kSegSatCollectionResolver));
+  ScanResultBuilder result(input, std::string(kSegSatFormatName));
   const SegSatDriverVersion version = determineSegSatDriverVersion(input.reader);
   const SegSatVolumeModel volumeModel = determineSegSatVolumeModel(input.reader);
   std::vector<BankAssets> banks;
@@ -55,7 +49,13 @@ struct BankAssets {
     }
   }
 
+  // Song tables may share physical streams. Keep the first entry as the
+  // canonical sequence, including its name and collection.
+  std::unordered_set<u32> publishedSequences;
   for (const auto& sequence : sequenceLayouts) {
+    if (!publishedSequences.insert(sequence.offset).second) {
+      continue;
+    }
     const std::string sourceName =
         result.sourceFile().name.empty() ? result.sourceDisplayName() : result.sourceFile().name;
     const std::string name = fmt::format("{} {}_{}", sourceName, sequence.tableIndex, sequence.sequenceIndex);
@@ -65,8 +65,7 @@ struct BankAssets {
         parseSegSatSequence(input.reader, sequenceDraft.id(), sequence, &result.sourceMap(), &result.diagnostics());
     const std::vector<u8> referencedBanks =
         sequence.referencedBanks.empty() ? std::vector<u8>{0} : sequence.referencedBanks;
-    sequenceDraft.collection(collectionKey(result.source(), sequence))
-        .assignBanks(assignSegSatBanks)
+    sequenceDraft.assignBanks(assignSegSatBanks)
         .prepare<SegSatSequenceBindingData>(prepareSegSatSequence)
         .data(SegSatSequenceBindingData{
             .volumeModel = volumeModel,

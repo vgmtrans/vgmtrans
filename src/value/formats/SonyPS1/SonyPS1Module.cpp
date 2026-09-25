@@ -49,7 +49,7 @@ namespace {
     return {};
   }
 
-  ScanResultBuilder result(input, std::string(kSonyPs1FormatName), std::string(kSonyPs1CollectionResolver));
+  ScanResultBuilder result(input, std::string(kSonyPs1FormatName));
   if (rawBody) {
     if (!addSonyPs1RawSampleBody(result)) {
       return {};

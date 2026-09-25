@@ -29,7 +29,6 @@ using namespace core;
 
   // A sequence is useful on its own, so publish it even when the snapshot does
   // not contain enough information to reconstruct instruments and samples.
-  sequence.collection();
 
   const bool hasSynthLayout = layout->spcDirAddress && layout->commonInstrumentTableAddress &&
                               layout->bankedInstrumentTableAddress && layout->percussionInstrumentTableAddress;

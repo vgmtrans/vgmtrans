@@ -163,7 +163,6 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
     builder.collections.push_back(Collection{
         .id = CollectionId{index},
         .name = "Part " + std::to_string(index),
-        .key = CollectionKey{.resolver = "ProbeSequence"},
         .members =
             {
                 .sequence = sequenceId,

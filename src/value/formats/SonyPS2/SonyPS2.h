@@ -21,7 +21,6 @@
 namespace vgmtrans::formats::sony_ps2 {
 
 inline constexpr std::string_view kFormatName = "SonyPS2";
-inline constexpr std::string_view kCollectionResolver = "sony-ps2";
 inline constexpr std::string_view kInstrumentDomain = "sony-ps2.instrument";
 inline constexpr std::string_view kSetbInstrumentDomain = "sony-ps2.setb-instrument";
 inline constexpr std::string_view kCommandKindPrefix = "sony-ps2:sequence";

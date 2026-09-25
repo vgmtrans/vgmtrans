@@ -55,7 +55,6 @@ void scanLayout(const Mp2kLayout& layout, ScanResultBuilder& result, const Retai
     sequence.program(
         parseMp2kSequenceProgram(source, sequence.id(), song, tones, &result.sourceMap(), &result.diagnostics()));
 
-    sequence.collection();
     if (bank != banks.end()) {
       sequence.useBank(bank->second.instruments);
     }

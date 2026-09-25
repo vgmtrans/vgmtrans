@@ -122,7 +122,6 @@ void dependenciesPreserveSharingPlacementsAndPrivatePreparation() {
   const AssetId sequenceId{1}, firstBank{2}, secondBank{3}, poolId{4};
   SequenceProgramAsset sequence{
       .metadata = {.id = sequenceId, .format = "Sequence"},
-      .collection = SequenceCollection{},
       .recipe = {.banks = {exact(firstBank), exact(secondBank)}},
   };
   auto bank = [&](AssetId id, u32 position) {
@@ -178,7 +177,6 @@ void manualChoicesOverrideSequenceRequestsAndConstrainBankInputs() {
   SourceStore sources;
   SequenceProgramAsset sequence{
       .metadata = {.id = AssetId{1}},
-      .collection = SequenceCollection{},
       .recipe = {.banks = {DependencyTarget{AssetId{99}, {}}}},
   };
   SoundBankAsset bank{
@@ -220,7 +218,6 @@ void manualChoicesOverrideSequenceRequestsAndConstrainBankInputs() {
 void dependencyFailuresAreLocalAndAmbiguityRetainsAlternatives() {
   SourceStore sources;
   SequenceProgramAsset sequence{.metadata = {.id = AssetId{1}},
-                                .collection = SequenceCollection{},
                                 .recipe = {.banks = {[](const DependencyContext& context) {
                                              return selectOne(context.candidates<SoundBankAsset>());
                                            }}}};
@@ -258,7 +255,6 @@ void automaticCandidatesRespectContainerBoundaries() {
   const SourceId bankFile = sources.add(SourceFile{.name = "bank", .parent = second}, {0});
   SequenceProgramAsset sequence{
       .metadata = {.id = AssetId{1}, .range = sources.reader(sequenceFile).range(0, 1)},
-      .collection = SequenceCollection{},
       .recipe = {.banks = {[](const DependencyContext& context) {
                    return selectOne(context.candidates<SoundBankAsset>());
                  }}},
@@ -336,7 +332,6 @@ void combinedRequestsPreserveUnresolvedOutcomes() {
   for (const auto status : {ResolutionStatus::Incomplete, ResolutionStatus::Ambiguous, ResolutionStatus::Failed}) {
     SequenceProgramAsset sequence{
         .metadata = {.id = AssetId{1}},
-        .collection = SequenceCollection{},
         .recipe = {.banks = {exact(AssetId{2}),
                              [status](const DependencyContext&) {
                                if (status == ResolutionStatus::Failed) {
@@ -369,7 +364,6 @@ void bankAssignmentsBelongToEachSequenceAndRespectManualSelection() {
     return SequenceProgramAsset{
         .metadata = {.id = AssetId{id}, .format = "Sequence"},
         .privateData = AssetPrivateData::make(ProbeData{address}),
-        .collection = SequenceCollection{},
         .recipe = {.banks = {DependencyTarget{bankId, {}}, DependencyTarget{bankId, {}}},
                    .assignBanks =
                        [](BankAssignmentContext& context) {

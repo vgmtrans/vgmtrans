@@ -46,7 +46,6 @@ namespace {
     auto sequence = result.sequence(name, input.reader.range(layout.offset, layout.length));
     sequence.program(parseSuzukiPs1Sequence(input.reader, sequence.id(), layout, envelopes, &result.sourceMap(),
                                             &result.diagnostics()));
-    sequence.collection();
 
     // A source can contain several WDS uploads and switch between them with
     // FE. Keeping them in one collection preserves those source bank IDs.

@@ -23,7 +23,7 @@ ScanResult scan(const ScanInput& input) {
   auto sequence = result.sequence(name);
   sequence.program(decodeSequence(input.reader, *layout, data, sequence.id(), &result.sourceMap(),
                                   &result.diagnostics(), &programs));
-  sequence.collection();
+
   if (const auto bank = addSynth(result, *layout, data, programs, name)) {
     sequence.useBank(*bank);
   } else {

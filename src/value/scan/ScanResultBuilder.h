@@ -34,10 +34,9 @@ public:
   [[nodiscard]] AssetId id() const noexcept { return id_; }
   ScanSequenceDraft& range(SourceRange range);
   ScanSequenceDraft& program(SequenceProgram program);
-  // Publish a collection even when this sequence has no bank dependencies.
-  // useBank/useBanks opt in automatically; explicit options preserve naming
-  // and identity when they differ from the sequence's defaults.
-  ScanSequenceDraft& collection(CollectionKey key = {}, std::string name = {});
+  // A sequence produces a collection by default, using its own name.
+  ScanSequenceDraft& collectionName(std::string name);
+  ScanSequenceDraft& withoutCollection();
   ScanSequenceDraft& includeMisc(AssetId asset);
   ScanSequenceDraft& includeMisc(const ScanMiscDraft& asset);
   ScanSequenceDraft& useBank(AssetId bank);
@@ -132,7 +131,7 @@ private:
 // asset metadata setup, and diagnostics.
 class ScanResultBuilder {
 public:
-  ScanResultBuilder(ScanInput input, std::string format, std::string collectionNamespace = {});
+  ScanResultBuilder(ScanInput input, std::string format);
   ~ScanResultBuilder();
 
   [[nodiscard]] SourceId source() const noexcept { return input_.source.id; }
@@ -171,7 +170,6 @@ private:
 
   ScanInput input_;
   std::string format_;
-  std::string collectionNamespace_;
   ScanResult result_;
   SourceMapBuilder sourceMap_;
 

@@ -20,7 +20,6 @@
 namespace vgmtrans::formats::konami_ps1 {
 
 inline constexpr std::string_view kKonamiPs1FormatName = "KonamiPS1";
-inline constexpr std::string_view kKonamiPs1CollectionResolver = "konami-ps1";
 inline constexpr std::string_view kKonamiPs1CommandKindPrefix = "konami-ps1:sequence";
 
 enum class EventKind {

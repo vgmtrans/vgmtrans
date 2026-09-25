@@ -11,6 +11,8 @@
 #include "value/scan/ScanResultBuilder.h"
 #include "value/session/Session.h"
 
+#include <array>
+
 using namespace vgmtrans::core;
 
 namespace {
@@ -113,7 +115,7 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
   const auto misc =
       out.misc("Builder Misc", input.reader.range(0, 1)).data(BuilderPrivateData{.value = 44}).payload({0xaa});
 
-  sequence.collection(CollectionKey{.value = "song:1"}, "Builder Song").useBank(bank).includeMisc(misc);
+  sequence.collectionName("Builder Song").useBank(bank).includeMisc(misc);
   bank.useSamples(samplePool);
   out.warning("builder warning", input.reader.range(0, 1));
 
@@ -176,6 +178,29 @@ void sessionStoresTheOwningFormatsPreferredSampleFilter() {
          "sample assets should retain their owning format's preferred export filter");
 }
 
+void scanResultBuilderPublishesCollectionsByDefaultAndPreservesOptOut() {
+  SourceStore sources;
+  const auto source = sources.add(SourceFile{.name = "collection-defaults.bin"}, {0});
+  ScanIdAllocator ids;
+  ScanResultBuilder out(ScanInput{.source = sources.source(source), .reader = sources.reader(source), .ids = ids},
+                        "Defaults");
+  const auto song = out.sequence("Song").program(probeSequenceProgram());
+  const auto bank = out.soundBank("Bank");
+  const auto table = out.misc("Table", sources.reader(source).range(0, 1)).payload({0});
+  auto loose = out.sequence("Loose").program(probeSequenceProgram()).withoutCollection();
+  loose.useBank(bank).useBanks([id = bank.id()](const DependencyContext&) { return selectAll(std::array{id}); });
+  loose.includeMisc(table).collectionName("Still loose");
+  const auto result = out.finish();
+  const auto collections = dependencyCollections(AssetCatalog{sources, SharedSequence<Asset>{result.assets}});
+  expect(collections.size() == 1 && collections.front().members.sequence == song.id() &&
+             collections.front().name == "Song" && collections.front().members.soundBanks.empty(),
+         "publishing a sequence must create a collection even without bank requests or explicit collection metadata");
+  const auto& retained = std::get<SequenceProgramAsset>(result.assets.back());
+  expect(retained.metadata.id == loose.id() && retained.recipe.banks.size() == 2 &&
+             retained.collection.miscAssets == std::vector{table.id()} && !retained.collection.enabled,
+         "bank requests, naming, and supplemental assets must not undo an explicit collection opt-out");
+}
+
 void scanResultBuilderNamesSequenceCollections() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "fallback.spc", .title = "Tagged Song"}, {0xaa});
@@ -189,14 +214,13 @@ void scanResultBuilderNamesSequenceCollections() {
   ScanResultBuilder out(input, "ProbeBuilder");
   expect(out.sourceDisplayName() == "Tagged Song", "source display name should prefer source metadata");
   const auto sequence =
-      out.sequence("Sequence").program(probeSequenceProgram()).collection({}, out.sourceDisplayName());
+      out.sequence("Sequence").program(probeSequenceProgram()).collectionName(out.sourceDisplayName());
 
   const ScanResult result = out.finish();
   const auto collections = dependencyCollections(AssetCatalog{sources, SharedSequence<Asset>{result.assets}});
   expect(collections.size() == 1 && collections[0].name == "Tagged Song",
          "a sequence collection can use a source title independently of the sequence name");
-  expect(collections[0].key.resolver == "ProbeBuilder" &&
-             collections[0].key.value == "asset:" + std::to_string(sequence.id().value),
+  expect(collections[0].members.sequence == sequence.id(),
          "sequence collection identity should not depend on its display name");
 }
 
@@ -231,7 +255,7 @@ void scanResultBuilderChecksAllDraftsBeforeConsumingValues() {
   bank.instruments().append(Instrument{.name = "Retained Instrument"});
   auto sequence = out.sequence("Incomplete Sequence");
   auto misc = out.misc("Incomplete Misc", input.reader.range(0, 1));
-  sequence.collection({}, "Broken");
+  sequence.collectionName("Broken");
 
   expectThrows<std::logic_error>([&] { static_cast<void>(out.finish()); },
                                  "scan result builder should reject a sequence draft that was never given a program");
@@ -303,6 +327,7 @@ void scanResultBuilderCursorReportsMalformedFields() {
 void runValueRegistryTests() {
   formatRegistryStoresCopyableModulesAtomically();
   scanResultBuilderCoversCommonScannerPlumbing();
+  scanResultBuilderPublishesCollectionsByDefaultAndPreservesOptOut();
   scanResultBuilderNamesSequenceCollections();
   scanResultBuilderInfersSequenceRangesUnlessExplicit();
   scanResultBuilderChecksAllDraftsBeforeConsumingValues();

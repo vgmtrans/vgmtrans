@@ -154,7 +154,6 @@ void annotateArticulationTable(SourceMapBuilder& sourceMap, ByteReader reader, c
     sequence.program(decodeCpsSequence(input.reader, *layout, sourceSequence, sequence.id(), &result.sourceMap(),
                                        &result.diagnostics()));
 
-    sequence.collection();
     if (isCps1(layout->version)) {
       if (cps1Synth.ym2151) {
         sequence.useBank(*cps1Synth.ym2151);

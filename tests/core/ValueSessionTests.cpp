@@ -442,8 +442,9 @@ void sessionPublishesDeclaredSequenceCollections() {
   session.scanSource(source);
   SessionSnapshot project = session.snapshot();
   expect(project.collections().size() == 1, "declared sequence collection should be published");
-  expect(project.collections()[0].key && project.collections()[0].key->resolver == "ProbeDeclared",
-         "declared sequence collection should use its scanner resolver key");
+  expect(project.collections()[0].isDiscovered() &&
+             project.collections()[0].members.sequence == metadata(project.assets().front()).id,
+         "a discovered collection should belong to its published sequence");
 
   session.removeSource(source);
 
@@ -1086,7 +1087,7 @@ void sessionKeepsSequenceCollectionsWhenSupplementalAssetsDisappear() {
         ScanResultBuilder out(input, "Supplemental");
         auto sequence = out.sequence("Song").program(probeSequenceProgram());
         auto misc = out.misc("Table", input.reader.range(0, 1)).payload({0});
-        sequence.collection().includeMisc(misc).includeMisc(sequence.id());
+        sequence.includeMisc(misc).includeMisc(sequence.id());
         out.sourceMap().header("Sequence", input.reader.range(0, 1)).owner(ObjectRefs::sequence(sequence.id()));
         out.sourceMap().header("Table", input.reader.range(0, 1)).owner(ObjectRefs::misc(misc.id()));
         return out.finish();
@@ -1106,24 +1107,23 @@ void sessionKeepsSequenceCollectionsWhenSupplementalAssetsDisappear() {
   expect(collection.members.miscAssets.size() == 1, "earlier snapshots must retain their supplemental membership");
 }
 
-void sessionReportsDuplicateDesiredCollectionKeys() {
-  Session session;
-  auto module = probeSequenceModule();
-  module.scan = [](const ScanInput& input) {
-    ScanResultBuilder out(input, "ProbeSequence");
-    for (const auto name : {"First", "Duplicate"}) {
-      auto sequence = out.sequence(name).program(probeSequenceProgram()).collection({.value = "duplicate"});
-      out.sourceMap().header(name, input.reader.range(0, 1)).owner(ObjectRefs::sequence(sequence.id()));
-    }
-    return out.finish();
-  };
-  session.registerFormat(std::move(module));
-  session.addSource(SourceFile{.name = "duplicate-keys.probe"}, {0xaa});
-  session.scanPendingSources();
-  const auto project = session.snapshot();
-  expect(project.collections().size() == 1, "duplicate scanner collection keys must not publish duplicate collections");
-  diagnosticWithMessage(project.diagnostics(),
-                        "Collection resolver 'ProbeSequence' returned duplicate collection key 'duplicate'");
+void sessionReconcilesCollectionsBySequenceIdentity() {
+  SessionState state;
+  state.reconcileCollections({{.name = "Same name", .members = {.sequence = AssetId{1}}},
+                              {.name = "Same name", .members = {.sequence = AssetId{2}}}});
+  const auto first = state.collections()[0].id;
+  const auto second = state.collections()[1].id;
+  expect(first != second, "distinct sequences must retain distinct collections even with the same name");
+
+  state.reconcileCollections({{.name = "Renamed", .members = {.sequence = AssetId{2}}},
+                              {.name = "Same name", .members = {.sequence = AssetId{1}}}});
+  expect(state.collections().size() == 2 && state.collections()[0].id == first &&
+             state.collections()[0].members.sequence == AssetId{1} && state.collections()[1].id == second &&
+             state.collections()[1].name == "Renamed" && state.collections()[1].members.sequence == AssetId{2},
+         "renaming or reordering discovery results must preserve each sequence's collection identity");
+  state.reconcileCollections({{.name = "Renamed", .members = {.sequence = AssetId{2}}}});
+  expect(state.collections().size() == 1 && state.collections().front().id == second,
+         "removing one sequence must remove only its discovered collection");
 }
 
 void retainedSourceOwnsStableCopiedBytes() {
@@ -1364,10 +1364,13 @@ void sessionExportsASequenceWithoutACollection() {
   const auto scan = format.scan;
   format.scan = [scan](const ScanInput& input) {
     auto result = scan(input);
-    std::get<SequenceProgramAsset>(result.assets.front()).collection.reset();
+    for (auto& asset : result.assets) {
+      std::get<SequenceProgramAsset>(asset).collection.enabled = false;
+    }
     return result;
   };
   session.registerFormat(std::move(format));
+  session.registerFormat(probeBankInstrumentModule());
 
   session.addSource(SourceFile{.name = "loose.probe"}, {0xaa});
   session.scanPendingSources();
@@ -1381,6 +1384,19 @@ void sessionExportsASequenceWithoutACollection() {
   expect(artifact.diagnostics.empty() && artifact.bytes.size() >= 4 &&
              std::string(artifact.bytes.begin(), artifact.bytes.begin() + 4) == "MThd",
          "session should export an uncollected sequence as Standard MIDI");
+
+  session.addSource(SourceFile{.name = "chosen-bank.probe"}, {0xdd, 7});
+  session.scanPendingSources();
+  const auto withBank = session.snapshot();
+  const AssetId bank = metadata(withBank.assets().back()).id;
+  const auto manual = session.createUserCollection("Manual", {.sequence = sequence, .soundBanks = {bank}});
+  const auto unrelated = session.addSource(SourceFile{.name = "unrelated-bank.probe"}, {0xdd, 8});
+  session.scanPendingSources();
+  session.removeSource(unrelated);
+  const auto after = session.snapshot();
+  expect(after.collections().size() == 1 && after.collections().front().id == manual &&
+             !after.collections().front().isDiscovered() && after.collections().front().members.sequence == sequence,
+         "an opted-out sequence must support manual collections that survive an empty discovery rebuild");
 }
 
 void snapshotFindsTheFirstCollectionContainingAnAsset() {
@@ -1432,7 +1448,7 @@ void runValueSessionTests() {
   scanValidationRejectsDanglingSourceAnnotationReferences();
   sessionReportsDesiredCollectionMissingAssetReferences();
   sessionKeepsSequenceCollectionsWhenSupplementalAssetsDisappear();
-  sessionReportsDuplicateDesiredCollectionKeys();
+  sessionReconcilesCollectionsBySequenceIdentity();
   retainedSourceOwnsStableCopiedBytes();
   sourceStoreRejectsMissingOrRemovedDerivedParents();
   sessionStateRebuildsLookupIndexAfterRemoval();

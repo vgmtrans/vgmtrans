@@ -19,7 +19,6 @@
 namespace vgmtrans::formats::segsat {
 
 inline constexpr std::string_view kSegSatFormatName = "SegSat";
-inline constexpr std::string_view kSegSatCollectionResolver = "SegSat";
 inline constexpr std::string_view kSegSatInstrumentDomain = "segsat";
 
 [[nodiscard]] inline core::InstrumentIdentity segSatInstrumentIdentity(u8 sourceBank, u8 program) {

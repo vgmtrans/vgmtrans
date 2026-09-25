@@ -64,8 +64,6 @@ namespace {
               .range = assetRange,
           },
       .program = probeSequenceProgram(),
-      .collection = SequenceCollection{.key = {.resolver = "ProbeSequence",
-                                               .value = "source:" + std::to_string(input.source.id.value)}},
   };
 
   ScanResult result;
@@ -122,7 +120,7 @@ namespace {
         .annotation(SourceRole::Payload, "Probe Payload", input.reader.range(1, input.reader.size() - 1))
         .owner(ObjectRefs::sequence(sequence.id()));
   }
-  sequence.collection(CollectionKey{.value = "source:" + std::to_string(input.source.id.value)}, input.source.name);
+  sequence.collectionName(input.source.name);
   return out.finish();
 }
 
@@ -154,7 +152,6 @@ struct ProbeBankData {
           },
       .program = probeSequenceProgram(),
       .privateData = AssetPrivateData::make(ProbeBankData{.bank = bank}),
-      .collection = SequenceCollection{},
       .recipe = {.banks = {[bank](const DependencyContext& context) {
                    auto banks = context.candidates<SoundBankAsset, ProbeBankData>();
                    std::erase_if(banks, [bank](const auto& candidate) { return candidate.data->bank != bank; });

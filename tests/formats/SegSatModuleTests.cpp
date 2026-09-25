@@ -730,7 +730,38 @@ void segSatSsfExtractorUsesFourByteMiniHeader() {
          "SSF extraction should overlay payload bytes immediately after its four-byte load address");
 }
 
+void segSatPublishesSharedSequenceTableEntriesOnce() {
+  std::vector<u8> bytes(0x1000);
+  for (const u32 table : {0x400u, 0x600u}) {
+    bytes[table + 1] = 2;
+    be32(bytes, table + 2, 10);
+    be32(bytes, table + 6, 0x800 - table);
+    for (const u32 sequence : {table + 10, 0x800u}) {
+      be16(bytes, sequence, 48);
+      be16(bytes, sequence + 2, 0);
+      be16(bytes, sequence + 4, 8);
+      be16(bytes, sequence + 6, 0);
+      bytes[sequence + 8] = 0x83;
+    }
+  }
+  expect(findSegSatSequences(ByteReader{SourceId{0}, bytes}).size() == 4,
+         "both sequence tables should discover their reference to the shared physical stream");
+  Session session;
+  session.registerFormat(segSatModule());
+  session.addSource(SourceFile{.name = "shared.bin"}, std::move(bytes));
+  session.scanPendingSources();
+  const auto snapshot = session.snapshot();
+  expect(snapshot.assets().size() == 3 && snapshot.collections().size() == 3 && snapshot.diagnostics().empty(),
+         "shared Saturn sequence entries must publish one asset and collection without duplicate-key diagnostics");
+  const auto shared =
+      std::ranges::find_if(snapshot.assets(), [](const Asset& asset) { return metadata(asset).range.offset == 0x800; });
+  expect(shared != snapshot.assets().end() && metadata(*shared).name == "shared.bin 0_1" &&
+             snapshot.countCollectionsContaining(metadata(*shared).id) == 1,
+         "the first table entry must preserve the shared sequence's canonical name and collection");
+}
+
 void runSegSatModuleTests() {
+  segSatPublishesSharedSequenceTableEntriesOnce();
   segSatVlCurveMatchesMm8Saturation();
   segSatTempoDeltaBytesPreserveSourceOrder();
   segSatCollectionBindingSuppliesVlTablesToSequence();

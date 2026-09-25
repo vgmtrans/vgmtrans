@@ -497,7 +497,6 @@ void collectionBindingAppliesToWholeExport() {
   builder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Performance Finalizer",
-      .key = CollectionKey{.resolver = "Performance Finalizer", .value = "one"},
       .members =
           {
               .sequence = sequence.metadata.id,
@@ -511,12 +510,10 @@ void collectionBindingAppliesToWholeExport() {
   builder.assets.emplace_back(failingSequence);
   auto failingCollection = builder.collections.front();
   failingCollection.id = CollectionId{1};
-  failingCollection.key->value = "failure";
   failingCollection.members.sequence = failingSequence.metadata.id;
   builder.collections.push_back(std::move(failingCollection));
   auto mismatchedCollection = builder.collections.front();
   mismatchedCollection.id = CollectionId{2};
-  mismatchedCollection.key->value = "runtime-mismatch";
   auto mismatchedSequence = sequence;
   mismatchedSequence.metadata.id = AssetId{4};
   mismatchedSequence.prepare = [](SequencePreparationContext& context) {
@@ -613,7 +610,6 @@ void collectionBindingProducesAnImmutableInstrumentView() {
   builder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Prepared Probe",
-      .key = CollectionKey{.resolver = "Prepared Probe", .value = "one"},
       .members =
           {
               .soundBanks = {durable.metadata.id},

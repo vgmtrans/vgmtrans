@@ -172,7 +172,6 @@ void addSongTables(ScanResultBuilder& result, const Layout& layout, const std::s
   sequence.range(sequenceSourceRange(input.reader, input.reader.range(layout->sequenceAddress, 1), parsed.program))
       .program(std::move(parsed.program));
 
-  sequence.collection();
   addSongTables(result, *layout, parsed.percussion, sequence);
   if (const auto synth = addSynth(result, *layout, parsed.srcns, parsed.percussion, parsed.noiseRates, name)) {
     sequence.useBank(*synth);

@@ -28,7 +28,6 @@ namespace {
       decodeSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics());
   sequence.program(std::move(parsed.program));
 
-  sequence.collection();
   if (const auto synth = addSynth(result, *layout, parsed.programs, parsed.patches, displayName)) {
     sequence.useBank(*synth);
   } else {

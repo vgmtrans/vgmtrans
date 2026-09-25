@@ -26,7 +26,6 @@ namespace {
   auto sequence = result.sequence(displayName);
   sequence.program(decodeSequence(input.retain(), *layout, sequence.id(), &result.sourceMap(), &result.diagnostics()));
 
-  sequence.collection();
   if (const auto synth = addSynth(result, *layout, displayName)) {
     sequence.useBank(*synth);
   } else {

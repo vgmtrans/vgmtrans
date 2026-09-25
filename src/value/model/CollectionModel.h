@@ -16,15 +16,6 @@
 
 namespace vgmtrans::core {
 
-struct CollectionKey {
-  // Stable identity for a resolved collection. The same key updates the same
-  // collection when more sources are loaded later.
-  std::string resolver;
-  std::string value;
-
-  friend bool operator==(const CollectionKey&, const CollectionKey&) noexcept = default;
-};
-
 struct CollectionMembers {
   std::optional<AssetId> sequence;
   std::vector<AssetId> soundBanks;
@@ -72,17 +63,16 @@ struct ResolvedDependency {
   std::vector<DependencyTarget> alternatives;
 };
 
-// Opting into a collection is independent of whether a sequence needs banks.
-// Empty identity/name fields use the sequence's asset identity and display name.
-struct SequenceCollection {
-  CollectionKey key;
+// Published sequences produce collections by default. Identity is always the
+// sequence's AssetId; an empty name uses the sequence's display name.
+struct SequenceCollectionOptions {
+  bool enabled = true;
   std::string name;
   // Supplemental inspection assets, not providers in the audio dependency chain.
   std::vector<AssetId> miscAssets;
 };
 
 struct DesiredCollection {
-  CollectionKey key;
   std::string name;
   CollectionMembers members;
   std::vector<CollectionIssue> issues;

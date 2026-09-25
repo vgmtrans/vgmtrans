@@ -752,7 +752,6 @@ void akaoSampleSelectionUsesPlayableArticulations() {
                                 .format = std::string(kAkaoFormatName),
                                 .name = "Sequence",
                                 .range = sources.reader(sequenceSource).range(10, 20)},
-      .collection = SequenceCollection{.key = {.resolver = std::string(kAkaoCollectionResolver)}},
       .recipe = {.banks = {DependencyTarget{bankId, {}}}},
   });
   assets.emplace_back(SoundBankAsset{

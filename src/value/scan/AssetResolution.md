@@ -21,14 +21,17 @@ Direct references are stored as values. Local samples and already-resolved
 `SampleRef`s need no additional declaration: the core discovers their external
 pool dependencies from the bank's regions.
 
-`useBank` and `useBanks` opt the sequence into an automatic collection. Use
-`sequence.collection()` to publish a sequence even when it has no banks, and
-`sequence.includeMisc(table)` to attach supplemental inspection assets. Collection
-publication is an explicit optional descriptor on the sequence, independent of
-its dependency requests. The default name comes from the sequence; its stable
-identity comes from its asset ID. `collection(key, name)` can override either.
-All discovered collections use these declarations. User-created collections
-remain a separate session operation with explicitly chosen members.
+Every published sequence produces a discovered collection, even without bank
+requests. The sequence's `AssetId` determines its stable identity; its name is
+the default display name. Formats do not supply collection keys or resolver
+namespaces. `useBank` and `useBanks` only declare dependencies.
+
+Use `sequence.collectionName(name)` for a naming override and
+`sequence.includeMisc(table)` for supplemental inspection assets. A loose or
+helper sequence can opt out with `sequence.withoutCollection()` while remaining
+available for direct sequence export. Naming, supplemental assets, and bank
+requests do not undo that opt-out. User-created collections remain a separate
+session operation with explicitly chosen members and independent identities.
 
 For assets that arrive separately, use a small callable request with owned values:
 
@@ -109,7 +112,10 @@ bank. Standalone bank preparation has no sequence assignment.
 ## Core policy
 
 - Adding or removing providers updates the same sequence collection. Missing
-  providers leave an incomplete root.
+  providers leave an incomplete root. Renaming or reordering discovery results
+  preserves collection IDs; removing a sequence removes its discovered collection.
+- Scanners publish shared physical sequences once. SegSat deduplicates aliases
+  across song tables before publication, preserving the first entry's name.
 - Banks and sample pools remain assets without generating synthetic collections.
   `bindSoundBank` resolves and prepares a standalone bank's own dependencies.
 - Each owner has one ordered input list for its dependency role. Multiple requests
@@ -143,14 +149,15 @@ collection also applies its sequence-specific runtime and instrument behavior.
 
 ## Regression coverage
 
-Core tests exercise direct and deferred requests, typed failure status independent
+Core tests exercise automatic publication, persistent opt-outs, identity across
+renaming and reordering, direct and deferred requests, typed failure status independent
 of diagnostic codes, ambiguous positions within one pool, manual ordering and
 confinement, container scope, provider type validation, standalone preparation,
 and copy isolation. Shared-bank tests cover different logical assignments across
 sequences, overlapping requests, assignment failures, and assignments to a manually
 substituted bank. Format tests cover
-native matching, sample positions, Akao coverage, PSF2 manifests, and SegSat logical
-addressing and velocity behavior.
+native matching, sample positions, Akao coverage, PSF2 manifests, and SegSat shared
+sequence entries, logical addressing, and velocity behavior.
 
 The refined implementation passes all 43 headless CTest targets. Corpus
 verification covers 56 files across 17 groups, including the original six formats

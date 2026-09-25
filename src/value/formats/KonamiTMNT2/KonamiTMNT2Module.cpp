@@ -101,7 +101,7 @@ namespace {
         pointer.description("Unused track");
       }
     }
-    sequence.collection();
+
     sequence.includeMisc(sequenceTable);
     for (const auto& bank : synth) {
       sequence.useBank(bank);

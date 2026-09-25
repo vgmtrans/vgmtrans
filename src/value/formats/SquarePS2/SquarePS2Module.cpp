@@ -24,7 +24,7 @@ namespace {
     return {};
   }
 
-  ScanResultBuilder result(input, std::string(kSquarePs2FormatName), std::string(kSquarePs2FormatName));
+  ScanResultBuilder result(input, std::string(kSquarePs2FormatName));
   for (const auto& wd : wds) {
     if (!addWd(result, wd)) {
       result.warning("SquarePS2 WD header was recognized, but no playable instruments were found",

@@ -51,7 +51,7 @@ struct ScanResultBuilder::DraftSlot {
 
   Value value;
   AssetPrivateData privateData;
-  std::optional<SequenceCollection> collection;
+  SequenceCollectionOptions collection;
   SequenceRecipe sequenceRecipe;
   BankRecipe bankRecipe;
   SequencePreparer sequencePreparer;
@@ -82,9 +82,6 @@ ScanSoundBankDraft::ScanSoundBankDraft(ScanResultBuilder& out, size_t slot, Asse
 
 ScanSequenceDraft& ScanSequenceDraft::useBank(AssetId bank) {
   out_->drafts_.at(slot_)->sequenceRecipe.banks.emplace_back(DependencyTarget{bank, {}});
-  if (!out_->drafts_.at(slot_)->collection) {
-    collection();
-  }
   return *this;
 }
 
@@ -97,9 +94,6 @@ ScanSequenceDraft& ScanSequenceDraft::useBanks(DependencySelector select) {
     throw std::invalid_argument("Bank request has no selector");
   }
   out_->drafts_.at(slot_)->sequenceRecipe.banks.emplace_back(std::move(select));
-  if (!out_->drafts_.at(slot_)->collection) {
-    collection();
-  }
   return *this;
 }
 
@@ -135,29 +129,20 @@ ScanSoundBankDraft& ScanSoundBankDraft::prepare(BankPreparer prepare) {
   return *this;
 }
 
-ScanSequenceDraft& ScanSequenceDraft::collection(CollectionKey key, std::string name) {
-  if (key.resolver.empty()) {
-    key.resolver = out_->collectionNamespace_;
-  }
-  if (key.value.empty()) {
-    key.value = "asset:" + std::to_string(id_.value);
-  }
-  auto& descriptor = out_->drafts_.at(slot_)->collection;
-  if (!descriptor) {
-    descriptor.emplace();
-  }
-  descriptor->key = std::move(key);
-  descriptor->name = std::move(name);
+ScanSequenceDraft& ScanSequenceDraft::collectionName(std::string name) {
+  out_->drafts_.at(slot_)->collection.name = std::move(name);
+  return *this;
+}
+
+ScanSequenceDraft& ScanSequenceDraft::withoutCollection() {
+  out_->drafts_.at(slot_)->collection.enabled = false;
   return *this;
 }
 
 ScanSequenceDraft& ScanSequenceDraft::includeMisc(AssetId asset) {
-  auto& descriptor = out_->drafts_.at(slot_)->collection;
-  if (!descriptor) {
-    collection();
-  }
-  if (std::ranges::find(descriptor->miscAssets, asset) == descriptor->miscAssets.end()) {
-    descriptor->miscAssets.push_back(asset);
+  auto& assets = out_->drafts_.at(slot_)->collection.miscAssets;
+  if (std::ranges::find(assets, asset) == assets.end()) {
+    assets.push_back(asset);
   }
   return *this;
 }
@@ -206,9 +191,8 @@ ScanMiscDraft& ScanMiscDraft::payload(std::vector<u8> payload) {
   return *this;
 }
 
-ScanResultBuilder::ScanResultBuilder(ScanInput input, std::string format, std::string collectionNamespace)
+ScanResultBuilder::ScanResultBuilder(ScanInput input, std::string format)
     : input_(std::move(input)), format_(std::move(format)),
-      collectionNamespace_(collectionNamespace.empty() ? format_ : std::move(collectionNamespace)),
       sourceMap_([this]() { return input_.ids.nextSourceAnnotationId(); }) {
 }
 

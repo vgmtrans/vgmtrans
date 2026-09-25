@@ -51,6 +51,7 @@ public:
 
   [[nodiscard]] const SourceMap& sourceMap() const noexcept { return sourceMap_; }
   [[nodiscard]] SourceMap sourceMapForAsset(AssetId asset) const;
+  // Reconcile all discovered collections; every desired value has a sequence.
   void reconcileCollections(std::vector<DesiredCollection> desired);
 
 private:

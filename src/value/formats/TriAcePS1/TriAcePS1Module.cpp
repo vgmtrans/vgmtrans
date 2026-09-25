@@ -68,7 +68,7 @@ namespace {
     auto sequence = result.sequence(name, input.reader.range(layout.offset, layout.length));
     sequence.program(
         parseTriAcePs1Sequence(input.reader, sequence.id(), layout, &result.sourceMap(), &result.diagnostics()));
-    sequence.collection();
+
     for (const auto& bank : bankDrafts) {
       sequence.useBank(bank);
     }

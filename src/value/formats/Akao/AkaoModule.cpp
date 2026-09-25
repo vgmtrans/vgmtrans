@@ -82,7 +82,7 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
     return {};
   }
 
-  ScanResultBuilder result(input, std::string(kAkaoFormatName), std::string(kAkaoCollectionResolver));
+  ScanResultBuilder result(input, std::string(kAkaoFormatName));
   scanSamplePools(input, result, offsets, hardcodedSampleLocation);
   scanSequences(input, result, offsets);
   return result.finish();

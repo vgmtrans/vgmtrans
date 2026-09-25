@@ -20,7 +20,6 @@
 namespace vgmtrans::formats::sony_ps1 {
 
 inline constexpr std::string_view kSonyPs1FormatName = "SonyPS1";
-inline constexpr std::string_view kSonyPs1CollectionResolver = "sony-ps1";
 inline constexpr std::string_view kSonyPs1InstrumentDomain = "sony-ps1.instrument";
 inline constexpr std::string_view kSonyPs1CommandKindPrefix = "sony-ps1:sequence";
 

@@ -28,7 +28,6 @@ namespace {
   sequence.range(sequenceSourceRange(input.reader, layout->sequenceHeaderRange, parsed.program))
       .program(std::move(parsed.program));
 
-  sequence.collection();
   if (const auto synth = addSynth(result, *layout, parsed.referencedInstruments, displayName)) {
     sequence.useBank(*synth);
   } else {

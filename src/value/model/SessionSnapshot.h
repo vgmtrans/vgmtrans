@@ -34,19 +34,21 @@ struct MiscAsset {
 
 using Asset = std::variant<SequenceProgramAsset, SoundBankAsset, SamplePoolAsset, MiscAsset>;
 
+enum class CollectionOrigin { Discovered, User };
+
 struct Collection {
   CollectionId id;
   std::string name;
-  // Present only for collections produced by discovery. This is also their
-  // stable identity across reconciliation; user-created collections have none.
-  std::optional<CollectionKey> key;
+  // A discovered collection is identified by members.sequence during rebuilds.
+  // User collections have independent identities, even for the same sequence.
+  CollectionOrigin origin = CollectionOrigin::User;
   // Collections are the export units. A sequence may be paired with instrument
   // banks and sample pools loaded from the same or separate sources.
   CollectionMembers members;
   std::vector<CollectionIssue> issues;
   std::vector<ResolvedDependency> dependencies;
 
-  [[nodiscard]] bool isDiscovered() const noexcept { return key.has_value(); }
+  [[nodiscard]] bool isDiscovered() const noexcept { return origin == CollectionOrigin::Discovered; }
   [[nodiscard]] CollectionIssueImpact issueImpact() const noexcept;
 };
 

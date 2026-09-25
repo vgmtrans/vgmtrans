@@ -24,7 +24,7 @@ namespace {
     return {};
   }
 
-  ScanResultBuilder result(input, std::string(kKonamiPs1FormatName), std::string(kKonamiPs1CollectionResolver));
+  ScanResultBuilder result(input, std::string(kKonamiPs1FormatName));
   const auto rootCounterTarget = findKonamiPs1RootCounterTarget(input.reader);
   if (!rootCounterTarget) {
     result.diagnostics().push_back(Diagnostic{

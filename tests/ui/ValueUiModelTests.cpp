@@ -48,7 +48,7 @@ ScanResult scanUiProbe(const ScanInput& input) {
       .annotation(SourceRole::Payload, "Payload", input.reader.range(1, 2))
       .parent(section.id())
       .field("first", input.reader.range(1, 1), 1);
-  sequence.collection({}, "Probe collection");
+  sequence.collectionName("Probe collection");
   result.warning("Probe warning", input.reader.range(0, 1));
   return result.finish();
 }

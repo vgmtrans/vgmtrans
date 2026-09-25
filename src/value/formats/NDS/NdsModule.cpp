@@ -85,7 +85,6 @@ void scanNdsLayout(const NdsLayout& layout, ScanResultBuilder& result) {
     sequenceAsset.program(
         parseNdsSequenceProgram(reader, sequenceAsset.id(), range, &result.sourceMap(), &result.diagnostics()));
 
-    sequenceAsset.collection();
     if (sequence.bank && bankAssets[*sequence.bank]) {
       sequenceAsset.useBank(*bankAssets[*sequence.bank]);
     }

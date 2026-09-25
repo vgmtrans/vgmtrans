@@ -351,7 +351,7 @@ void publishSequenceLayout(ScanResultBuilder& result, const SequenceLayout& layo
   if (sequences.empty() && banks.empty() && !bodyCandidate) {
     return {};
   }
-  ScanResultBuilder result(input, std::string(kFormatName), std::string(kCollectionResolver));
+  ScanResultBuilder result(input, std::string(kFormatName));
   if (bodyCandidate && !addSampleBody(result) && sequences.empty() && banks.empty()) {
     return {};
   }
