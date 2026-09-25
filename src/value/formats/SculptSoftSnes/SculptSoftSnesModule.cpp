@@ -23,9 +23,9 @@ ScanResult scan(const ScanInput& input) {
   auto sequence = result.sequence(name);
   sequence.program(decodeSequence(input.reader, *layout, data, sequence.id(), &result.sourceMap(),
                                   &result.diagnostics(), &programs));
-  auto collection = result.sourceCollection(name).sequence(sequence);
+  sequence.collection();
   if (const auto bank = addSynth(result, *layout, data, programs, name)) {
-    collection.soundBank(*bank);
+    sequence.useBank(*bank);
   } else {
     result.warning("SculptSoftSnes sequence found without valid BRR samples", input.reader.range(layout->song, 1));
   }

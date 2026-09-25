@@ -29,8 +29,7 @@ namespace {
   sequence.program(
       decodeCapcomSnesSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics()));
 
-  auto collection = result.sourceCollection(displayName);
-  collection.sequence(sequence);
+  sequence.collection();
 
   if (!layout->instrumentTableAddress || !layout->spcDirAddress) {
     result.warning("CapcomSnes sequence found, but instrument table or SPC DIR address was not detected",
@@ -38,7 +37,7 @@ namespace {
   } else {
     if (const auto synth =
             addCapcomSnesSynth(result, *layout->instrumentTableAddress, *layout->spcDirAddress, displayName)) {
-      collection.soundBank(*synth);
+      sequence.useBank(*synth);
     } else {
       result.warning("CapcomSnes sequence found, but no valid instruments or samples were discovered",
                      input.reader.range(0, input.reader.size()));

@@ -5,6 +5,7 @@
  */
 
 #include "../TestSupport.h"
+#include "ValueFormatTestSupport.h"
 
 #include "value/extractors/MameRomSetExtractor.h"
 #include "value/formats/KonamiTMNT2/KonamiTMNT2.h"
@@ -345,13 +346,13 @@ void konamiTmnt2AliasesMiscSamplesAndTrackLabels() {
   const ScanResult result = module().scan(ScanInput{.source = source, .reader = reader, .ids = ids});
   const auto* misc = firstAsset<MiscAsset>(result);
   const auto* bank = firstAsset<SoundBankAsset>(result);
-  expect(result.diagnostics.empty() && result.explicitCollections.size() == 2 && misc != nullptr &&
+  expect(result.diagnostics.empty() && resolvedScanCollections(result).size() == 2 && misc != nullptr &&
              misc->metadata.name == "Sequence Table" && misc->metadata.range.offset == 0x200 &&
              misc->metadata.range.endOffset() == 0x273 && misc->payload.size() == 0x73,
          "the complete pointer/track-table span should be published once as a shared Sequence Table misc asset");
   expect(std::ranges::all_of(
-             result.explicitCollections,
-             [](const ExplicitCollection& collection) { return collection.members.miscAssets.size() == 1; }),
+             resolvedScanCollections(result),
+             [](const DesiredCollection& collection) { return collection.members.miscAssets.size() == 1; }),
          "every aliased sequence collection should attach the shared Sequence Table misc asset");
   const auto* sequence = firstAsset<SequenceProgramAsset>(result);
   expect(sequence && sequence->program.tracks.size() == 1 && sequence->program.tracks[0].name == "FM Track 0",

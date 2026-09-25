@@ -40,12 +40,10 @@ namespace {
     auto sequence = result.sequence(name, input.reader.range(layout.offset, layout.length));
     sequence.program(parseSequence(input.reader, sequence.id(), layout, instruments, &result.sourceMap(),
                                    &result.diagnostics()));
-    auto collection =
-        result
-            .collection(name, CollectionKey{.value = fmt::format("source:{}:sequence:{}", result.source().value,
-                                                                  layout.offset)})
-            .sequence(sequence);
-    if (bank) collection.soundBank(*bank);
+    sequence.collection();
+    if (bank) {
+      sequence.useBank(*bank);
+    }
   }
   return result.finish();
 }

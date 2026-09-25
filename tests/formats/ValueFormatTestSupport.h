@@ -10,6 +10,7 @@
 
 #include "value/model/SourceMap.h"
 #include "value/scan/FormatModule.h"
+#include "value/scan/AssetResolution.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
@@ -119,4 +120,16 @@ inline void expectScanSharesPlaybackSource(const vgmtrans::core::FormatModule& f
   if (!lifetime.expired()) {
     throw std::runtime_error("releasing the last program should release its source bytes");
   }
+}
+
+// Resolve scanner-known relationships in module fixtures without requiring a
+// session or reopening the fixture's sources. Deferred matching uses Session tests.
+inline std::vector<vgmtrans::core::DesiredCollection> resolvedScanCollections(const vgmtrans::core::ScanResult& scan) {
+  using namespace vgmtrans::core;
+  std::vector<DesiredCollection> result;
+  for (auto& [name, collection] :
+       dependencyCollections(AssetCatalog{std::vector<SourceFile>{}, SharedSequence<Asset>{scan.assets}})) {
+    result.push_back(std::move(collection));
+  }
+  return result;
 }

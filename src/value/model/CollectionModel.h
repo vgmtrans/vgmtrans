@@ -48,7 +48,10 @@ struct CollectionIssue {
   SourceRange range;
 };
 
-enum class DependencyRole { SoundBank, SamplePool, Misc };
+// The supported dependency chain is sequence -> sound bank -> sample pool.
+enum class DependencyRole { SoundBank, SamplePool };
+
+enum class ResolutionStatus { Resolved, Incomplete, Ambiguous, Failed };
 
 // A selected provider and optional format-owned placement within it. Two banks
 // may use the same pool at different positions; membership alone cannot express
@@ -61,8 +64,18 @@ struct DependencyTarget {
 struct ResolvedDependency {
   AssetId owner;
   DependencyRole role = DependencyRole::SoundBank;
+  ResolutionStatus status = ResolutionStatus::Resolved;
   std::vector<DependencyTarget> targets;
-  std::vector<AssetId> alternatives;
+  std::vector<DependencyTarget> alternatives;
+};
+
+// Opting into a collection is independent of whether a sequence needs banks.
+// Empty identity/name fields use the sequence's asset identity and display name.
+struct SequenceCollection {
+  CollectionKey key;
+  std::string name;
+  // Supplemental inspection assets, not providers in the audio dependency chain.
+  std::vector<AssetId> miscAssets;
 };
 
 struct DesiredCollection {

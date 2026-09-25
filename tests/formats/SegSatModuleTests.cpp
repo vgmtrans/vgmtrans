@@ -9,6 +9,7 @@
 
 #include "value/base/LevelScale.h"
 #include "value/export/CollectionBinding.h"
+#include "value/scan/AssetResolution.h"
 #include "value/export/Export.h"
 #include "value/extractors/PsfExtractor.h"
 #include "value/formats/SegSat/SegSat.h"
@@ -577,7 +578,10 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "SegSat", .name = "Sequence"},
       .program = std::move(parsedSequence.program),
   };
-  sequence.prepare = bindSegSatCollection;
+  sequence.recipe.assignBanks = assignSegSatBanks;
+  sequence.prepare = [](SequencePreparationContext& context) {
+    prepareSegSatSequence(context, *context.sequence->privateData.get<SegSatSequenceBindingData>());
+  };
   sequence.privateData = AssetPrivateData::make(SegSatSequenceBindingData{
       .volumeModel = SegSatVolumeModel::V1_33,
       .referencedBanks = {4, 6},
@@ -600,6 +604,10 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
       }},
       .privateData = AssetPrivateData::make(
           readSegSatVelocityBank(sources.reader(bank5Source), *bank5Layout, 5, SegSatVolumeModel::V1_33)),
+      .prepare =
+          [](BankPreparationContext& context) {
+            prepareSegSatBank(context, *context.bank.privateData.get<SegSatBankBindingData>());
+          },
   };
   const SoundBankAsset bank6{
       .metadata =
@@ -615,6 +623,10 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
       }},
       .privateData = AssetPrivateData::make(
           readSegSatVelocityBank(sources.reader(bank6Source), *bank6Layout, 6, SegSatVolumeModel::V1_33)),
+      .prepare =
+          [](BankPreparationContext& context) {
+            prepareSegSatBank(context, *context.bank.privateData.get<SegSatBankBindingData>());
+          },
   };
   const SoundBankAsset foreignBank{
       .metadata = AssetMetadata{.id = AssetId{3}, .format = "Foreign", .name = "Foreign Bank"},
@@ -636,7 +648,11 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
   test::SessionSnapshotBuilder builder;
   builder.sources = sources.sourceFiles();
   builder.assets = {sequence, bank5, foreignBank, bank6};
+  DesiredCollection desired{.members = collection.members};
+  resolveDependencies(AssetCatalog{sources, SharedSequence<Asset>{builder.assets}}, desired, ResolutionMode::Manual);
   builder.collections = {collection};
+  builder.collections.front().dependencies = std::move(desired.dependencies);
+  builder.collections.front().issues = std::move(desired.issues);
   const SessionSnapshot snapshot = builder.finish();
 
   const auto binding = bindCollection(snapshot, collection.id);

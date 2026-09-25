@@ -79,12 +79,7 @@ std::vector<SampleEntry> chooseSamples(const DependencyContext& context, const A
     if (preferred != candidates.end()) {
       select(*preferred);
     } else if (!isolated) {
-      result.issues.push_back(CollectionIssue{
-          .impact = CollectionIssueImpact::Incomplete,
-          .severity = Severity::Warning,
-          .code = "missing-preferred-sample-set",
-          .message = missingSampleMessage(request),
-      });
+      result.incomplete(missingSampleMessage(request), "missing-preferred-sample-set");
     }
   }
 
@@ -123,23 +118,13 @@ DependencySelection AkaoSamples::operator()(const DependencyContext& context) co
     markCovered(remaining, sample);
   }
   if (selected.empty()) {
-    result.issues.push_back(CollectionIssue{
-        .impact = CollectionIssueImpact::Incomplete,
-        .severity = Severity::Warning,
-        .code = "missing-sample-collection",
-        .message = missingSampleMessage(*this),
-    });
+    result.incomplete(missingSampleMessage(*this), "missing-sample-collection");
   } else if (!remaining.empty()) {
     std::string message = "Akao sample pools do not cover required articulation ids:";
     for (const u32 articulation : remaining) {
       message += " " + std::to_string(articulation);
     }
-    result.issues.push_back(CollectionIssue{
-        .impact = CollectionIssueImpact::Incomplete,
-        .severity = Severity::Warning,
-        .code = "missing-articulation-coverage",
-        .message = std::move(message),
-    });
+    result.incomplete(std::move(message), "missing-articulation-coverage");
   }
   return result;
 }

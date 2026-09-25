@@ -6,6 +6,7 @@
 
 #include "../MidiTestSupport.h"
 #include "../TestSupport.h"
+#include "ValueFormatTestSupport.h"
 
 #include "value/export/InstrumentVariants.h"
 #include "value/export/SequenceModulationProfile.h"
@@ -265,7 +266,7 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
   const auto module = konamiArcadeModule();
   const ScanResult result = module.scan(input);
   expect(result.diagnostics.empty(), "complete KonamiArcade scan should not report diagnostics");
-  expect(result.assets.size() == 2 && result.explicitCollections.size() == 1,
+  expect(result.assets.size() == 2 && resolvedScanCollections(result).size() == 1,
          "KonamiArcade scan should publish a sequence, sound bank, and collection");
 
   const auto* sequence = firstAsset<SequenceProgramAsset>(result);

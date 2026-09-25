@@ -19,13 +19,6 @@ using namespace core;
 
 namespace {
 
-[[nodiscard]] CollectionKey collectionKey(SourceId source, u32 sequenceIndex) {
-  return CollectionKey{
-      .resolver = std::string(kCpsFormatName),
-      .value = "source:" + std::to_string(source.value) + ":sequence:" + std::to_string(sequenceIndex),
-  };
-}
-
 void annotateSequenceTable(SourceMapBuilder& sourceMap, ByteReader reader, const CpsLayout& layout,
                            SourceAnnotationId table) {
   const u64 entrySize = isCps1(layout.version) ? 2 : 4;
@@ -161,20 +154,19 @@ void annotateArticulationTable(SourceMapBuilder& sourceMap, ByteReader reader, c
     sequence.program(decodeCpsSequence(input.reader, *layout, sourceSequence, sequence.id(), &result.sourceMap(),
                                        &result.diagnostics()));
 
-    auto collection = result.collection(sourceSequence.name, collectionKey(input.source.id, sourceSequence.index));
-    collection.sequence(sequence);
+    sequence.collection();
     if (isCps1(layout->version)) {
       if (cps1Synth.ym2151) {
-        collection.soundBank(*cps1Synth.ym2151);
+        sequence.useBank(*cps1Synth.ym2151);
       }
       if (cps1Synth.oki) {
-        collection.soundBank(*cps1Synth.oki);
+        sequence.useBank(*cps1Synth.oki);
       }
     } else if (qsoundSynth) {
-      collection.soundBank(*qsoundSynth);
+      sequence.useBank(*qsoundSynth);
     }
     for (const auto misc : miscAssets) {
-      collection.misc(misc);
+      sequence.includeMisc(misc);
     }
   }
   return result.finish();

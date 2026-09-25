@@ -367,7 +367,7 @@ void ndsModuleOnlyBuildsDependenciesOfReferencedBanks() {
   };
   const ScanResult result = ndsModule().scan(input);
   expect(result.diagnostics.empty(), "NDS module should scan a complete dependency fixture without diagnostics");
-  expect(result.assets.size() == 4 && result.explicitCollections.size() == 1,
+  expect(result.assets.size() == 4 && resolvedScanCollections(result).size() == 1,
          "NDS module should create PSG, one used wave archive, one used bank, and one sequence");
   const auto hasAssetNamed = [&](std::string_view name) {
     return std::ranges::any_of(result.assets, [&](const Asset& asset) {

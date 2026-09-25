@@ -13,26 +13,35 @@
 
 namespace vgmtrans::core {
 
-// Formats bind collection-local meaning into private instrument copies and a
-// copied sequence runtime. Member lists themselves were fixed during matching.
+// A sequence configures its private runtime from prepared, read-only banks.
+// Logical bank addressing is assigned during resolution and applied by each
+// bank's own preparation hook.
 struct SequencePreparationContext {
 public:
   SequencePreparationContext(const SequenceProgramAsset* sequence, SequenceRuntime& sequenceRuntime,
-                             std::span<SoundBankAsset> soundBanks, std::span<const SamplePoolAsset* const> samplePools,
-                             std::span<const MiscAsset* const> miscAssets, std::vector<Diagnostic>& diagnostics)
+                             std::span<const SoundBankAsset> soundBanks,
+                             std::span<const SamplePoolAsset* const> samplePools,
+                             std::span<const MiscAsset* const> miscAssets, std::vector<Diagnostic>& diagnostics,
+                             std::span<const DependencyTarget> bankUses = {})
       : sequence(sequence), soundBanks(soundBanks), samplePools(samplePools), miscAssets(miscAssets),
-        diagnostics(diagnostics), sequenceRuntime_(sequenceRuntime) {}
+        diagnostics(diagnostics), sequenceRuntime_(sequenceRuntime), bankUses_(bankUses) {}
 
   const SequenceProgramAsset* sequence;
-  std::span<SoundBankAsset> soundBanks;
+  std::span<const SoundBankAsset> soundBanks;
   std::span<const SamplePoolAsset* const> samplePools;
   std::span<const MiscAsset* const> miscAssets;
   std::vector<Diagnostic>& diagnostics;
   bool failed = false;
 
-  [[nodiscard]] SoundBankAsset* soundBank(AssetId id) const noexcept {
+  [[nodiscard]] const SoundBankAsset* soundBank(AssetId id) const noexcept {
     const auto found = std::ranges::find(soundBanks, id, [](const SoundBankAsset& asset) { return asset.metadata.id; });
     return found == soundBanks.end() ? nullptr : &*found;
+  }
+
+  template <class Data>
+  [[nodiscard]] const Data* bankPlacement(AssetId id) const {
+    const auto use = std::ranges::find(bankUses_, id, &DependencyTarget::asset);
+    return use == bankUses_.end() ? nullptr : use->placement.template get<Data>();
   }
 
   [[nodiscard]] const SamplePoolAsset* samplePool(AssetId id) const noexcept {
@@ -81,6 +90,7 @@ private:
   }
 
   SequenceRuntime& sequenceRuntime_;
+  std::span<const DependencyTarget> bankUses_;
 };
 
 template <class Data>
@@ -94,14 +104,18 @@ struct SampleInput {
 // sample list. The same pool may appear in several banks' input lists.
 struct BankPreparationContext {
   BankPreparationContext(SoundBankAsset& bank, u32 bankIndex, std::span<const DependencyTarget> inputs,
-                         std::span<const SamplePoolAsset* const> samplePools, std::vector<Diagnostic>& diagnostics)
-      : bank(bank), bankIndex(bankIndex), inputs(inputs), diagnostics(diagnostics), samplePools_(samplePools) {}
+                         std::span<const SamplePoolAsset* const> samplePools, std::vector<Diagnostic>& diagnostics,
+                         AssetPrivateData placement = {})
+      : bank(bank), bankIndex(bankIndex), inputs(inputs), diagnostics(diagnostics), placement(std::move(placement)),
+        samplePools_(samplePools) {}
 
   SoundBankAsset& bank;
   // Ordinal among banks of this format, in the collection's selected order.
   u32 bankIndex;
   std::span<const DependencyTarget> inputs;
   std::vector<Diagnostic>& diagnostics;
+  // Meaning assigned by the selected sequence; empty for standalone banks.
+  const AssetPrivateData placement;
   bool failed = false;
 
   template <class Data>

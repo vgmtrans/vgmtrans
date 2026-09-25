@@ -68,15 +68,9 @@ namespace {
     auto sequence = result.sequence(name, input.reader.range(layout.offset, layout.length));
     sequence.program(
         parseTriAcePs1Sequence(input.reader, sequence.id(), layout, &result.sourceMap(), &result.diagnostics()));
-    auto collection =
-        result
-            .collection(name,
-                        CollectionKey{
-                            .value = fmt::format("source:{}:sequence:{}", result.source().value, layout.offset),
-                        })
-            .sequence(sequence);
+    sequence.collection();
     for (const auto& bank : bankDrafts) {
-      collection.soundBank(bank);
+      sequence.useBank(bank);
     }
   }
   return result.finish();

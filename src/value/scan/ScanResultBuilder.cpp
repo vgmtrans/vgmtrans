@@ -55,7 +55,9 @@ struct ScanResultBuilder::DraftSlot {
 
   Value value;
   AssetPrivateData privateData;
-  AssetRecipe recipe;
+  std::optional<SequenceCollection> collection;
+  SequenceRecipe sequenceRecipe;
+  BankRecipe bankRecipe;
   SequencePreparer sequencePreparer;
   BankPreparer bankPreparer;
 };
@@ -83,7 +85,11 @@ ScanSoundBankDraft::ScanSoundBankDraft(ScanResultBuilder& out, size_t slot, Asse
 }
 
 ScanSequenceDraft& ScanSequenceDraft::useBank(AssetId bank) {
-  return useBanks([bank](const DependencyContext&) { return DependencySelection{.targets = {{bank, {}}}}; });
+  out_->drafts_.at(slot_)->sequenceRecipe.banks.emplace_back(DependencyTarget{bank, {}});
+  if (!out_->drafts_.at(slot_)->collection) {
+    collection();
+  }
+  return *this;
 }
 
 ScanSequenceDraft& ScanSequenceDraft::useBank(const ScanSoundBankDraft& bank) {
@@ -91,7 +97,13 @@ ScanSequenceDraft& ScanSequenceDraft::useBank(const ScanSoundBankDraft& bank) {
 }
 
 ScanSequenceDraft& ScanSequenceDraft::useBanks(DependencySelector select) {
-  out_->addDependency(slot_, {DependencyRole::SoundBank, std::move(select)}, true);
+  if (!select) {
+    throw std::invalid_argument("Bank request has no selector");
+  }
+  out_->drafts_.at(slot_)->sequenceRecipe.banks.emplace_back(std::move(select));
+  if (!out_->drafts_.at(slot_)->collection) {
+    collection();
+  }
   return *this;
 }
 
@@ -100,8 +112,14 @@ ScanSequenceDraft& ScanSequenceDraft::prepare(SequencePreparer prepare) {
   return *this;
 }
 
+ScanSequenceDraft& ScanSequenceDraft::assignBanks(BankAssigner assign) {
+  out_->drafts_.at(slot_)->sequenceRecipe.assignBanks = std::move(assign);
+  return *this;
+}
+
 ScanSoundBankDraft& ScanSoundBankDraft::useSamples(AssetId samples) {
-  return useSamples([samples](const DependencyContext&) { return DependencySelection{.targets = {{samples, {}}}}; });
+  out_->drafts_.at(slot_)->bankRecipe.samples.emplace_back(DependencyTarget{samples, {}});
+  return *this;
 }
 
 ScanSoundBankDraft& ScanSoundBankDraft::useSamples(const ScanSamplePoolDraft& samples) {
@@ -109,7 +127,10 @@ ScanSoundBankDraft& ScanSoundBankDraft::useSamples(const ScanSamplePoolDraft& sa
 }
 
 ScanSoundBankDraft& ScanSoundBankDraft::useSamples(DependencySelector select) {
-  out_->addDependency(slot_, {DependencyRole::SamplePool, std::move(select)}, false);
+  if (!select) {
+    throw std::invalid_argument("Sample request has no selector");
+  }
+  out_->drafts_.at(slot_)->bankRecipe.samples.emplace_back(std::move(select));
   return *this;
 }
 
@@ -118,15 +139,35 @@ ScanSoundBankDraft& ScanSoundBankDraft::prepare(BankPreparer prepare) {
   return *this;
 }
 
-void ScanResultBuilder::addDependency(size_t slot, AssetDependency dependency, bool root) {
-  auto& recipe = drafts_.at(slot)->recipe;
-  if (!dependency.select) {
-    throw std::invalid_argument("Asset dependency has no selector");
+ScanSequenceDraft& ScanSequenceDraft::collection(CollectionKey key, std::string name) {
+  if (key.resolver.empty()) {
+    key.resolver = out_->collectionNamespace_;
   }
-  if (root) {
-    recipe.collectionNamespace = collectionNamespace_;
+  if (key.value.empty()) {
+    key.value = "asset:" + std::to_string(id_.value);
   }
-  recipe.dependencies.push_back(std::move(dependency));
+  auto& descriptor = out_->drafts_.at(slot_)->collection;
+  if (!descriptor) {
+    descriptor.emplace();
+  }
+  descriptor->key = std::move(key);
+  descriptor->name = std::move(name);
+  return *this;
+}
+
+ScanSequenceDraft& ScanSequenceDraft::includeMisc(AssetId asset) {
+  auto& descriptor = out_->drafts_.at(slot_)->collection;
+  if (!descriptor) {
+    collection();
+  }
+  if (std::ranges::find(descriptor->miscAssets, asset) == descriptor->miscAssets.end()) {
+    descriptor->miscAssets.push_back(asset);
+  }
+  return *this;
+}
+
+ScanSequenceDraft& ScanSequenceDraft::includeMisc(const ScanMiscDraft& asset) {
+  return includeMisc(asset.id());
 }
 
 void ScanResultBuilder::setSequencePreparer(size_t slot, SequencePreparer prepare) {
@@ -309,7 +350,8 @@ ScanResult ScanResultBuilder::finish() {
                 .metadata = metadata(pending.id, std::move(pending.name), pending.range),
                 .program = std::move(*pending.program),
                 .privateData = std::move(privateData),
-                .recipe = std::move(slot->recipe),
+                .collection = std::move(slot->collection),
+                .recipe = std::move(slot->sequenceRecipe),
                 .prepare = std::move(slot->sequencePreparer),
             };
           } else if constexpr (std::is_same_v<Pending, PendingSoundBank>) {
@@ -321,7 +363,7 @@ ScanResult ScanResultBuilder::finish() {
                 .instruments = std::move(instruments.values),
                 .localSamples = std::move(samples.value),
                 .privateData = std::move(privateData),
-                .recipe = std::move(slot->recipe),
+                .recipe = std::move(slot->bankRecipe),
                 .prepare = std::move(slot->bankPreparer),
             };
           } else if constexpr (std::is_same_v<Pending, PendingSamplePool>) {

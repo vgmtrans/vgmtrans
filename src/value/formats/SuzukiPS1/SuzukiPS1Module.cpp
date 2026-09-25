@@ -46,18 +46,12 @@ namespace {
     auto sequence = result.sequence(name, input.reader.range(layout.offset, layout.length));
     sequence.program(parseSuzukiPs1Sequence(input.reader, sequence.id(), layout, envelopes, &result.sourceMap(),
                                             &result.diagnostics()));
-    auto collection =
-        result
-            .collection(name,
-                        CollectionKey{
-                            .value = fmt::format("source:{}:sequence:{}", result.source().value, layout.offset),
-                        })
-            .sequence(sequence);
+    sequence.collection();
 
     // A source can contain several WDS uploads and switch between them with
     // FE. Keeping them in one collection preserves those source bank IDs.
     for (const auto bank : banks) {
-      collection.soundBank(bank);
+      sequence.useBank(bank);
     }
   }
 

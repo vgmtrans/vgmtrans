@@ -32,14 +32,13 @@ using namespace core;
   }
   sequence.program(std::move(program));
 
-  auto collection = result.sourceCollection(displayName);
-  collection.sequence(sequence);
+  sequence.collection();
 
   const bool hasSynthLayout = layout->spcDirAddress && layout->tuningTableAddress &&
                               (layout->version == AKAOSNES_V1 || layout->adsrTableAddress);
   if (hasSynthLayout) {
     if (const auto synth = addAkaoSnesSynth(result, *layout, displayName)) {
-      collection.soundBank(*synth);
+      sequence.useBank(*synth);
     } else {
       result.warning("AkaoSnes sequence found, but no valid instruments or samples were discovered",
                      input.reader.range(0, input.reader.size()));

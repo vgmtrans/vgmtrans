@@ -93,8 +93,8 @@ void addPercussionTable(ByteReader reader, SourceMapBuilder& sourceMap, ObjectRe
   }
 }
 
-void addSongTables(ScanResultBuilder& result, const Layout& layout,
-                   const std::set<u8>& usedPercussion, ScanCollectionBuilder& collection) {
+void addSongTables(ScanResultBuilder& result, const Layout& layout, const std::set<u8>& usedPercussion,
+                   ScanSequenceDraft& sequence) {
   const ByteReader reader = result.reader();
   const u16 begin = layout.dataPointerBlockAddress;
   const u16 amplitudeEnvelopes = layout.amplitudeEnvelopePointerTable(reader);
@@ -134,7 +134,7 @@ void addSongTables(ScanResultBuilder& result, const Layout& layout,
     } else {
       auto entryAsset = misc(result, "Song Entry", entryRange);
       entry.owner(ObjectRefs::misc(entryAsset.id()));
-      collection.misc(entryAsset);
+      sequence.includeMisc(entryAsset);
     }
     pointer(reader, sourceMap, "Event Data Pointer", entryRange.offset).parent(entry.id());
   }
@@ -155,7 +155,7 @@ void addSongTables(ScanResultBuilder& result, const Layout& layout,
                   reader.s8At(address + coefficient), SourceValueDisplay::SignedDecimal);
     }
   }
-  collection.misc(asset);
+  sequence.includeMisc(asset);
 }
 
 [[nodiscard]] ScanResult scan(const ScanInput& input) {
@@ -172,10 +172,10 @@ void addSongTables(ScanResultBuilder& result, const Layout& layout,
   sequence.range(sequenceSourceRange(input.reader, input.reader.range(layout->sequenceAddress, 1), parsed.program))
       .program(std::move(parsed.program));
 
-  auto collection = result.sourceCollection(name).sequence(sequence);
-  addSongTables(result, *layout, parsed.percussion, collection);
+  sequence.collection();
+  addSongTables(result, *layout, parsed.percussion, sequence);
   if (const auto synth = addSynth(result, *layout, parsed.srcns, parsed.percussion, parsed.noiseRates, name)) {
-    collection.soundBank(*synth);
+    sequence.useBank(*synth);
   } else {
     result.warning("NamcoSnes sequence found, but no valid instruments or samples were discovered",
                    input.reader.range(0, input.reader.size()));

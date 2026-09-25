@@ -57,7 +57,7 @@ namespace {
   // advertise an exportable collection once all three musical parts exist.
   if (layout->instrumentTableAddress && layout->spcDirAddress) {
     if (const auto synth = addSynth(result, *layout, parsed.recipes, displayName)) {
-      result.sourceCollection(displayName).sequence(sequence).soundBank(*synth);
+      sequence.useBank(*synth);
     } else {
       result.warning("NinSnes sequence found, but no valid instruments or samples were discovered",
                      input.reader.range(0, input.reader.size()));

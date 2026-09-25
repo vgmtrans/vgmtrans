@@ -25,9 +25,9 @@ namespace {
   auto sequence = result.sequence(displayName);
   sequence.program(decodeSequence(input.retain(), *layout, sequence.id(), &result.sourceMap(), &result.diagnostics()));
 
-  auto collection = result.sourceCollection(displayName).sequence(sequence);
+  sequence.collection();
   if (const auto synth = addSynth(result, *layout, displayName)) {
-    collection.soundBank(*synth);
+    sequence.useBank(*synth);
   } else {
     result.warning("ChunSnes sequence found, but its active sound bank did not contain usable samples",
                    input.reader.range(0, input.reader.size()));

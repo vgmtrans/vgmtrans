@@ -27,7 +27,82 @@ template <class T>
   return dependencyId(*value);
 }
 
+[[nodiscard]] inline AssetId dependencyId(AssetId id) {
+  return id;
+}
+
+template <class T>
+[[nodiscard]] DependencyTarget dependencyTarget(const T& value) {
+  return {dependencyId(value), {}};
+}
+
+[[nodiscard]] inline DependencyTarget dependencyTarget(const DependencyTarget& target) {
+  return target;
+}
+
+template <class Range>
+[[nodiscard]] std::vector<DependencyTarget> dependencyTargets(const Range& candidates) {
+  std::vector<DependencyTarget> result;
+  for (const auto& candidate : candidates) {
+    result.push_back(dependencyTarget(candidate));
+  }
+  return result;
+}
+
 enum class ResolutionMode { Automatic, Manual };
+
+template <class Data>
+struct BankAssignment {
+  const SoundBankAsset& bank;
+  const Data& data;
+  AssetPrivateData& placement;
+};
+
+// Runs after automatic or manual bank selection. Assignments belong to this
+// sequence-bank relationship, so shared banks retain independent meanings.
+class BankAssignmentContext {
+public:
+  BankAssignmentContext(const AssetCatalog& assets, const SequenceProgramAsset& sequence,
+                        std::span<DependencyTarget> targets, std::vector<CollectionIssue>& issues)
+      : sequence(sequence), assets_(assets), targets_(targets), issues_(issues) {}
+
+  const SequenceProgramAsset& sequence;
+
+  template <class Data>
+  [[nodiscard]] const Data& data() const {
+    const auto* value = sequence.privateData.template get<Data>();
+    if (value == nullptr) {
+      throw std::logic_error("Sequence is missing its bank assignment data");
+    }
+    return *value;
+  }
+
+  template <class Data>
+  [[nodiscard]] std::vector<BankAssignment<Data>> banks() {
+    std::vector<BankAssignment<Data>> result;
+    for (auto& target : targets_) {
+      const auto* bank = assets_.asset<SoundBankAsset>(target.asset);
+      if (bank != nullptr) {
+        if (const auto* data = bank->privateData.template get<Data>()) {
+          result.push_back({*bank, *data, target.placement});
+        }
+      }
+    }
+    return result;
+  }
+
+  void warning(std::string message) {
+    issues_.push_back({.severity = Severity::Warning,
+                       .message = std::move(message),
+                       .asset = sequence.metadata.id,
+                       .range = sequence.metadata.range});
+  }
+
+private:
+  const AssetCatalog& assets_;
+  std::span<DependencyTarget> targets_;
+  std::vector<CollectionIssue>& issues_;
+};
 
 // One asset's request, with candidates restricted to the user's selection for
 // manual collections. Selectors never mutate assets or construct collections.
@@ -99,7 +174,8 @@ template <class Range>
 [[nodiscard]] DependencySelection selectAll(const Range& candidates) {
   DependencySelection result;
   for (const auto& candidate : candidates) {
-    result.add(dependencyId(candidate));
+    auto target = dependencyTarget(candidate);
+    result.add(target.asset, std::move(target.placement));
   }
   return result;
 }
@@ -107,18 +183,16 @@ template <class Range>
 // An intentional group and an unresolved choice are different values. A tie
 // retains alternatives for inspection without arbitrarily selecting a provider.
 template <class Range>
-[[nodiscard]] DependencySelection selectOne(const Range& candidates) {
+[[nodiscard]] DependencySelection selectOne(const Range& candidates,
+                                            std::string message = "Asset dependency matches multiple providers") {
   if (candidates.size() <= 1) {
     return selectAll(candidates);
   }
   DependencySelection result;
-  for (const auto& candidate : candidates) {
-    result.alternatives.push_back(dependencyId(candidate));
-  }
+  result.ambiguous(dependencyTargets(candidates), std::move(message));
   return result;
 }
 
-[[nodiscard]] const AssetRecipe* assetRecipe(const Asset& asset);
 void resolveDependencies(const AssetCatalog& assets, DesiredCollection& collection,
                          ResolutionMode mode = ResolutionMode::Automatic);
 [[nodiscard]] std::vector<std::pair<std::string, DesiredCollection>> dependencyCollections(

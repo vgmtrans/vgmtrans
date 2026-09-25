@@ -129,21 +129,13 @@ DependencySelection selectSonyPs1Samples(const DependencyContext& context) {
     }));
   }
 
-  DependencySelection result;
+  std::vector<DependencyTarget> positions;
   for (const auto& body : bodies) {
     for (u32 start : findSonyPs1SampleStarts(*body.data, bank.sampleSizes)) {
-      result.add(body.id(), AssetPrivateData::make(SamplePosition{start}));
+      positions.push_back({body.id(), AssetPrivateData::make(SamplePosition{start})});
     }
   }
-  if (result.targets.size() > 1) {
-    for (const auto& target : result.targets) {
-      result.alternatives.push_back(target.asset);
-    }
-    result.targets.clear();
-    result.issues.push_back(
-        ambiguousMatchIssue("Sony PS1 sound bank matches multiple external sample pools or positions"));
-  }
-  return result;
+  return selectOne(positions, "Sony PS1 sound bank matches multiple external sample pools or positions");
 }
 
 void prepareSonyPs1Bank(BankPreparationContext& context, const SonyPs1BankLayout& layout) {

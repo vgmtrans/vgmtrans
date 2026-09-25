@@ -175,7 +175,14 @@ void finalizeSegSatPerformance(core::PerformanceSequence& performance, std::span
                                                       core::SourceMapBuilder* sourceMap = nullptr,
                                                       std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& segSatSequenceConfig();
-void bindSegSatCollection(core::SequencePreparationContext& context);
+struct SegSatBankUse {
+  u8 logicalBank = 0;
+  u8 exportBank = 0;
+};
+
+void assignSegSatBanks(core::BankAssignmentContext& context);
+void prepareSegSatBank(core::BankPreparationContext& context, const SegSatBankBindingData& data);
+void prepareSegSatSequence(core::SequencePreparationContext& context, const SegSatSequenceBindingData& sequence);
 [[nodiscard]] core::FormatModule segSatModule();
 
 }  // namespace vgmtrans::formats::segsat

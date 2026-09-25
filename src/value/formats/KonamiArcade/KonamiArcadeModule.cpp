@@ -16,13 +16,6 @@ using namespace core;
 
 namespace {
 
-[[nodiscard]] CollectionKey collectionKey(SourceId source, u32 sequenceIndex) {
-  return CollectionKey{
-      .resolver = std::string(kKonamiArcadeFormatName),
-      .value = "source:" + std::to_string(source.value) + ":sequence:" + std::to_string(sequenceIndex),
-  };
-}
-
 [[nodiscard]] ScanResult scanKonamiArcade(const ScanInput& input) {
   if (input.source.attribute(mame::kMameFormatAttribute) != kKonamiArcadeFormatName) {
     return {};
@@ -41,9 +34,7 @@ namespace {
     sequence.program(decodeKonamiArcadeSequence(input.reader, *layout, sourceSequence, sequence.id(),
                                                 &result.sourceMap(), &result.diagnostics()));
 
-    auto collection = result.collection(sourceSequence.name, collectionKey(input.source.id, sourceSequence.index));
-    collection.sequence(sequence);
-    collection.soundBank(synth);
+    sequence.useBank(synth);
   }
 
   return result.finish();

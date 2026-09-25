@@ -1,11 +1,10 @@
 # Asset dependencies and collection preparation
 
 A format describes what each asset needs when it scans that asset. The core
-expands those dependencies into a collection, records the selected relationships,
-and prepares private copies for playback or export.
-
-`FormatModule` only registers scanning, accepted source formats, and sample-filter
-preferences. It has no collection-resolution or binding callback.
+resolves sequences to banks, then banks to sample pools, and prepares private
+copies for playback or export. These two supported relationships are represented
+by separate `SequenceRecipe` and `BankRecipe` types. There is no general dependency
+graph, bank-to-bank traversal, or format-level collection callback.
 
 ## Writing a format
 
@@ -18,7 +17,19 @@ bank.useSamples(samples);
 sequence.useBank(bank);
 ```
 
-Local samples and already-resolved `SampleRef`s need no deferred dependency.
+Direct references are stored as values. Local samples and already-resolved
+`SampleRef`s need no additional declaration: the core discovers their external
+pool dependencies from the bank's regions.
+
+`useBank` and `useBanks` opt the sequence into an automatic collection. Use
+`sequence.collection()` to publish a sequence even when it has no banks, and
+`sequence.includeMisc(table)` to attach supplemental inspection assets. Collection
+publication is an explicit optional descriptor on the sequence, independent of
+its dependency requests. The default name comes from the sequence; its stable
+identity comes from its asset ID. `collection(key, name)` can override either.
+All format scanners use these declarations. The explicit collection builder
+remains available for custom groupings such as several collections per sequence.
+
 For assets that arrive separately, use a small callable request with owned values:
 
 ```cpp
@@ -37,62 +48,92 @@ bank.data(layout).useSamples(selectSamples).prepare<BankData>(prepareBank);
 ```
 
 `selectOne` records an unresolved choice when candidates tie. `selectAll` records
-an intentional ordered group. A request can instead build a `DependencySelection`
-with custom diagnostics, a prioritized subset, or per-provider placement data.
-For example, Sony PS1 records where a bank's sample table begins inside a pool;
-Akao selects enough pools to cover its required playable articulations.
+an intentional ordered group. Both accept asset views or `DependencyTarget` values
+with native placement data. Sony PS1 uses the latter to retain the possible
+starting positions of a bank's sample table within one or more pools.
 
-Selection only examines immutable assets. It must not mutate format state,
-construct collections, or capture borrowed pointers in its result. Asset IDs and
+A selection has a typed `ResolutionStatus`: `Resolved`, `Incomplete`, `Ambiguous`,
+or `Failed`. Empty selections are incomplete. `incomplete(message)` records
+missing coverage, including when some useful providers were selected.
+`ambiguous(alternatives, message)` retains complete alternatives and any explicitly
+selected fallback. `DependencySelection::failed(message)` reports a fatal request
+failure. Diagnostics explain these outcomes; their code strings do not control
+export. Akao's coverage selection and Tamsoft's first-choice fallback retain their
+native policies through these operations.
+
+Selection examines immutable assets. It must not mutate format state, construct
+collections, or capture borrowed pointers in its result. Asset IDs and owned
 `AssetPrivateData` placements survive the temporary catalog.
 
-Preparation runs after selection, on a private bank copy:
+## Bank assignments and preparation
+
+A bank's preparation hook receives its selected sample inputs and a private bank
+copy:
 
 ```cpp
 void prepareBank(BankPreparationContext& context, const BankData& layout) {
   for (const auto& input : context.samples<SampleData>()) {
-    // input.asset, input.data, and input.placement belong to this bank's inputs.
-    // Resolve native sample indexes into context.bank's regions.
+    // Resolve native sample indexes using input.asset, input.data,
+    // and input.placement, updating context.bank's regions.
   }
 }
 ```
 
-A bank's hook belongs to the bank, so a Konami sequence can use a Sony bank
-without knowing how Sony prepares samples. `bankIndex` gives its ordinal among
-selected banks of the same format. Sequence preparation runs afterward and may
-configure its private runtime from the prepared banks. SegSat also uses this
-step for sequence-specific logical bank addressing. Runtime replacement must
-keep the same executor family.
+The hook belongs to the bank, so a Konami sequence can use a Sony bank without
+knowing how Sony prepares samples. `bankIndex` gives the bank's ordinal among
+selected banks of the same format. A shared sample pool can have different
+placements in each bank's inputs.
+
+Some sequences also assign logical meanings to their selected banks. Register
+`sequence.assignBanks(assignBanks)` for that case. It runs after automatic or
+manual selection and can attach native placement values to the sequence-to-bank
+relationships. It cannot change membership or mutate bank assets:
+
+```cpp
+void assignBanks(BankAssignmentContext& context) {
+  const auto& sequence = context.data<SequenceData>();
+  for (auto& bank : context.banks<BankData>()) {
+    bank.placement = AssetPrivateData::make(logicalUse(sequence, bank.data));
+  }
+}
+```
+
+SegSat uses this step to reserve exact physical bank matches before assigning
+fallback logical roles. Each bank applies its assignment through
+`BankPreparationContext::placement`. Sequence preparation runs afterward with
+read-only banks; it can read the same assignment with `bankPlacement<T>(id)` and
+configure its private runtime. Runtime replacement must retain the executor family.
+Different sequences can assign different logical addresses to the same durable
+bank. Standalone bank preparation has no sequence assignment.
 
 ## Core policy
 
-- `useBank` and `useBanks` make a sequence an automatic collection root. Its key
-  uses the sequence's stable asset ID; adding or removing a matching provider
-  updates the existing collection. Missing providers leave an incomplete root.
+- Adding or removing providers updates the same sequence collection. Missing
+  providers leave an incomplete root.
 - Banks and sample pools remain assets without generating synthetic collections.
   `bindSoundBank` resolves and prepares a standalone bank's own dependencies.
-- Existing scanner-supplied collections remain supported. Their members seed
-  dependency expansion, and they suppress duplicate automatic roots for the
-  same sequence.
-- Each bank retains its own ordered dependency targets. Flattened collection
-  membership deduplicates assets without discarding relationships or placements.
+- Explicit collection members seed dependency expansion and suppress duplicate
+  automatic roots for the same sequence.
+- Flattened membership deduplicates assets while recorded dependencies retain
+  their ordered targets, placements, alternatives, and resolution status.
 - Automatic candidates cannot cross independent container roots. Standalone
-  files remain available to format-specific ID, path, and compatibility rules.
-  Exact references supplied by a scanner are authoritative.
-- Manual collections override the sequence's bank requests. Bank requests run
-  within the manually selected sample pools, in user-selected order. They may
-  intentionally cross container boundaries but cannot add an unselected asset.
-- Selection failures and cycles become issues on the affected collection.
-  Missing or ambiguous providers are inspectable; export may still work for
-  requests such as MIDI without a bank. Preparation and sample validation decide
-  whether the requested collection can actually be bound.
-- Preparation validates membership, recorded relationships, bank identity, sample
-  references, and resulting synth data. Failures publish no partially prepared
-  collection. Durable assets and previous snapshots remain unchanged.
+  files remain available to native ID, path, and compatibility rules. Exact
+  references supplied by a scanner are authoritative.
+- Manual collections replace the sequence's bank requests with the chosen banks.
+  Bank sample requests run within the selected pools in user order. Manual
+  selections may cross container boundaries but cannot add unselected providers.
+  Bank assignments apply after this override.
+- Wrong-type providers, selector exceptions, and assignment exceptions produce
+  failed dependencies and block preparation. Missing or ambiguous requests remain
+  inspectable; preparation and sample validation determine whether the selected
+  assets can be used. MIDI can still be useful without a bank.
+- Preparation validates recorded relationships, bank identity, sample references,
+  and resulting synth data. Failures publish no partially prepared collection.
+  Durable assets and previous snapshots remain unchanged.
 
 The resolver rebuilds decisions from the current immutable catalog after session
-changes. It does not retain a mutable matching database or search globally for a
-combination of providers. Driver-specific choices stay in small format requests.
+changes. It retains no mutable matching database and does not search globally for
+a combination of providers. Driver-specific choices stay in format requests.
 
 Standalone full-bank export uses the bank's own recipe. Exporting only instruments
 used by a sequence requires one unambiguous collection; exporting a particular
@@ -100,16 +141,19 @@ collection also applies its sequence-specific runtime and instrument behavior.
 
 ## Regression coverage
 
-Core tests exercise direct and deferred dependencies, shared providers with
-different positions, manual candidate ordering and confinement, container scope,
-cycles and exceptions, standalone preparation, and copy isolation. Format tests
-cover native matching and runtime semantics, including Sony sample positions,
-Akao articulation coverage, PSF2 manifests, and multibank addressing.
+Core tests exercise direct and deferred requests, typed failure status independent
+of diagnostic codes, ambiguous positions within one pool, manual ordering and
+confinement, container scope, provider type validation, standalone preparation,
+and copy isolation. Shared-bank tests cover different logical assignments across
+sequences and assignments to a manually substituted bank. Format tests cover
+native matching, sample positions, Akao coverage, PSF2 manifests, and SegSat logical
+addressing and velocity behavior.
 
-Migration verification used all 43 headless CTest targets and 49 real files from
-13 corpus groups spanning the six migrated formats. All 157 discovered
-collections retained the same banks, sample pools, and resolved sample references;
-manual selections agreed with automatic resolution. The 157 MIDI exports and 13
-each of SoundFont and DLS exports were byte-identical to the previous architecture.
-The corpus sample included shared Tamsoft banks, multibank Konami sequences,
-FFVIII articulation supplementation, and PSF2 files with unrelated member names.
+The refined implementation passes all 43 headless CTest targets. Corpus
+verification covers 56 files across 17 groups, including the original six formats
+and additional SegSat, NDS, MP2k, and Namco SNES archives. All 430 collections
+retain the same banks, pools, and resolved sample references; manual selections
+agree with automatic resolution. All 464 generated artifacts are byte-identical:
+430 MIDI files and 17 each of SoundFont and DLS. The sampled MP2k group reports
+pre-existing sample-reference errors in both builds, with matching artifacts and
+exit status; the other 16 groups export without a nonzero exit status.

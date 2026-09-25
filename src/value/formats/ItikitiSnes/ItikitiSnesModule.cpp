@@ -31,9 +31,9 @@ namespace {
       decodeSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics());
   sequence.program(std::move(parsed.program));
 
-  auto collection = result.sourceCollection(displayName).sequence(sequence);
+  sequence.collection();
   if (const auto synth = addSynth(result, *layout, parsed.references, displayName)) {
-    collection.soundBank(*synth);
+    sequence.useBank(*synth);
   } else {
     result.warning("ItikitiSnes sequence found, but no valid instruments or samples were discovered",
                    input.reader.range(0, input.reader.size()));

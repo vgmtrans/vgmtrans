@@ -32,18 +32,13 @@ namespace {
   return value;
 }
 
-[[nodiscard]] CollectionKey collectionKey(SourceId source, u32 table, u32 song) {
-  return CollectionKey{
-      .resolver = std::string(kMp2kFormatName),
-      .value = fmt::format("source:{}:table:{}:song:{}", source.value, table, song),
-  };
-}
-
 void scanLayout(const Mp2kLayout& layout, ScanResultBuilder& result, const RetainedSource& source) {
   auto psg = result.samplePool("MP2k PSG samples");
   std::map<u32, Mp2kScannedBank> banks;
   for (const auto& bank : layout.banks) {
-    banks.emplace(bank.offset, addMp2kInstrumentSet(result, bank, layout.engine, psg));
+    auto scanned = addMp2kInstrumentSet(result, bank, layout.engine, psg);
+    scanned.instruments.useSamples(psg);
+    banks.emplace(bank.offset, std::move(scanned));
   }
 
   const auto selected = selectedSong(result.sourceFile());
@@ -60,11 +55,9 @@ void scanLayout(const Mp2kLayout& layout, ScanResultBuilder& result, const Retai
     sequence.program(
         parseMp2kSequenceProgram(source, sequence.id(), song, tones, &result.sourceMap(), &result.diagnostics()));
 
-    auto collection =
-        result.collection(name, collectionKey(result.source(), layout.engine.songTableOffset, song.index));
-    collection.sequence(sequence).samplePool(psg);
+    sequence.collection();
     if (bank != banks.end()) {
-      collection.soundBank(bank->second.instruments);
+      sequence.useBank(bank->second.instruments);
     }
   }
 }

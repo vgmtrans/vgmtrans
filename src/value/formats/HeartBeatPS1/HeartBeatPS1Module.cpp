@@ -50,15 +50,11 @@ namespace {
     auto sequence = result.sequence(name, input.reader.range(layout.containerOffset, layout.containerSize));
     sequence.program(parseHeartBeatPs1Sequence(input.reader, sequence.id(), layout, instruments, &result.sourceMap(),
                                                &result.diagnostics()));
-    auto collection =
-        result
-            .collection(name, CollectionKey{.value = fmt::format("source:{}:heartbeat-sequence:{}",
-                                                                 result.source().value, layout.containerOffset)})
-            .sequence(sequence);
+    sequence.collection();
     // Driver bank-select values index the four IDs in the sequence container.
     // Attach every loaded bank so those source identities remain resolvable.
     for (const auto bank : banks) {
-      collection.soundBank(bank);
+      sequence.useBank(bank);
     }
   }
   return result.finish();

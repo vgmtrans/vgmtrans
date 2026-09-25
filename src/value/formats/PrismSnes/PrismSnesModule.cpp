@@ -26,9 +26,9 @@ namespace {
   auto sequence = result.sequence(displayName);
   sequence.program(decodeSequence(input.retain(), *layout, sequence.id(), &result.sourceMap(), &result.diagnostics()));
 
-  auto collection = result.sourceCollection(displayName).sequence(sequence);
+  sequence.collection();
   if (const auto synth = addSynth(result, *layout, displayName)) {
-    collection.soundBank(*synth);
+    sequence.useBank(*synth);
   } else {
     result.warning("PrismSnes sequence found, but no valid referenced instruments or samples were discovered",
                    input.reader.range(0, input.reader.size()));

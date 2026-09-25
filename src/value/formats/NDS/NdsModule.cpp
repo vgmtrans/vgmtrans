@@ -18,22 +18,8 @@ using namespace core;
 
 namespace {
 
-struct BankAssets {
-  std::optional<ScanSoundBankDraft> instruments;
-  std::array<std::optional<ScanSamplePoolDraft>, 4> samples;
-};
-
-// Gives each sequence collection a stable identity within its source SDAT.
-[[nodiscard]] CollectionKey ndsCollectionKey(SourceId source, u64 sdatOffset, u32 sequenceIndex) {
-  return CollectionKey{
-      .resolver = std::string(kNdsFormatName),
-      .value = "source:" + std::to_string(source.value) + ":sdat:" + std::to_string(sdatOffset) +
-               ":seq:" + std::to_string(sequenceIndex),
-  };
-}
-
 // Builds the assets described by one SDAT. Dependencies are created first so
-// each sequence collection can attach its bank and samples directly.
+// each sequence can reference its bank directly.
 void scanNdsLayout(const NdsLayout& layout, ScanResultBuilder& result) {
   const ByteReader reader = result.reader();
   const auto psg = addNdsPsgSamples(result);
@@ -64,17 +50,26 @@ void scanNdsLayout(const NdsLayout& layout, ScanResultBuilder& result) {
     }
   }
 
-  std::vector<BankAssets> bankAssets(layout.banks.size());
+  std::vector<std::optional<ScanSoundBankDraft>> bankAssets(layout.banks.size());
   for (const u16 bankIndex : referencedBanks) {
     const auto& bank = layout.banks[bankIndex];
-    auto& assets = bankAssets[bankIndex];
+    std::array<std::optional<ScanSamplePoolDraft>, 4> samples;
     for (u32 slot = 0; slot < bank.waveArchives.size(); ++slot) {
       if (bank.waveArchives[slot]) {
-        assets.samples[slot] = waveAssets[*bank.waveArchives[slot]];
+        samples[slot] = waveAssets[*bank.waveArchives[slot]];
       }
     }
     if (bank.file) {
-      assets.instruments = addNdsInstrumentSet(result, *bank.file, bank.name, psg, assets.samples);
+      auto instruments = addNdsInstrumentSet(result, *bank.file, bank.name, psg, samples);
+      if (instruments) {
+        instruments->useSamples(psg);
+        for (const auto& sample : samples) {
+          if (sample) {
+            instruments->useSamples(*sample);
+          }
+        }
+      }
+      bankAssets[bankIndex] = instruments;
     }
   }
 
@@ -90,21 +85,9 @@ void scanNdsLayout(const NdsLayout& layout, ScanResultBuilder& result) {
     sequenceAsset.program(
         parseNdsSequenceProgram(reader, sequenceAsset.id(), range, &result.sourceMap(), &result.diagnostics()));
 
-    auto collection =
-        result.collection(sequence.name, ndsCollectionKey(result.source(), layout.range.offset, sequenceIndex));
-    collection.sequence(sequenceAsset).samplePool(psg);
-    if (!sequence.bank) {
-      continue;
-    }
-
-    const auto& assets = bankAssets[*sequence.bank];
-    if (assets.instruments) {
-      collection.soundBank(*assets.instruments);
-    }
-    for (const auto sample : assets.samples) {
-      if (sample) {
-        collection.samplePool(*sample);
-      }
+    sequenceAsset.collection();
+    if (sequence.bank && bankAssets[*sequence.bank]) {
+      sequenceAsset.useBank(*bankAssets[*sequence.bank]);
     }
   }
 }

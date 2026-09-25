@@ -339,7 +339,8 @@ struct SequenceProgramAsset {
   AssetMetadata metadata;
   SequenceProgram program;
   AssetPrivateData privateData;
-  AssetRecipe recipe;
+  std::optional<SequenceCollection> collection;
+  SequenceRecipe recipe;
   SequencePreparer prepare;
 };
 

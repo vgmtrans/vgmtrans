@@ -443,7 +443,7 @@ std::optional<ScanSoundBankDraft> addSegSatBank(ScanResultBuilder& builder, cons
       entry.region(*sample, std::move(parsedRegion.region)).source("Region", parsedRegion.source, "segsat-region");
     }
   }
-  bank.data(std::move(velocityBank));
+  bank.data(std::move(velocityBank)).prepare<SegSatBankBindingData>(prepareSegSatBank);
   return bank;
 }
 

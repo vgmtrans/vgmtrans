@@ -28,9 +28,9 @@ namespace {
   sequence.range(sequenceSourceRange(input.reader, layout->sequenceHeaderRange, parsed.program))
       .program(std::move(parsed.program));
 
-  auto collection = result.sourceCollection(displayName).sequence(sequence);
+  sequence.collection();
   if (const auto synth = addSynth(result, *layout, parsed.referencedInstruments, displayName)) {
-    collection.soundBank(*synth);
+    sequence.useBank(*synth);
   } else {
     result.warning("SoftCreatSnes sequence found, but no valid referenced BRR instruments were discovered",
                    layout->sequenceHeaderRange);

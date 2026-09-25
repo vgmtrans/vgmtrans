@@ -84,13 +84,9 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
       collection->name.empty() ? "collection-" + std::to_string(collection->id.value) : collection->name;
   const SequenceProgramAsset* sequence = nullptr;
   SequenceRuntime sequenceRuntime;
-  bool failed = false;
-  for (const auto& issue : collection->issues) {
-    if (issue.severity == Severity::Error &&
-        (issue.code.starts_with("dependency-") || issue.code == "invalid-dependency")) {
-      failed = true;
-    }
-  }
+  bool failed = std::ranges::any_of(collection->dependencies, [](const ResolvedDependency& dependency) {
+    return dependency.status == ResolutionStatus::Failed;
+  });
   if (members.sequence) {
     sequence = snapshot.asset<SequenceProgramAsset>(*members.sequence);
     if (sequence == nullptr) {
@@ -133,15 +129,15 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
   }
 
   for (const auto& dependency : collection->dependencies) {
-    const bool ownerSelected = members.sequence == dependency.owner ||
-                               std::ranges::find(members.soundBanks, dependency.owner) != members.soundBanks.end();
+    const bool ownerSelected =
+        dependency.role == DependencyRole::SoundBank
+            ? members.sequence == dependency.owner
+            : std::ranges::find(members.soundBanks, dependency.owner) != members.soundBanks.end();
     if (!ownerSelected) {
       diagnostics.push_back(exportError("Dependency owner is not a selected sequence or sound bank"));
       failed = true;
     }
-    const auto& providers = dependency.role == DependencyRole::SoundBank    ? members.soundBanks
-                            : dependency.role == DependencyRole::SamplePool ? members.samplePools
-                                                                            : members.miscAssets;
+    const auto& providers = dependency.role == DependencyRole::SoundBank ? members.soundBanks : members.samplePools;
     for (const auto& target : dependency.targets) {
       if (std::ranges::find(providers, target.asset) == providers.end()) {
         diagnostics.push_back(exportError("Dependency provider is not a selected collection member"));
@@ -151,6 +147,12 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
   }
   if (!failed) {
     try {
+      std::vector<DependencyTarget> bankUses;
+      for (const auto& dependency : collection->dependencies) {
+        if (dependency.role == DependencyRole::SoundBank) {
+          bankUses.insert(bankUses.end(), dependency.targets.begin(), dependency.targets.end());
+        }
+      }
       for (size_t i = 0; i < soundBanks.size(); ++i) {
         auto& bank = soundBanks[i];
         const auto& prepare = snapshot.asset<SoundBankAsset>(members.soundBanks[i])->prepare;
@@ -167,7 +169,9 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
             static_cast<u32>(std::count_if(soundBanks.begin(), soundBanks.begin() + i, [&](const auto& previous) {
               return previous.metadata.format == bank.metadata.format;
             }));
-        BankPreparationContext context{bank, index, inputs, samplePools, diagnostics};
+        const auto use = std::ranges::find(bankUses, bank.metadata.id, &DependencyTarget::asset);
+        BankPreparationContext context{
+            bank, index, inputs, samplePools, diagnostics, use == bankUses.end() ? AssetPrivateData{} : use->placement};
         prepare(context);
         if (context.failed) {
           failed = true;
@@ -175,7 +179,8 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
         }
       }
       if (!failed && sequence != nullptr && sequence->prepare) {
-        SequencePreparationContext context{sequence, sequenceRuntime, soundBanks, samplePools, miscAssets, diagnostics};
+        SequencePreparationContext context{sequence,   sequenceRuntime, soundBanks, samplePools,
+                                           miscAssets, diagnostics,     bankUses};
         sequence->prepare(context);
         failed = context.failed;
       }

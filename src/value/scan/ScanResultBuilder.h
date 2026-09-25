@@ -24,6 +24,7 @@ namespace vgmtrans::core {
 class ScanResultBuilder;
 class ScanSoundBankDraft;
 class ScanSamplePoolDraft;
+class ScanMiscDraft;
 
 // Drafts are lightweight views into result-owned pending assets. Creating a
 // draft is the publication decision: ScanResultBuilder::finish() materializes
@@ -33,9 +34,16 @@ public:
   [[nodiscard]] AssetId id() const noexcept { return id_; }
   ScanSequenceDraft& range(SourceRange range);
   ScanSequenceDraft& program(SequenceProgram program);
+  // Publish a collection even when this sequence has no bank dependencies.
+  // useBank/useBanks opt in automatically; explicit options preserve naming
+  // and identity when they differ from the sequence's defaults.
+  ScanSequenceDraft& collection(CollectionKey key = {}, std::string name = {});
+  ScanSequenceDraft& includeMisc(AssetId asset);
+  ScanSequenceDraft& includeMisc(const ScanMiscDraft& asset);
   ScanSequenceDraft& useBank(AssetId bank);
   ScanSequenceDraft& useBank(const ScanSoundBankDraft& bank);
   ScanSequenceDraft& useBanks(DependencySelector select);
+  ScanSequenceDraft& assignBanks(BankAssigner assign);
   ScanSequenceDraft& prepare(SequencePreparer prepare);
 
   template <class Data, class Prepare>
@@ -119,8 +127,9 @@ private:
   AssetId id_;
 };
 
-// Builds one scanner-known collection. This is the common path when a format has
-// already discovered the sequence, instruments, and samples together.
+// Explicit grouping for callers that need several collections per sequence or
+// a collection without a sequence. Ordinary scanners declare dependencies on
+// the sequence and bank drafts instead.
 class ScanCollectionBuilder {
 public:
   ScanCollectionBuilder(ScanResultBuilder& out, size_t index);
@@ -185,7 +194,6 @@ private:
   [[nodiscard]] ExplicitCollection& explicitCollection(size_t index);
 
   void setPrivateData(size_t slot, AssetPrivateData data);
-  void addDependency(size_t slot, AssetDependency dependency, bool root);
   void setSequencePreparer(size_t slot, SequencePreparer prepare);
   void setBankPreparer(size_t slot, BankPreparer prepare);
 

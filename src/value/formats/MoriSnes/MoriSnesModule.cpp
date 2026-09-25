@@ -30,9 +30,9 @@ namespace {
       decodeSequence(input.retain(), *layout, sequence.id(), &result.sourceMap(), &result.diagnostics());
   sequence.program(std::move(parsed.program));
 
-  auto collection = result.sourceCollection(displayName).sequence(sequence);
+  sequence.collection();
   if (const auto synth = addSynth(result, *layout, parsed.references, displayName)) {
-    collection.soundBank(*synth);
+    sequence.useBank(*synth);
   } else {
     result.warning("MoriSnes sequence found, but no valid referenced instruments or samples were discovered",
                    input.reader.range(0, input.reader.size()));

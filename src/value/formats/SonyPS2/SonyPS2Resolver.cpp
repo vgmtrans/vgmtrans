@@ -273,7 +273,7 @@ DependencySelection BankRequest::operator()(const DependencyContext& context) co
   }
   auto result = selectAll(matches);
   if (matches.size() > 1) {
-    result.issues.push_back(ambiguousMatchIssue("SonyPS2 SQ matches multiple HD banks with equal source affinity"));
+    result.ambiguous(dependencyTargets(matches), "SonyPS2 SQ matches multiple HD banks with equal source affinity");
   }
   return result;
 }

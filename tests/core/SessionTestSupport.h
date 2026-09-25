@@ -163,15 +163,12 @@ struct ProbeBankData {
           },
       .program = probeSequenceProgram(),
       .privateData = AssetPrivateData::make(ProbeBankData{.bank = bank}),
-      .recipe = {.collectionNamespace = "ProbeBank",
-                 .dependencies = {{.select =
-                                       [bank](const DependencyContext& context) {
-                                         auto banks = context.candidates<SoundBankAsset, ProbeBankData>();
-                                         std::erase_if(banks, [bank](const auto& candidate) {
-                                           return candidate.data->bank != bank;
-                                         });
-                                         return selectAll(banks);
-                                       }}}},
+      .collection = SequenceCollection{},
+      .recipe = {.banks = {[bank](const DependencyContext& context) {
+                   auto banks = context.candidates<SoundBankAsset, ProbeBankData>();
+                   std::erase_if(banks, [bank](const auto& candidate) { return candidate.data->bank != bank; });
+                   return selectAll(banks);
+                 }}},
   };
 
   ScanResult result;

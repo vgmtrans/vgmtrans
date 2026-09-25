@@ -752,21 +752,15 @@ void akaoSampleSelectionUsesPlayableArticulations() {
                                 .format = std::string(kAkaoFormatName),
                                 .name = "Sequence",
                                 .range = sources.reader(sequenceSource).range(10, 20)},
-      .recipe = {.collectionNamespace = std::string(kAkaoCollectionResolver),
-                 .dependencies = {{.select =
-                                       [bankId](const DependencyContext&) {
-                                         DependencySelection selection;
-                                         selection.add(bankId);
-                                         return selection;
-                                       }}}},
+      .collection = SequenceCollection{.key = {.resolver = std::string(kAkaoCollectionResolver)}},
+      .recipe = {.banks = {DependencyTarget{bankId, {}}}},
   });
   assets.emplace_back(SoundBankAsset{
       .metadata = AssetMetadata{.id = bankId,
                                 .format = std::string(kAkaoFormatName),
                                 .name = "Bank",
                                 .range = sources.reader(sequenceSource).range(40, 20)},
-      .recipe = {.dependencies = {{.role = DependencyRole::SamplePool,
-                                   .select = AkaoSamples{.sampleSetId = 7, .requiredArticulations = {5, 9}}}}},
+      .recipe = {.samples = {AkaoSamples{.sampleSetId = 7, .requiredArticulations = {5, 9}}}},
   });
   const auto samples = [&](AssetId id, SourceId source, u16 sampleSet, std::vector<AkaoArticulation> articulations) {
     return SamplePoolAsset{
@@ -969,7 +963,7 @@ void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView() {
          "an articulation with an incomplete sample must not bind to sample zero");
 
   const auto* sequence = project.asset<SequenceProgramAsset>(sequenceId);
-  expect(sequence->recipe.dependencies.size() == 1 && detectedInstrumentSet->recipe.dependencies.size() == 1,
+  expect(sequence->recipe.banks.size() == 1 && detectedInstrumentSet->recipe.samples.size() == 1,
          "Akao sequence should name its bank, whose recipe owns sample requirements");
   const auto prepared = bindCollection(project, collection.id);
   expect(prepared.collection && prepared.collection->soundBanks().size() == 1 &&

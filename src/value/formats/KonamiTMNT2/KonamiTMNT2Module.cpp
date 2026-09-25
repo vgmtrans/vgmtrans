@@ -18,13 +18,6 @@ using namespace core;
 
 namespace {
 
-[[nodiscard]] CollectionKey collectionKey(SourceId source, u32 sequence) {
-  return CollectionKey{
-      .resolver = std::string(kFormatName),
-      .value = "source:" + std::to_string(source.value) + ":sequence:" + std::to_string(sequence),
-  };
-}
-
 [[nodiscard]] ScanResult scan(const ScanInput& input) {
   if (input.source.attribute(mame::kMameFormatAttribute) != kFormatName) {
     return {};
@@ -108,11 +101,10 @@ namespace {
         pointer.description("Unused track");
       }
     }
-    auto collection = result.collection(sourceSequence.name, collectionKey(input.source.id, sourceSequence.index));
-    collection.sequence(sequence);
-    collection.misc(sequenceTable);
+    sequence.collection();
+    sequence.includeMisc(sequenceTable);
     for (const auto& bank : synth) {
-      collection.soundBank(bank);
+      sequence.useBank(bank);
     }
   }
   return result.finish();

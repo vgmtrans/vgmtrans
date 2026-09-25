@@ -29,14 +29,13 @@ using namespace core;
 
   // A sequence is useful on its own, so publish it even when the snapshot does
   // not contain enough information to reconstruct instruments and samples.
-  auto collection = result.sourceCollection(displayName);
-  collection.sequence(sequence);
+  sequence.collection();
 
   const bool hasSynthLayout = layout->spcDirAddress && layout->commonInstrumentTableAddress &&
                               layout->bankedInstrumentTableAddress && layout->percussionInstrumentTableAddress;
   if (hasSynthLayout) {
     if (const auto synth = addKonamiSnesSynth(result, *layout, instruments, displayName)) {
-      collection.soundBank(*synth);
+      sequence.useBank(*synth);
     } else {
       result.warning("KonamiSnes sequence found, but no valid instruments or samples were discovered",
                      input.reader.range(0, input.reader.size()));
