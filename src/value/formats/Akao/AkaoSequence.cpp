@@ -10,6 +10,7 @@
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceVm.h"
+#include "value/synth/PsxSpu.h"
 
 #include <algorithm>
 #include <array>
@@ -56,14 +57,42 @@ struct PendingPitchSlide {
   s8 semitones = 0;
 };
 
+struct Ff7Portamento {
+  PitchSlideBinding binding;
+  PerformanceNoteId note;
+  PerformanceNoteId previous;
+  u64 tick = 0;
+  double startKey = 0;
+  double targetKey = 0;
+};
+
 // These are the registers whose values genuinely survive from one executed
 // command to the next. Source bounds, version rules, and analysis do not.
 struct TrackState {
+  explicit TrackState(const AkaoRuntimeConfig& config) : envelopes(config.articulationEnvelopes) { loadEnvelope(); }
+
+  void loadEnvelope() {
+    const auto found = articulation ? envelopes.find(*articulation) : envelopes.end();
+    envelope = found != envelopes.end() ? std::optional{found->second} : std::nullopt;
+  }
+
+  const std::map<u32, AkaoAdsr>& envelopes;
+  std::optional<u32> articulation = 0;
+  std::optional<AkaoAdsr> envelope;
+  bool envelopeOverridden = false;
   u8 octave = 4;
   s8 transpose = 0;
   s8 tuning = 0;
   bool slur = false;
   bool legato = false;
+  bool slurContinuation = false;
+  bool connectionChangedSinceNote = false;
+  bool portamentoChangedSinceNote = false;
+  PerformanceNoteId lastNote;
+  u64 lastNoteStart = 0;
+  u32 lastNoteDelta = 0;
+  bool lastNoteFullGate = false;
+  std::optional<Ff7Portamento> lastPortamento;
   u16 portamentoTicks = 0;
   bool drum = false;
   bool useOneTimeDuration = false;
@@ -101,7 +130,35 @@ struct TrackState {
 // Playback holds the few runtime services shared by several commands. One-off
 // behavior stays beside the opcode that invokes it below.
 struct Playback : SequencePlayback<TrackState> {
-  void instrument(u32 bank, u32 program) { out.instrument(bank, program, true); }
+  void instrument(u32 bank, u32 program) {
+    track.articulation = bank == 0 || bank == 2 ? std::optional{program} : std::nullopt;
+    track.loadEnvelope();
+    out.instrument(bank, program, true);
+    if (std::exchange(track.envelopeOverridden, false)) {
+      out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    }
+  }
+
+  void resetAdsr() {
+    track.loadEnvelope();
+    track.envelopeOverridden = false;
+    out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+  }
+
+  void adsr(u16 mask1, u16 value1, u16 mask2, u16 value2) {
+    // FF7 SCUS_941.63: AD..B2 and B7/BB/BF update the current voice's
+    // register cache immediately; A1 and B3 reload articulation defaults.
+    // A raw sequence without a selected sample pool has no native defaults.
+    if (!track.envelope) {
+      return;
+    }
+    auto& envelope = *track.envelope;
+    envelope.adsr1 = static_cast<u16>((envelope.adsr1 & ~mask1) | value1);
+    envelope.adsr2 = static_cast<u16>((envelope.adsr2 & ~mask2) | value2);
+    track.envelopeOverridden = true;
+    out.replaceEnvelope(psxSpuEnvelope(envelope.adsr1, envelope.adsr2),
+                        VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+  }
 
   [[nodiscard]] u32 consumeDelta(u32 encodedDelta, u32 fallbackDelta) {
     u32 delta = encodedDelta;
@@ -124,6 +181,87 @@ struct Playback : SequencePlayback<TrackState> {
       return std::max<u32>(1, delta);
     }
     return std::max<u32>(1, delta > 2 ? delta - 2 : 0);
+  }
+
+  void startFf7Connection(bool slur) {
+    // CC writes 1 and D0 writes 4 to track+0x6e, including clearing the
+    // previous-note continuation bit. The first note still attacks.
+    track.slur = slur;
+    track.legato = !slur;
+    track.slurContinuation = false;
+    track.connectionChangedSinceNote = true;
+  }
+
+  void endFf7Connection() {
+    // FF7's lookahead (800318bc) clears these modes before the preceding
+    // timed event when it finds CD/D1/DB, a rest, or end. Revise that event
+    // when we reach the boundary, following the VM's actual repeat path.
+    // CC/D0 encountered after that event take effect after native lookahead.
+    // CD/D1 themselves are no-ops, so preserve a newly established mode.
+    if (!track.connectionChangedSinceNote) {
+      track.slur = false;
+      track.legato = false;
+    }
+    track.slurContinuation = false;
+    if (!track.portamentoChangedSinceNote) {
+      track.portamentoTicks = 0;
+    }
+    if (std::exchange(track.lastNoteFullGate, false)) {
+      const u32 gate = std::max<u32>(1, track.lastNoteDelta > 2 ? track.lastNoteDelta - 2 : 0);
+      out.setNoteEnd(track.lastNote, track.lastNoteStart + gate);
+    }
+    if (auto glide = std::exchange(track.lastPortamento, std::nullopt)) {
+      // Lookahead also disables portamento before computing the final pitch.
+      // That pitch still continues the voice, but changes immediately.
+      glide->binding.interruptAt(glide->tick);
+      out.at(glide->tick).pitchSlide(glide->note, glide->startKey, glide->targetKey, 0)
+          .continueFrom(glide->previous).preferPitchBend();
+    }
+  }
+
+  void rememberFf7Note(PerformanceNoteId note, u32 delta) {
+    track.lastNote = note;
+    track.lastNoteStart = vm.tick();
+    track.lastNoteDelta = delta;
+    track.lastNoteFullGate = track.slur || track.legato;
+    track.slurContinuation = track.slur;
+    track.connectionChangedSinceNote = false;
+    track.portamentoChangedSinceNote = false;
+  }
+
+  PerformanceNoteId ff7Note(u8 key, u32 delta) {
+    track.lastPortamento.reset();
+    const PerformanceNoteId previous = track.lastNote;
+    const bool continues = track.slurContinuation && previous.valid() && !track.drum;
+    const bool glide = !track.drum && track.portamentoTicks != 0 && track.previousKey && *track.previousKey != key;
+    const double startKey = continues
+                                ? out.currentPitchTransitionKey(previous).value_or(track.previousKey.value_or(key))
+                                : track.previousKey.value_or(key);
+    const bool samePitch = continues && !glide && std::abs(startKey - key) < 0.000001;
+    if (continues) {
+      out.setNoteEnd(previous, vm.tick());
+    }
+    const PerformanceNoteId note = out.note(NotePerformanceEvent{
+        .key = static_cast<double>(key),
+        .linearVelocity = LevelScale::linearFromMidi7(kNoteVelocity),
+        .durationTicks = soundingTicks(delta, false),
+        .extendsPrevious = samePitch,
+        .restartsEnvelope = !continues,
+        // FF7 resets modulation phase even when it suppresses key-on.
+        .restartsLfoPhase = true,
+        .note = samePitch ? previous : PerformanceNoteId{},
+    });
+    if (glide || (continues && !samePitch)) {
+      auto slide = out.pitchSlide(note, startKey, key, glide ? track.portamentoTicks : 0);
+      if (continues) {
+        slide.continueFrom(previous).preferPitchBend();
+        if (glide) {
+          track.lastPortamento = Ff7Portamento{slide, note, previous, vm.tick(), startKey, static_cast<double>(key)};
+        }
+      }
+    }
+    rememberFf7Note(note, delta);
+    return note;
   }
 
   void queuePitchSlide(u16 durationTicks, s8 semitones) {
@@ -383,33 +521,47 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
     const bool tie = !rest && noteByte >= 0x84;
     const u32 fallbackDelta = kDeltaTimeTable[noteByte % 11];
     const bool modern = profile.version3OrLater();
+    const bool ff7 = profile.version == AkaoPs1Version::Version1_0;
 
     if (rest) {
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
       const u32 delta = inlineDuration ? cursor.u8("duration") : fallbackDelta;
       return event.invoke(
-          [](Playback& playback, u32 encodedDelta, u32 defaultDelta) -> Effects {
+          [](Playback& playback, u32 encodedDelta, u32 defaultDelta, bool ff7Driver) -> Effects {
             const u32 duration = playback.consumeDelta(encodedDelta, defaultDelta);
+            if (ff7Driver) {
+              playback.endFf7Connection();
+              playback.track.lastNote = {};
+              playback.track.connectionChangedSinceNote = false;
+              playback.track.portamentoChangedSinceNote = false;
+            }
             playback.track.tieKey.reset();
             return Effects::wait(duration);
           },
-          {delta, fallbackDelta});
+          {delta, fallbackDelta, ff7});
     }
     if (tie) {
       auto event = cursor.command("Tie", SequenceSemantic::Note);
       const u32 delta = inlineDuration ? cursor.u8("duration") : fallbackDelta;
       return event.invoke(
-          [](Playback& playback, u32 encodedDelta, u32 defaultDelta, bool modernDriver) -> Effects {
+          [](Playback& playback, u32 encodedDelta, u32 defaultDelta, bool modernDriver, bool ff7Driver) -> Effects {
             const u32 duration = playback.consumeDelta(encodedDelta, defaultDelta);
             if (playback.track.tieKey) {
+              if (ff7Driver) {
+                playback.track.lastPortamento.reset();
+                playback.out.setNoteEnd(playback.track.lastNote, playback.vm.tick());
+              }
               const PerformanceNoteId note =
                   playback.out.note(*playback.track.tieKey, LevelScale::linearFromMidi7(kNoteVelocity),
                                     playback.soundingTicks(duration, modernDriver), true);
               playback.applyPendingPitchSlide(note, *playback.track.tieKey);
+              if (ff7Driver) {
+                playback.rememberFf7Note(note, duration);
+              }
             }
             return Effects::wait(duration);
           },
-          {delta, fallbackDelta, modern});
+          {delta, fallbackDelta, modern, ff7});
     }
 
     auto event = cursor.command("Note", SequenceSemantic::Note);
@@ -418,16 +570,20 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
     const u8 relativeKey = cursor.opcodeValue("scale_step", static_cast<u8>(noteByte / 11));
     const u32 delta = inlineDuration ? cursor.u8("duration") : fallbackDelta;
     return event.invoke(
-        [](Playback& playback, u8 scaleStep, u32 encodedDelta, u32 defaultDelta, bool modernDriver) -> Effects {
+        [](Playback& playback, u8 scaleStep, u32 encodedDelta, u32 defaultDelta, bool modernDriver,
+           bool ff7Driver) -> Effects {
           const u32 duration = playback.consumeDelta(encodedDelta, defaultDelta);
           const u8 sourceKey = playback.track.drum && !modernDriver
                                    ? static_cast<u8>(24 + scaleStep)
                                    : static_cast<u8>(playback.track.octave * 12 + scaleStep);
           const u8 key =
               static_cast<u8>(std::clamp<int>(static_cast<int>(sourceKey) + playback.track.transpose, 0, 127));
-          const PerformanceNoteId note = playback.out.note(key, LevelScale::linearFromMidi7(kNoteVelocity),
-                                                           playback.soundingTicks(duration, modernDriver));
-          if (playback.track.portamentoTicks != 0 && playback.track.previousKey && *playback.track.previousKey != key) {
+          const PerformanceNoteId note = ff7Driver
+                                             ? playback.ff7Note(key, duration)
+                                             : playback.out.note(key, LevelScale::linearFromMidi7(kNoteVelocity),
+                                                                 playback.soundingTicks(duration, modernDriver));
+          if (!ff7Driver && playback.track.portamentoTicks != 0 && playback.track.previousKey &&
+              *playback.track.previousKey != key) {
             playback.out.pitchSlide(note, *playback.track.previousKey, key, playback.track.portamentoTicks);
           }
           playback.applyPendingPitchSlide(note, key);
@@ -435,7 +591,7 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
           playback.track.tieKey = key;
           return Effects::wait(duration);
         },
-        {relativeKey, delta, fallbackDelta, modern});
+        {relativeKey, delta, fallbackDelta, modern, ff7});
   }
 
   if (status >= 0x9a && status <= 0x9f) {
@@ -447,8 +603,13 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
   }
 
   switch (status) {
-    case 0xa0:
-      return cursor.command("End", SequenceSemantic::End).end();
+    case 0xa0: {
+      auto event = cursor.command("End", SequenceSemantic::End);
+      if (profile.version == AkaoPs1Version::Version1_0) {
+        event.invoke<&Playback::endFf7Connection>();
+      }
+      return event.end();
+    }
     case 0xa1:
       return programArticulation(cursor);
     case 0xa2: {
@@ -519,6 +680,59 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
           },
           {duration, target});
     }
+    case 0xad:
+    case 0xae:
+    case 0xaf:
+    case 0xb0:
+    case 0xb1:
+    case 0xb2:
+    case 0xb3:
+    case 0xb7:
+    case 0xbb:
+    case 0xbf: {
+      if (profile.version != AkaoPs1Version::Version1_0) {
+        break;
+      }
+      if (status == 0xb3) {
+        return cursor.command("Reset ADSR", SequenceSemantic::Envelope).invoke<&Playback::resetAdsr>();
+      }
+      if (status == 0xb0) {
+        auto event = cursor.command("Decay Rate and Sustain Level", SequenceSemantic::Envelope);
+        const u8 decay = cursor.u8("decay_rate");
+        const u8 sustain = cursor.u8("sustain_level");
+        return event.invoke<&Playback::adsr>({0x00ff, static_cast<u16>(((decay & 15) << 4) | (sustain & 15)), 0, 0});
+      }
+      const auto field = [&](std::string_view name, u16 mask1, u16 mask2, u8 shift) {
+        auto event = cursor.command(name, SequenceSemantic::Envelope);
+        const u16 value = static_cast<u16>(cursor.u8("value") << shift);
+        return event.invoke<&Playback::adsr>({mask1, static_cast<u16>(value & mask1),
+                                              mask2, static_cast<u16>(value & mask2)});
+      };
+      switch (status) {
+        case 0xad: return field("Attack Rate", 0x7f00, 0, 8);
+        case 0xae: return field("Decay Rate", 0x00f0, 0, 4);
+        case 0xaf: return field("Sustain Level", 0x000f, 0, 0);
+        case 0xb1: return field("Sustain Rate", 0, 0x1fc0, 6);
+        case 0xb2: return field("Release Rate", 0, 0x001f, 0);
+        case 0xb7: {
+          auto event = cursor.command("Attack Mode", SequenceSemantic::Envelope);
+          const u8 mode = cursor.u8("mode");
+          return event.invoke<&Playback::adsr>({0x8000, static_cast<u16>(mode == 5 ? 0x8000 : 0), 0, 0});
+        }
+        case 0xbb: {
+          auto event = cursor.command("Sustain Mode", SequenceSemantic::Envelope);
+          const u8 mode = cursor.u8("mode");
+          // Sony's SDK defaults unrecognized modes to linear decrease.
+          const u16 bits = mode == 1 ? 0 : mode == 5 ? 0x8000 : mode == 7 ? 0xc000 : 0x4000;
+          return event.invoke<&Playback::adsr>({0, 0, 0xc000, bits});
+        }
+        default: {
+          auto event = cursor.command("Release Mode", SequenceSemantic::Envelope);
+          const u8 mode = cursor.u8("mode");
+          return event.invoke<&Playback::adsr>({0, 0, 0x0020, static_cast<u16>(mode == 7 ? 0x0020 : 0)});
+        }
+      }
+    }
     case 0xc0:
       return cursor.command("Transpose", SequenceSemantic::Pitch).set<&TrackState::transpose>(cursor.s8("semitones"));
     case 0xc1: {
@@ -571,12 +785,24 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
       return event.loopCandidate(target);
     }
     case 0xcc:
+      if (profile.version == AkaoPs1Version::Version1_0) {
+        return cursor.command("Slur On", SequenceSemantic::State).invoke<&Playback::startFf7Connection>({true});
+      }
       return cursor.command("Slur On", SequenceSemantic::State).set<&TrackState::slur>(true);
     case 0xcd:
+      if (profile.version == AkaoPs1Version::Version1_0) {
+        return cursor.command("Slur Off", SequenceSemantic::State).invoke<&Playback::endFf7Connection>();
+      }
       return cursor.command("Slur Off", SequenceSemantic::State).set<&TrackState::slur>(false);
     case 0xd0:
+      if (profile.version == AkaoPs1Version::Version1_0) {
+        return cursor.command("Legato On", SequenceSemantic::State).invoke<&Playback::startFf7Connection>({false});
+      }
       return cursor.command("Legato On", SequenceSemantic::State).set<&TrackState::legato>(true);
     case 0xd1:
+      if (profile.version == AkaoPs1Version::Version1_0) {
+        return cursor.command("Legato Off", SequenceSemantic::State).invoke<&Playback::endFf7Connection>();
+      }
       return cursor.command("Legato Off", SequenceSemantic::State).set<&TrackState::legato>(false);
     case 0xd8: {
       auto event = cursor.command("Tuning", SequenceSemantic::Pitch);
@@ -604,9 +830,21 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
     case 0xda: {
       auto event = cursor.command("Portamento On", SequenceSemantic::Portamento);
       const u16 speed = cursor.resolved("ticks", cursor.rawU8("speed"), akaoZeroAs256);
+      if (profile.version == AkaoPs1Version::Version1_0) {
+        // 8003257c also enables slur and clears the preceding pitch. The
+        // first note attacks; subsequent pitches glide on the same voice.
+        event.invoke<&Playback::startFf7Connection>({true});
+        event.invoke([](Playback& playback) {
+          playback.track.previousKey.reset();
+          playback.track.portamentoChangedSinceNote = true;
+        });
+      }
       return event.set<&TrackState::portamentoTicks>(speed);
     }
     case 0xdb:
+      if (profile.version == AkaoPs1Version::Version1_0) {
+        return cursor.command("Portamento Off", SequenceSemantic::Portamento).invoke<&Playback::endFf7Connection>();
+      }
       return cursor.command("Portamento Off", SequenceSemantic::Portamento).set<&TrackState::portamentoTicks>(0);
     case 0xdc: {
       auto event = cursor.command("Fixed Note Length", SequenceSemantic::State);
@@ -825,8 +1063,8 @@ SequenceProgramConfig makeAkaoConfig(AkaoPs1Version version) {
   };
 }
 
-SequenceRuntime akaoSequenceRuntime() {
-  return makeCompiledRuntime<Playback>();
+SequenceRuntime akaoSequenceRuntime(AkaoRuntimeConfig config) {
+  return makeCompiledRuntime<Playback>(std::move(config));
 }
 
 namespace {

@@ -159,6 +159,23 @@ void prepareAkaoBank(BankPreparationContext& context, const AkaoSoundBankData& d
     }
     context.warning(std::move(message));
   }
+
+  auto preparedData = data;
+  preparedData.runtime.articulationEnvelopes.clear();
+  for (const auto& [id, articulation] : articulations) {
+    preparedData.runtime.articulationEnvelopes.emplace(id, AkaoAdsr{articulation.adsr1, articulation.adsr2});
+  }
+  context.bank.privateData = AssetPrivateData::make(std::move(preparedData));
+}
+
+SequenceRuntime prepareAkaoSequence(SequencePreparationContext& context) {
+  AkaoRuntimeConfig config;
+  for (const auto& bank : context.banks<AkaoSoundBankData>(kAkaoFormatName)) {
+    for (const auto& [id, envelope] : bank.data.runtime.articulationEnvelopes) {
+      config.articulationEnvelopes[id] = envelope;
+    }
+  }
+  return akaoSequenceRuntime(std::move(config));
 }
 
 }  // namespace vgmtrans::formats::akao

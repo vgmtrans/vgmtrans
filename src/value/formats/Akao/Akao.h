@@ -135,6 +135,7 @@ struct AkaoRegionBindingData {
   u8 sustainRate = 0;
   u8 sustainMode = 0;
   u8 releaseRate = 0;
+  bool hasEnvelopeOverride = true;
   std::optional<u8> drumRelativeUnityKey;
 };
 
@@ -145,8 +146,19 @@ struct AkaoInstrumentSetBindingData {
   std::set<u32> noAttackArticulationIds;
 };
 
+struct AkaoAdsr {
+  u16 adsr1 = 0;
+  u16 adsr2 = 0;
+};
+
+struct AkaoRuntimeConfig {
+  std::map<u32, AkaoAdsr> articulationEnvelopes;
+};
+
 struct AkaoSoundBankData {
   AkaoInstrumentSetBindingData binding;
+  // Filled on the prepared bank after its sample pools have been selected.
+  AkaoRuntimeConfig runtime;
 };
 
 // An articulation is Akao's complete description of one playable sample:
@@ -182,7 +194,7 @@ struct AkaoSplitSampleLocation {
 };
 
 [[nodiscard]] core::SequenceProgramConfig makeAkaoConfig(AkaoPs1Version version);
-[[nodiscard]] core::SequenceRuntime akaoSequenceRuntime();
+[[nodiscard]] core::SequenceRuntime akaoSequenceRuntime(AkaoRuntimeConfig config = {});
 [[nodiscard]] core::TrackProgram decodeAkaoTrack(AkaoPs1Version version, const core::TrackDecodeScope& tracks,
                                                  u32 trackIndex, u32 startOffset,
                                                  std::vector<core::Diagnostic>* diagnostics = nullptr,
@@ -214,6 +226,7 @@ struct AkaoInstrumentSetBuild {
                                           const AkaoArticulationMap& articulations);
 
 void prepareAkaoBank(core::BankPreparationContext& context, const AkaoSoundBankData& data);
+[[nodiscard]] core::SequenceRuntime prepareAkaoSequence(core::SequencePreparationContext& context);
 
 [[nodiscard]] core::FormatModule akaoModule();
 

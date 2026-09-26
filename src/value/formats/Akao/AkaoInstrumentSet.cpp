@@ -27,8 +27,8 @@ namespace {
                                           u8 sustainMode, u8 releaseRate) {
   u16 adsr1 = articulation.adsr1;
   u16 adsr2 = articulation.adsr2;
-  // Legacy Akao applies region-level ADSR bytes over the articulation ADSR. Keep that
-  // behavior here so key-split and drum regions retain their per-region shaping.
+  // Key-split and later drum tables override the articulation ADSR. The early
+  // five-byte drum rows have no ADSR fields and bypass this overlay entirely.
   adsr1 &= static_cast<u16>(~0x7f00u);
   adsr1 |= static_cast<u16>((attackRate & 0x7f) << 8);
   adsr2 &= static_cast<u16>(~0xffdfu);
@@ -39,7 +39,8 @@ namespace {
 }
 
 void applyArticulationToRegion(Region& region, const AkaoArticulation* articulation, u8 attackRate, u8 sustainRate,
-                               u8 sustainMode, u8 releaseRate, bool drum, u8 drumRelativeUnityKey = 0) {
+                               u8 sustainMode, u8 releaseRate, bool hasEnvelopeOverride, bool drum,
+                               u8 drumRelativeUnityKey = 0) {
   if (articulation == nullptr) {
     return;
   }
@@ -47,7 +48,9 @@ void applyArticulationToRegion(Region& region, const AkaoArticulation* articulat
   const double rootKey =
       drum ? articulation->unityKey + region.keyRange.low - drumRelativeUnityKey : articulation->unityKey;
   region.unityKey = rootKey - (articulation->fineTuneCents / 100.0);
-  region.envelope = akaoRegionEnvelope(*articulation, attackRate, sustainRate, sustainMode, releaseRate);
+  region.envelope = hasEnvelopeOverride
+                        ? akaoRegionEnvelope(*articulation, attackRate, sustainRate, sustainMode, releaseRate)
+                        : psxSpuEnvelope(articulation->adsr1, articulation->adsr2);
   region.loop = articulation->loop;
 }
 
@@ -214,6 +217,7 @@ void addDrumInstrument(std::vector<Instrument>& instruments, ByteReader reader, 
       drum.regions.push_back(region);
       regionBinding.push_back(AkaoRegionBindingData{
           .articulationId = articulationId,
+          .hasEnvelopeOverride = false,
           .drumRelativeUnityKey = reader.u8At(regionOffset + 1),
       });
     }
@@ -471,7 +475,8 @@ bool applyAkaoArticulations(SoundBankAsset& instruments, const AkaoInstrumentSet
       const auto& binding = regionRecipes[regionIndex];
       applyArticulationToRegion(region, findArticulation(articulations, binding.articulationId), binding.attackRate,
                                 binding.sustainRate, binding.sustainMode, binding.releaseRate,
-                                binding.drumRelativeUnityKey.has_value(), binding.drumRelativeUnityKey.value_or(0));
+                                binding.hasEnvelopeOverride, binding.drumRelativeUnityKey.has_value(),
+                                binding.drumRelativeUnityKey.value_or(0));
     }
   }
   if (recipe.usesIndividualArticulations) {

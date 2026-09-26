@@ -14,6 +14,7 @@
 #include "value/scan/AssetResolution.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
+#include "value/synth/PsxSpu.h"
 
 #include <algorithm>
 #include <array>
@@ -484,6 +485,267 @@ void akaoTieAfterRestDoesNotExtendPreviousNote() {
   expect(noteCount == 2, "0x83 must sound a note, and a tie after a rest must not extend it");
   const auto notes = midiNotes(renderMidiSequence(performance).tracks[0].events);
   expect(notes.size() == 1 && notes[0].key == 59, "0x83 must export as B, not a tie");
+}
+
+void ff7SlurChangesPitchWithoutAnotherAttack() {
+  // Underneath the Rotting Pizza, track 11, extracted offsets 1c04bb..1c04ca:
+  // B -> D -> B is one voice, followed by three separately attacked notes.
+  std::vector<u8> bytes(0x50, 0xa0);
+  const std::vector<u8> phrase{
+      0xa5, 4, 0xcc, 0xa8, 84, 0x7d, 0xa6, 0xa8, 126, 0x1a, 0xa7, 0x7d,
+      0xcd, 0xa6, 0x2f, 0xa7, 0x30, 0x30, 0xa0,
+  };
+  std::copy(phrase.begin(), phrase.end(), bytes.begin() + 0x20);
+  const auto config = makeAkaoConfig(AkaoPs1Version::Version1_0);
+  const SequenceProgram program{
+      .runtime = akaoSequenceRuntime(),
+      .timebase = config.timebase,
+      .behavior = config.behavior,
+      .tracks = {decodeFixtureTrack(bytes, AkaoPs1Version::Version1_0, 0x20, bytes.size())},
+  };
+  const auto performance = SequenceVm().render(program);
+  expect(performance.diagnostics.empty(), "FF7 slurred phrase should render without diagnostics");
+  std::vector<const NotePerformanceEvent*> notes;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(note);
+    }
+  }
+  expect(notes.size() == 6 && notes[0]->restartsEnvelope && !notes[1]->restartsEnvelope &&
+             !notes[2]->restartsEnvelope && notes[3]->restartsEnvelope && notes[2]->durationTicks == 10,
+         "FF7 slur should suppress only the connected attacks and restore the final two-tick gate gap");
+  const auto& slides = performance.tracks[0].automations;
+  expect(slides.size() == 2, "FF7 B-D-B slur should retain both immediate pitch changes");
+  for (size_t i = 0; i < slides.size(); ++i) {
+    const auto* slide = pitchTransitionIntent(slides[i]);
+    expect(slide && slide->previousNote == notes[i]->note && slide->note == notes[i + 1]->note &&
+               slide->timing.timelineTicks == 0 &&
+               slide->preferredRendering == PitchTransitionRenderingHint::PitchBend,
+           "FF7 slurs must link the previous voice without introducing a portamento ramp");
+  }
+  for (auto modulation : {ModulationConversionPolicy::SynthModulators,
+                          ModulationConversionPolicy::SequenceEventSimulation}) {
+    const auto midi = renderMidiSequence(performance, {}, modulation);
+    const auto attacks = midiNotes(midi.tracks[0].events);
+    expect(attacks.size() == 4 && attacks[0].key == 59 && attacks[0].duration == 34,
+           "FF7 slurs should export and preview as one sustained attack spanning the three source notes");
+    expect(std::ranges::any_of(midi.tracks[0].events, [](const MidiEvent& event) {
+             const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+             return bend && event.tick == 12 && bend->value > 0;
+           }) && std::ranges::any_of(midi.tracks[0].events, [](const MidiEvent& event) {
+             const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+             return bend && event.tick == 24 && bend->value == 0;
+           }), "FF7 slurs should bend to D and back to B on the existing voice");
+  }
+}
+
+void ff7SlurBoundariesRespectRestsTiesLegatoAndRepeats() {
+  const auto check = [](std::vector<u8> phrase, std::vector<u32> expectedDurations) {
+    std::vector<u8> bytes(0x60, 0xa0);
+    std::copy(phrase.begin(), phrase.end(), bytes.begin() + 0x20);
+    const auto config = makeAkaoConfig(AkaoPs1Version::Version1_0);
+    const SequenceProgram program{
+        .runtime = akaoSequenceRuntime(),
+        .timebase = config.timebase,
+        .behavior = config.behavior,
+        .tracks = {decodeFixtureTrack(bytes, AkaoPs1Version::Version1_0, 0x20, bytes.size())},
+    };
+    const auto performance = SequenceVm().render(program);
+    expect(performance.diagnostics.empty(), "FF7 connection boundary fixture should render without diagnostics");
+    const auto notes = midiNotes(renderMidiSequence(performance).tracks[0].events);
+    std::vector<u32> durations;
+    for (const auto& note : notes) {
+      durations.push_back(note.duration);
+    }
+    if (durations != expectedDurations) {
+      std::string detail = "FF7 connection boundary has incorrect gate lengths:";
+      for (auto duration : durations) {
+        detail += " " + std::to_string(duration);
+      }
+      throw std::runtime_error(detail);
+    }
+  };
+  check({0xcc, 0x08, 0x08, 0xcd, 0x13, 0xa0}, {30, 14});  // Same-pitch slur.
+  check({0xcc, 0x08, 0x13, 0x97, 0x1e, 0x29, 0xa0}, {30, 14, 14});  // Rest clears slur.
+  check({0xd0, 0x08, 0x13, 0xd1, 0x1e, 0xa0}, {16, 14, 14});  // Legato still attacks.
+  check({0xcc, 0x08, 0xcc, 0x13, 0xcd, 0x1e, 0xa0}, {16, 14, 14});  // CC resets continuation.
+  check({0xcc, 0x08, 0xcd, 0xcc, 0x13, 0x1e, 0xcd, 0xa0}, {14, 30});
+  check({0xcc, 0x08, 0xcc, 0xcd, 0x13, 0x1e, 0xcd, 0xa0}, {14, 30});  // CD is handled by lookahead.
+  check({0xcc, 0x08, 0x8c, 0x13, 0xcd, 0xa0}, {46});  // Tie retains the connected voice.
+  check({0xcc, 0xc8, 0x08, 0x13, 0xc9, 2, 0xcd, 0xa0}, {62});  // Repeat path stays connected.
+}
+
+void ff7PortamentoEnablesSlurAndStartsWithAFreshAttack() {
+  std::vector<u8> bytes(0x40, 0xa0);
+  const std::vector<u8> phrase{0x29, 0xda, 4, 0x08, 0x13, 0x1e, 0xdb, 0x29, 0xa0};
+  std::copy(phrase.begin(), phrase.end(), bytes.begin() + 0x20);
+  const auto config = makeAkaoConfig(AkaoPs1Version::Version1_0);
+  const SequenceProgram program{
+      .runtime = akaoSequenceRuntime(),
+      .timebase = config.timebase,
+      .behavior = config.behavior,
+      .tracks = {decodeFixtureTrack(bytes, AkaoPs1Version::Version1_0, 0x20, bytes.size())},
+  };
+  const auto performance = SequenceVm().render(program);
+  expect(performance.diagnostics.empty(), "FF7 portamento fixture should render without diagnostics");
+  const auto& slides = performance.tracks[0].automations;
+  expect(slides.size() == 3, "FF7 DA should produce two pitch changes, revising the last glide at DB");
+  const auto* slide = pitchTransitionIntent(slides.front());
+  expect(slide && slide->previousNote && slide->startKey == 48 && slide->targetKey == 49 &&
+             slide->timing.timelineTicks == 4,
+         "FF7 DA must enable attack-free portamento for subsequent pitches");
+  const auto* finalPitch = pitchTransitionIntent(slides.back());
+  expect(finalPitch && finalPitch->previousNote && finalPitch->startKey == 49 && finalPitch->targetKey == 50 &&
+             finalPitch->timing.timelineTicks == 0 && slides[1].realization.endTick == slides[1].realization.startTick,
+         "FF7 DB lookahead must make the preceding note's pitch change immediate");
+  const auto notes = midiNotes(renderMidiSequence(performance).tracks[0].events);
+  expect(notes.size() == 3 && notes[1].key == 48 && notes[1].duration == 46 && notes[2].key == 51,
+         "FF7 DB must end portamento and restore a fresh attack");
+}
+
+void ff7EnvelopeCommandsKeepNativeStateAndResetOnProgramChange() {
+  // The guitar in Underneath the Rotting Pizza changes SR from 0x3b to
+  // 0x40. Also exercise a change during a tied note, B3, and a new program.
+  const std::vector<u8> bytes{
+      0xa1, 27, 0xb1, 0x40, 0x02, 0xb1, 0x45, 0x86, 0xb3, 0x02,
+      0xb1, 0x40, 0xa1, 28, 0xb2, 8, 0x02, 0xa0,
+  };
+  constexpr u16 adsr1 = 0x00ff;
+  constexpr u16 guitarAdsr2 = 0x4ec5;  // Linear decreasing SR=0x3b, RR=5.
+  constexpr u16 otherAdsr2 = 0x5fc5;   // Infinite sustain, RR=5.
+  const auto config = makeAkaoConfig(AkaoPs1Version::Version1_0);
+  const SequenceProgram program{
+      .runtime = akaoSequenceRuntime({.articulationEnvelopes = {{27, {adsr1, guitarAdsr2}},
+                                                               {28, {adsr1, otherAdsr2}}}}),
+      .timebase = config.timebase,
+      .behavior = config.behavior,
+      .tracks = {decodeFixtureTrack(bytes, AkaoPs1Version::Version1_0, 0, bytes.size())},
+  };
+  const auto performance = SequenceVm().render(program);
+  std::vector<EnvelopePerformanceEvent> envelopes;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event)) envelopes.push_back(*envelope);
+  }
+  expect(performance.diagnostics.empty() && envelopes.size() == 6,
+         "FF7 ADSR commands and resets should reach the performance");
+  const auto original = psxSpuEnvelope(adsr1, guitarAdsr2);
+  const auto slower = psxSpuEnvelope(adsr1, 0x5005);
+  expect(envelopes[0].update.values == slower &&
+             *slower.secondDecaySeconds > 2.0 * *original.secondDecaySeconds,
+         "B1 40 should substantially lengthen the guitar sustain while preserving its other ADSR fields");
+  expect(envelopes[1].header.tick == 48 &&
+             envelopes[1].scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
+             envelopes[1].update.values == psxSpuEnvelope(adsr1, 0x5145),
+         "B1 during a note should update that voice as well as later attacks");
+  expect(!envelopes[2].update.values && envelopes[2].update.fields == EnvelopeFields::All,
+         "B3 should restore the selected articulation envelope");
+  expect(!envelopes[4].update.values && envelopes[5].update.values == psxSpuEnvelope(adsr1, 0x5fc8),
+         "A1 should discard the previous program's overrides before the next partial ADSR command");
+
+  auto later = program;
+  later.tracks = {decodeFixtureTrack(bytes, AkaoPs1Version::Version1_1, 0, bytes.size())};
+  const auto laterPerformance = SequenceVm().render(later);
+  expect(std::ranges::none_of(laterPerformance.tracks[0].events, [](const auto& event) {
+    return std::holds_alternative<EnvelopePerformanceEvent>(event);
+  }), "FF7 envelope support should not change unaudited later drivers");
+}
+
+void ff7EnvelopeRatesModesAndCombinedCommandCompose() {
+  const std::vector<u8> bytes{0xa1, 27, 0xad, 0x28, 0xb7, 5, 0xae, 7, 0xaf, 4,
+                             0xb0, 9, 6, 0xb1, 0x45, 0xbb, 7, 0xb2, 8, 0xbf, 7, 0x02, 0xa0};
+  const auto config = makeAkaoConfig(AkaoPs1Version::Version1_0);
+  const SequenceProgram program{
+      .runtime = akaoSequenceRuntime({.articulationEnvelopes = {{27, {0x00ff, 0x4ec5}}}}),
+      .timebase = config.timebase,
+      .behavior = config.behavior,
+      .tracks = {decodeFixtureTrack(bytes, AkaoPs1Version::Version1_0, 0, bytes.size())},
+  };
+  const auto performance = SequenceVm().render(program);
+  const EnvelopePerformanceEvent* last = nullptr;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event)) last = envelope;
+  }
+  expect(last && last->update.values == psxSpuEnvelope(0xa896, 0xd168),
+         "FF7 partial ADSR commands should compose without discarding previous rates or modes");
+}
+
+void ff7BassExpressionUsesLinearAmplitude() {
+  const std::vector<u8> bytes{0xa3, 127, 0xa1, 16, 0xa8, 39, 0x2f, 0xa8, 9, 0x30, 0x30, 0xa0};
+  const auto config = makeAkaoConfig(AkaoPs1Version::Version1_0);
+  const SequenceProgram program{
+      .runtime = akaoSequenceRuntime(),
+      .timebase = config.timebase,
+      .behavior = config.behavior,
+      .tracks = {decodeFixtureTrack(bytes, AkaoPs1Version::Version1_0, 0, bytes.size())},
+  };
+  const auto performance = SequenceVm().render(program);
+  std::vector<double> gains;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* expression = std::get_if<ExpressionPerformanceEvent>(&event)) gains.push_back(expression->linearGain);
+  }
+  expect(gains.size() == 2 && std::abs(gains[1] / gains[0] - 9.0 / 39.0) < 1e-12,
+         "FF7's opening bass accents should retain the driver's linear 39:9 gain ratio");
+}
+
+void ff7CollectionBindsNativeEnvelopesAndPreservesDrumDefaults() {
+  std::vector<u8> bytes(0x1a8000);
+  writeBe32(bytes, 0, kAkaoSignature);
+  writeLe16(bytes, 6, 0x100);
+  writeLe32(bytes, 0x10, 1);
+  writeLe16(bytes, 0x14, 0x20 - 0x16);
+  // Avoid the zero header fields used to recognize the v2/v3 layouts.
+  writeLe32(bytes, 0x1c, 1);
+  writeLe32(bytes, 0x2c, 1);
+  const std::vector<u8> commands{0xa1, 27, 0xb1, 0x40, 0x02, 0xec, 0x18, 0, 0x02, 0xa0};
+  std::copy(commands.begin(), commands.end(), bytes.begin() + 0x20);
+  // EC's signed pointer is based after the operand: 0x28 + 0x18 = 0x40.
+  bytes[0x40] = 27;
+  bytes[0x41] = 60;
+  writeLe16(bytes, 0x42, 0x3f80);
+  bytes[0x44] = 64;
+  writeLe32(bytes, 0xe0000, 0x1010);
+  writeLe32(bytes, 0xe0004, 0x20);
+  bytes[0xe0011] = 4;
+  bytes[0xe0021] = 3;
+  for (const u32 id : {0u, 27u}) {
+    const u32 offset = 0x156000 + id * 0x40;
+    writeLe32(bytes, offset, 0x1010);
+    writeLe32(bytes, offset + 4, 0x1010);
+    const std::array<u8, 8> adsr{0, 15, 15, 0x3b, 5, 1, 3, 3};
+    std::copy(adsr.begin(), adsr.end(), bytes.begin() + offset + 8);
+    writeLe32(bytes, offset + 0x10, 4096);
+  }
+  Session session;
+  session.registerFormat(akaoModule());
+  session.addSource(SourceFile{.name = "Final Fantasy VII envelope fixture.psf"}, bytes);
+  session.scanPendingSources();
+  const auto snapshot = session.snapshot();
+  expect(snapshot.collections().size() == 1, "FF7 fixture should resolve its split sample pool");
+  const auto bound = bindCollection(snapshot, snapshot.collections()[0].id);
+  expect(bound.collection.has_value(), "FF7 envelope fixture should bind successfully");
+  const auto rendered = renderCollection(*bound.collection, {});
+  expect(rendered.performance.has_value(), "FF7 prepared runtime should render successfully");
+  const auto& events = rendered.performance->tracks[0].events;
+  expect(std::ranges::any_of(events, [](const auto& event) {
+    const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event);
+    return envelope && envelope->update.values == psxSpuEnvelope(0x00ff, 0x5005);
+  }), "collection preparation should supply the selected sample's native registers to B1");
+  const auto& bank = bound.collection->soundBanks()[0];
+  const auto drum = std::ranges::find_if(bank.instruments, [](const Instrument& instrument) {
+    return instrument.explicitAddress && instrument.explicitAddress->bank == 127;
+  });
+  expect(drum != bank.instruments.end() && drum->regions[0].envelope == psxSpuEnvelope(0x00ff, 0x4ec5),
+         "FF7 drum rows contain no ADSR overrides and must preserve the articulation envelope");
+  CollectionWorkspace workspace{*bound.collection, {}};
+  workspace.render({}, DynamicEnvelopePolicy::InstrumentVariants);
+  expect(std::ranges::any_of(workspace.soundBanks()[0].instruments, [](const Instrument& instrument) {
+    return !instrument.regions.empty() && instrument.regions[0].envelope == psxSpuEnvelope(0x00ff, 0x5005);
+  }), "combined export should materialize the slower guitar envelope in a playable instrument variant");
+  const auto artifacts = session.exportCollection(snapshot.collections()[0].id,
+                                                   ExportRequest{.kinds = {ExportKind::Midi, ExportKind::SoundFont2}});
+  expect(artifacts.size() == 2 && std::ranges::all_of(artifacts, [](const auto& artifact) {
+    return !artifact.bytes.empty();
+  }), "FF7 dynamic envelopes should survive combined MIDI and SoundFont export");
 }
 
 void akaoTempoFadeEmitsDriverTickRamp() {
@@ -987,6 +1249,13 @@ void runAkaoFormatTests() {
   akaoPanLawFollowsDriverProfile();
   akaoLoopBranchUsesCurrentRepeatPass();
   akaoTieAfterRestDoesNotExtendPreviousNote();
+  ff7SlurChangesPitchWithoutAnotherAttack();
+  ff7SlurBoundariesRespectRestsTiesLegatoAndRepeats();
+  ff7PortamentoEnablesSlurAndStartsWithAFreshAttack();
+  ff7EnvelopeCommandsKeepNativeStateAndResetOnProgramChange();
+  ff7EnvelopeRatesModesAndCombinedCommandCompose();
+  ff7BassExpressionUsesLinearAmplitude();
+  ff7CollectionBindsNativeEnvelopesAndPreservesDrumDefaults();
   akaoTempoFadeEmitsDriverTickRamp();
   akaoPitchSlideAppliesOnceToTheNextNote();
   akaoPortamentoRetainsPitchTransitionIntent();
