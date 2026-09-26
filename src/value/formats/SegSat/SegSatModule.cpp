@@ -107,8 +107,8 @@ void assignSegSatBanks(BankAssignmentContext& context) {
                                 sequence.referencedBanks.size(), banks.size()));
   }
 
-  // Reserve exact physical matches before assigning missing logical roles to
-  // the remaining banks. The result belongs to each sequence-bank connection.
+  // Keep banks whose stored numbers already match the sequence's bank commands.
+  // Assign the remaining requested numbers to unmatched banks in selected order.
   std::vector<u8> unmatched = sequence.referencedBanks;
   std::vector<bool> exact(banks.size());
   for (size_t i = 0; i < banks.size(); ++i) {
@@ -121,6 +121,8 @@ void assignSegSatBanks(BankAssignmentContext& context) {
   auto fallback = unmatched.begin();
   for (size_t i = 0; i < banks.size(); ++i) {
     const u8 logical = !exact[i] && fallback != unmatched.end() ? *fallback++ : banks[i].data.sourceBank;
+    // Keep the sequence's bank number for interpreting its commands, but export
+    // a lone bank as bank zero. These settings apply only to this collection.
     banks[i].placement = AssetPrivateData::make(
         SegSatBankUse{.logicalBank = logical, .exportBank = static_cast<u8>(banks.size() == 1 ? 0 : logical)});
   }

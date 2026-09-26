@@ -16,7 +16,8 @@ namespace vgmtrans::core {
 
 namespace detail {
 
-// Caught at the collection boundary so no preparation continues after failure.
+// prepareCollection() catches this, reports the diagnostic, and skips the
+// remaining callbacks. Formats use context.fail() to stop preparation this way.
 struct PreparationFailure {
   Diagnostic diagnostic;
 };
@@ -30,9 +31,8 @@ struct BankInput {
   const AssetPrivateData placement;
 };
 
-// A sequence configures its private runtime from prepared, read-only banks.
-// Logical bank addressing is assigned during resolution and applied by each
-// bank's own preparation hook.
+// Used by the sequence's prepare callback after all banks have been prepared.
+// Banks are read-only here; the callback configures how this sequence plays them.
 struct SequencePreparationContext {
 public:
   SequencePreparationContext(const SequenceProgramAsset& sequence, std::span<const SoundBankAsset> soundBanks,
@@ -42,8 +42,8 @@ public:
   const SequenceProgramAsset& sequence;
   std::vector<Diagnostic>& diagnostics;
 
-  // Preserve selected order, skip other formats, and reject matching banks
-  // without the requested data. Placements are empty when none was assigned.
+  // Return this format's banks in selected order. Missing format data stops
+  // preparation. Each placement describes how the sequence uses that bank.
   template <class Data>
   [[nodiscard]] std::vector<BankInput<Data>> banks(std::string_view format) {
     std::vector<BankInput<Data>> result;
@@ -67,6 +67,7 @@ public:
                            .range = range.valid() ? range : sequence.metadata.range});
   }
 
+  // Report an error and stop the entire collection's preparation immediately.
   [[noreturn]] void fail(std::string message, SourceRange range = {}) {
     throw detail::PreparationFailure{{
         .severity = Severity::Error,
@@ -87,8 +88,8 @@ struct SampleInput {
   const AssetPrivateData& placement;
 };
 
-// The core supplies the bank's selected inputs, not the collection's entire
-// sample list. The same pool may appear in several banks' input lists.
+// Used by a bank's prepare callback to update its private copy. Its sample
+// inputs were chosen during resolution; the shared sample pools remain read-only.
 struct BankPreparationContext {
   BankPreparationContext(SoundBankAsset& bank, u32 bankIndex, std::span<const DependencyTarget> inputs,
                          std::span<const SamplePoolAsset* const> samplePools, std::vector<Diagnostic>& diagnostics,
@@ -97,13 +98,15 @@ struct BankPreparationContext {
         samplePools_(samplePools) {}
 
   SoundBankAsset& bank;
-  // Ordinal among banks of this format, in the collection's selected order.
+  // Zero-based index among banks of this format, in the selected order.
   u32 bankIndex;
   std::span<const DependencyTarget> inputs;
   std::vector<Diagnostic>& diagnostics;
-  // Meaning assigned by the selected sequence; empty for standalone banks.
+  // Settings assigned by the sequence, if any; empty for standalone banks.
   const AssetPrivateData placement;
 
+  // Only this bank's chosen inputs, in order. A pool can appear more than once
+  // with different placements, such as different starting sample positions.
   template <class Data>
   [[nodiscard]] std::vector<SampleInput<Data>> samples() {
     std::vector<SampleInput<Data>> result;
@@ -122,6 +125,7 @@ struct BankPreparationContext {
     return result;
   }
 
+  // Empty or multiple inputs stop preparation when the format requires one pool.
   template <class Data>
   [[nodiscard]] SampleInput<Data> sample(std::string_view message = "Bank requires exactly one sample input") {
     const auto selected = samples<Data>();
@@ -136,6 +140,7 @@ struct BankPreparationContext {
                            .message = std::move(message),
                            .range = range.valid() ? range : bank.metadata.range});
   }
+  // Report an error and stop the entire collection's preparation immediately.
   [[noreturn]] void fail(std::string message, SourceRange range = {}) {
     throw detail::PreparationFailure{{.severity = Severity::Error,
                                       .message = std::move(message),

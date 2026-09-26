@@ -44,6 +44,8 @@ struct SamplePosition {
     }
   }
   if (!selected.empty()) {
+    // Pair sequences with banks counting backwards through the source. If there
+    // are more sequences, reuse the earliest bank for the extras.
     std::ranges::sort(selected, [](const InstrumentEntry& left, const InstrumentEntry& right) {
       return left.asset->metadata.range.offset > right.asset->metadata.range.offset;
     });
@@ -75,6 +77,7 @@ void applySampleBinding(BankPreparationContext& context, const SonyPs1BankLayout
       if (index >= sizes.size() || sizes[index] == 0) {
         context.fail("Sony PS1 sound bank refers outside its external sample pool", region.range);
       }
+      // Empty table slots keep their original indexes but occupy no space in the pool.
       const u32 sample = firstSample + index - static_cast<u32>(std::count(sizes.begin(), sizes.begin() + index, 0));
       if (sample >= pool.pool.samples.size()) {
         context.fail("Sony PS1 sound bank refers outside its external sample pool", region.range);
@@ -108,6 +111,8 @@ DependencySelection selectSonyPs1Samples(const DependencyContext& context) {
     }));
   }
 
+  // A manually selected pool can contain several banks' samples. Match a starting
+  // position inside it, instead of requiring the whole pool to have this bank's size.
   std::vector<DependencyTarget> positions;
   for (const auto& body : bodies) {
     for (u32 start : findSonyPs1SampleStarts(*body.data, bank.sampleSizes)) {

@@ -39,12 +39,17 @@ public:
   ScanSequenceDraft& withoutCollection();
   ScanSequenceDraft& includeMisc(AssetId asset);
   ScanSequenceDraft& includeMisc(const ScanMiscDraft& asset);
+  // Record a bank that scanning already identified.
   ScanSequenceDraft& useBank(AssetId bank);
   ScanSequenceDraft& useBank(const ScanSoundBankDraft& bank);
+  // Choose from scanned banks when collections are rebuilt, including after new files arrive.
   ScanSequenceDraft& useBanks(DependencySelector select);
+  // Assign settings such as bank numbers after automatic or manual bank selection.
   ScanSequenceDraft& assignBanks(BankAssigner assign);
+  // Configure playback from the prepared banks when binding a collection.
   ScanSequenceDraft& prepare(SequencePreparer prepare);
 
+  // Pass the value saved with data(...) to the callback as a const Data& argument.
   template <class Data, class Prepare>
   ScanSequenceDraft& prepare(Prepare prepare);
 
@@ -67,11 +72,14 @@ public:
 
   [[nodiscard]] InstrumentSetBuilder& instruments();
   [[nodiscard]] SamplePoolBuilder& localSamples();
+  // Record a known pool, or supply a callback to choose pools when collections are rebuilt.
   ScanSoundBankDraft& useSamples(AssetId samples);
   ScanSoundBankDraft& useSamples(const ScanSamplePoolDraft& samples);
   ScanSoundBankDraft& useSamples(DependencySelector select);
+  // Connect the chosen samples to a private bank copy when binding a collection.
   ScanSoundBankDraft& prepare(BankPreparer prepare);
 
+  // Pass the value saved with data(...) to the callback as a const Data& argument.
   template <class Data, class Prepare>
   ScanSoundBankDraft& prepare(Prepare prepare);
 

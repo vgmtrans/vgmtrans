@@ -21,6 +21,8 @@ namespace vgmtrans::core {
 
 namespace {
 
+// Collection membership lists each asset once; dependencies say which inputs
+// belong to this particular sequence or bank, including their placement settings.
 [[nodiscard]] std::span<const DependencyTarget> inputsFor(const Collection& collection, AssetId owner,
                                                           DependencyRole role) {
   const auto found = std::ranges::find_if(collection.dependencies, [&](const auto& dependency) {
@@ -72,6 +74,9 @@ BoundCollection::BoundCollection(SessionSnapshot snapshot, CollectionId id, std:
       samplePools_(std::move(samplePools)) {
 }
 
+// Prepare the selected assets for playback or export using the choices made
+// during resolution. Check their references, prepare private bank copies, configure
+// the sequence, then validate the resulting instruments and sample references.
 CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const Collection& selected) {
   const auto* collection = &selected;
   std::vector<Diagnostic> diagnostics;
@@ -92,6 +97,8 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
       collection->name.empty() ? "collection-" + std::to_string(collection->id.value) : collection->name;
   const SequenceProgramAsset* sequence = nullptr;
   SequenceRuntime sequenceRuntime;
+  // Missing or ambiguous matches may still leave useful inputs. Only a Failed
+  // outcome stops preparation here; diagnostic severity does not decide this.
   bool failed = collection->resolutionStatus() == ResolutionStatus::Failed;
   if (members.sequence) {
     sequence = snapshot.asset<SequenceProgramAsset>(*members.sequence);
@@ -103,6 +110,8 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
     }
   }
 
+  // Callbacks change private bank copies so preparing one collection cannot
+  // change another. Sample pools stay read-only and are kept alive by the snapshot.
   std::vector<SoundBankAsset> soundBanks;
   soundBanks.reserve(members.soundBanks.size());
   for (const AssetId assetId : members.soundBanks) {
@@ -130,6 +139,8 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
     }
   }
 
+  // Every recorded use must connect selected members. A valid asset elsewhere
+  // in the snapshot is not enough: it must belong to this collection too.
   for (const auto& dependency : collection->dependencies) {
     const bool ownerSelected = dependency.role == DependencyRole::SamplePool
                                    ? std::ranges::find(members.soundBanks, dependency.owner) != members.soundBanks.end()
@@ -150,16 +161,21 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
   }
   if (!failed) {
     try {
+      // The sequence's bank list carries its settings for each bank. Each bank
+      // also has its own sample input list, retrieved separately below.
       const auto bankUses = sequence == nullptr
                                 ? std::span<const DependencyTarget>{}
                                 : inputsFor(*collection, sequence->metadata.id, DependencyRole::SoundBank);
       for (size_t i = 0; i < soundBanks.size(); ++i) {
         auto& bank = soundBanks[i];
+        // Keep the callback on the original asset so it stays alive even if it
+        // replaces the bank copy. Each bank uses its own format's preparation.
         const auto& prepare = snapshot.asset<SoundBankAsset>(members.soundBanks[i])->prepare;
         if (!prepare) {
           continue;
         }
         const auto inputs = inputsFor(*collection, bank.metadata.id, DependencyRole::SamplePool);
+        // Banks of other formats must not shift this format's bank numbers.
         const u32 index =
             static_cast<u32>(std::count_if(soundBanks.begin(), soundBanks.begin() + i, [&](const auto& previous) {
               return previous.metadata.format == bank.metadata.format;
@@ -169,6 +185,7 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
             bank, index, inputs, samplePools, diagnostics, use == bankUses.end() ? AssetPrivateData{} : use->placement};
         prepare(context);
       }
+      // Sequence settings may depend on the banks' prepared instruments and samples.
       if (sequence != nullptr && sequence->prepare) {
         SequencePreparationContext context{*sequence, soundBanks, diagnostics, bankUses};
         if (auto replacement = sequence->prepare(context)) {
@@ -178,6 +195,7 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
           if (!replacement->valid()) {
             context.fail("Collection binding produced a replacement sequence runtime with no executor");
           }
+          // Settings may change, but the scanned commands still need the same interpreter.
           if (sequenceRuntime.execute != replacement->execute) {
             context.fail("Collection binding produced an incompatible sequence runtime family");
           }
@@ -185,6 +203,7 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
         }
       }
     } catch (detail::PreparationFailure& failure) {
+      // context.fail() ends the whole pass; no later callback runs after it.
       diagnostics.push_back(std::move(failure.diagnostic));
       failed = true;
     } catch (const std::exception& error) {
@@ -197,6 +216,8 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
   }
 
   if (!failed) {
+    // Preparation may change a bank's contents, but its ID, format, and place
+    // in the selected order must still agree with the stored dependencies.
     for (size_t index = 0; index < soundBanks.size(); ++index) {
       const auto& metadata = soundBanks[index].metadata;
       const auto* original = snapshot.asset<SoundBankAsset>(members.soundBanks[index]);
@@ -208,6 +229,8 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
     }
   }
   if (!failed) {
+    // Check sample references after preparation has connected each instrument
+    // to its samples; scanned banks are allowed to leave those links unfinished.
     for (const auto& bank : soundBanks) {
       auto validation = validateSoundBank(bank);
       validation.merge(validateSampleReferences(bank, samplePools));
@@ -218,6 +241,7 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
     }
   }
   if (failed) {
+    // Discard the private copies instead of exposing a partly prepared collection.
     return CollectionBindingResult{.diagnostics = std::move(diagnostics)};
   }
   return CollectionBindingResult{

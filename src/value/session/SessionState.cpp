@@ -192,6 +192,8 @@ SourceMap SessionState::sourceMapForAsset(AssetId asset) const {
   return SourceMap{std::move(selected)};
 }
 
+// Banks and samples can change as files arrive or are removed. Keep a discovered
+// collection's ID while its sequence stays the same; leave user collections alone.
 void SessionState::reconcileCollections(std::vector<DesiredCollection> desired) {
   std::unordered_set<AssetId> sequences;
   for (auto& candidate : desired) {
@@ -298,8 +300,8 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
 }
 
 void SessionState::validateMiscAssets(DesiredCollection& desired) {
-  // Resolution already validates the sequence and audio providers. Supplemental
-  // inspection assets are direct scanner references and can disappear separately.
+  // Audio inputs were checked during resolution. These extra assets are for
+  // inspection only, so losing one reports a problem without blocking audio preparation.
   if (desired.members.miscAssets.empty()) {
     return;
   }

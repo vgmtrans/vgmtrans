@@ -23,7 +23,8 @@ struct CollectionMembers {
   std::vector<AssetId> miscAssets;
 };
 
-// Diagnostic presentation is independent of dependency usability.
+// Explains a problem to the user. Severity controls how it is shown; the
+// dependency's ResolutionStatus determines whether preparation can proceed.
 struct CollectionIssue {
   Severity severity = Severity::Info;
   std::string code;
@@ -36,22 +37,24 @@ struct CollectionIssue {
 // references connect a sequence to inspection assets outside that audio chain.
 enum class DependencyRole { SoundBank, SamplePool, Supplemental };
 
-// Ordered by precedence. Each relationship owns its outcome; collection status
-// is the greatest of those outcomes, independent of diagnostic severity.
-// Incomplete and ambiguous inputs may still be usable; failed resolution blocks preparation.
+// Listed from least to most serious; a collection reports the most serious
+// outcome among its dependencies. Incomplete or ambiguous selections may still
+// be usable, but Failed blocks preparation, regardless of diagnostic severity.
 enum class ResolutionStatus { Resolved, Incomplete, Ambiguous, Failed };
 
-// A selected provider and optional format-owned placement within it. Two banks
-// may use the same pool at different positions; membership alone cannot express
-// that relationship. Placements own values, never discovery-time pointers.
+// A chosen input asset, plus settings for this particular use. For example,
+// placement can hold a bank number or the first sample to use in a pool.
+// Settings must own their data because the catalog used for matching is temporary.
+// Another sequence or bank can use the same asset with different settings.
 struct DependencyTarget {
   AssetId asset;
   AssetPrivateData placement;
 };
 
-// One ordered input list per owner and role. Status combines all requests;
-// diagnostics and alternatives retain unresolved choices. Bank targets are
-// unique by asset; sample targets may repeat an asset at different placements.
+// owner is the sequence or bank requesting inputs; targets are its chosen inputs
+// in order. All requests for the same role share this list and status. Alternatives
+// record unresolved choices. Banks appear once, but a sample pool may appear at
+// several starting positions.
 struct ResolvedDependency {
   AssetId owner;
   DependencyRole role = DependencyRole::SoundBank;
@@ -69,6 +72,7 @@ struct SequenceCollectionOptions {
   std::vector<AssetId> miscAssets;
 };
 
+// A collection description before the session assigns or reuses its CollectionId.
 struct DesiredCollection {
   std::string name;
   CollectionMembers members;

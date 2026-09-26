@@ -146,6 +146,8 @@ private:
       };
     }
 
+    // The bank may name a sample start the separate body scan did not discover.
+    // Add it to this bank's copy and reuse it for other regions with the same offset.
     auto [sample, inserted] = localSamples_.try_emplace(bodyOffset, 0);
     if (inserted) {
       sample->second = addLocalSample(bodyOffset, logicalOffset, range);
@@ -243,6 +245,8 @@ DependencySelection BankRequest::operator()(const DependencyContext& context) co
     }));
   }
   auto matches = bestMatches(banks, [&](const BankEntry& bank) { return affinity(context.source(), bank.source); });
+  // Keep tied filename or directory matches together and warn below. A tie based
+  // only on sharing a container, or an even weaker match, leaves no bank chosen.
   if (matches.size() > 1 && affinity(context.source(), matches.front().source) < 4) {
     matches.clear();
   }

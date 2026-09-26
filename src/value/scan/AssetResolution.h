@@ -58,8 +58,9 @@ struct BankAssignment {
   AssetPrivateData& placement;
 };
 
-// Runs after automatic or manual bank selection. Assignments belong to this
-// sequence-bank relationship, so shared banks retain independent meanings.
+// Runs after banks have been chosen, whether automatically or by the user.
+// Settings belong to this sequence's use of each bank: two sequences can give
+// the same bank different bank numbers without changing the scanned bank.
 class BankAssignmentContext {
 public:
   BankAssignmentContext(const AssetCatalog& assets, const SequenceProgramAsset& sequence,
@@ -104,8 +105,9 @@ private:
   std::vector<CollectionIssue>& issues_;
 };
 
-// One asset's request, with candidates restricted to the user's selection for
-// manual collections. Selectors never mutate assets or construct collections.
+// Information available while choosing one asset's inputs. Manual collections
+// offer only the user's chosen candidates, in the user's order. The callback
+// returns its choices; the core records the collection and leaves assets unchanged.
 class DependencyContext {
 public:
   DependencyContext(const AssetCatalog& assets, const Asset& owner, ResolutionMode mode,
@@ -155,6 +157,8 @@ private:
     if (manual()) {
       return std::ranges::find(candidates_, id) != candidates_.end();
     }
+    // Automatically match extracted data only within the same user-loaded source.
+    // Loose files can match across sources; the user's manual choices can too.
     const auto* asset = assets_.asset(id);
     const auto* ownerSource = source();
     const auto* providerSource = asset != nullptr ? assets_.sourceFor(core::metadata(*asset)) : nullptr;
@@ -180,8 +184,8 @@ template <class Range>
   return result;
 }
 
-// An intentional group and an unresolved choice are different values. A tie
-// retains alternatives for inspection without arbitrarily selecting a provider.
+// A tie records alternatives and selects nothing. Use selectAll when all matches
+// should be used together rather than treated as competing choices.
 template <class Range>
 [[nodiscard]] DependencySelection selectOne(const Range& candidates,
                                             std::string message = "Asset dependency matches multiple providers") {
@@ -193,6 +197,8 @@ template <class Range>
   return result;
 }
 
+// Fill in the banks and sample pools a collection needs, along with each asset's
+// chosen inputs and any matching problems. This does not prepare or change assets.
 void resolveDependencies(const AssetCatalog& assets, DesiredCollection& collection,
                          ResolutionMode mode = ResolutionMode::Automatic);
 [[nodiscard]] std::vector<DesiredCollection> dependencyCollections(const AssetCatalog& assets);

@@ -30,6 +30,7 @@ using BankEntry = AssetWithData<SoundBankAsset, SoundBankData>;
   if (sameContainer(sequence, bank)) {
     return 3;
   }
+  // These fallbacks compare the outer files, even for assets extracted from archives.
   if (!sequence->path.empty() && sequence->path == bank->path) {
     return 2;
   }

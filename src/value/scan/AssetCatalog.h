@@ -39,10 +39,9 @@ template <class Candidate, class Score>
   return selected;
 }
 
-// One format-owned value joined to its asset at the heterogeneous asset
-// boundary. Copies borrow the catalog's assets, data, and sources, independently
-// of the candidate list. Recipes and resolved dependencies retain stable IDs
-// and owned values instead.
+// An asset together with its format's saved parsing data and source location.
+// Copying this view copies only pointers. It can outlive a temporary candidate
+// list, but not the catalog. Store IDs and owned values in matching results.
 template <class AssetT, class DataT>
 struct AssetWithData {
   const AssetT* asset = nullptr;
@@ -53,9 +52,9 @@ struct AssetWithData {
   [[nodiscard]] SourceId sourceId() const noexcept { return asset->metadata.range.source; }
 };
 
-// Session-wide, read-only input to format-owned collection discovery. It owns a
-// cheap shared asset view and source metadata. Candidate views remain valid
-// while their catalog is alive.
+// Read-only access to the scanned assets and their sources while choosing inputs.
+// Shares asset storage and keeps its own copy of source metadata.
+// Candidate views remain valid while their catalog is alive.
 class AssetCatalog {
 public:
   AssetCatalog(const SourceStore& sources, SharedSequence<Asset> assets)

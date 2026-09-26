@@ -112,6 +112,8 @@ DependencySelection AkaoSamples::operator()(const DependencyContext& context) co
   const auto samples = context.candidates<SamplePoolAsset, AkaoSamplePoolData>();
   std::set<u32> remaining(requiredArticulations.begin(), requiredArticulations.end());
   DependencySelection result;
+  // Manual choices keep the user's pools and order, but still report any sample
+  // definitions (articulations) the bank needs and those pools do not provide.
   const auto selected = context.manual() ? samples : chooseSamples(context, *this, samples, remaining, result);
   for (const auto& sample : selected) {
     result.add(sample.id());

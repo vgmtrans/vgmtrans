@@ -21,9 +21,9 @@ struct CollectionBindingResult;
 struct RenderedCollection;
 class CollectionWorkspace;
 
-// Final, collection-local input to rendering and export. The retained snapshot
-// keeps every borrowed asset alive, while private storage prevents exporters
-// from confusing target-specific projections with collection binding.
+// Prepared inputs for one collection. It owns the changed bank copies and
+// sequence settings, and keeps the snapshot alive for the assets it references.
+// Playback and export can use it without changing the scanned assets.
 class BoundCollection {
 public:
   [[nodiscard]] CollectionId id() const noexcept { return id_; }
@@ -53,9 +53,8 @@ private:
   std::vector<const SamplePoolAsset*> samplePools_;
 };
 
-// A BoundCollection exists only after every fatal membership and format-binding
-// check succeeds. Diagnostics remain available for both successful warnings and
-// failures that intentionally publish no partially bound value.
+// Failure returns diagnostics without a collection. Successful preparation can
+// still carry warnings, so callers check collection rather than the message list.
 struct CollectionBindingResult {
   std::optional<BoundCollection> collection;
   std::vector<Diagnostic> diagnostics;
@@ -67,9 +66,9 @@ struct RenderedCollection {
   std::vector<Diagnostic> diagnostics;
 };
 
-// Move-owned preparation shared by playback, ordinary export, and stitching.
-// The canonical rendering remains separate from its export-only projection.
-// Callers invoke each preparation phase at most once on a fresh instance.
+// Work shared by playback, export, and stitching. Keep the rendered performance
+// separate from changes needed only for export. Call each preparation step at
+// most once on a fresh workspace.
 class CollectionWorkspace {
 public:
   CollectionWorkspace(BoundCollection collection, std::vector<Diagnostic> diagnostics);
@@ -94,7 +93,7 @@ public:
 };
 
 [[nodiscard]] CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, CollectionId collection);
-// Resolve and prepare a bank's own dependencies without inventing a sequence collection.
+// Resolve a bank's sample inputs and prepare it without requiring a sequence.
 [[nodiscard]] CollectionBindingResult bindSoundBank(const SessionSnapshot& snapshot, AssetId bank);
 [[nodiscard]] RenderedCollection renderSequence(const SequenceProgramAsset& sequence,
                                                 const SequenceRenderOptions& options);

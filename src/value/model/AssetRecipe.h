@@ -25,6 +25,8 @@ struct SequenceRuntime;
 // Return a configured runtime, or nullopt to keep the scanned runtime.
 using SequencePreparer = std::function<std::optional<SequenceRuntime>(SequencePreparationContext&)>;
 
+// The answer to one input request. Chosen inputs are separate from alternatives
+// so an unresolved choice is never mistaken for a group that should play together.
 class DependencySelection {
 public:
   [[nodiscard]] ResolutionStatus status() const {
@@ -34,8 +36,8 @@ public:
   [[nodiscard]] const std::vector<DependencyTarget>& alternatives() const { return alternatives_; }
   [[nodiscard]] const std::vector<CollectionIssue>& issues() const { return issues_; }
 
-  // An empty selection is incomplete. Adding providers resolves it unless the
-  // request has explicitly reported incomplete coverage or ambiguity.
+  // An empty selection is incomplete. Adding inputs resolves it unless the
+  // request has already reported missing coverage, ambiguity, or failure.
   DependencySelection& add(AssetId id, AssetPrivateData placement = {}) {
     targets_.push_back({id, std::move(placement)});
     return *this;
@@ -49,8 +51,8 @@ public:
     return *this;
   }
 
-  // Selected targets, when present, are an explicit format-chosen fallback.
-  // Alternatives retain placements, including different positions in one pool.
+  // Keep any targets the format deliberately chose as a fallback. Alternatives
+  // describe the unresolved choices, including different positions in one pool.
   DependencySelection& ambiguous(std::vector<DependencyTarget> alternatives, std::string message) {
     if (status_ != ResolutionStatus::Failed) {
       status_ = ResolutionStatus::Ambiguous;
@@ -79,14 +81,16 @@ using DependencySelector = std::function<DependencySelection(const DependencyCon
 using BankPreparer = std::function<void(BankPreparationContext&)>;
 using BankAssigner = std::function<void(BankAssignmentContext&)>;
 
-// Scanner-known references are values; only genuinely deferred matching needs
-// a callback. The owning recipe determines the provider type.
+// Use an asset ID when scanning already found the input. Otherwise, a callback
+// chooses from the available assets when collections are rebuilt.
 using DependencyRequest = std::variant<DependencyTarget, DependencySelector>;
 
+// Recipes describe which inputs are needed. Preparation callbacks later use
+// those inputs to make the sequence or bank ready for playback and export.
 struct SequenceRecipe {
   std::vector<DependencyRequest> banks;
-  // Optional sequence-specific meaning of the selected banks. It can attach
-  // placement values, but cannot change membership or mutate the banks.
+  // Give the chosen banks settings for this sequence, such as bank numbers.
+  // This cannot change which banks were chosen or edit the banks themselves.
   BankAssigner assignBanks;
 };
 

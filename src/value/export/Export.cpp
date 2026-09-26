@@ -221,6 +221,8 @@ Artifact exportSoundBank(const SessionSnapshot& snapshot, const SourceStore& sou
   const auto failedArtifact = [&](std::vector<Diagnostic> diagnostics) {
     return synthArtifact(baseName, format, SynthExportResult{.diagnostics = std::move(diagnostics)});
   };
+  // Filtering to played instruments requires a specific sequence. A full bank
+  // export can resolve the bank's samples without choosing one of its collections.
   const size_t collectionCount = snapshot.countCollectionsContaining(soundBankId);
   if (request.exportOnlyUsedInstruments && collectionCount > 1) {
     return failedArtifact(

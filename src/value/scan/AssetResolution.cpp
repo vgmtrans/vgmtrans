@@ -16,6 +16,7 @@ public:
       : assets_(assets), result_(result), mode_(mode), selected_(result.members) {}
 
   void resolve() {
+    // Choose banks first, then ask those banks which sample pools they need.
     if (result_.members.sequence) {
       if (const auto* sequence = assets_.asset<SequenceProgramAsset>(*result_.members.sequence)) {
         ResolvedDependency banks{.owner = sequence->metadata.id, .role = DependencyRole::SoundBank};
@@ -34,8 +35,8 @@ public:
         }
       }
     }
-    // The domain has two dependency levels. A bank can only request samples;
-    // wrong-type providers are rejected without following another graph edge.
+    // Banks can request sample pools only. Requests for other asset types fail,
+    // so resolution never needs to follow a chain back to another bank or sequence.
     for (auto id : result_.members.soundBanks) {
       if (const auto* bank = assets_.asset<SoundBankAsset>(id)) {
         ResolvedDependency samples{.owner = id, .role = DependencyRole::SamplePool};
@@ -92,6 +93,8 @@ private:
     }
   }
 
+  // Some scanners already know which pool supplies each region's sample. Include
+  // those pools automatically so formats do not need to repeat those links in a recipe.
   void concreteSamples(const SoundBankAsset& bank, ResolvedDependency& resolved) {
     DependencySelection samples;
     for (const auto& instrument : bank.instruments) {
@@ -128,6 +131,7 @@ private:
       missing.range = owner.range;
       result_.issues.push_back(std::move(missing));
     }
+    // Satisfying a later request must not hide an earlier missing or failed input.
     resolved.status = std::max(resolved.status, selection.status());
     resolved.alternatives.insert(resolved.alternatives.end(), selection.alternatives().begin(),
                                  selection.alternatives().end());
@@ -164,6 +168,7 @@ private:
   const AssetCatalog& assets_;
   DesiredCollection& result_;
   ResolutionMode mode_;
+  // Keep the user's original choices while result_ accumulates resolved inputs.
   CollectionMembers selected_;
 };
 

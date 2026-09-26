@@ -36,7 +36,8 @@ const Asset* AssetCatalog::asset(AssetId id) const noexcept {
 }
 
 SourceId AssetCatalog::sourceRoot(SourceId source) const noexcept {
-  // Session admission prevents cycles; the bound also protects hand-built snapshots.
+  // Follow parents to the user-loaded source. Sessions prevent parent cycles;
+  // the limit also avoids an endless loop in a malformed, hand-built snapshot.
   for (size_t depth = 0; depth < sources_.size(); ++depth) {
     const auto found = sourcesById_.find(source.value);
     if (found == sourcesById_.end() || !sources_[found->second].parent) {
