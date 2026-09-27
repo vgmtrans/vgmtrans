@@ -658,22 +658,19 @@ void ff7CollectionBindsNativeEnvelopesAndPreservesDrumDefaults() {
   expect(snapshot.collections().size() == 1, "FF7 fixture should resolve its split sample pool");
   const auto bound = bindCollection(snapshot, snapshot.collections()[0].id);
   expect(bound.collection.has_value(), "FF7 envelope fixture should bind successfully");
-  const auto rendered = renderCollection(*bound.collection, {});
-  expect(rendered.performance.has_value(), "FF7 prepared runtime should render successfully");
-  const auto& events = rendered.performance->tracks[0].events;
-  expect(std::ranges::any_of(events, [](const auto& event) {
-    const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event);
-    return envelope && envelope->update.values == psxSpuEnvelope(0x00ff, 0x5005);
-  }), "collection preparation should supply the selected sample's native registers to B1");
-  const auto& bank = bound.collection->soundBanks()[0];
+  CollectionWorkspace workspace{*bound.collection, {}};
+  workspace.render({}, DynamicEnvelopePolicy::InstrumentVariants);
+  expect(workspace.rendering.performance.has_value(), "FF7 prepared runtime should render successfully");
+  const auto envelopes = fixtureEvents<EnvelopePerformanceEvent>(*workspace.rendering.performance);
+  expect(!envelopes.empty() && envelopes[0].update.values == psxSpuEnvelope(0x00ff, 0x5005),
+         "collection preparation should supply the selected sample's native registers to B1");
+  const auto& bank = workspace.soundBanks()[0];
   const auto drum = std::ranges::find_if(bank.instruments, [](const Instrument& instrument) {
     return instrument.explicitAddress && instrument.explicitAddress->bank == 127;
   });
   expect(drum != bank.instruments.end() && drum->regions[0].envelope == psxSpuEnvelope(0x00ff, 0x4ec5),
          "FF7 drum rows contain no ADSR overrides and must preserve the articulation envelope");
-  CollectionWorkspace workspace{*bound.collection, {}};
-  workspace.render({}, DynamicEnvelopePolicy::InstrumentVariants);
-  expect(std::ranges::any_of(workspace.soundBanks()[0].instruments, [](const Instrument& instrument) {
+  expect(std::ranges::any_of(bank.instruments, [](const Instrument& instrument) {
     return !instrument.regions.empty() && instrument.regions[0].envelope == psxSpuEnvelope(0x00ff, 0x5005);
   }), "combined export should materialize the slower guitar envelope in a playable instrument variant");
   const auto artifacts = session.exportCollection(snapshot.collections()[0].id,

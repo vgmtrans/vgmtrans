@@ -351,6 +351,18 @@ void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
              configuredIntent.portamentoRendering.restoreTimeMilliseconds == 250.0 &&
              configuredIntent.portamentoRendering.overlapTicks == 2,
          "the pitch-slide handle should attach uncommon source behavior without exposing IR construction");
+
+  configured.sample(out.at(72), 82.5);
+  configured.makeImmediate();
+  expect(track.automations.size() == 10 && configuredIntent.previousNote == interruptedNote &&
+             configuredIntent.preferredRendering == PitchTransitionRenderingHint::PitchBend &&
+             configuredIntent.timing.timelineTicks == 0 &&
+             std::holds_alternative<TempoRelativePitchSlideTiming>(configuredIntent.timing.physical) &&
+             std::holds_alternative<LinearAutomationCurve>(configuredIntent.curve) &&
+             track.automations[9].realization.endTick == 70 &&
+             track.automations[9].realization.endReason == PerformanceAutomationEndReason::Completed &&
+             out.at(70).currentPitchTransitionKey(stoppedNote) == 84.0,
+         "lookahead should make a slide immediate in place, preserving its voice connection and rendering choice");
 }
 
 void continuedVoiceResolvesPriorPitchMotion() {

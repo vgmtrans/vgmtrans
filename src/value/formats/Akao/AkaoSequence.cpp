@@ -130,7 +130,7 @@ struct Playback : SequencePlayback<TrackState> {
     out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
 
-  void adsr(u16 mask1, u16 value1, u16 mask2, u16 value2) {
+  void adsr(u16 AkaoAdsr::* reg, u16 mask, u16 value) {
     // FF7 SCUS_941.63: AD..B2 and B7/BB/BF update the current voice's
     // register cache immediately; A1 and B3 reload articulation defaults.
     // A raw sequence without a selected sample pool has no native defaults.
@@ -138,8 +138,7 @@ struct Playback : SequencePlayback<TrackState> {
       return;
     }
     auto& envelope = *track.envelope;
-    envelope.adsr1 = static_cast<u16>((envelope.adsr1 & ~mask1) | value1);
-    envelope.adsr2 = static_cast<u16>((envelope.adsr2 & ~mask2) | value2);
+    envelope.*reg = static_cast<u16>((envelope.*reg & ~mask) | (value & mask));
     track.envelopeOverridden = true;
     out.replaceEnvelope(psxSpuEnvelope(envelope.adsr1, envelope.adsr2),
                         VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
@@ -166,21 +165,6 @@ struct Playback : SequencePlayback<TrackState> {
       return std::max<u32>(1, delta);
     }
     return std::max<u32>(1, delta > 2 ? delta - 2 : 0);
-  }
-
-  void connection(u8 opcode, u16 duration, bool ff7) {
-    if (ff7) {
-      track.ff7Voice.connection(out, opcode, duration);
-      return;
-    }
-    switch (opcode) {
-      case 0xcc: track.slur = true; break;
-      case 0xcd: track.slur = false; break;
-      case 0xd0: track.legato = true; break;
-      case 0xd1: track.legato = false; break;
-      case 0xda: track.portamentoTicks = duration; break;
-      case 0xdb: track.portamentoTicks = 0; break;
-    }
   }
 
   Effects timedEvent(u8 noteByte, u32 encodedDelta, u32 fallbackDelta, AkaoPs1Version version) {
@@ -449,6 +433,96 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
   }
 }
 
+// FF7 overrides only these commands; everything else uses the shared decoder.
+[[nodiscard]] std::optional<DecodedBytecodeCommand> decodeFF7Command(AkaoCursor& cursor, u8 status) {
+  const auto field = [&](std::string_view name, u16 AkaoAdsr::* reg, u16 mask, u8 shift) -> DecodedBytecodeCommand {
+    auto event = cursor.command(name, SequenceSemantic::Envelope);
+    return event.invoke<&Playback::adsr>({reg, mask, static_cast<u16>(cursor.u8("value") << shift)});
+  };
+  const auto endConnection = [](Playback& playback) { playback.track.ff7Voice.end(playback.out); };
+  switch (status) {
+    case 0xa0:
+      return cursor.command("End", SequenceSemantic::End).invoke(endConnection).end();
+    case 0xad:
+      return field("Attack Rate", &AkaoAdsr::adsr1, 0x7f00, 8);
+    case 0xae:
+      return field("Decay Rate", &AkaoAdsr::adsr1, 0x00f0, 4);
+    case 0xaf:
+      return field("Sustain Level", &AkaoAdsr::adsr1, 0x000f, 0);
+    case 0xb0: {
+      auto event = cursor.command("Decay Rate and Sustain Level", SequenceSemantic::Envelope);
+      const u8 decay = cursor.u8("decay_rate");
+      const u8 sustain = cursor.u8("sustain_level");
+      return event.invoke<&Playback::adsr>({&AkaoAdsr::adsr1, 0x00ff, (decay << 4) | (sustain & 15)});
+    }
+    case 0xb1:
+      return field("Sustain Rate", &AkaoAdsr::adsr2, 0x1fc0, 6);
+    case 0xb2:
+      return field("Release Rate", &AkaoAdsr::adsr2, 0x001f, 0);
+    case 0xb3:
+      return cursor.command("Reset ADSR", SequenceSemantic::Envelope).invoke<&Playback::resetAdsr>();
+    case 0xb7: {
+      auto event = cursor.command("Attack Mode", SequenceSemantic::Envelope);
+      const u8 mode = cursor.u8("mode");
+      return event.invoke<&Playback::adsr>({&AkaoAdsr::adsr1, 0x8000, mode == 5 ? 0x8000 : 0});
+    }
+    case 0xbb: {
+      auto event = cursor.command("Sustain Mode", SequenceSemantic::Envelope);
+      const u8 mode = cursor.u8("mode");
+      // Sony's SDK defaults unrecognized modes to linear decrease.
+      const u16 bits = mode == 1 ? 0 : mode == 5 ? 0x8000 : mode == 7 ? 0xc000 : 0x4000;
+      return event.invoke<&Playback::adsr>({&AkaoAdsr::adsr2, 0xc000, bits});
+    }
+    case 0xbf: {
+      auto event = cursor.command("Release Mode", SequenceSemantic::Envelope);
+      const u8 mode = cursor.u8("mode");
+      return event.invoke<&Playback::adsr>({&AkaoAdsr::adsr2, 0x0020, mode == 7 ? 0x0020 : 0});
+    }
+    case 0xcc:
+      return cursor.command("Slur On", SequenceSemantic::State).invoke([](Playback& playback) {
+        playback.track.ff7Voice.start(AkaoFF7Voice::Mode::Slur);
+      });
+    case 0xcd:
+      return cursor.command("Slur Off", SequenceSemantic::State).invoke(endConnection);
+    case 0xd0:
+      return cursor.command("Legato On", SequenceSemantic::State).invoke([](Playback& playback) {
+        playback.track.ff7Voice.start(AkaoFF7Voice::Mode::Legato);
+      });
+    case 0xd1:
+      return cursor.command("Legato Off", SequenceSemantic::State).invoke(endConnection);
+    case 0xda: {
+      auto event = cursor.command("Portamento On", SequenceSemantic::Portamento);
+      const u16 duration = cursor.resolved("ticks", cursor.rawU8("speed"), akaoZeroAs256);
+      return event.invoke([](Playback& playback, u16 ticks) { playback.track.ff7Voice.portamento(ticks); }, {duration});
+    }
+    case 0xdb:
+      return cursor.command("Portamento Off", SequenceSemantic::Portamento).invoke(endConnection);
+    case 0xf4: {
+      auto event = cursor.command("Overlay Voice On", SequenceSemantic::Program);
+      const u8 primaryArt = cursor.u8("primary_articulation", SemanticOperandRole::InstrumentProgram);
+      cursor.u8("secondary_articulation", SemanticOperandRole::InstrumentProgram);
+      cursor.derived("bank", 0u, SemanticOperandRole::InstrumentBank);
+      return event.invoke<&Playback::instrument>({0u, primaryArt});
+    }
+    case 0xf5:
+      return cursor.sourceOnly("Overlay Voice Off");
+    case 0xf6: {
+      auto event = cursor.sourceOnly("Overlay Volume Balance");
+      cursor.u8("balance");
+      return event;
+    }
+    case 0xf7: {
+      auto event = cursor.sourceOnly("Overlay Volume Balance Fade");
+      const u8 rawDuration = cursor.u8("duration");
+      cursor.derived("duration_ticks", akaoZeroAs256(rawDuration));
+      cursor.u8("balance");
+      return event;
+    }
+    default:
+      return std::nullopt;
+  }
+}
+
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end, const AkaoProfile& profile,
                                                    RepeatStack& repeats, std::vector<Diagnostic>* diagnostics) {
   AkaoCursor cursor(reader, begin, end, commandKindPrefix(profile.version), diagnostics);
@@ -482,14 +556,15 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
     return decodeSubEvent(cursor, begin, profile);
   }
 
-  switch (status) {
-    case 0xa0: {
-      auto event = cursor.command("End", SequenceSemantic::End);
-      if (profile.version == AkaoPs1Version::Version1_0) {
-        event.invoke([](Playback& playback) { playback.track.ff7Voice.end(playback.out); });
-      }
-      return event.end();
+  if (profile.version == AkaoPs1Version::Version1_0) {
+    if (auto command = decodeFF7Command(cursor, status)) {
+      return std::move(*command);
     }
+  }
+
+  switch (status) {
+    case 0xa0:
+      return cursor.command("End", SequenceSemantic::End).end();
     case 0xa1:
       return programArticulation(cursor);
     case 0xa2: {
@@ -560,59 +635,6 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
           },
           {duration, target});
     }
-    case 0xad:
-    case 0xae:
-    case 0xaf:
-    case 0xb0:
-    case 0xb1:
-    case 0xb2:
-    case 0xb3:
-    case 0xb7:
-    case 0xbb:
-    case 0xbf: {
-      if (profile.version != AkaoPs1Version::Version1_0) {
-        break;
-      }
-      if (status == 0xb3) {
-        return cursor.command("Reset ADSR", SequenceSemantic::Envelope).invoke<&Playback::resetAdsr>();
-      }
-      if (status == 0xb0) {
-        auto event = cursor.command("Decay Rate and Sustain Level", SequenceSemantic::Envelope);
-        const u8 decay = cursor.u8("decay_rate");
-        const u8 sustain = cursor.u8("sustain_level");
-        return event.invoke<&Playback::adsr>({0x00ff, static_cast<u16>(((decay & 15) << 4) | (sustain & 15)), 0, 0});
-      }
-      const auto field = [&](std::string_view name, u16 mask1, u16 mask2, u8 shift) {
-        auto event = cursor.command(name, SequenceSemantic::Envelope);
-        const u16 value = static_cast<u16>(cursor.u8("value") << shift);
-        return event.invoke<&Playback::adsr>({mask1, static_cast<u16>(value & mask1),
-                                              mask2, static_cast<u16>(value & mask2)});
-      };
-      switch (status) {
-        case 0xad: return field("Attack Rate", 0x7f00, 0, 8);
-        case 0xae: return field("Decay Rate", 0x00f0, 0, 4);
-        case 0xaf: return field("Sustain Level", 0x000f, 0, 0);
-        case 0xb1: return field("Sustain Rate", 0, 0x1fc0, 6);
-        case 0xb2: return field("Release Rate", 0, 0x001f, 0);
-        case 0xb7: {
-          auto event = cursor.command("Attack Mode", SequenceSemantic::Envelope);
-          const u8 mode = cursor.u8("mode");
-          return event.invoke<&Playback::adsr>({0x8000, static_cast<u16>(mode == 5 ? 0x8000 : 0), 0, 0});
-        }
-        case 0xbb: {
-          auto event = cursor.command("Sustain Mode", SequenceSemantic::Envelope);
-          const u8 mode = cursor.u8("mode");
-          // Sony's SDK defaults unrecognized modes to linear decrease.
-          const u16 bits = mode == 1 ? 0 : mode == 5 ? 0x8000 : mode == 7 ? 0xc000 : 0x4000;
-          return event.invoke<&Playback::adsr>({0, 0, 0xc000, bits});
-        }
-        default: {
-          auto event = cursor.command("Release Mode", SequenceSemantic::Envelope);
-          const u8 mode = cursor.u8("mode");
-          return event.invoke<&Playback::adsr>({0, 0, 0x0020, static_cast<u16>(mode == 7 ? 0x0020 : 0)});
-        }
-      }
-    }
     case 0xc0:
       return cursor.command("Transpose", SequenceSemantic::Pitch).set<&TrackState::transpose>(cursor.s8("semitones"));
     case 0xc1: {
@@ -665,14 +687,13 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
       return event.loopCandidate(target);
     }
     case 0xcc:
+      return cursor.command("Slur On", SequenceSemantic::State).set<&TrackState::slur>(true);
     case 0xcd:
+      return cursor.command("Slur Off", SequenceSemantic::State).set<&TrackState::slur>(false);
     case 0xd0:
-    case 0xd1: {
-      const auto name = status == 0xcc ? "Slur On" : status == 0xcd ? "Slur Off"
-                                       : status == 0xd0 ? "Legato On" : "Legato Off";
-      return cursor.command(name, SequenceSemantic::State)
-          .invoke<&Playback::connection>({status, 0, profile.version == AkaoPs1Version::Version1_0});
-    }
+      return cursor.command("Legato On", SequenceSemantic::State).set<&TrackState::legato>(true);
+    case 0xd1:
+      return cursor.command("Legato Off", SequenceSemantic::State).set<&TrackState::legato>(false);
     case 0xd8: {
       auto event = cursor.command("Tuning", SequenceSemantic::Pitch);
       const s8 tuning = cursor.s8("tuning");
@@ -699,11 +720,11 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
     case 0xda: {
       auto event = cursor.command("Portamento On", SequenceSemantic::Portamento);
       const u16 speed = cursor.resolved("ticks", cursor.rawU8("speed"), akaoZeroAs256);
-      return event.invoke<&Playback::connection>({status, speed, profile.version == AkaoPs1Version::Version1_0});
+      return event.set<&TrackState::portamentoTicks>(speed);
     }
     case 0xdb:
       return cursor.command("Portamento Off", SequenceSemantic::Portamento)
-          .invoke<&Playback::connection>({status, 0, profile.version == AkaoPs1Version::Version1_0});
+          .set<&TrackState::portamentoTicks>(0);
     case 0xdc: {
       auto event = cursor.command("Fixed Note Length", SequenceSemantic::State);
       const s8 relativeLength = cursor.s8("relative_length");
@@ -759,36 +780,6 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
     case 0xf2:
       if (profile.legacyFamily()) {
         return programArticulation(cursor, true);
-      }
-      break;
-    case 0xf4:
-      if (profile.version == AkaoPs1Version::Version1_0) {
-        auto event = cursor.command("Overlay Voice On", SequenceSemantic::Program);
-        const u8 primaryArt = cursor.u8("primary_articulation", SemanticOperandRole::InstrumentProgram);
-        cursor.u8("secondary_articulation", SemanticOperandRole::InstrumentProgram);
-        cursor.derived("bank", 0u, SemanticOperandRole::InstrumentBank);
-        return event.invoke<&Playback::instrument>({0u, primaryArt});
-      }
-      break;
-    case 0xf5:
-      if (profile.version == AkaoPs1Version::Version1_0) {
-        return cursor.sourceOnly("Overlay Voice Off");
-      }
-      break;
-    case 0xf6:
-      if (profile.version == AkaoPs1Version::Version1_0) {
-        auto event = cursor.sourceOnly("Overlay Volume Balance");
-        cursor.u8("balance");
-        return event;
-      }
-      break;
-    case 0xf7:
-      if (profile.version == AkaoPs1Version::Version1_0) {
-        auto event = cursor.sourceOnly("Overlay Volume Balance Fade");
-        const u8 rawDuration = cursor.u8("duration");
-        cursor.derived("duration_ticks", akaoZeroAs256(rawDuration));
-        cursor.u8("balance");
-        return event;
       }
       break;
     case 0xfc:

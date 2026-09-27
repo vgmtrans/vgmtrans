@@ -772,6 +772,17 @@ PitchTransitionIntent* PitchSlideBinding::intent() const {
   return transition;
 }
 
+void PitchSlideBinding::makeImmediate() {
+  if (auto* transition = intent()) {
+    transition->timing = PitchSlideTiming::fromTicks(0);
+    transition->curve = LinearAutomationCurve{};
+    transition->portamentoRendering.useCurrentTiming = false;
+    auto& realization = owner_->automations[automation_].realization;
+    realization.endTick = realization.startTick;
+    realization.endReason = PerformanceAutomationEndReason::Completed;
+  }
+}
+
 PitchSlideBinding& PitchSlideBinding::continueFrom(PerformanceNoteId previousNote) {
   if (auto* transition = intent()) {
     transition->previousNote = previousNote.valid() ? std::optional{previousNote} : std::nullopt;

@@ -250,6 +250,9 @@ public:
 
   // Add the source driver's calculated pitch at this emitter's tick.
   void sample(const PerformanceEmitter& out, double key) const;
+  // Retroactively reach the target at the original start tick. Source drivers
+  // with lookahead can discover this only after emitting the transition.
+  void makeImmediate();
   PitchSlideBinding& continueFrom(PerformanceNoteId previousNote);
   PitchSlideBinding& continueAcrossNotes(bool enabled = true);
   // Export preferences; neither changes the source transition's semantics.
