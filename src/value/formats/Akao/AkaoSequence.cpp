@@ -58,11 +58,12 @@ struct PendingPitchSlide {
   s8 semitones = 0;
 };
 
-// These are the registers whose values genuinely survive from one executed
-// command to the next. Source bounds, version rules, and analysis do not.
+// Track state retained between SequenceVm command executions.
 struct TrackState {
   explicit TrackState(const AkaoRuntimeConfig& config) : envelopes(config.articulationEnvelopes) { loadEnvelope(); }
 
+  // Load the selected articulation's ADSR defaults; leave ADSR unset if that
+  // articulation is unavailable or the program selects articulations by key.
   void loadEnvelope() {
     const auto found = articulation ? envelopes.find(*articulation) : envelopes.end();
     envelope = found != envelopes.end() ? std::optional{found->second} : std::nullopt;
@@ -112,9 +113,11 @@ struct TrackState {
   return tuning / static_cast<double>(divisor);
 }
 
-// Playback holds the few runtime services shared by several commands. One-off
-// behavior stays beside the opcode that invokes it below.
+// SequenceVm executes these handlers to build a PerformanceSequence.
+// Shared command operations are methods; other handlers stay with their opcodes.
 struct Playback : SequencePlayback<TrackState> {
+  // Reset ADSR on program changes. Banks 0 and 2 address articulations directly;
+  // key-split and drum programs select an articulation per key.
   void instrument(u32 bank, u32 program) {
     track.articulation = bank == 0 || bank == 2 ? std::optional{program} : std::nullopt;
     track.loadEnvelope();
@@ -124,16 +127,17 @@ struct Playback : SequencePlayback<TrackState> {
     }
   }
 
+  // B3 reloads the current articulation's ADSR and emits a reset for active and future notes.
   void resetAdsr() {
     track.loadEnvelope();
     track.envelopeOverridden = false;
     out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
 
+  // FF7 commands modify masked fields of ADSR1 or ADSR2. Preserve all other
+  // register bits, then emit the resulting ADSR for active and future notes.
   void adsr(u16 AkaoAdsr::* reg, u16 mask, u16 value) {
-    // FF7 SCUS_941.63: AD..B2 and B7/BB/BF update the current voice's
-    // register cache immediately; A1 and B3 reload articulation defaults.
-    // A raw sequence without a selected sample pool has no native defaults.
+    // Partial ADSR updates require the articulation's defaults for the unchanged fields.
     if (!track.envelope) {
       return;
     }
@@ -144,6 +148,8 @@ struct Playback : SequencePlayback<TrackState> {
                         VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
 
+  // Apply length overrides to notes, ties, and rests. Fixed length (DC) takes
+  // precedence over one-time length (A2), but the one-time override is still cleared.
   [[nodiscard]] u32 consumeDelta(u32 encodedDelta, u32 fallbackDelta) {
     u32 delta = encodedDelta;
     if (track.useOneTimeDuration) {
@@ -160,6 +166,7 @@ struct Playback : SequencePlayback<TrackState> {
     return delta;
   }
 
+  // Before v3, normal notes have a two-tick gap; slur and legato remove it.
   [[nodiscard]] u32 soundingTicks(u32 delta, bool modern) const {
     if (modern || track.slur || track.legato) {
       return std::max<u32>(1, delta);
@@ -167,6 +174,8 @@ struct Playback : SequencePlayback<TrackState> {
     return std::max<u32>(1, delta > 2 ? delta - 2 : 0);
   }
 
+  // Process a note, tie, or rest and advance sequence time by its duration.
+  // Delegate FF7 key-on suppression and pitch transitions to AkaoFF7Voice.
   Effects timedEvent(u8 noteByte, u32 encodedDelta, u32 fallbackDelta, AkaoPs1Version version) {
     const u32 duration = consumeDelta(encodedDelta, fallbackDelta);
     const bool ff7 = version == AkaoPs1Version::Version1_0;
@@ -176,6 +185,7 @@ struct Playback : SequencePlayback<TrackState> {
       track.tieKey.reset();
     } else {
       const bool tie = noteByte >= 0x84;
+      // Before v3, drum notes use keys 24..35 before transposition, ignoring the octave.
       const u8 sourceKey = (track.drum && !modern ? 24 : track.octave * 12) + noteByte / 11;
       const u8 key = tie ? track.tieKey.value_or(0)
                          : static_cast<u8>(std::clamp<int>(sourceKey + track.transpose, 0, 127));
@@ -200,6 +210,7 @@ struct Playback : SequencePlayback<TrackState> {
     };
   }
 
+  // Consume the queued A4 pitch slide for this note or tie.
   void applyPendingPitchSlide(PerformanceNoteId note, double key) {
     const auto slide = std::exchange(track.pendingPitchSlide, std::nullopt);
     if (!slide || slide->durationTicks == 0 || slide->semitones == 0) {
@@ -433,8 +444,10 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
   }
 }
 
-// FF7 overrides only these commands; everything else uses the shared decoder.
+// Handle FF7-specific command behavior, including ADSR edits and key-on suppression.
+// Returning nullopt lets the shared decoder handle commands with common behavior.
 [[nodiscard]] std::optional<DecodedBytecodeCommand> decodeFF7Command(AkaoCursor& cursor, u8 status) {
+  // Shift the operand into its ADSR1/ADSR2 field; adsr() preserves the other bits.
   const auto field = [&](std::string_view name, u16 AkaoAdsr::* reg, u16 mask, u8 shift) -> DecodedBytecodeCommand {
     auto event = cursor.command(name, SequenceSemantic::Envelope);
     return event.invoke<&Playback::adsr>({reg, mask, static_cast<u16>(cursor.u8("value") << shift)});
@@ -461,6 +474,7 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
       return field("Release Rate", &AkaoAdsr::adsr2, 0x001f, 0);
     case 0xb3:
       return cursor.command("Reset ADSR", SequenceSemantic::Envelope).invoke<&Playback::resetAdsr>();
+    // SDK mode constants: 5 selects exponential attack, 7 selects exponential release.
     case 0xb7: {
       auto event = cursor.command("Attack Mode", SequenceSemantic::Envelope);
       const u8 mode = cursor.u8("mode");
@@ -469,7 +483,8 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
     case 0xbb: {
       auto event = cursor.command("Sustain Mode", SequenceSemantic::Envelope);
       const u8 mode = cursor.u8("mode");
-      // Sony's SDK defaults unrecognized modes to linear decrease.
+      // SDK modes 1/5/7 select linear increase, exponential increase, or exponential decrease.
+      // Other values select linear decrease.
       const u16 bits = mode == 1 ? 0 : mode == 5 ? 0x8000 : mode == 7 ? 0xc000 : 0x4000;
       return event.invoke<&Playback::adsr>({&AkaoAdsr::adsr2, 0xc000, bits});
     }
@@ -498,6 +513,7 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
     case 0xdb:
       return cursor.command("Portamento Off", SequenceSemantic::Portamento).invoke(endConnection);
     case 0xf4: {
+      // F4 starts two SPU voices; the converter currently emits only the primary articulation.
       auto event = cursor.command("Overlay Voice On", SequenceSemantic::Program);
       const u8 primaryArt = cursor.u8("primary_articulation", SemanticOperandRole::InstrumentProgram);
       cursor.u8("secondary_articulation", SemanticOperandRole::InstrumentProgram);
@@ -654,8 +670,8 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
     case 0xc8: {
       auto event = cursor.command("Repeat Start", SequenceSemantic::Repeat);
       const Address start = cursor.nextAddress();
-      // Decoding and playback walk the track independently, so each needs its
-      // own copy of the repeat stack.
+      // Track decoding and SequenceVm execution follow repeats independently,
+      // so each needs its own repeat stack.
       repeats.start(start);
       return event.invoke([](Playback& playback, Address address) { playback.track.repeats.start(address); }, {start});
     }

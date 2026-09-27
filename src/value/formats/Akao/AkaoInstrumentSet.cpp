@@ -23,12 +23,12 @@ using namespace core;
 
 namespace {
 
+// Key-split and later drum tables override the articulation ADSR. Early
+// five-byte drum entries have no ADSR fields and bypass this overlay entirely.
 [[nodiscard]] Envelope akaoRegionEnvelope(const AkaoArticulation& articulation, u8 attackRate, u8 sustainRate,
                                           u8 sustainMode, u8 releaseRate) {
   u16 adsr1 = articulation.adsr1;
   u16 adsr2 = articulation.adsr2;
-  // Key-split and later drum tables override the articulation ADSR. The early
-  // five-byte drum rows have no ADSR fields and bypass this overlay entirely.
   adsr1 &= static_cast<u16>(~0x7f00u);
   adsr1 |= static_cast<u16>((attackRate & 0x7f) << 8);
   adsr2 &= static_cast<u16>(~0xffdfu);

@@ -146,6 +146,7 @@ struct AkaoInstrumentSetBindingData {
   std::set<u32> noAttackArticulationIds;
 };
 
+// Raw SPU ADSR1/ADSR2 register values retained for partial ADSR updates.
 struct AkaoAdsr {
   u16 adsr1 = 0;
   u16 adsr2 = 0;
@@ -162,7 +163,7 @@ struct AkaoSoundBankData {
 };
 
 // An articulation is Akao's complete description of one playable sample:
-// its location, tuning, loop, and envelope all travel together.
+// its location, tuning, loop, and ADSR all travel together.
 struct AkaoArticulation {
   u32 articulationId = 0;
   core::SourceRecord source;

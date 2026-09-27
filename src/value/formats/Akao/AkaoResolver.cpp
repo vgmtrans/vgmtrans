@@ -131,6 +131,9 @@ DependencySelection AkaoSamples::operator()(const DependencyContext& context) co
   return result;
 }
 
+// Assign samples, tuning, loops, and ADSR from the selected articulations to the
+// bank's instrument regions. Retain raw articulation ADSR values so sequence
+// commands can update individual ADSR fields during sequence conversion.
 void prepareAkaoBank(BankPreparationContext& context, const AkaoSoundBankData& data) {
   AkaoArticulationMap articulations;
   for (const auto& input : context.samples<AkaoSamplePoolData>()) {
@@ -168,6 +171,8 @@ void prepareAkaoBank(BankPreparationContext& context, const AkaoSoundBankData& d
   context.bank.privateData = AssetPrivateData::make(std::move(preparedData));
 }
 
+// Configure SequenceVm with articulation ADSR defaults from the prepared banks.
+// FF7 ADSR commands edit or reset these values during sequence conversion.
 SequenceRuntime prepareAkaoSequence(SequencePreparationContext& context) {
   AkaoRuntimeConfig config;
   for (const auto& bank : context.banks<AkaoSoundBankData>(kAkaoFormatName)) {
