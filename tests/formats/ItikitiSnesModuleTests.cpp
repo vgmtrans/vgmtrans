@@ -9,7 +9,6 @@
 #include "../TestSupport.h"
 
 #include "value/base/LevelScale.h"
-#include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/formats/ItikitiSnes/ItikitiSnes.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/sequence/SequenceVm.h"
@@ -188,7 +187,7 @@ void lfoModesFollowTheDriverStateMachine() {
   const auto portamentoNotes = eventsOfType<NotePerformanceEvent>(portamento.tracks.front());
   const auto tremoloDepth = modulationEvents(stoppedTremolo.tracks.front(), ModulationPerformanceTarget::TremoloDepth);
   const MidiSequence portamentoMidi =
-      renderMidiSequence(portamento, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+      renderTestMidi(portamento, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
   const auto hasNonzeroBendAt = [&](u64 tick) {
     return std::ranges::any_of(portamentoMidi.tracks.front().events, [=](const MidiEvent& event) {
       const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
@@ -254,7 +253,7 @@ void trackAndMasterVolumeRetainIndependentResolution() {
              std::abs(masters.back()->linearGain - half) < 0.000001,
          "master volume should be an absolute gain instead of a clipped boost over the $18 startup value");
 
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi = renderTestMidi(performance);
   const auto volume = std::ranges::find_if(midi.tracks.front().events, [](const MidiEvent& event) {
     return isMidiController(event, MidiController::ChannelVolume);
   });

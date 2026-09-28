@@ -51,12 +51,12 @@ struct NoteSpan {
 class PitchBendRangeTimeline {
  public:
   PitchBendRangeTimeline(const std::vector<PerformanceEvent>& events,
-                         std::span<const SoundBankAsset* const> soundBanks)
-      : initial_(soundBanks) {
+                         const ResolvedPerformance& performance)
+      : initial_(performance) {
     PerformancePitchBendContext context = initial_;
 
     for (const auto& event : events) {
-      if (context.apply(event, soundBanks)) {
+      if (context.apply(event, performance)) {
         points_.push_back(Point{.header = performanceEventHeader(event), .context = context});
       }
     }
@@ -115,42 +115,15 @@ struct PitchBendLayer {
   return found == notes.end() ? nullptr : &*found;
 }
 
-[[nodiscard]] std::vector<NoteSpan> collectNotes(const PerformanceTrack& track,
-                                                 std::span<const SoundBankAsset* const> soundBanks) {
+[[nodiscard]] std::vector<NoteSpan> collectNotes(const PerformanceTrack& track) {
   std::vector<NoteSpan> notes;
-  const auto predecessors = performanceNotePredecessors(track);
-  InstrumentSelection selection;
   for (const auto& event : track.events) {
-    if (const auto* change = std::get_if<InstrumentPerformanceEvent>(&event)) {
-      selection = change->instrument;
-    }
     const auto* source = std::get_if<NotePerformanceEvent>(&event);
-    if (source == nullptr || !source->note.valid()) {
-      continue;
-    }
+    if (source == nullptr || !source->note.valid()) continue;
     if (auto* note = findNote(notes, source->note)) {
       note->endTick = std::max(note->endTick, noteEnd(*source));
     } else {
-      // Resolve the attack before splitting it. A source program change selects
-      // future attacks; every native-portamento fragment keeps this preset.
-      auto resolved = *source;
-      const auto* instrument = findPerformanceInstrument(selection, soundBanks);
-      resolved.instrumentAddress = source->instrumentAddress.value_or(
-          instrument ? resolveInstrumentAddress(instrument->explicitAddress, instrument->identity)
-                     : resolveInstrumentAddress(selection));
-      const auto predecessor = predecessors.find(source->note);
-      const auto* previous = source->extendsPrevious && !notes.empty() ? &notes.back() : nullptr;
-      if (predecessor != predecessors.end()) {
-        previous = findNote(notes, predecessor->second);
-      }
-      if (previous != nullptr) {
-        resolved.instrumentAddress = previous->source.instrumentAddress;
-      }
-      notes.push_back(NoteSpan{
-          .source = std::move(resolved),
-          .endTick = noteEnd(*source),
-          .bendBaseKey = source->key,
-      });
+      notes.push_back(NoteSpan{.source = *source, .endTick = noteEnd(*source), .bendBaseKey = source->key});
     }
   }
   return notes;
@@ -677,7 +650,7 @@ void appendSourceEvents(std::vector<PerformanceEvent>& events, const Performance
       }
       if (span != nullptr) {
         auto resolved = *note;
-        resolved.instrumentAddress = span->source.instrumentAddress;
+        resolved.instrument = span->source.instrument;
         resolved.extendsPrevious |= span->continuesPreviousVoice;
         events.emplace_back(std::move(resolved));
         continue;
@@ -735,16 +708,11 @@ void appendSourceEvents(std::vector<PerformanceEvent>& events, const Performance
 
 }  // namespace
 
-PerformanceSequence lowerMidiPerformanceAutomation(const PerformanceSequence& performance,
-                                                   const MidiExportOptions& options) {
-  return lowerMidiPerformanceAutomation(performance, options, PerformanceTempoMap{performance}, {});
-}
-
-PerformanceSequence lowerMidiPerformanceAutomation(const PerformanceSequence& performance,
-                                                   const MidiExportOptions& options,
-                                                   const PerformanceTempoMap& tempos,
-                                                   std::span<const SoundBankAsset* const> soundBanks) {
-  PerformanceSequence lowered = performance;
+ResolvedPerformance lowerMidiPerformanceAutomation(ResolvedPerformance resolved,
+                                                    const MidiExportOptions& options,
+                                                    const PerformanceTempoMap& tempos) {
+  auto& lowered = resolved.performance_;
+  const auto& performance = lowered;
 
   for (auto& track : lowered.tracks) {
     std::ranges::stable_sort(track.events, {},
@@ -780,10 +748,10 @@ PerformanceSequence lowerMidiPerformanceAutomation(const PerformanceSequence& pe
 
     std::optional<PitchBendRangeTimeline> pitchBendRanges;
     if (!portamentoTransitions.empty() || !pitchBendTransitions.empty()) {
-      pitchBendRanges.emplace(track.events, soundBanks);
+      pitchBendRanges.emplace(track.events, resolved);
     }
 
-    auto notes = collectNotes(track, soundBanks);
+    auto notes = collectNotes(track);
     std::vector<PerformanceEvent> events;
     events.reserve(track.events.size() + (portamentoTransitions.size() + pitchBendTransitions.size()) * 4);
     if (!portamentoTransitions.empty()) {
@@ -805,7 +773,7 @@ PerformanceSequence lowerMidiPerformanceAutomation(const PerformanceSequence& pe
     std::erase_if(track.automations,
                   [](const PerformanceAutomation& automation) { return pitchTransitionIntent(automation) != nullptr; });
   }
-  return lowered;
+  return resolved;
 }
 
 }  // namespace vgmtrans::core

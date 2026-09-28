@@ -310,13 +310,16 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
               },
       }},
   };
-  const std::array<const SoundBankAsset*, 1> semanticSets{&semanticInstruments};
   const std::array<const SamplePoolAsset*, 1> sampleSets{&samples};
+  const auto semanticPrepared = preparePerformance(semanticPerformance, {semanticInstruments});
+  const auto semanticViews = semanticPrepared.soundBankView();
+  const auto semanticSelection = selectSynthInstruments(semanticPrepared, planInstrumentAddresses(semanticPrepared), true);
   const auto semanticData = prepareSynthData(
       SynthExportInput{
-          .soundBanks = semanticSets,
+          .soundBanks = semanticViews,
           .samplePools = sampleSets,
-          .sequenceUsage = &semanticPerformance,
+          .instrumentSelections = semanticSelection,
+          .filterSamplesToReferencedInstruments = true,
       },
       sources);
   expect(semanticData.instruments.size() == 1 && semanticData.instruments[0].instrument->name == "Noise" &&
@@ -334,12 +337,15 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
               },
       }},
   };
-  const std::array<const SoundBankAsset*, 1> logicalBankSets{&logicalBankInstruments};
+  const auto logicalBankPrepared = preparePerformance(logicalBankPerformance, {logicalBankInstruments});
+  const auto logicalBankViews = logicalBankPrepared.soundBankView();
+  const auto logicalBankSelection = selectSynthInstruments(logicalBankPrepared, planInstrumentAddresses(logicalBankPrepared), true);
   const auto logicalBankData = prepareSynthData(
       SynthExportInput{
-          .soundBanks = logicalBankSets,
+          .soundBanks = logicalBankViews,
           .samplePools = sampleSets,
-          .sequenceUsage = &logicalBankPerformance,
+          .instrumentSelections = logicalBankSelection,
+          .filterSamplesToReferencedInstruments = true,
       },
       sources);
   expect(logicalBankData.instruments.size() == 1 && logicalBankData.instruments[0].instrument->name == "Lead" &&
@@ -357,12 +363,15 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
               },
       }},
   };
-  const std::array<const SoundBankAsset*, 1> exactBankSets{&exactBankInstruments};
+  const auto exactBankPrepared = preparePerformance(exactBankPerformance, {exactBankInstruments});
+  const auto exactBankViews = exactBankPrepared.soundBankView();
+  const auto exactBankSelection = selectSynthInstruments(exactBankPrepared, planInstrumentAddresses(exactBankPrepared), true);
   const auto exactBankData = prepareSynthData(
       SynthExportInput{
-          .soundBanks = exactBankSets,
+          .soundBanks = exactBankViews,
           .samplePools = sampleSets,
-          .sequenceUsage = &exactBankPerformance,
+          .instrumentSelections = exactBankSelection,
+          .filterSamplesToReferencedInstruments = true,
       },
       sources);
   expect(exactBankData.instruments.size() == 1 && exactBankData.instruments[0].instrument->name == "Noise" &&
@@ -371,8 +380,10 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
 
   SequenceProgramAsset missingRuntimeSequence = sequence;
   missingRuntimeSequence.program.runtime = {};
+  auto nativeModulationBank = instruments;
+  nativeModulationBank.instruments[0].modulation.vibrato = VibratoSpec{.maxDepthCents = 100, .rateHertz = {5, 5}};
   test::SessionSnapshotBuilder missingRuntimeBuilder;
-  missingRuntimeBuilder.assets = {missingRuntimeSequence, instruments, samples};
+  missingRuntimeBuilder.assets = {missingRuntimeSequence, nativeModulationBank, samples};
   missingRuntimeBuilder.collections = snapshot.collections();
   const SessionSnapshot missingRuntimeSnapshot = missingRuntimeBuilder.finish();
 
@@ -384,6 +395,13 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   expect(baseline.size() == 1 && !baseline[0].bytes.empty(),
          "ordinary full-bank synth export should survive a sequence rendering failure");
   diagnosticWithMessage(baseline[0].diagnostics, "Sequence program has no runtime executor");
+  const auto failedCompanion = exportCollection(missingRuntimeSnapshot, sources, CollectionId{0},
+      {.kinds = {ExportKind::Midi, ExportKind::Dls},
+       .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
+       .dynamicEnvelopes = DynamicEnvelopePolicy::Ignore});
+  expect(failedCompanion.size() == 2 && failedCompanion[0].bytes.empty() &&
+             failedCompanion[1].bytes == baseline[0].bytes,
+         "failed MIDI rendering must preserve native synth modulation in the surviving full-bank export");
 
   for (const auto kind : {ExportKind::SoundFont2, ExportKind::Dls}) {
     const auto failed = exportCollection(missingRuntimeSnapshot, sources, CollectionId{0},

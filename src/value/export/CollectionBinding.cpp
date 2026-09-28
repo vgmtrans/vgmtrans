@@ -8,7 +8,6 @@
 
 #include "value/export/ExportDiagnostics.h"
 #include "value/export/AssetPreparation.h"
-#include "value/export/InstrumentVariants.h"
 #include "value/scan/AssetResolution.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/validation/SynthValidation.h"
@@ -290,49 +289,33 @@ CollectionWorkspace::CollectionWorkspace(BoundCollection collection, std::vector
 }
 
 void CollectionWorkspace::render(const SequenceRenderOptions& options, DynamicEnvelopePolicy dynamicEnvelopes,
-                                 bool materializeSignedStereo) {
+                                 bool materializeSignedStereo, ModulationConversionPolicy conversion,
+                                 ModulationScalingPolicy scaling) {
   rendering = renderCollection(collection, options);
-  if (!rendering.performance ||
-      (dynamicEnvelopes != DynamicEnvelopePolicy::InstrumentVariants && !materializeSignedStereo)) {
-    return;
+  if (!rendering.performance) return;
+  if (conversion == ModulationConversionPolicy::SynthModulators && rendering.modulation.hasSynthModulation()) {
+    for (auto& bank : collection.soundBanks_) applySequenceModulation(bank, rendering.modulation);
   }
-
-  auto materialized = materializeInstrumentVariants(
-      *rendering.performance, collection.soundBanks_,
-      InstrumentVariantOptions{
-          .dynamicEnvelopes = dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants,
-          .signedStereo = materializeSignedStereo,
-      });
-  exportPerformance = std::move(materialized.performance);
-  diagnostics.insert(diagnostics.end(), std::make_move_iterator(materialized.diagnostics.begin()),
-                     std::make_move_iterator(materialized.diagnostics.end()));
-}
-
-void CollectionWorkspace::prepareModulation(ModulationConversionPolicy conversion, ModulationScalingPolicy scaling) {
-  if (conversion != ModulationConversionPolicy::SynthModulators || !rendering.performance) {
-    return;
-  }
-  if (rendering.modulation.hasSynthModulation()) {
-    for (auto& soundBank : collection.soundBanks_) {
-      applySequenceModulation(soundBank, rendering.modulation);
-    }
-  }
-  if (scaling == ModulationScalingPolicy::ObservedSequenceRange) {
-    modulationUsage = analyzePerformanceModulationUsage(*performance(), &rendering.modulation);
+  exportPerformance = preparePerformance(*rendering.performance, std::move(collection.soundBanks_),
+      {.dynamicEnvelopes = dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants,
+       .signedStereo = materializeSignedStereo});
+  if (conversion == ModulationConversionPolicy::SynthModulators &&
+      scaling == ModulationScalingPolicy::ObservedSequenceRange) {
+    modulationUsage = analyzePerformanceModulationUsage(exportPerformance->performance(), &rendering.modulation);
   }
 }
 
 const PerformanceSequence* CollectionWorkspace::performance() const noexcept {
   if (exportPerformance) {
-    return &*exportPerformance;
+    return &exportPerformance->performance();
   }
   return rendering.performance ? &*rendering.performance : nullptr;
 }
 
 std::vector<const SoundBankAsset*> CollectionWorkspace::soundBankView() const {
   std::vector<const SoundBankAsset*> view;
-  view.reserve(collection.soundBanks_.size());
-  for (const auto& soundBank : collection.soundBanks_) {
+  view.reserve(soundBanks().size());
+  for (const auto& soundBank : soundBanks()) {
     view.push_back(&soundBank);
   }
   return view;

@@ -7,7 +7,7 @@
 #include "../MidiTestSupport.h"
 #include "../TestSupport.h"
 
-#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "../PerformanceTestSupport.h"
 #include "value/formats/RareSnes/RareSnes.h"
 #include "value/sequence/SequenceVm.h"
 
@@ -376,7 +376,7 @@ void rareSnesPhysicalLfosAndPitchEnvelopesUseTimerClock() {
   const PerformanceSequence delayedNote =
       render(Profile::DonkeyKongCountry, {0x0f, 8, 2, 4, 3, 0x80, 32, 0x81, 16, 0x00});
   const MidiSequence simulated =
-      renderMidiSequence(delayedNote, {}, ModulationConversionPolicy::SequenceEventSimulation);
+      renderTestMidi(delayedNote, {}, ModulationConversionPolicy::SequenceEventSimulation);
   expect(std::ranges::none_of(simulated.tracks.front().events,
                               [](const MidiEvent& event) {
                                 const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
@@ -400,7 +400,7 @@ void rareSnesPitchEnvelopeInvertsOnlyItsInitialSteps() {
          "the initial inverted step should precede the remaining upward driver steps");
 
   const MidiSequence pitchBend =
-      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+      renderTestMidi(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   expect(std::ranges::count_if(pitchBend.tracks.front().events,
                                [](const MidiEvent& event) {
                                  const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
@@ -409,7 +409,7 @@ void rareSnesPitchEnvelopeInvertsOnlyItsInitialSteps() {
          "pitch-bend rendering should step upward instead of popping to Gang-Plank Galleon's target");
 
   const MidiSequence portamento =
-      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
+      renderTestMidi(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
   expect(std::ranges::any_of(portamento.tracks.front().events,
                              [](const MidiEvent& event) {
                                const auto* note = std::get_if<NoteDuration>(&event.payload);

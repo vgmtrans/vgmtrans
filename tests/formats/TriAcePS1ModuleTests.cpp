@@ -7,7 +7,6 @@
 #include "../PerformanceTestSupport.h"
 #include "../TestSupport.h"
 
-#include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/formats/TriAcePS1/TriAcePS1.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
@@ -190,7 +189,7 @@ void triAcePs1SequenceExecutesAuditedDriverFeatures() {
   expect(notes[1]->extendsPrevious && notes[1]->note == notes[0]->note && notes[2]->durationTicks == 4,
          "raw-key continuations should retain their voice without consuming random pitch, and sustain should defer "
          "release");
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi = renderTestMidi(performance);
   const auto midiNotes = std::ranges::count_if(midi.tracks.front().events, [](const MidiEvent& event) {
     return std::holds_alternative<NoteDuration>(event.payload);
   });

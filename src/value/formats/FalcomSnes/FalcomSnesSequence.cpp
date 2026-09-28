@@ -243,7 +243,7 @@ struct Playback : SequencePlayback<TrackState> {
         .durationTicks = duration,
         .extendsPrevious = continues,
         .restartsEnvelope = !continues,
-        .instrumentAddress = InstrumentAddress{.bank = 0, .program = track.program},
+        .instrument = InstrumentAddress{.bank = 0, .program = track.program},
         // Falcom restarts vibrato on attacks, while its independent pan LFO
         // continues across notes.
         .restartsLfoPhase = false,

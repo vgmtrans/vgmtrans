@@ -9,7 +9,7 @@
 
 #include "value/export/SequenceModulationProfile.h"
 #include "value/export/midi/ModulationAnalysis.h"
-#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "../PerformanceTestSupport.h"
 #include "value/export/synth/ModulationScaling.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/sequence/TempoRelativeModulation.h"
@@ -138,7 +138,7 @@ void physicalModulationProfileDrivesMidiAndSynthFromOnePlan() {
              profile.instruments.tremolo->gainMode == TremoloGainMode::NoBoost,
          "the shared plan should preserve physical tremolo behavior");
 
-  const MidiSequence midi = renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators);
+  const MidiSequence midi = renderTestMidi(performance, {}, ModulationConversionPolicy::SynthModulators);
   u8 firstVibratoDepth = 255;
   u8 lastVibratoDepth = 0;
   u8 firstVibratoRate = 255;
@@ -327,7 +327,7 @@ void tempoRelativeModulationFollowsTheGlobalTempoTimeline() {
     }
     resolveTempoRelativeModulation(simulation);
     const MidiSequence midi =
-        renderMidiSequence(simulation, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+        renderTestMidi(simulation, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
     std::vector<std::pair<u64, s16>> result;
     for (const MidiEvent& event : midi.tracks[0].events) {
       if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend)) {

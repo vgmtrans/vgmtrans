@@ -7,7 +7,7 @@
 #include "../MidiTestSupport.h"
 #include "../TestSupport.h"
 
-#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "../PerformanceTestSupport.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
@@ -23,7 +23,7 @@ MidiSequence renderSimulatedModulation(u64 endTick, std::vector<PerformanceEvent
                                     .header = PerformanceEventHeader{.tick = 0},
                                     .microsecondsPerQuarter = 1'000'000,
                                 });
-  return renderMidiSequence(
+  return renderTestMidi(
       PerformanceSequence{
           .timebase = Timebase{.ppqn = 100},
           .tracks = {PerformanceTrack{
@@ -69,7 +69,7 @@ void performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape() {
   };
 
   const MidiSequence midiSequence =
-      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+      renderTestMidi(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
   const auto& events = midiSequence.tracks[0].events;
 
   bool hasPreDelayNonzero = false;
@@ -280,7 +280,7 @@ void performanceMidiRendererDoesNotDoubleDelayVibrato() {
   };
 
   const MidiSequence midiSequence =
-      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+      renderTestMidi(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
 
   std::vector<std::pair<u64, s16>> pitchBends;
   for (const MidiEvent& event : midiSequence.tracks[0].events) {
@@ -341,7 +341,7 @@ void performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes() {
   };
 
   const MidiSequence midiSequence =
-      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+      renderTestMidi(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
 
   std::vector<std::pair<u64, s16>> pitchBends;
   for (const MidiEvent& event : midiSequence.tracks[0].events) {
@@ -392,7 +392,7 @@ void performanceMidiRendererRestartsVibratoDelayWithOrWithoutPhaseReset() {
           .context = context,
       });
       const MidiSequence midi =
-          renderMidiSequence(PerformanceSequence{.timebase = Timebase{.ppqn = 100}, .tracks = {track}}, {},
+          renderTestMidi(PerformanceSequence{.timebase = Timebase{.ppqn = 100}, .tracks = {track}}, {},
                              ModulationConversionPolicy::SequenceEventSimulation);
       const auto bendAt = [&](u64 tick) {
         s32 value = 0;
@@ -515,7 +515,7 @@ void performanceMidiRendererSimulatesTremoloUsingGlobalTempo() {
   };
 
   const MidiSequence midiSequence =
-      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+      renderTestMidi(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
 
   std::vector<std::pair<u64, u8>> expressions;
   for (const MidiEvent& event : midiSequence.tracks[1].events) {
@@ -562,7 +562,7 @@ void performanceMidiRendererUsesGlobalTempoOrderAtTrackBoundaries() {
                       }},
           },
   };
-  const auto midi = renderMidiSequence(performance);
+  const auto midi = renderTestMidi(performance);
   std::vector<std::pair<u64, u32>> tempos;
   for (const auto& event : midi.tracks[0].events) {
     if (const auto tempo = midiTempo(event)) {
@@ -642,7 +642,7 @@ void performanceMidiRendererHonorsNoBoostTremoloPhaseAndResetPolicy() {
   };
 
   const MidiSequence midi =
-      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+      renderTestMidi(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
   std::vector<std::pair<u64, u8>> expressions;
   for (const MidiEvent& event : midi.tracks[0].events) {
     if (const auto* expression = midiController(event, MidiController::Expression)) {

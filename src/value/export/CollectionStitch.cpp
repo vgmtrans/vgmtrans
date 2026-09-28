@@ -19,9 +19,7 @@
 #include <limits>
 #include <numeric>
 #include <optional>
-#include <set>
 #include <type_traits>
-#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 
@@ -35,8 +33,10 @@ constexpr u32 kMaximumPpqn = 1920;
 struct StitchPart {
   CollectionId collection;
   u64 startTick = 0;
-  std::vector<SoundBankAsset> instruments;
   std::vector<const SamplePoolAsset*> samples;
+  std::optional<ResolvedPerformance> performance;
+  InstrumentAddressPlan layout;
+  SequenceModulationProfile modulation;
   MidiSequence midi;
   MidiModulationUsage modulationUsage;
   std::vector<CollectionStitchBank> banks;
@@ -79,37 +79,17 @@ void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulation
     return false;
   }
 
-  workspace.render(request.sequence, request.dynamicEnvelopes, /*materializeSignedStereo=*/true);
+  workspace.render(request.sequence, request.dynamicEnvelopes, /*materializeSignedStereo=*/true,
+                   request.modulationConversion, request.modulationScaling);
   if (!workspace.performance()) {
     append(diagnostics, workspace.diagnostics);
     append(diagnostics, workspace.rendering.diagnostics);
     return false;
   }
 
-  workspace.prepareModulation(request.modulationConversion, request.modulationScaling);
-  const PerformanceSequence* performance = workspace.performance();
-  const auto instruments = workspace.soundBankView();
-  part.midi = renderMidiSequence(*performance, request.sequence.midi, request.modulationConversion, instruments,
-                                 &workspace.rendering.modulation);
   part.modulationUsage = std::move(workspace.modulationUsage);
-  auto& soundBanks = workspace.soundBanks();
-  if (request.exportOnlyUsedInstruments) {
-    const auto selected = selectSynthInstruments(instruments, performance);
-    const std::unordered_set<const Instrument*> used(selected.begin(), selected.end());
-    for (auto& set : soundBanks) {
-      std::vector<Instrument> retained;
-      retained.reserve(set.instruments.size());
-      for (auto& instrument : set.instruments) {
-        if (used.contains(&instrument)) {
-          retained.push_back(std::move(instrument));
-        }
-      }
-      set.instruments = std::move(retained);
-    }
-    std::erase_if(soundBanks, [](const SoundBankAsset& set) { return set.instruments.empty(); });
-  }
-
-  part.instruments = std::move(soundBanks);
+  part.modulation = std::move(workspace.rendering.modulation);
+  part.performance = std::move(workspace.exportPerformance);
   part.samples = bound.samplePools();
   append(diagnostics, workspace.diagnostics);
   return true;
@@ -156,57 +136,6 @@ void appendInitialChannelState(MidiTrack& track, u64 tick, u8 channel, u16 bank,
 [[nodiscard]] std::optional<u32> remappedBank(const StitchPart& part, u32 source) {
   const auto found = std::ranges::find(part.banks, source, &CollectionStitchBank::source);
   return found == part.banks.end() ? std::nullopt : std::optional{found->target};
-}
-
-[[nodiscard]] bool planBanks(std::vector<StitchPart>& parts) {
-  u32 nextBank = 0;
-  std::unordered_map<u32, std::vector<CollectionStitchBank>> planned;
-  for (auto& part : parts) {
-    if (const auto previous = planned.find(part.collection.value); previous != planned.end()) {
-      part.banks = previous->second;
-      continue;
-    }
-
-    std::set<u32> sourceBanks{0};
-    for (const auto& set : part.instruments) {
-      for (const auto& instrument : set.instruments) {
-        sourceBanks.insert(resolveInstrumentAddress(instrument.explicitAddress, instrument.identity).bank);
-      }
-    }
-    for (const auto& track : part.midi.tracks) {
-      for (const auto& event : track.events) {
-        if (const auto* bank = std::get_if<BankSelect>(&event.payload)) {
-          sourceBanks.insert(bank->bank);
-        }
-      }
-    }
-    if (sourceBanks.size() > 128 - nextBank) {
-      return false;
-    }
-    for (const u32 source : sourceBanks) {
-      part.banks.push_back(CollectionStitchBank{.source = source, .target = nextBank++});
-    }
-    planned.emplace(part.collection.value, part.banks);
-  }
-  return true;
-}
-
-void remapPart(StitchPart& part) {
-  for (auto& set : part.instruments) {
-    for (auto& instrument : set.instruments) {
-      auto address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
-      address.bank = *remappedBank(part, address.bank);
-      instrument.explicitAddress = address;
-    }
-  }
-
-  for (auto& track : part.midi.tracks) {
-    for (auto& event : track.events) {
-      if (auto* bank = std::get_if<BankSelect>(&event.payload)) {
-        bank->bank = static_cast<u16>(*remappedBank(part, bank->bank));
-      }
-    }
-  }
 }
 
 [[nodiscard]] u32 normalizedPpqn(u32 ppqn) {
@@ -324,12 +253,25 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
 
   std::vector<StitchPart> parts;
   parts.reserve(collections.size());
+  u32 nextBank = 0;
   for (const CollectionId collection : collections) {
+    if (const auto previous = std::ranges::find(parts, collection, &StitchPart::collection); previous != parts.end()) {
+      parts.push_back(*previous);
+      continue;
+    }
     StitchPart part{.collection = collection};
     if (!preparePart(part, snapshot, request, result.midi.diagnostics)) {
       result.soundFont.diagnostics = result.midi.diagnostics;
       return result;
     }
+    part.layout = planInstrumentAddresses(*part.performance, request.exportOnlyUsedInstruments, nextBank);
+    append(result.midi.diagnostics, part.layout.diagnostics);
+    if (!part.layout.valid) {
+      result.soundFont.diagnostics = result.midi.diagnostics;
+      return result;
+    }
+    nextBank = part.layout.nextBank();
+    for (const auto& [source, target] : part.layout.banks) part.banks.push_back({source, target});
     parts.push_back(std::move(part));
   }
 
@@ -338,15 +280,9 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
     mergeModulationUsage(modulationUsage, part.modulationUsage);
   }
   for (auto& part : parts) {
+    part.midi = renderMidiSequence(*part.performance, part.layout, request.sequence.midi,
+                                  request.modulationConversion, &part.modulation);
     applyMidiModulationScaling(part.midi, modulationUsage, request.modulationScaling);
-  }
-
-  if (!planBanks(parts)) {
-    fail(result, "Stitched collections require more than the 128 preset banks supported by SoundFont2");
-    return result;
-  }
-  for (auto& part : parts) {
-    remapPart(part);
   }
 
   auto midi = composeMidi(parts, request.sequence.midi.bankSelectStyle);
@@ -358,6 +294,7 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
   append(result.midi.diagnostics, midi->diagnostics);
 
   std::vector<const SoundBankAsset*> instruments;
+  std::vector<SynthInstrumentSelection> synthInstruments;
   std::vector<const SamplePoolAsset*> samples;
   std::unordered_set<u32> includedCollections;
   std::unordered_set<u32> includedSamples;
@@ -365,9 +302,9 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
     if (!includedCollections.insert(part.collection.value).second) {
       continue;
     }
-    for (const auto& set : part.instruments) {
-      instruments.push_back(&set);
-    }
+    const auto selected = selectSynthInstruments(*part.performance, part.layout, request.exportOnlyUsedInstruments);
+    synthInstruments.insert(synthInstruments.end(), selected.begin(), selected.end());
+    for (const auto& set : part.performance->soundBanks()) instruments.push_back(&set);
     for (const auto* collection : part.samples) {
       if (includedSamples.insert(collection->metadata.id.value).second) {
         samples.push_back(collection);
@@ -379,6 +316,7 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
           .name = "Stitched Collections",
           .soundBanks = instruments,
           .samplePools = samples,
+          .instrumentSelections = synthInstruments,
           .filterSamplesToReferencedInstruments = request.exportOnlyUsedInstruments,
           .midiModulationUsage = &modulationUsage,
           .modulationScaling = request.modulationScaling,

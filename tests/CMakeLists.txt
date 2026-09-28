@@ -28,6 +28,7 @@ add_value_test(vgmtrans-value-core-tests
   core/ValueCollectionStitchTests.cpp
   core/ValueCompilerCursorTests.cpp
   core/ValueInstrumentVariantTests.cpp
+  core/ValueResolvedInstrumentTests.cpp
   core/ValueMidiEncodingTests.cpp
   core/ValueMidiRendererTests.cpp
   core/ValueMidiPitchTests.cpp

@@ -7,7 +7,7 @@
 #include "../TestSupport.h"
 
 #include "value/export/CollectionBinding.h"
-#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "../PerformanceTestSupport.h"
 #include "value/export/synth/SynthExportData.h"
 #include "value/extractors/PsfExtractor.h"
 #include "value/formats/SonyPS2/SonyPS2.h"
@@ -494,7 +494,7 @@ void syntheticFeatures() {
              near(std::get<FixedDurationPitchSlideTiming>(portamento->timing.physical).milliseconds, 500.0) &&
              portamento->portamentoRendering.useCurrentTiming,
          "SonyPS2 note-off should define the next note's physical portamento transition; CC84 is inert");
-  const MidiSequence midi = renderMidiSequence(*rendered.performance);
+  const MidiSequence midi = renderTestMidi(*rendered.performance);
   const auto midiNote = std::ranges::find_if(midi.tracks.front().events, [](const MidiEvent& event) {
     return std::holds_alternative<NoteDuration>(event.payload);
   });
@@ -511,7 +511,7 @@ void syntheticFeatures() {
          "SonyPS2 MIDI should lower CC10 directly without clipping the independent CC11 flow");
   expect(hasController(midi, MidiController::PortamentoControl, 60),
          "native MIDI lowering should retain SonyPS2's derived portamento source key");
-  const MidiSequence bendMidi = renderMidiSequence(
+  const MidiSequence bendMidi = renderTestMidi(
       *rendered.performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   expect(!hasController(bendMidi, MidiController::PortamentoControl, 60),
          "pitch-bend lowering should not leak MIDI portamento controls from SonyPS2 interpretation");
@@ -730,7 +730,7 @@ void realArchive(const std::filesystem::path& path) {
            "g01 channel 2 should switch between its exact +/-12 and +/-24-semitone split ranges");
     const std::array<const SoundBankAsset*, 1> soundBanks{&bound.collection->soundBanks().front()};
     const MidiSequence midi =
-        renderMidiSequence(*rendered.performance, {}, ModulationConversionPolicy::SynthModulators, soundBanks);
+        renderTestMidi(*rendered.performance, {}, ModulationConversionPolicy::SynthModulators, soundBanks);
     const auto midiBendAt = [&](u64 tick, s16 value) {
       return std::ranges::any_of(midi.tracks[2].events, [&](const MidiEvent& event) {
         const auto* message = std::get_if<MidiChannelMessage>(&event.payload);
@@ -744,7 +744,7 @@ void realArchive(const std::filesystem::path& path) {
   if (striderFalloff) {
     const std::array<const SoundBankAsset*, 1> soundBanks{&bound.collection->soundBanks().front()};
     const MidiSequence midi =
-        renderMidiSequence(*rendered.performance, {}, ModulationConversionPolicy::SynthModulators, soundBanks);
+        renderTestMidi(*rendered.performance, {}, ModulationConversionPolicy::SynthModulators, soundBanks);
     const auto expressionAt = [&](u64 tick, u16 value) {
       return std::ranges::any_of(midi.tracks[1].events, [&](const MidiEvent& event) {
         const auto* message = std::get_if<MidiChannelMessage>(&event.payload);
@@ -756,7 +756,7 @@ void realArchive(const std::filesystem::path& path) {
            "Strider channel 1 should retain the unclipped expression fade after the note at SQ offset 0x15f3");
   }
   if (streetFighterVelocity) {
-    const MidiSequence midi = renderMidiSequence(*rendered.performance);
+    const MidiSequence midi = renderTestMidi(*rendered.performance);
     const auto noteAt = [&](size_t track, u64 tick, u8 key, u8 velocity) {
       return std::ranges::any_of(midi.tracks[track].events, [&](const MidiEvent& event) {
         const auto* note = std::get_if<NoteDuration>(&event.payload);

@@ -8,7 +8,7 @@
 #include "../TestSupport.h"
 #include "ValueFormatTestSupport.h"
 
-#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "../PerformanceTestSupport.h"
 #include "value/export/synth/ModulationScaling.h"
 #include "value/formats/NDS/Nds.h"
 #include "value/formats/NDS/NdsEnvelope.h"
@@ -439,7 +439,7 @@ void ndsSequenceDecodesAndRendersNoteWaitCommands() {
   expect(performance.tracks.size() == 1 && performance.tracks[0].endTick == 30,
          "NDS note-wait should make notes advance time before the rest command");
 
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi = renderTestMidi(performance);
   expect(midi.tracks.size() == 1, "NDS SSEQ MIDI rendering should preserve one track");
   const auto& events = midi.tracks[0].events;
   const auto port = std::ranges::find_if(events, [](const MidiEvent& event) { return midiMeta(event, 33) != nullptr; });
@@ -515,7 +515,7 @@ void ndsSequenceDecodesAndRendersNoteWaitCommands() {
       .behavior = config.behavior,
       .tracks = {expressionTrack},
   };
-  const MidiSequence expressionMidi = renderMidiSequence(SequenceVm(LoopPolicy::PlayOnce).render(expressionProgram));
+  const MidiSequence expressionMidi = renderTestMidi(SequenceVm(LoopPolicy::PlayOnce).render(expressionProgram));
   expect(isMidiController(expressionMidi.tracks[0].events[1], MidiController::Expression),
          "NDS expression opcode should render as MIDI expression");
 }
@@ -701,7 +701,7 @@ void ndsSynthModulatorsUseSequenceLfoRanges() {
          "shared LFO analysis should retain the NDS sequence's physical rate and delay range");
 
   const MidiSequence midi =
-      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SynthModulators, {}, &profile);
+      renderTestMidi(performance, MidiExportOptions{}, ModulationConversionPolicy::SynthModulators, {}, &profile);
   u8 maxVibratoDepth = 0;
   u8 maxTremoloDepth = 0;
   u8 maxVibratoFrequency = 0;
@@ -797,7 +797,7 @@ void ndsSequenceRevealsRunningSineLfoAtDepthChange() {
       0xff,
   });
   const MidiSequence midi =
-      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+      renderTestMidi(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
 
   const auto bend = std::ranges::find_if(midi.tracks[0].events, [](const MidiEvent& event) {
     const auto* pitch = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
@@ -852,14 +852,14 @@ void ndsSequencePreservesPortamentoTimingIntent() {
                               }),
          "NDS format code should retain transition intent instead of emitting MIDI portamento controls");
 
-  const MidiSequence native = renderMidiSequence(performance);
+  const MidiSequence native = renderTestMidi(performance);
   expect(std::ranges::count_if(
              native.tracks[0].events,
              [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }) == 2,
          "preserve-format MIDI should lower both NDS source portamento transitions natively");
 
   const MidiSequence bent =
-      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+      renderTestMidi(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   expect(std::ranges::none_of(bent.tracks[0].events,
                               [](const MidiEvent& event) {
                                 return isMidiController(event, MidiController::PortamentoTime) ||
@@ -915,7 +915,7 @@ void ndsSequencePreservesTiedSweepVoices() {
              jump->timing.timelineTicks == 0 && jump->preferredRendering == PitchTransitionRenderingHint::PitchBend,
          "a tied NDS note without a sweep should preserve its immediate attack-free pitch change");
 
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi = renderTestMidi(performance);
   const auto noteCount = std::ranges::count_if(midi.tracks[0].events, [](const MidiEvent& event) {
     return std::holds_alternative<NoteDuration>(event.payload);
   });

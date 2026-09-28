@@ -7,6 +7,7 @@
 #pragma once
 
 #include "value/sequence/PerformanceModel.h"
+#include "value/export/midi/PerformanceMidiRenderer.h"
 
 #include <variant>
 #include <vector>
@@ -21,4 +22,24 @@ std::vector<const Event*> eventsOfType(const vgmtrans::core::PerformanceTrack& t
     }
   }
   return result;
+}
+
+// Fixture setup for tests whose subject is MIDI or format interpretation.
+// Preparation/ownership tests call the production boundary directly.
+inline vgmtrans::core::ResolvedPerformance prepareTestPerformance(
+    const vgmtrans::core::PerformanceSequence& performance,
+    std::span<const vgmtrans::core::SoundBankAsset* const> banks = {}) {
+  std::vector<vgmtrans::core::SoundBankAsset> copies;
+  for (const auto* bank : banks) copies.push_back(bank ? *bank : vgmtrans::core::SoundBankAsset{});
+  return vgmtrans::core::preparePerformance(performance, std::move(copies));
+}
+
+inline vgmtrans::core::MidiSequence renderTestMidi(
+    const vgmtrans::core::PerformanceSequence& performance, vgmtrans::core::MidiExportOptions options = {},
+    vgmtrans::core::ModulationConversionPolicy conversion = vgmtrans::core::ModulationConversionPolicy::SynthModulators,
+    std::span<const vgmtrans::core::SoundBankAsset* const> banks = {},
+    const vgmtrans::core::SequenceModulationProfile* modulation = nullptr) {
+  const auto prepared = prepareTestPerformance(performance, banks);
+  return vgmtrans::core::renderMidiSequence(prepared, vgmtrans::core::planInstrumentAddresses(prepared), options,
+                                           conversion, modulation);
 }

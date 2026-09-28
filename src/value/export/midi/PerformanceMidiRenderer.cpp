@@ -7,7 +7,6 @@
 #include "value/export/midi/PerformanceMidiRenderer.h"
 
 #include "value/base/LevelScale.h"
-#include "value/export/PerformanceInstrumentSelection.h"
 #include "value/export/PerformancePitchBendContext.h"
 #include "value/export/SequenceModulationProfile.h"
 #include "value/export/midi/PitchTransitionMidiLowering.h"
@@ -195,13 +194,13 @@ struct MidiInstrumentSelection {
 };
 
 [[nodiscard]] MidiInstrumentSelection instrumentSelection(const InstrumentSelection& selection,
-                                                          std::span<const SoundBankAsset* const> soundBanks,
+                                                          const ResolvedPerformance& performance,
+                                                          const InstrumentAddressPlan& layout,
                                                           bool forceBankSelect = false) {
-  const Instrument* instrument = findPerformanceInstrument(selection, soundBanks);
+  const Instrument* instrument = performance.instrument(selection);
   return MidiInstrumentSelection{
-      .address = instrument ? resolveInstrumentAddress(instrument->explicitAddress, instrument->identity)
-                            : resolveInstrumentAddress(selection),
-      .forceBankSelect = std::holds_alternative<InstrumentIdentity>(selection) || forceBankSelect,
+      .address = layout.address(selection),
+      .forceBankSelect = forceBankSelect,
       .pitchBendRangeCents = instrument != nullptr ? instrument->pitchBendRangeCents : std::nullopt,
   };
 }
@@ -377,8 +376,7 @@ struct VoicePitchBendRangeChange {
 // physical attack through every linked note in that sounding voice.
 [[nodiscard]] std::vector<VoicePitchBendRangeChange> planVoicePitchBendRanges(const PerformanceTimeline& timeline,
                                                                               MidiTuningRendering tuningRendering,
-                                                                              std::span<const SoundBankAsset* const>
-                                                                                  soundBanks) {
+                                                                              const ResolvedPerformance& resolved) {
   struct Voice {
     u64 startTick = 0;
     u64 startSequence = 0;
@@ -398,7 +396,7 @@ struct VoicePitchBendRangeChange {
 
   size_t nextVoice = 0;
   size_t activeVoice = voices.size();
-  PerformancePitchBendContext pitchContext{soundBanks};
+  PerformancePitchBendContext pitchContext{resolved};
   PitchBendLayers activeBendLayers;
   double activeTuningBend = 0.0;
   const auto observePitch = [&] {
@@ -420,7 +418,7 @@ struct VoicePitchBendRangeChange {
       voices[activeVoice].sourceCents = pitchContext.sourceRangeCents();
       pitchChanged = true;
     }
-    if (pitchContext.apply(*event, soundBanks)) {
+    if (pitchContext.apply(*event, resolved)) {
       pitchChanged = true;
     } else if (const auto* tuning = std::get_if<TuningPerformanceEvent>(event)) {
       activeTuningBend = tuningBendSemitones(tuning->cents, tuningRendering);
@@ -751,11 +749,13 @@ public:
 
   void render(const PerformanceTrack& lowered, const PerformanceTimeline& timeline,
               std::span<const GlobalTransposePerformanceEvent* const> globalTransposes,
-              ModulationConversionPolicy modulationConversion, std::span<const SoundBankAsset* const> soundBanks,
+              ModulationConversionPolicy modulationConversion, const ResolvedPerformance& resolved,
+              const InstrumentAddressPlan& layout,
               const SequenceModulationProfile* modulationProfile) {
-    const auto pitchBendRangeChanges = planVoicePitchBendRanges(timeline, options.tuning, soundBanks);
+    const auto pitchBendRangeChanges = planVoicePitchBendRanges(timeline, options.tuning, resolved);
     size_t nextPitchBendRangeChange = 0;
-    applyInstrumentPitchBendRange(0, instrumentSelection(InstrumentAddress{}, soundBanks).pitchBendRangeCents,
+    const auto* initialInstrument = resolved.instrument(resolved.initialInstrument());
+    applyInstrumentPitchBendRange(0, initialInstrument ? initialInstrument->pitchBendRangeCents : std::nullopt,
                                   modulationConversion);
     for (const auto* event : timeline) {
       const auto& header = performanceEventHeader(*event);
@@ -784,7 +784,7 @@ public:
         flushSimulatedTremolo(otherFlushTick, modulationConversion);
       }
       flushSimulatedPan(otherFlushTick);
-      addMidiEvent(*event, lowered.sourceTrackNumber, globalTransposes, modulationConversion, soundBanks,
+      addMidiEvent(*event, lowered.sourceTrackNumber, globalTransposes, modulationConversion, resolved, layout,
                    modulationProfile);
     }
     flushSimulatedVibrato(lowered.endTick);
@@ -805,9 +805,6 @@ private:
   std::vector<RenderVoice> voices;
   std::optional<size_t> lastVoice;
   bool hasNote = false;
-  // Source selection belongs to the next attack; MIDI may temporarily select
-  // an older voice's preset for a native-portamento fragment.
-  InstrumentSelection selectedInstrument;
   // MIDI starts in bank/program zero.
   u16 midiBank = 0;
   u8 midiProgram = 0;
@@ -1331,7 +1328,8 @@ private:
 
   void addMidiEvent(const PerformanceEvent& event, u32 sourceTrackNumber,
                     std::span<const GlobalTransposePerformanceEvent* const> globalTransposes,
-                    ModulationConversionPolicy modulationConversion, std::span<const SoundBankAsset* const> soundBanks,
+                    ModulationConversionPolicy modulationConversion, const ResolvedPerformance& resolved,
+                    const InstrumentAddressPlan& layout,
                     const SequenceModulationProfile* modulationProfile) {
     const bool forceControllers = !performanceEventHeader(event).automation;
     std::visit(
@@ -1344,11 +1342,8 @@ private:
               return;
             }
             if (!typedEvent.extendsPrevious) {
-              const auto selection = typedEvent.instrumentAddress ? InstrumentSelection{*typedEvent.instrumentAddress}
-                                                                  : selectedInstrument;
-              auto resolved = instrumentSelection(selection, soundBanks);
-              resolved.forceBankSelect = false;
-              applyInstrumentSelection(typedEvent.header.tick, resolved, modulationConversion, false);
+              auto selection = instrumentSelection(*typedEvent.instrument, resolved, layout);
+              applyInstrumentSelection(typedEvent.header.tick, selection, modulationConversion, false);
             }
             const u8 key = midiKey(typedEvent.key + globalTransposeAt(globalTransposes, typedEvent.header.tick));
             if (shouldRestartSimulatedVibratoForNote(typedEvent)) {
@@ -1389,8 +1384,8 @@ private:
             // Standard MIDI treats time signatures as global metadata. They are collected
             // once and written to the first MIDI track by renderMidiSequence.
           } else if constexpr (std::is_same_v<TypedEvent, InstrumentPerformanceEvent>) {
-            selectedInstrument = typedEvent.instrument;
-            const auto selection = instrumentSelection(typedEvent.instrument, soundBanks, typedEvent.forceBankSelect);
+            const auto selection = instrumentSelection(typedEvent.instrument, resolved, layout,
+                                                       typedEvent.forceBankSelect);
             applyInstrumentSelection(typedEvent.header.tick, selection, modulationConversion, true);
           } else if constexpr (std::is_same_v<TypedEvent, LevelPerformanceEvent>) {
             sourceLevelGain = typedEvent.linearGain;
@@ -1584,10 +1579,15 @@ private:
 
 }  // namespace
 
-MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExportOptions options,
-                                ModulationConversionPolicy modulationConversion,
-                                std::span<const SoundBankAsset* const> soundBanks,
+MidiSequence renderMidiSequence(const ResolvedPerformance& resolved, const InstrumentAddressPlan& layout,
+                                MidiExportOptions options, ModulationConversionPolicy modulationConversion,
                                 const SequenceModulationProfile* modulationProfile) {
+  const auto& performance = resolved.performance();
+  if (!layout.valid) {
+    MidiSequence failed{.diagnostics = performance.diagnostics};
+    failed.diagnostics.insert(failed.diagnostics.end(), layout.diagnostics.begin(), layout.diagnostics.end());
+    return failed;
+  }
   std::optional<SequenceModulationProfile> derivedModulationProfile;
   if (modulationProfile == nullptr) {
     derivedModulationProfile = analyzeSequenceModulation(performance);
@@ -1596,8 +1596,8 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
 
   const PerformanceTempoMap globalTempos{performance};
   const std::vector<PerformanceTempoMap::Point> globalTempoPoints = globalTempos.points();
-  const PerformanceSequence loweredPerformance =
-      lowerMidiPerformanceAutomation(performance, options, globalTempos, soundBanks);
+  const auto lowered = lowerMidiPerformanceAutomation(resolved, options, globalTempos);
+  const auto& loweredPerformance = lowered.performance();
   MidiSequence sequence{
       .timebase = loweredPerformance.timebase,
       .diagnostics = loweredPerformance.diagnostics,
@@ -1626,7 +1626,7 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
     if (options.writePortMetaEvents) {
       midiTrack.events.push_back(midi::meta(0, 0x21, {midiPortByte(assignment.port)}, -5));
     }
-    renderer.render(performanceTrack, timelines[trackIndex], globalTransposes, modulationConversion, soundBanks,
+    renderer.render(performanceTrack, timelines[trackIndex], globalTransposes, modulationConversion, resolved, layout,
                     modulationProfile);
     u64 endTick = performanceTrack.endTick;
     if (trackIndex == 0) {

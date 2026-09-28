@@ -99,9 +99,10 @@ void appendWavArtifacts(std::vector<Artifact>& artifacts, std::string_view baseN
   }
 }
 
-[[nodiscard]] std::vector<Artifact> exportWav(const BoundCollection& collection, const SourceStore& sources) {
+[[nodiscard]] std::vector<Artifact> exportWav(const CollectionWorkspace& workspace, const SourceStore& sources) {
   std::vector<Artifact> artifacts;
-  for (const auto& bank : collection.soundBanks()) {
+  const auto& collection = workspace.collection;
+  for (const auto& bank : workspace.soundBanks()) {
     appendWavArtifacts(artifacts, collection.baseName(), bank.localSamples, sources);
   }
   for (const auto* samplePool : collection.samplePools()) {
@@ -157,8 +158,9 @@ Artifact exportStandaloneSequenceMidi(const SessionSnapshot& snapshot, AssetId s
   const auto rendering = renderSequence(*sequence, request);
   std::optional<MidiSequence> midi;
   if (rendering.performance) {
-    midi = renderMidiSequence(*rendering.performance, request.midi, ModulationConversionPolicy::SequenceEventSimulation,
-                              {}, &rendering.modulation);
+    const auto prepared = preparePerformance(*rendering.performance);
+    midi = renderMidiSequence(prepared, planInstrumentAddresses(prepared), request.midi,
+                              ModulationConversionPolicy::SequenceEventSimulation, &rendering.modulation);
   }
   return exportMidi(artifactBaseName(sequence->metadata, "sequence"), rendering, midi);
 }
@@ -320,26 +322,32 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
     }
   }
 
-  workspace.render(request.sequence, request.dynamicEnvelopes, /*materializeSignedStereo=*/true);
+  workspace.render(request.sequence, request.dynamicEnvelopes, /*materializeSignedStereo=*/true,
+                   request.modulationConversion);
   const auto instruments = workspace.soundBankView();
   std::optional<MidiSequence> midi;
-  if (const auto* performance = workspace.performance()) {
-    midi = renderMidiSequence(*performance, request.sequence.midi, request.modulationConversion, instruments,
-                              &workspace.rendering.modulation);
+  InstrumentAddressPlan layout;
+  std::vector<SynthInstrumentSelection> synthInstruments;
+  if (workspace.exportPerformance) {
+    layout = planInstrumentAddresses(*workspace.exportPerformance);
+    midi = renderMidiSequence(*workspace.exportPerformance, layout, request.sequence.midi,
+                             request.modulationConversion, &workspace.rendering.modulation);
+    synthInstruments = selectSynthInstruments(*workspace.exportPerformance, layout);
   }
   const auto synthConversion = midi ? request.modulationConversion : ModulationConversionPolicy::SynthModulators;
-  workspace.prepareModulation(synthConversion, ModulationScalingPolicy::FullFormatRange);
-  auto soundFont = buildSoundFont2(
+  auto soundFont = !layout.valid ? SynthExportResult{} : buildSoundFont2(
       SynthExportInput{
           .name = bound.baseName(),
           .soundBanks = instruments,
           .samplePools = bound.samplePools(),
+          .instrumentSelections = workspace.exportPerformance
+              ? std::optional<std::span<const SynthInstrumentSelection>>{synthInstruments} : std::nullopt,
           .modulationConversion = synthConversion,
           .sampleFiltering = request.sampleFiltering,
       },
       sources);
 
-  if (midi) {
+  if (midi && layout.valid) {
     playback.midi = encodeMidiFile(*midi);
   }
   playback.soundFont = std::move(soundFont.bytes);
@@ -381,36 +389,59 @@ std::vector<Artifact> exportCollectionImpl(const SessionSnapshot& snapshot, cons
       request.exportOnlyUsedInstruments;
   const bool needsRendering = exportsMidi || (exportsSynth && (bound.hasSequence() || synthRequiresPerformance));
 
+  auto synthConversion = exportsMidi ? request.modulationConversion : ModulationConversionPolicy::SynthModulators;
   if (needsRendering) {
-    workspace.render(request.sequence, request.dynamicEnvelopes,
-                     /*materializeSignedStereo=*/exportsMidi && exportsSynth);
+    workspace.render(request.sequence, exportsSynth ? request.dynamicEnvelopes : DynamicEnvelopePolicy::Ignore,
+                     /*materializeSignedStereo=*/exportsMidi && exportsSynth, synthConversion, request.modulationScaling);
   }
   const auto& rendering = workspace.rendering;
+  if (!workspace.exportPerformance) synthConversion = ModulationConversionPolicy::SynthModulators;
+  if (exportsMidi && !exportsSynth && request.dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants &&
+      rendering.performance && std::ranges::any_of(rendering.performance->tracks, [](const PerformanceTrack& track) {
+        return std::ranges::any_of(track.events, [](const PerformanceEvent& event) {
+          return std::holds_alternative<EnvelopePerformanceEvent>(event);
+        });
+      })) {
+    workspace.diagnostics.push_back({
+        .severity = Severity::Warning,
+        .code = "dynamic-envelope-no-companion",
+        .message = "Dynamic envelope variants require a companion SF2 or DLS export; MIDI uses the original instruments",
+    });
+  }
   const PerformanceSequence* preparedPerformance = workspace.performance();
   auto instruments = workspace.soundBankView();
-  ModulationConversionPolicy synthConversion = request.modulationConversion;
-  // Sequence-event simulation replaces native synth modulation only when a
-  // companion MIDI artifact was requested and could actually be rendered.
-  if (synthConversion == ModulationConversionPolicy::SequenceEventSimulation &&
-      (!exportsMidi || !preparedPerformance)) {
-    synthConversion = ModulationConversionPolicy::SynthModulators;
+  InstrumentAddressPlan layout;
+  std::vector<SynthInstrumentSelection> synthInstruments;
+  if (workspace.exportPerformance) {
+    layout = planInstrumentAddresses(*workspace.exportPerformance, request.exportOnlyUsedInstruments);
+    synthInstruments = selectSynthInstruments(*workspace.exportPerformance, layout, request.exportOnlyUsedInstruments);
   }
-
-  if (exportsMidi || exportsSynth) {
-    workspace.prepareModulation(synthConversion, request.modulationScaling);
-  }
-
   std::optional<MidiSequence> loweredMidi;
-  if (exportsMidi && preparedPerformance) {
-    loweredMidi = renderMidiSequence(*preparedPerformance, request.sequence.midi, request.modulationConversion,
-                                     instruments, &rendering.modulation);
+  if (!layout.valid) {
+    const auto& diagnostics = workspace.exportPerformance->performance().diagnostics;
+    workspace.diagnostics.insert(workspace.diagnostics.end(), diagnostics.begin(), diagnostics.end());
+    workspace.diagnostics.insert(workspace.diagnostics.end(), layout.diagnostics.begin(), layout.diagnostics.end());
+  }
+  if (exportsMidi && workspace.exportPerformance && layout.valid) {
+    loweredMidi = renderMidiSequence(*workspace.exportPerformance, layout, request.sequence.midi,
+                                    request.modulationConversion, &rendering.modulation);
     applyMidiModulationScaling(*loweredMidi, workspace.modulationUsage, request.modulationScaling);
   }
   if (selectedSoundBank) {
     std::erase_if(instruments, [&](const SoundBankAsset* bank) { return bank->metadata.id != *selectedSoundBank; });
+    std::erase_if(synthInstruments, [&](const SynthInstrumentSelection& selected) {
+      return std::ranges::none_of(instruments, [&](const SoundBankAsset* bank) {
+        return std::ranges::any_of(bank->instruments, [&](const Instrument& instrument) {
+          return &instrument == selected.instrument;
+        });
+      });
+    });
   }
 
   const auto writeSynth = [&](SynthExportFormat format) {
+    if (!layout.valid) {
+      return synthArtifact(bound.baseName(), format, SynthExportResult{});
+    }
     if (synthRequiresPerformance && preparedPerformance == nullptr) {
       return synthArtifact(bound.baseName(), format, SynthExportResult{.diagnostics = rendering.diagnostics});
     }
@@ -420,18 +451,18 @@ std::vector<Artifact> exportCollectionImpl(const SessionSnapshot& snapshot, cons
             .name = bound.baseName(),
             .soundBanks = instruments,
             .samplePools = bound.samplePools(),
-            .sequenceUsage = request.exportOnlyUsedInstruments ? preparedPerformance : nullptr,
-            .filterSamplesToReferencedInstruments = selectedSoundBank.has_value(),
+            .instrumentSelections = workspace.exportPerformance
+                ? std::optional<std::span<const SynthInstrumentSelection>>{synthInstruments} : std::nullopt,
+            .filterSamplesToReferencedInstruments = request.exportOnlyUsedInstruments || selectedSoundBank.has_value(),
             .midiModulationUsage = &workspace.modulationUsage,
             .modulationScaling = request.modulationScaling,
             .modulationConversion = synthConversion,
             .sampleFiltering = request.sampleFiltering,
         },
         format, sources);
-    if (!rendering.performance) {
-      artifact.diagnostics.insert(artifact.diagnostics.begin(), rendering.diagnostics.begin(),
-                                  rendering.diagnostics.end());
-    }
+    const auto& diagnostics = workspace.exportPerformance ? workspace.exportPerformance->performance().diagnostics
+                                                         : rendering.diagnostics;
+    artifact.diagnostics.insert(artifact.diagnostics.begin(), diagnostics.begin(), diagnostics.end());
     return artifact;
   };
 
@@ -443,7 +474,7 @@ std::vector<Artifact> exportCollectionImpl(const SessionSnapshot& snapshot, cons
         artifacts.push_back(exportMidi(bound.baseName(), rendering, loweredMidi));
         break;
       case ExportKind::Wav: {
-        auto wavArtifacts = exportWav(bound, sources);
+        auto wavArtifacts = exportWav(workspace, sources);
         artifacts.insert(artifacts.end(), std::make_move_iterator(wavArtifacts.begin()),
                          std::make_move_iterator(wavArtifacts.end()));
         break;

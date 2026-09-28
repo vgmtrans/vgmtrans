@@ -8,7 +8,7 @@
 #include "../TestSupport.h"
 
 #include "value/export/midi/MidiExporter.h"
-#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "../PerformanceTestSupport.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
@@ -67,7 +67,7 @@ void performanceMidiRendererTrustsSourceNoteExtensions() {
       }},
   };
 
-  const MidiSequence midiSequence = renderMidiSequence(performance);
+  const MidiSequence midiSequence = renderTestMidi(performance);
   expect(midiSequence.tracks.size() == 1, "performance renderer should preserve tracks");
   const auto& events = midiSequence.tracks[0].events;
   expect(midiPort(events[0]).has_value(), "performance renderer should mark each track's MIDI port");
@@ -99,7 +99,7 @@ void performanceMidiRendererKeepsPhysicalLimitsAcrossPortamentoFragments() {
         out.at(slideTick).pitchSlide(held, 60, 64, 8);
         out.at(40).note(67, 1.0, 4);
         const PerformanceSequence performance{.timebase = {.ppqn = 10}, .tracks = {track}};
-        const auto midi = renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = mode});
+        const auto midi = renderTestMidi(performance, MidiExportOptions{.pitchTransitions = mode});
         const auto notes = midiNotes(midi.tracks[0].events);
         // At 50 ms/tick through tick 8, then 100 ms/tick, the timer expires at 14.
         const u64 stopTick = limitMilliseconds == 0.0 ? 0 : 14;
@@ -147,7 +147,7 @@ void performanceMidiRendererKeepsPhysicalLimitsAcrossVoiceContinuations() {
           out.at(4).pitchSlide(next, laterLimit ? 62 : 60, 64, 8).continueFrom(held).portamentoOverlap(24);
         }
         out.at(8).tempo(1000000);
-        const auto midi = renderMidiSequence(PerformanceSequence{.timebase = {.ppqn = 10}, .tracks = {track}},
+        const auto midi = renderTestMidi(PerformanceSequence{.timebase = {.ppqn = 10}, .tracks = {track}},
                                              MidiExportOptions{.pitchTransitions = mode});
         const auto notes = midiNotes(midi.tracks[0].events);
         const u64 stopTick = laterLimit ? 16 : 14;
@@ -184,7 +184,7 @@ void performanceMidiRendererLimitsOnlyTheOwningVoice() {
         } else {
           out.at(10).pitchSlide(held, 60, 64, 10);
         }
-        const auto midi = renderMidiSequence(PerformanceSequence{.timebase = {.ppqn = 100}, .tracks = {track}},
+        const auto midi = renderTestMidi(PerformanceSequence{.timebase = {.ppqn = 100}, .tracks = {track}},
                                              {.pitchTransitions = mode});
         const auto notes = midiNotes(midi.tracks[0].events);
         const bool split = mode == MidiPitchTransitionRendering::Portamento;
@@ -219,7 +219,7 @@ void performanceMidiRendererSelectsTuningRepresentation() {
       }},
   };
 
-  const MidiSequence pitchBend = renderMidiSequence(performance);
+  const MidiSequence pitchBend = renderTestMidi(performance);
   std::vector<std::pair<u64, s32>> tuningBends;
   size_t tuningRpnCount = 0;
   for (const auto& rpn : midiRpns(pitchBend.tracks.front().events)) {
@@ -238,7 +238,7 @@ void performanceMidiRendererSelectsTuningRepresentation() {
 
   MidiExportOptions coarseOptions;
   coarseOptions.tuning = MidiTuningRendering::CoarseAndFineTune;
-  const MidiSequence coarse = renderMidiSequence(performance, coarseOptions);
+  const MidiSequence coarse = renderTestMidi(performance, coarseOptions);
   std::vector<u16> coarseTuning;
   std::vector<u16> coarseFine;
   std::vector<std::pair<u64, s32>> coarseBends;
@@ -296,7 +296,7 @@ void performanceMidiRendererWritesTimeSignaturesToFirstTrack() {
           },
   };
 
-  const MidiSequence midiSequence = renderMidiSequence(performance);
+  const MidiSequence midiSequence = renderTestMidi(performance);
   expect(midiSequence.tracks.size() == 2, "performance renderer should preserve source track count");
 
   const auto& firstTrackEvents = midiSequence.tracks[0].events;
@@ -339,7 +339,7 @@ void performanceMidiRendererUsesGlobalExecutionOrderForTransposeAndMeter() {
                                      }},
             },
     };
-    const auto midi = renderMidiSequence(performance);
+    const auto midi = renderTestMidi(performance);
     const auto notes = midiNotes(midi.tracks[0].events);
     expect(notes.size() == 1 && notes[0].key == (otherSequence == 1 ? 65 : 57),
            "global transposition must follow execution order, preserving track order only for equal sequence values");
@@ -384,7 +384,7 @@ void performanceMidiRendererWritesPanGainResetWhenRequested() {
       }},
   };
 
-  const MidiSequence midiSequence = renderMidiSequence(performance);
+  const MidiSequence midiSequence = renderTestMidi(performance);
   const auto& events = midiSequence.tracks[0].events;
   expect(midiController(events[1], MidiController::Pan)->value == 0 &&
              midiController(events[2], MidiController::ChannelVolume)->value == 76,
@@ -445,7 +445,7 @@ void performanceMidiRendererKeepsPanGainOutOfExpression() {
   };
 
   const auto controllerValues = [&](ModulationConversionPolicy policy, MidiController controller) {
-    const MidiSequence midi = renderMidiSequence(performance, MidiExportOptions{}, policy);
+    const MidiSequence midi = renderTestMidi(performance, MidiExportOptions{}, policy);
     std::vector<u8> values;
     for (const MidiEvent& event : midi.tracks[0].events) {
       if (const auto* message = midiController(event, controller)) {
@@ -467,7 +467,7 @@ void performanceMidiRendererKeepsPanGainOutOfExpression() {
   PerformanceSequence precisePerformance = performance;
   std::get<ExpressionPerformanceEvent>(precisePerformance.tracks[0].events[0]).sourceQuantization =
       ValueQuantization{.levels = 256};
-  const MidiSequence preciseMidi = renderMidiSequence(precisePerformance);
+  const MidiSequence preciseMidi = renderTestMidi(precisePerformance);
   expect(
       std::count_if(preciseMidi.tracks[0].events.begin(), preciseMidi.tracks[0].events.end(),
                     [](const MidiEvent& event) { return isMidiControllerLsb(event, MidiController::Expression); }) == 1,
@@ -502,7 +502,7 @@ void performanceMidiRendererLowersDeclaredPanLaws() {
           },
   };
 
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi = renderTestMidi(performance);
   expect(
       std::ranges::none_of(midi.tracks[0].events,
                            [](const MidiEvent& event) { return isMidiController(event, MidiController::Expression); }),
@@ -555,7 +555,7 @@ void performanceMidiRendererRetainsPanLawDuringLfoSimulation() {
   };
 
   const MidiSequence midi =
-      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+      renderTestMidi(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
   const auto& events = midi.tracks[0].events;
   expect(std::ranges::any_of(events,
                              [](const MidiEvent& event) {
@@ -608,7 +608,7 @@ void performanceMidiRendererHonorsMidiExportOptions() {
     });
   }
 
-  const MidiSequence autoMidi = renderMidiSequence(performance);
+  const MidiSequence autoMidi = renderTestMidi(performance);
   expect(*midiPort(autoMidi.tracks[0].events[0]) == 0,
          "MIDI renderer should emit port zero for the first channel group");
   expect(midiBankSelect(autoMidi.tracks[0].events[1])->bank == 130 &&
@@ -625,7 +625,7 @@ void performanceMidiRendererHonorsMidiExportOptions() {
          "MIDI renderer should move skipped-channel overflow to the next MIDI port");
 
   const MidiSequence forcedMidi =
-      renderMidiSequence(performance, MidiExportOptions{
+      renderTestMidi(performance, MidiExportOptions{
                                           .volumeResolution = MidiLevelResolution::SevenBit,
                                           .expressionResolution = MidiLevelResolution::SevenBit,
                                           .skipChannel10 = false,
@@ -676,7 +676,7 @@ void performanceMidiRendererCanTerminatePreviousVoices() {
       }},
   };
 
-  const MidiSequence plain = renderMidiSequence(performance);
+  const MidiSequence plain = renderTestMidi(performance);
   expect(
       std::ranges::none_of(plain.tracks[0].events,
                            [](const MidiEvent& event) { return isMidiController(event, MidiController::AllSoundOff); }),
@@ -684,7 +684,7 @@ void performanceMidiRendererCanTerminatePreviousVoices() {
 
   MidiExportOptions options;
   options.terminatePreviousVoice = true;
-  const MidiSequence terminated = renderMidiSequence(performance, options);
+  const MidiSequence terminated = renderTestMidi(performance, options);
   const auto isSoundOff = [](const MidiEvent& event) { return isMidiController(event, MidiController::AllSoundOff); };
   const auto soundOff = std::ranges::find_if(terminated.tracks[0].events, isSoundOff);
   const auto attackBend = std::ranges::find_if(terminated.tracks[0].events, [](const MidiEvent& event) {
@@ -753,7 +753,7 @@ void performanceMidiRendererLowersStructuredScalarAutomationPoints() {
       }},
   };
 
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi = renderTestMidi(performance);
   const auto& events = midi.tracks.front().events;
   const auto firstVolume = std::ranges::find_if(events, [](const MidiEvent& event) {
     const auto* volume = midiController(event, MidiController::ChannelVolume);
@@ -778,7 +778,7 @@ void performanceMidiRendererLowersStructuredScalarAutomationPoints() {
     std::visit([](auto& typed) { typed.header.automation.reset(); }, event);
   }
   flatTrack.automations.clear();
-  const MidiSequence flatMidi = renderMidiSequence(flatPerformance);
+  const MidiSequence flatMidi = renderTestMidi(flatPerformance);
   expect(encodeMidiFile(midi) == encodeMidiFile(flatMidi),
          "structured scalar automation should lower identically to the same exact flat performance points");
 }
@@ -809,7 +809,7 @@ void performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates() 
       out.pan(1.0);
     }
     PerformanceSequence performance{.timebase = {.ppqn = 48}, .tracks = {track}};
-    const auto midi = renderMidiSequence(performance);
+    const auto midi = renderTestMidi(performance);
     for (const auto controller : {MidiController::ChannelVolume, MidiController::Expression, MidiController::Pan}) {
       expect(std::ranges::count_if(midi.tracks[0].events,
                                    [=](const MidiEvent& event) { return isMidiController(event, controller); }) ==
@@ -822,7 +822,7 @@ void performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates() 
       std::visit([](auto& typed) { typed.header.automation.reset(); }, event);
     }
     flatTrack.automations.clear();
-    const auto flatMidi = renderMidiSequence(performance);
+    const auto flatMidi = renderTestMidi(performance);
     if (interveningWrites) {
       expect(encodeMidiFile(midi) == encodeMidiFile(flatMidi),
              "interleaved automation and source writes must preserve the exact controller sequence");
@@ -848,7 +848,7 @@ void performanceMidiRendererSuppressesRedundantReverbSends() {
               }}},
   };
 
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi = renderTestMidi(performance);
   const auto& events = midi.tracks[0].events;
   expect(std::ranges::count_if(
              events, [](const MidiEvent& event) { return isMidiController(event, MidiController::Reverb); }) == 2,

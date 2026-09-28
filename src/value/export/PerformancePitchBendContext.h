@@ -6,12 +6,10 @@
 
 #pragma once
 
-#include "value/export/PerformanceInstrumentSelection.h"
-#include "value/sequence/PerformanceModel.h"
+#include "value/export/ResolvedPerformance.h"
 
 #include <algorithm>
 #include <optional>
-#include <span>
 
 namespace vgmtrans::core {
 
@@ -19,22 +17,21 @@ namespace vgmtrans::core {
 // Consumers may follow events chronologically or retain snapshots for later queries.
 class PerformancePitchBendContext {
  public:
-  explicit PerformancePitchBendContext(
-      std::span<const SoundBankAsset* const> soundBanks = {}) noexcept {
-    selectInstrument(InstrumentAddress{}, soundBanks);
+  PerformancePitchBendContext() = default;
+  explicit PerformancePitchBendContext(const ResolvedPerformance& performance) {
+    selectInstrument(performance.initialInstrument(), performance);
   }
 
   // Returns true only when the effective pitch context changes.
-  [[nodiscard]] bool apply(const PerformanceEvent& event,
-                           std::span<const SoundBankAsset* const> soundBanks) noexcept {
+  [[nodiscard]] bool apply(const PerformanceEvent& event, const ResolvedPerformance& performance) {
     const auto previous = *this;
     if (const auto* range = std::get_if<PitchBendRangePerformanceEvent>(&event)) {
       sourceRangeCents_ = range->cents;
     } else if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event)) {
-      selectInstrument(selection->instrument, soundBanks);
+      selectInstrument(selection->instrument, performance);
     } else if (const auto* note = std::get_if<NotePerformanceEvent>(&event);
-               note != nullptr && !note->extendsPrevious && note->instrumentAddress) {
-      selectInstrument(*note->instrumentAddress, soundBanks);
+               note != nullptr && !note->extendsPrevious && note->instrument) {
+      selectInstrument(*note->instrument, performance);
     }
     return *this != previous;
   }
@@ -54,9 +51,8 @@ class PerformancePitchBendContext {
   friend bool operator==(const PerformancePitchBendContext&, const PerformancePitchBendContext&) noexcept = default;
 
  private:
-  void selectInstrument(const InstrumentSelection& selection,
-                        std::span<const SoundBankAsset* const> soundBanks) noexcept {
-    const auto* instrument = findPerformanceInstrument(selection, soundBanks);
+  void selectInstrument(const InstrumentSelection& selection, const ResolvedPerformance& performance) {
+    const auto* instrument = performance.instrument(selection);
     instrumentRangeCents_ = instrument == nullptr ? std::nullopt : instrument->pitchBendRangeCents;
   }
 

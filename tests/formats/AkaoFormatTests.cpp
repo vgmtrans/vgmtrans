@@ -10,7 +10,7 @@
 #include "value/export/SequenceModulationProfile.h"
 #include "ValueFormatTestSupport.h"
 
-#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "../PerformanceTestSupport.h"
 #include "value/formats/Akao/Akao.h"
 #include "value/scan/AssetResolution.h"
 #include "value/sequence/SequenceVm.h"
@@ -267,7 +267,7 @@ void akaoPointerInstrumentsSelectTheirExportedPrograms() {
     };
     const auto performance = SequenceVm().render(program);
     const std::array<const SoundBankAsset*, 1> banks{&bank};
-    const auto midi = renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, banks);
+    const auto midi = renderTestMidi(performance, {}, ModulationConversionPolicy::SynthModulators, banks);
     std::vector<u8> programs;
     u16 selectedBank = 0;
     size_t notes = 0;
@@ -508,7 +508,7 @@ void akaoTieAfterRestDoesNotExtendPreviousNote() {
     return std::holds_alternative<NotePerformanceEvent>(event);
   });
   expect(noteCount == 2, "0x83 must sound a note, and a tie after a rest must not extend it");
-  const auto notes = midiNotes(renderMidiSequence(performance).tracks[0].events);
+  const auto notes = midiNotes(renderTestMidi(performance).tracks[0].events);
   expect(notes.size() == 1 && notes[0].key == 59, "0x83 must export as B, not a tie");
 }
 
@@ -534,7 +534,7 @@ void ff7SlurChangesPitchWithoutAnotherAttack() {
   }
   for (auto modulation : {ModulationConversionPolicy::SynthModulators,
                           ModulationConversionPolicy::SequenceEventSimulation}) {
-    const auto midi = renderMidiSequence(performance, {}, modulation);
+    const auto midi = renderTestMidi(performance, {}, modulation);
     const auto attacks = midiNotes(midi.tracks[0].events);
     expect(attacks.size() == 4 && attacks[0].key == 59 && attacks[0].duration == 34,
            "FF7 slurs should export and preview as one sustained attack spanning the three source notes");
@@ -552,7 +552,7 @@ void ff7SlurBoundariesRespectRestsTiesLegatoAndRepeats() {
   const auto check = [](std::string_view name, std::vector<u8> bytes, std::vector<u32> expected) {
     const auto performance = renderAkaoFixture(bytes);
     std::vector<u32> durations;
-    for (const auto& note : midiNotes(renderMidiSequence(performance).tracks[0].events)) {
+    for (const auto& note : midiNotes(renderTestMidi(performance).tracks[0].events)) {
       durations.push_back(note.duration);
     }
     expect(durations == expected, name);
@@ -581,7 +581,7 @@ void ff7PortamentoEnablesSlurAndStartsWithAFreshAttack(u8 boundary) {
   expect(finalPitch && finalPitch->previousNote && finalPitch->startKey == 49 && finalPitch->targetKey == 50 &&
              finalPitch->timing.timelineTicks == 0,
          "FF7 DB/CB lookahead must make the preceding note's pitch change immediate");
-  const auto notes = midiNotes(renderMidiSequence(performance).tracks[0].events);
+  const auto notes = midiNotes(renderTestMidi(performance).tracks[0].events);
   expect(notes.size() == 3 && notes[1].key == 48 && notes[1].duration == 46 && notes[2].key == 51,
          "FF7 DB/CB must end portamento and restore a fresh attack");
 }
@@ -609,7 +609,7 @@ void ff7ExpressionFadesRetargetAndCancel() {
 
 void ff7ReverbSwitchesAndResetReachMidi() {
   const std::vector<u8> commands{0xc2, 0x08, 0xc3, 0x08, 0xc2, 0x08, 0xcb, 0x08, 0xa0};
-  const auto midi = renderMidiSequence(renderAkaoFixture(commands));
+  const auto midi = renderTestMidi(renderAkaoFixture(commands));
   std::vector<std::pair<u64, int>> sends;
   for (const auto& event : midi.tracks[0].events) {
     if (const auto* cc = midiController(event, MidiController::Reverb)) sends.emplace_back(event.tick, cc->value);
@@ -802,7 +802,7 @@ void akaoPitchSlideAppliesOnceToTheNextNote() {
              transition->preferredRendering == PitchTransitionRenderingHint::PitchBend,
          "Akao A4 should retain its upward semitone depth, tick duration, and pitch-bend intent");
 
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi = renderTestMidi(performance);
   expect(std::ranges::count_if(
              midi.tracks[0].events,
              [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event.payload); }) == 2 &&
@@ -859,7 +859,7 @@ void akaoPortamentoRetainsPitchTransitionIntent() {
                               }),
          "Akao format code should not preselect a MIDI portamento representation");
 
-  const MidiSequence native = renderMidiSequence(
+  const MidiSequence native = renderTestMidi(
       performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PreserveFormat});
   expect(std::ranges::any_of(native.tracks[0].events,
                              [](const MidiEvent& event) {
@@ -869,7 +869,7 @@ void akaoPortamentoRetainsPitchTransitionIntent() {
          "preserve-format MIDI should lower Akao portamento with its explicit source key");
 
   const MidiSequence pitchBend =
-      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+      renderTestMidi(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   expect(std::ranges::none_of(pitchBend.tracks[0].events,
                               [](const MidiEvent& event) {
                                 return isMidiController(event, MidiController::PortamentoTime) ||

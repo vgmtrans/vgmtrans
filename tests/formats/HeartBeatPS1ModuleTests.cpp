@@ -8,7 +8,6 @@
 #include "../PerformanceTestSupport.h"
 #include "../TestSupport.h"
 
-#include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/formats/HeartBeatPS1/HeartBeatPS1.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
@@ -169,7 +168,7 @@ void sequenceModelsAuditedDriverFeatures() {
   };
   const std::array<const SoundBankAsset*, 1> soundBanks{&soundBank};
   const MidiSequence midi =
-      renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, soundBanks);
+      renderTestMidi(performance, {}, ModulationConversionPolicy::SynthModulators, soundBanks);
   expect(std::ranges::any_of(midi.tracks.front().events,
                              [](const MidiEvent& event) {
                                const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);

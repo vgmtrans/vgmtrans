@@ -7,7 +7,7 @@
 #include "../MidiTestSupport.h"
 #include "../TestSupport.h"
 
-#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "../PerformanceTestSupport.h"
 #include "value/formats/SculptSoftSnes/SculptSoftSnes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
@@ -148,7 +148,7 @@ void midiPreservesSampleTuningAndFinePitch() {
   auto data = fixture();
   word(data, 0x6000, 7);  // Sample tuning: +35 cents, before the hardware lookup.
   bytes(data, 0x4100, {0xf2, 100, 0xf7, 0xc0, 3, 2, 0x88, 2, 0xf0});
-  const auto midi = renderMidiSequence(render(data));
+  const auto midi = renderTestMidi(render(data));
   const auto& track = midi.tracks.front();
   const auto notes = midiNotes(track.events);
   expect(notes.size() == 1, "fine-pitch commands must bend the existing MIDI note");
@@ -186,7 +186,7 @@ void semitoneAttacksKeepOneTuningBend() {
           bytes(data, 0x4102 + 4 * i, {0xf7, static_cast<u8>(pitch), static_cast<u8>(pitch >> 8), 1});
         }
         data[0x4192] = 0xf0;
-        const auto midi = renderMidiSequence(render(data));
+        const auto midi = renderTestMidi(render(data));
         const auto& track = midi.tracks.front();
         const auto notes = midiNotes(track.events);
         expect(notes.size() == 36, "semitone runs must preserve every attack");

@@ -9,7 +9,6 @@
 #include "../TestSupport.h"
 #include "ValueFormatTestSupport.h"
 
-#include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/formats/AkaoSnes/AkaoSnes.h"
 #include "value/formats/AkaoSnes/AkaoSnesV4Lfo.h"
 #include "value/formats/ValueFormats.h"
@@ -689,7 +688,7 @@ void akaoSnesV3VibratoPreservesSquareWaveModesAndSteppedAttack() {
            "AkaoSnes V3 vibrato rate should use rate plus one driver frames per held state");
 
     const MidiSequence midi =
-        renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+        renderTestMidi(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
     const auto bends = bendValues(midi);
     const bool hasNegative = std::ranges::any_of(bends, [](const auto& bend) { return bend.second < -3000; });
     const bool hasPositive = std::ranges::any_of(bends, [](const auto& bend) { return bend.second > 3000; });
@@ -716,7 +715,7 @@ void akaoSnesV3VibratoPreservesSquareWaveModesAndSteppedAttack() {
          "AkaoSnes V3 should not replace its held depth stages with a linear sequence-tick fade");
 
   const MidiSequence delayedMidi =
-      renderMidiSequence(delayed, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+      renderTestMidi(delayed, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
   const auto delayedBends = bendValues(delayedMidi);
   const auto firstExcursion = std::ranges::find_if(delayedBends, [](const auto& bend) { return bend.second > 0; });
   expect(firstExcursion != delayedBends.end() && firstExcursion->first == 1 && firstExcursion->second > 800 &&
@@ -829,7 +828,7 @@ void akaoSnesV4LfosPreserveDriverFamiliesAndPackedModes() {
            "AkaoSnes V4 LFO rate should follow the selected driver's counter semantics");
 
     const MidiSequence midi =
-        renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+        renderTestMidi(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
     const bool bendsDown = std::ranges::any_of(midi.tracks.front().events, [](const MidiEvent& event) {
       const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
       return bend != nullptr && bend->value < 0;
@@ -1050,7 +1049,7 @@ void akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo() {
              slideCurve->samples.front().tickOffset == 0 && slideCurve->samples.back().tickOffset == 2,
          "a pending AkaoSnes pitch slide should attach its exact driver curve to the next sounding note");
 
-  const MidiSequence bendSlide = renderMidiSequence(slide);
+  const MidiSequence bendSlide = renderTestMidi(slide);
   expect(std::ranges::count_if(bendSlide.tracks.front().events,
                                [](const MidiEvent& event) {
                                  return isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend);
@@ -1059,7 +1058,7 @@ void akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo() {
 
   MidiExportOptions portamentoOptions;
   portamentoOptions.pitchTransitions = MidiPitchTransitionRendering::Portamento;
-  const MidiSequence portamentoSlide = renderMidiSequence(slide, portamentoOptions);
+  const MidiSequence portamentoSlide = renderTestMidi(slide, portamentoOptions);
   expect(std::ranges::any_of(
              portamentoSlide.tracks.front().events,
              [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }) &&
@@ -1184,7 +1183,7 @@ void akaoSnesV4TieExtendsShortenedPreviousNote() {
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
   expect(performance.diagnostics.empty(), "AkaoSnes V4 tie fixture should render without diagnostics");
 
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi = renderTestMidi(performance);
   const auto note = std::ranges::find_if(midi.tracks[0].events, [](const MidiEvent& event) {
     return std::holds_alternative<NoteDuration>(event.payload);
   });

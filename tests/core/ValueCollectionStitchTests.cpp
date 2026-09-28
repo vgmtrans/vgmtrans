@@ -92,8 +92,10 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
   const SequenceProgramConfig config48 = probeSequenceConfig();
   SequenceProgramConfig config96 = config48;
   config96.timebase.ppqn = 96;
-  const SequencePreparer binder = [](SequencePreparationContext& context) {
+  std::array<u32, 2> preparations{};
+  const SequencePreparer binder = [&preparations](SequencePreparationContext& context) {
     const bool leaveDirtyMidiState = context.sequence.metadata.name == "Part 0";
+    ++preparations[leaveDirtyMidiState ? 0 : 1];
     return makeCompiledRuntime<ProbePlayback, StitchProgramState>(leaveDirtyMidiState);
   };
 
@@ -177,6 +179,14 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
   auto restrictedRequest = request;
   restrictedRequest.exportOnlyUsedInstruments = true;
   const auto restricted = stitchCollections(snapshot, sources, collections, restrictedRequest);
+  const auto beforeRepeat = preparations;
+  const std::array repeatedCollections{CollectionId{0}, CollectionId{1}, CollectionId{0}};
+  const auto repeated = stitchCollections(snapshot, sources, repeatedCollections, restrictedRequest);
+  expect(repeated.complete() && repeated.parts.size() == 3 &&
+             repeated.parts[0].banks == repeated.parts[2].banks &&
+             repeated.soundFont.bytes == restricted.soundFont.bytes &&
+             preparations == std::array<u32, 2>{beforeRepeat[0] + 1, beforeRepeat[1] + 1},
+         "repeating a collection must prepare it once and reuse its instruments, plan and companion presets");
   auto observedRequest = request;
   observedRequest.modulationScaling = ModulationScalingPolicy::ObservedSequenceRange;
   const auto observed = stitchCollections(snapshot, sources, collections, observedRequest);

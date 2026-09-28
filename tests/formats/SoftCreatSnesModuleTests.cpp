@@ -9,7 +9,6 @@
 #include "../TestSupport.h"
 #include "ValueFormatTestSupport.h"
 
-#include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/formats/SoftCreatSnes/SoftCreatSnes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
@@ -409,7 +408,7 @@ void restsPreserveTheKeyedVoice() {
       render({0xa2, 1, 120, 1, 120, 1, 120, 14, 0x93, 5, 0x84, 2, 0x18, 20, 0x9f, 0x18, 10, 0x18, 10,
               0x93, 0, 0x18, 40, 0, 160, 0, 80, 0x85, 0x9e, 0x19, 1, 0x80});
   const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi = renderTestMidi(performance);
   const auto heldNote = std::ranges::find_if(midi.tracks.front().events, [](const MidiEvent& event) {
     const auto* note = std::get_if<NoteDuration>(&event.payload);
     return note != nullptr && event.tick == 0 && note->duration == 640;
@@ -536,9 +535,9 @@ void legatoSlidesClearVibratoDuringEachNotesDelay() {
       0x2b, 70, 0x80,      // G, ticks 141-210, then end.
   });
   expect(performance.diagnostics.empty(), "the synthetic legato passage should render without diagnostics");
-  const MidiSequence plain = renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators);
+  const MidiSequence plain = renderTestMidi(performance, {}, ModulationConversionPolicy::SynthModulators);
   const MidiSequence simulated =
-      renderMidiSequence(performance, {}, ModulationConversionPolicy::SequenceEventSimulation);
+      renderTestMidi(performance, {}, ModulationConversionPolicy::SequenceEventSimulation);
   const auto notes = midiNotes(simulated.tracks.front().events);
   expect(notes.size() == 1 && notes.front().duration == 211,
          "vibrato restarts must preserve one held MIDI voice through every legato slide");

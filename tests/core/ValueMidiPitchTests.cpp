@@ -7,7 +7,7 @@
 #include "../MidiTestSupport.h"
 #include "../TestSupport.h"
 
-#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "../PerformanceTestSupport.h"
 #include "value/export/midi/PitchTransitionMidiLowering.h"
 #include "value/sequence/SequenceVm.h"
 
@@ -73,9 +73,9 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
   auto sourceAttack = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<NotePerformanceEvent>(event);
   });
-  std::get<NotePerformanceEvent>(*sourceAttack).instrumentAddress = InstrumentAddress{.bank = 3, .program = 4};
+  std::get<NotePerformanceEvent>(*sourceAttack).instrument = InstrumentAddress{.bank = 3, .program = 4};
 
-  const MidiSequence native = renderMidiSequence(
+  const MidiSequence native = renderTestMidi(
       performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PreserveFormat});
   const auto portamentoTime = firstMidiController14(native.tracks[0].events, MidiController::PortamentoTime);
   expect(portamentoTime == 63 &&
@@ -98,9 +98,10 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
   expect(fixedTime == 125, "fixed-duration timing should preserve source physical time independently of tempo");
 
   const MidiSequence bent =
-      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
-  const PerformanceSequence bendLowering = lowerMidiPerformanceAutomation(
-      performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+      renderTestMidi(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  const auto bendLoweringInput = preparePerformance(performance);
+  const auto bendLoweringResult = lowerMidiPerformanceAutomation(bendLoweringInput, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend}, PerformanceTempoMap{bendLoweringInput.performance()});
+  const auto& bendLowering = bendLoweringResult.performance();
   const auto sourceNote = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<NotePerformanceEvent>(event);
   });
@@ -113,7 +114,7 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
            lhs.header.tick == rhs.header.tick && lhs.header.sequence == rhs.header.sequence &&
            lhs.header.automation == rhs.header.automation && lhs.key == rhs.key &&
            lhs.linearVelocity == rhs.linearVelocity && lhs.durationTicks == rhs.durationTicks &&
-           lhs.extendsPrevious == rhs.extendsPrevious && lhs.instrumentAddress == rhs.instrumentAddress &&
+           lhs.extendsPrevious == rhs.extendsPrevious && lhs.instrument == rhs.instrument &&
            lhs.restartsLfoPhase == rhs.restartsLfoPhase && lhs.restartsVibratoLfoPhase == rhs.restartsVibratoLfoPhase &&
            lhs.restartsTremoloLfoPhase == rhs.restartsTremoloLfoPhase && lhs.note == rhs.note && lhs.lane == rhs.lane;
   };
@@ -183,7 +184,7 @@ void performanceMidiRendererAllowsMixedPitchTransitionRendering() {
                                                 : std::optional{std::get<NoteDuration>(found->payload).duration};
   };
 
-  const MidiSequence preserved = renderMidiSequence(
+  const MidiSequence preserved = renderTestMidi(
       performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PreserveFormat});
   expect(countPortamento(preserved) == 1 && countPitchBends(preserved) != 0,
          "PreserveFormat should allow portamento and pitch bend transitions in one track");
@@ -191,13 +192,13 @@ void performanceMidiRendererAllowsMixedPitchTransitionRendering() {
          "pitch-bend continuation should retain the voice started by MIDI portamento");
 
   const MidiSequence allPortamento =
-      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
+      renderTestMidi(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
   expect(countPortamento(allPortamento) == 2 && countPitchBends(allPortamento) == 0 &&
              noteDuration(allPortamento, 0) == 5 && noteDuration(allPortamento, 4) == 5 &&
              noteDuration(allPortamento, 8) == 4,
          "an explicit portamento request should override every transition preference");
 
-  const MidiSequence terminatingPortamento = renderMidiSequence(
+  const MidiSequence terminatingPortamento = renderTestMidi(
       performance,
       MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento, .terminatePreviousVoice = true});
   expect(
@@ -206,7 +207,7 @@ void performanceMidiRendererAllowsMixedPitchTransitionRendering() {
       "new-attack termination should not cut off linked native-portamento continuations");
 
   const MidiSequence allPitchBend =
-      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+      renderTestMidi(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   expect(countPortamento(allPitchBend) == 0 && countPitchBends(allPitchBend) != 0 &&
              noteDuration(allPitchBend, 0) == 12 && !noteDuration(allPitchBend, 4) && !noteDuration(allPitchBend, 8),
          "an explicit pitch-bend request should preserve one attack through linked transitions");
@@ -237,7 +238,7 @@ void performanceMidiRendererRetainsHeldVoiceAcrossChainedPitchBends() {
       .tracks = {track},
   };
   const MidiExportOptions bendOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend};
-  const MidiSequence midi = renderMidiSequence(performance, bendOptions);
+  const MidiSequence midi = renderTestMidi(performance, bendOptions);
 
   const auto notes = midiNotes(midi.tracks[0].events);
   expect(notes.size() == 1 && notes[0].tick == 0 && notes[0].key == 60 && notes[0].duration == 16,
@@ -272,7 +273,7 @@ void performanceMidiRendererHonorsRequiredPortamento() {
   const PerformanceNoteId destination = out.at(4).note(64, 1.0, 4);
   out.at(4).pitchSlide(destination, 60, 64, 4).requirePortamento();
 
-  const MidiSequence midi = renderMidiSequence(
+  const MidiSequence midi = renderTestMidi(
       PerformanceSequence{
           .timebase = Timebase{.ppqn = 48},
           .tracks = {track},
@@ -290,7 +291,7 @@ void performanceMidiRendererHonorsRequiredPortamento() {
               [](const MidiEvent& event) { return isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend); }),
       "required portamento should reject a channel-wide pitch-bend override");
 
-  const MidiSequence terminatingPortamento = renderMidiSequence(
+  const MidiSequence terminatingPortamento = renderTestMidi(
       PerformanceSequence{.timebase = Timebase{.ppqn = 48}, .tracks = {track}},
       MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento, .terminatePreviousVoice = true});
   expect(std::ranges::count_if(
@@ -316,7 +317,7 @@ void performanceMidiRendererStartsANewVoiceAfterPitchBendContinuationWhenMidiPor
   const PerformanceNoteId third = out.at(8).note(67, 1.0, 4);
   out.at(8).pitchSlide(third, 64, 67, 4).continueFrom(second).preferPortamento();
 
-  const MidiSequence midi = renderMidiSequence(
+  const MidiSequence midi = renderTestMidi(
       PerformanceSequence{
           .timebase = Timebase{.ppqn = 48},
           .tracks = {track},
@@ -349,7 +350,7 @@ void performanceMidiRendererResetsHeldPitchBeforeMidiPortamentoTakesOver() {
   out.at(4).pitchSlide(second, 60, 64, 4).continueFrom(first).preferPitchBend();
   out.at(8).pitchSlide(second, 64, 67, 4).preferPortamento();
 
-  const MidiSequence midi = renderMidiSequence(
+  const MidiSequence midi = renderTestMidi(
       PerformanceSequence{
           .timebase = Timebase{.ppqn = 48},
           .tracks = {track},
@@ -395,9 +396,9 @@ void performanceMidiRendererCombinesPitchSlidesWithSimulatedVibrato() {
       .timebase = Timebase{.ppqn = 100},
       .tracks = {track},
   };
-  const MidiSequence synthModulators = renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators);
+  const MidiSequence synthModulators = renderTestMidi(performance, {}, ModulationConversionPolicy::SynthModulators);
   const MidiSequence simulated =
-      renderMidiSequence(performance, {}, ModulationConversionPolicy::SequenceEventSimulation);
+      renderTestMidi(performance, {}, ModulationConversionPolicy::SequenceEventSimulation);
 
   const auto lastPitchBendAt = [](const MidiSequence& midi, u64 tick) -> std::optional<s16> {
     std::optional<s16> result;
@@ -476,7 +477,7 @@ void performanceMidiRendererAddsIndependentPitchLfosWithoutRestartingChannelPhas
               },
       }},
   };
-  const MidiSequence midi = renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators);
+  const MidiSequence midi = renderTestMidi(performance, {}, ModulationConversionPolicy::SynthModulators);
   const auto lastPitchBendAt = [&](u64 tick) -> std::optional<s16> {
     std::optional<s16> result;
     for (const auto& event : midi.tracks.front().events) {
@@ -534,7 +535,7 @@ void performanceMidiRendererSimulatesDeterministicSampleAndHoldNoise() {
               },
       }},
   };
-  const MidiSequence midi = renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators);
+  const MidiSequence midi = renderTestMidi(performance, {}, ModulationConversionPolicy::SynthModulators);
   const auto nonzero = std::ranges::find_if(midi.tracks.front().events, [](const MidiEvent& event) {
     const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
     return bend != nullptr && bend->value != 0;
@@ -585,7 +586,7 @@ void performanceMidiRendererUsesOnlyFrozenVibratoOffsetForPitchRange() {
   };
 
   const MidiSequence midi =
-      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+      renderTestMidi(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
   const auto pitchBendRanges = midiPitchBendRanges(midi.tracks[0].events);
 
   const std::vector<std::pair<u64, u16>> expectedPitchBendRanges{{0, 200}, {2, 300}};
@@ -614,7 +615,7 @@ void performanceMidiRendererUsesWholeSemitonePitchBendRanges() {
       }},
   };
 
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi = renderTestMidi(performance);
   const auto& events = midi.tracks[0].events;
   expect(midiPitchBendRanges(events) == std::vector<std::pair<u64, u16>>{{0, 300}},
          "MIDI renderer should round pitch-bend ranges upward to whole semitones");
@@ -658,9 +659,9 @@ void performanceMidiRendererDoesNotRestartVibratoAtAHeldPitchSlideBoundary() {
       .tracks = {track},
   };
   const MidiExportOptions bendOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend};
-  const MidiSequence plain = renderMidiSequence(performance, bendOptions, ModulationConversionPolicy::SynthModulators);
+  const MidiSequence plain = renderTestMidi(performance, bendOptions, ModulationConversionPolicy::SynthModulators);
   const MidiSequence simulated =
-      renderMidiSequence(performance, bendOptions, ModulationConversionPolicy::SequenceEventSimulation);
+      renderTestMidi(performance, bendOptions, ModulationConversionPolicy::SequenceEventSimulation);
   const auto lastPitchBendAt = [](const MidiSequence& midi, u64 tick) -> std::optional<s16> {
     std::optional<s16> result;
     for (const auto& event : midi.tracks[0].events) {
@@ -698,7 +699,7 @@ void performanceMidiRendererPreservesExactSamplesAndChainedPitchContinuity() {
       .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
       .tracks = {track},
   };
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi = renderTestMidi(performance);
 
   const auto ranges = midiPitchBendRanges(midi.tracks[0].events);
   std::vector<std::pair<u64, s16>> bends;
@@ -731,7 +732,7 @@ void performanceMidiRendererKeepsSampledPitchCurvesSparse() {
   const PerformanceNoteId note = out.note(60, 1.0, 8);
   out.pitchSlide(note, 60, 62, 6).sample(out.at(4), 61);
 
-  const MidiSequence midi = renderMidiSequence(PerformanceSequence{
+  const MidiSequence midi = renderTestMidi(PerformanceSequence{
       .timebase = Timebase{.ppqn = 48},
       .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
       .tracks = {track},
@@ -762,7 +763,7 @@ void performanceMidiRendererResetsInterruptedPitchBeforeTheNewNote() {
   out.pitchSlide(firstNote, 60, 64, 6);
   out.at(3).note(67, 1.0, 3);
 
-  const MidiSequence midi = renderMidiSequence(PerformanceSequence{
+  const MidiSequence midi = renderTestMidi(PerformanceSequence{
       .timebase = Timebase{.ppqn = 48},
       .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
       .tracks = {track},
@@ -792,13 +793,13 @@ void performanceMidiRendererDefersPitchResetUntilTheNextAttack() {
   out.pitchSlide(slidingNote, 60, 64, 4);
   out.at(12).note(67, 1.0, 4);
 
-  const PerformanceSequence lowered = lowerMidiPerformanceAutomation(
-      PerformanceSequence{
+  const auto loweredInput = preparePerformance(PerformanceSequence{
           .timebase = Timebase{.ppqn = 48},
           .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
           .tracks = {track},
-      },
-      {});
+      });
+  const auto loweredResult = lowerMidiPerformanceAutomation(loweredInput, {}, PerformanceTempoMap{loweredInput.performance()});
+  const auto& lowered = loweredResult.performance();
   std::vector<std::pair<u64, double>> bends;
   for (const auto& event : lowered.tracks[0].events) {
     if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event)) {
@@ -830,13 +831,13 @@ void performanceMidiLoweringAppliesPitchResetsBeforeLaterTransitions() {
   out.at(10).pitchSlide(heldTarget, 68, 70, 5).continueFrom(heldStart);
   out.at(16).pitchSlide(heldTarget, 70, 48, 4);
 
-  const PerformanceSequence lowered = lowerMidiPerformanceAutomation(
-      PerformanceSequence{
+  const auto loweredInput = preparePerformance(PerformanceSequence{
           .timebase = Timebase{.ppqn = 48},
           .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
           .tracks = {track},
-      },
-      {});
+      });
+  const auto loweredResult = lowerMidiPerformanceAutomation(loweredInput, {}, PerformanceTempoMap{loweredInput.performance()});
+  const auto& lowered = loweredResult.performance();
   const auto bendAt = [&](u64 tick) -> std::optional<double> {
     std::optional<double> bend;
     for (const auto& event : lowered.tracks[0].events) {
@@ -866,13 +867,13 @@ void performanceMidiRendererLeavesTerminalPitchBentWithoutAnotherAttack() {
   const PerformanceNoteId note = out.note(60, 1.0, 8);
   out.pitchSlide(note, 60, 64, 4);
 
-  const PerformanceSequence lowered = lowerMidiPerformanceAutomation(
-      PerformanceSequence{
+  const auto loweredInput = preparePerformance(PerformanceSequence{
           .timebase = Timebase{.ppqn = 48},
           .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
           .tracks = {track},
-      },
-      {});
+      });
+  const auto loweredResult = lowerMidiPerformanceAutomation(loweredInput, {}, PerformanceTempoMap{loweredInput.performance()});
+  const auto& lowered = loweredResult.performance();
   const auto& events = lowered.tracks[0].events;
   const auto lastBend = std::find_if(events.rbegin(), events.rend(), [](const PerformanceEvent& event) {
     return std::holds_alternative<PitchBendPerformanceEvent>(event);
@@ -908,7 +909,7 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
       .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
       .tracks = {track},
   };
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi = renderTestMidi(performance);
   const auto ranges = midiPitchBendRanges(midi.tracks[0].events);
   const auto hasRange = [&](u64 tick, u16 cents) {
     return std::ranges::find(ranges, std::pair{tick, cents}) != ranges.end();
@@ -946,7 +947,7 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
   };
   for (const auto policy :
        {ModulationConversionPolicy::SynthModulators, ModulationConversionPolicy::SequenceEventSimulation}) {
-    const MidiSequence delayedTransitionMidi = renderMidiSequence(delayedTransitionPerformance, {}, policy);
+    const MidiSequence delayedTransitionMidi = renderTestMidi(delayedTransitionPerformance, {}, policy);
     const auto preservedBend = std::ranges::find_if(delayedTransitionMidi.tracks[0].events, [](const MidiEvent& event) {
       const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
       return bend != nullptr && event.tick == 4 && bend->value == 186;
@@ -979,13 +980,13 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
   sameVoiceOut.at(4).pitchSlide(sameVoiceNote, 65, 67, 2);
   sameVoiceOut.at(7).pitchBend(-1.0);
   sameVoiceOut.at(8).note(60, 1.0, 4);
-  const PerformanceSequence sameVoiceLowered = lowerMidiPerformanceAutomation(
-      PerformanceSequence{
+  const auto sameVoiceLoweredInput = preparePerformance(PerformanceSequence{
           .timebase = Timebase{.ppqn = 48},
           .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
           .tracks = {sameVoiceTrack},
-      },
-      {});
+      });
+  const auto sameVoiceLoweredResult = lowerMidiPerformanceAutomation(sameVoiceLoweredInput, {}, PerformanceTempoMap{sameVoiceLoweredInput.performance()});
+  const auto& sameVoiceLowered = sameVoiceLoweredResult.performance();
   const auto sameVoiceStart =
       std::ranges::find_if(sameVoiceLowered.tracks[0].events, [](const PerformanceEvent& event) {
         const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
@@ -1038,7 +1039,7 @@ void performanceMidiRendererExpandsRangeForComposedPitchLayers() {
       }};
   const std::array<const SoundBankAsset*, 1> soundBanks{&soundBank};
   const MidiSequence midi =
-      renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, soundBanks);
+      renderTestMidi(performance, {}, ModulationConversionPolicy::SynthModulators, soundBanks);
   const auto& events = midi.tracks[0].events;
   const auto updatedBend = std::ranges::find_if(events, [](const MidiEvent& event) {
     const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
@@ -1061,7 +1062,7 @@ void performanceMidiRendererResolvesNormalizedWheelBeforeLoweringTransitions() {
       .key = 60,
       .linearVelocity = 1.0,
       .durationTicks = 4,
-      .instrumentAddress = InstrumentAddress{.bank = 0, .program = 1},
+      .instrument = InstrumentAddress{.bank = 0, .program = 1},
   });
   out.pitchBend(PitchBendPerformanceEvent{.semitones = 1.0, .normalizedWheelPosition = 0.5});
   const PerformanceNoteId second = out.at(4).note(62, 1.0, 4);
@@ -1079,20 +1080,23 @@ void performanceMidiRendererResolvesNormalizedWheelBeforeLoweringTransitions() {
   const std::array<const SoundBankAsset*, 1> soundBanks{&soundBank};
   const PerformanceTempoMap tempos{performance};
 
-  const PerformanceSequence pitchBend = lowerMidiPerformanceAutomation(performance, {}, tempos, soundBanks);
+  const auto pitchBendInput = prepareTestPerformance(performance, soundBanks);
+  const auto pitchBendResult = lowerMidiPerformanceAutomation(pitchBendInput, {}, tempos);
+  const auto& pitchBend = pitchBendResult.performance();
   const auto heldStart = std::ranges::find_if(pitchBend.tracks[0].events, [](const PerformanceEvent& event) {
     const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
     return bend != nullptr && bend->header.tick == 4 && bend->layer != kPrimaryPitchBendLayer;
   });
-  const PerformanceSequence portamento = lowerMidiPerformanceAutomation(
-      performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento}, tempos, soundBanks);
+  const auto portamentoInput = prepareTestPerformance(performance, soundBanks);
+  const auto portamentoResult = lowerMidiPerformanceAutomation(portamentoInput, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento}, tempos);
+  const auto& portamento = portamentoResult.performance();
   const auto sourceReset = std::ranges::find_if(portamento.tracks[0].events, [](const PerformanceEvent& event) {
     const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
     return bend != nullptr && bend->header.tick == 4 && bend->layer == kPrimaryPitchBendLayer &&
            bend->semitones == 0.0 && !bend->normalizedWheelPosition;
   });
   const MidiSequence midi =
-      renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, soundBanks);
+      renderTestMidi(performance, {}, ModulationConversionPolicy::SynthModulators, soundBanks);
 
   expect(heldStart != pitchBend.tracks[0].events.end() &&
              std::get<PitchBendPerformanceEvent>(*heldStart).semitones == 0.0 &&
@@ -1121,7 +1125,9 @@ void performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes() {
       .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
       .tracks = {track},
   };
-  const PerformanceSequence lowered = lowerMidiPerformanceAutomation(performance, {});
+  const auto loweredInput = preparePerformance(performance);
+  const auto loweredResult = lowerMidiPerformanceAutomation(loweredInput, {}, PerformanceTempoMap{loweredInput.performance()});
+  const auto& lowered = loweredResult.performance();
   const auto continuedBend = std::ranges::find_if(lowered.tracks[0].events, [](const PerformanceEvent& event) {
     const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
     return bend != nullptr && bend->header.tick == 4 && std::abs(bend->semitones - (-3.0)) < 0.000001;
@@ -1165,7 +1171,7 @@ void performanceMidiRendererResolvesSourceInstrumentIdentityAtExport() {
   const std::array<const SoundBankAsset*, 1> soundBanks{&soundBank};
 
   const MidiSequence midi =
-      renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, soundBanks);
+      renderTestMidi(performance, {}, ModulationConversionPolicy::SynthModulators, soundBanks);
   const auto bank = std::ranges::find_if(midi.tracks[0].events,
                                          [](const MidiEvent& event) { return midiBankSelect(event) != nullptr; });
   const auto program = std::ranges::find_if(midi.tracks[0].events, [](const MidiEvent& event) {
@@ -1183,7 +1189,7 @@ void performanceMidiRendererResolvesSourceInstrumentIdentityAtExport() {
          "an automated bend should retain the selected instrument's pitch-wheel sensitivity");
 
   const MidiSequence mmaMidi =
-      renderMidiSequence(performance, MidiExportOptions{.bankSelectStyle = MidiBankSelectStyle::MsbAndLsb},
+      renderTestMidi(performance, MidiExportOptions{.bankSelectStyle = MidiBankSelectStyle::MsbAndLsb},
                          ModulationConversionPolicy::SynthModulators, soundBanks);
   const auto mmaBank = std::ranges::find_if(mmaMidi.tracks[0].events,
                                             [](const MidiEvent& event) { return midiBankSelect(event) != nullptr; });
@@ -1216,7 +1222,7 @@ void performanceMidiRendererQuantizesPitchBendAndPortamento() {
       }},
   };
 
-  const MidiSequence midiSequence = renderMidiSequence(performance);
+  const MidiSequence midiSequence = renderTestMidi(performance);
   const auto& events = midiSequence.tracks[0].events;
   expect(midiPitchBendRanges(events) == std::vector<std::pair<u64, u16>>{{0, 400}},
          "MIDI renderer should emit the performance pitch-bend range");
@@ -1296,9 +1302,9 @@ void performanceMidiRendererSkipsRedundantPitchBends() {
     expect(pitchBends == expectedPitchBends, std::string(label) + " should skip repeated pitch bend values");
   };
 
-  assertPitchBends(renderMidiSequence(performance), "synth-modulator MIDI lowering");
+  assertPitchBends(renderTestMidi(performance), "synth-modulator MIDI lowering");
   assertPitchBends(
-      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation),
+      renderTestMidi(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation),
       "sequence-event MIDI lowering");
 }
 

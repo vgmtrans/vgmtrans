@@ -8,9 +8,8 @@
 #include "../PerformanceTestSupport.h"
 #include "../TestSupport.h"
 
-#include "value/export/InstrumentVariants.h"
+#include "value/export/ResolvedPerformance.h"
 #include "value/export/SequenceModulationProfile.h"
-#include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/formats/SuzukiSnes/SuzukiSnes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
@@ -326,7 +325,7 @@ void driverDefaultsAndPitchTransitionsAreVersioned() {
   const auto* thirdBoosterSlide =
       boosterAutomations.size() < 2 ? nullptr : pitchTransitionIntent(boosterAutomations[1]);
   const MidiSequence boosterMidi =
-      renderMidiSequence(booster, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+      renderTestMidi(booster, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   const bool thirdNoteBendsUp = std::ranges::any_of(boosterMidi.tracks.front().events, [](const MidiEvent& event) {
     const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
     return bend != nullptr && event.tick > 96 && bend->value > 0;
@@ -384,7 +383,7 @@ void smrBowserPitchSlideContinuesAcrossTies() {
          "SMR E5 C0 FE should slide E5 down to D5 for 192 ticks across the following ties");
 
   const MidiSequence midi =
-      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+      renderTestMidi(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   expect(std::ranges::any_of(midi.tracks.front().events,
                              [](const MidiEvent& event) {
                                const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
@@ -421,15 +420,12 @@ void laterE0UsesTheSustainRateAsAGatedRelease() {
       }},
   }};
   const auto materialized =
-      materializeInstrumentVariants(performance, sets, InstrumentVariantOptions{.dynamicEnvelopes = true});
-  const auto notes = eventsOfType<NotePerformanceEvent>(materialized.performance.tracks.front());
-  expect(notes.size() == 1 && notes.front()->instrumentAddress,
+      preparePerformance(performance, {sets.begin(), sets.end()}, InstrumentVariantOptions{.dynamicEnvelopes = true});
+  const auto notes = eventsOfType<NotePerformanceEvent>(materialized.performance().tracks.front());
+  expect(notes.size() == 1 && notes.front()->instrument,
          "E0 should select a materialized envelope variant for the following attack");
-  const auto variant = std::ranges::find_if(sets.front().instruments, [&](const Instrument& instrument) {
-    return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) ==
-           *notes.front()->instrumentAddress;
-  });
-  expect(variant != sets.front().instruments.end() && variant->regions.size() == 1 &&
+  const auto* variant = materialized.instrument(*notes.front()->instrument);
+  expect(variant != nullptr && variant->regions.size() == 1 &&
              variant->regions.front().envelope.secondDecaySeconds &&
              std::isinf(*variant->regions.front().envelope.secondDecaySeconds) &&
              variant->regions.front().envelope.releaseSeconds &&
@@ -487,7 +483,7 @@ void modulationMathMatchesEachDriverRevision() {
   const SequenceModulationProfile boosterProfile = analyzeSequenceModulation(booster);
   expect(boosterProfile.instruments.tremolo && boosterProfile.instruments.tremolo->gainMode == TremoloGainMode::NoBoost,
          "linear-gain tremolo planning should retain Suzuki's attenuation-first oscillator");
-  const MidiSequence boosterMidi = renderMidiSequence(booster, {}, ModulationConversionPolicy::SequenceEventSimulation);
+  const MidiSequence boosterMidi = renderTestMidi(booster, {}, ModulationConversionPolicy::SequenceEventSimulation);
   const auto boosterExpressionAt = [&](u64 tick) -> std::optional<u8> {
     for (const MidiEvent& event : boosterMidi.tracks.front().events) {
       if (const auto* expression = midiController(event, MidiController::Expression);
@@ -504,7 +500,7 @@ void modulationMathMatchesEachDriverRevision() {
 
   const PerformanceSequence shortTremolo = render(Version::SuperMarioRpg, {0xf4, 0x04, 0x10, 0xb6, 0x10, 0xd0});
   const MidiSequence shortTremoloMidi =
-      renderMidiSequence(shortTremolo, {}, ModulationConversionPolicy::SequenceEventSimulation);
+      renderTestMidi(shortTremolo, {}, ModulationConversionPolicy::SequenceEventSimulation);
   const auto expressionAt = [&](u64 tick) -> std::optional<u8> {
     for (const MidiEvent& event : shortTremoloMidi.tracks.front().events) {
       if (const auto* expression = midiController(event, MidiController::Expression);

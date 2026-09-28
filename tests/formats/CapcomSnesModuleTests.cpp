@@ -10,9 +10,9 @@
 #include "ValueFormatTestSupport.h"
 
 #include "value/export/Export.h"
-#include "value/export/InstrumentVariants.h"
+#include "value/export/ResolvedPerformance.h"
 #include "value/export/midi/MidiExporter.h"
-#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "../PerformanceTestSupport.h"
 #include "value/formats/CapcomSnes/CapcomSnes.h"
 #include "value/formats/ValueFormats.h"
 #include "value/sequence/SequenceVm.h"
@@ -502,7 +502,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "CapcomSnes volume should retain neutral source quantization rather than a MIDI bit width");
   const SequenceModulationProfile modulationProfile = analyzeSequenceModulation(performance);
   const MidiSequence midiSequence =
-      renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, {}, &modulationProfile);
+      renderTestMidi(performance, {}, ModulationConversionPolicy::SynthModulators, {}, &modulationProfile);
   expect(midiSequence.diagnostics.empty(), "CapcomSnes MIDI sequence build should not warn for linear fixture");
   expect(midiSequence.tracks.size() == 8, "builder should preserve track count");
   expect(midiSequence.tracks[0].events.size() == 15,
@@ -556,7 +556,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "CapcomSnes vibrato rate should retain the driver's physical LFO frequency");
 
   const MidiSequence simulatedMidi =
-      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+      renderTestMidi(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
   expect(std::ranges::any_of(simulatedMidi.tracks[0].events,
                              [](const MidiEvent& event) {
                                const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
@@ -1115,7 +1115,7 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
          "note-attribute annotation should carry a readable name");
 
   const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program);
-  const MidiSequence midiSequence = renderMidiSequence(performance);
+  const MidiSequence midiSequence = renderTestMidi(performance);
   expect(midiSequence.diagnostics.empty(), "CapcomSnes note-state emission should not report diagnostics");
   expect(!midiSequence.tracks.empty(), "CapcomSnes note-state emission should preserve tracks");
 
@@ -1260,7 +1260,7 @@ void capcomSnesPanPerformanceCarriesGainCompensation() {
   expect(performancePan != nullptr && performancePan->rightGain > performancePan->leftGain,
          "CapcomSnes pan performance should retain the source engine's stereo balance");
 
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi = renderTestMidi(performance);
   expect(midi.tracks[0].events.size() == 5 && midi.tracks[0].endTick == performance.tracks[0].endTick,
          "CapcomSnes compensated pan should render port, initial defaults, pan, and channel volume");
   expect(midiController(midi.tracks[0].events[3], MidiController::Pan)->value == 113,
@@ -1347,7 +1347,7 @@ void capcomSnesSequenceEmitsSourceOnlyDriverSemantics() {
          "CapcomSnes source-only fixture should still reach the later note");
   expect(performance.tracks[0].endTick == 6, "CapcomSnes source-only fixture should advance through the later note");
 
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi = renderTestMidi(performance);
   expect(std::ranges::any_of(midi.tracks[0].events,
                              [](const MidiEvent& event) {
                                const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
@@ -1446,21 +1446,19 @@ void capcomSnesReleaseRateIsStickyAcrossInstrumentChanges() {
           },
   }};
   const auto materialized =
-      materializeInstrumentVariants(performance, sets, InstrumentVariantOptions{.dynamicEnvelopes = true});
+      preparePerformance(performance, {sets.begin(), sets.end()}, InstrumentVariantOptions{.dynamicEnvelopes = true});
   std::vector<const NotePerformanceEvent*> notes;
-  for (const auto& event : materialized.performance.tracks.front().events) {
+  for (const auto& event : materialized.performance().tracks.front().events) {
     if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
       notes.push_back(note);
     }
   }
-  expect(materialized.diagnostics.empty() && notes.size() == 2 && notes[0]->instrumentAddress &&
-             notes[1]->instrumentAddress && sets.front().instruments.size() == 4,
+  expect(materialized.performance().diagnostics.empty() && notes.size() == 2 && notes[0]->instrument &&
+             notes[1]->instrument && materialized.soundBanks().front().instruments.size() == 4,
          "CapcomSnes sticky release should materialize a dynamic variant for both selected instruments");
   for (const NotePerformanceEvent* note : notes) {
-    const auto variant = std::ranges::find_if(sets.front().instruments, [&](const Instrument& instrument) {
-      return instrument.explicitAddress == note->instrumentAddress;
-    });
-    expect(variant != sets.front().instruments.end() && variant->regions.size() == 1 &&
+    const auto* variant = materialized.instrument(*note->instrument);
+    expect(variant != nullptr && variant->regions.size() == 1 &&
                variant->regions.front().envelope.releaseSeconds &&
                std::abs(*variant->regions.front().envelope.releaseSeconds - expectedReleaseSeconds) < 0.000001,
            "CapcomSnes dynamic instrument variants should carry the $1D release time");
@@ -1535,7 +1533,7 @@ void capcomSnesSequenceEmitsStructuredPitchSlides() {
                               }),
          "CapcomSnes format code should leave MIDI slide representation to export");
 
-  const MidiSequence midi = renderMidiSequence(
+  const MidiSequence midi = renderTestMidi(
       performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PreserveFormat});
   expect(std::ranges::any_of(midi.tracks[0].events,
                              [](const MidiEvent& event) {
@@ -1574,7 +1572,7 @@ void capcomSnesSequenceEmitsStructuredPitchSlides() {
          "native CapcomSnes lowering should emit one controller pair for each actual glide");
 
   const MidiSequence pitchBendMidi =
-      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+      renderTestMidi(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   expect(std::ranges::none_of(pitchBendMidi.tracks[0].events,
                               [](const MidiEvent& event) {
                                 return isMidiController(event, MidiController::PortamentoTime) ||
@@ -1596,7 +1594,7 @@ void capcomSnesSequenceEmitsStructuredPitchSlides() {
          "CapcomSnes pitch-bend export should carry one attack across the complete slurred note chain");
 
   const MidiSequence simulatedPitchBendMidi =
-      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend},
+      renderTestMidi(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend},
                          ModulationConversionPolicy::SequenceEventSimulation);
   const auto lastPitchBendAt = [](const MidiSequence& sequence, u64 tick) -> std::optional<s16> {
     std::optional<s16> result;

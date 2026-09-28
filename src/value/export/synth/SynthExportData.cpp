@@ -7,7 +7,6 @@
 #include "value/export/synth/SynthExportData.h"
 
 #include "value/export/ExportDiagnostics.h"
-#include "value/export/PerformanceInstrumentSelection.h"
 #include "value/sequence/PerformanceModel.h"
 #include "value/synth/SampleDecoder.h"
 
@@ -37,28 +36,8 @@ struct SynthSampleIndexKey {
 
 // A requested sample variant has no output index until decoding succeeds.
 using SynthSampleIndexMap = std::map<SynthSampleIndexKey, std::optional<u32>>;
-using SynthInstrumentSet = std::set<const Instrument*>;
 
 constexpr double kPerceivedHalfLoudnessDb = 10.0;
-
-bool markMatchingInstruments(SynthInstrumentSet& used, std::span<const Instrument* const> instruments,
-                             const InstrumentSelection& selection) {
-  bool found = false;
-  for (const auto* instrument : instruments) {
-    if (matchesInstrumentSelection(*instrument, selection)) {
-      found = true;
-      used.insert(instrument);
-    }
-  }
-  return found;
-}
-
-void markSelectedInstrument(const InstrumentSelection& selection, std::span<const Instrument* const> instruments,
-                            SynthInstrumentSet& used) {
-  if (!markMatchingInstruments(used, instruments, selection) && std::holds_alternative<InstrumentIdentity>(selection)) {
-    markMatchingInstruments(used, instruments, resolveInstrumentAddress(selection));
-  }
-}
 
 void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, AssetId owner,
                      const SamplePool& pool, const SynthExportInput& input, const SourceStore& sources,
@@ -66,7 +45,7 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
   // Decode once into the final sample table, including any phase-inverted
   // variants. Container exporters share its indexes and source diagnostics.
   const SampleFilter selectedFilter = resolveSampleFilter(input.sampleFiltering, pool.preferredFilter);
-  const bool discardUnreferenced = input.sequenceUsage != nullptr || input.filterSamplesToReferencedInstruments;
+  const bool discardUnreferenced = input.filterSamplesToReferencedInstruments;
 
   for (u32 sampleIndex = 0; sampleIndex < pool.samples.size(); ++sampleIndex) {
     if (!discardUnreferenced) {
@@ -145,7 +124,7 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
 }
 
 [[nodiscard]] std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
-    std::span<const Instrument* const> selectedInstruments, const SynthSampleIndexMap& samples,
+    std::span<const SynthInstrumentSelection> selectedInstruments, const SynthSampleIndexMap& samples,
     const SynthExportInput& input, std::vector<Diagnostic>& diagnostics) {
   const auto lowerModulation = [&](const InstrumentModulation& modulation) {
     auto lowered = lowerSynthModulation(modulation, input.modulationConversion);
@@ -157,7 +136,8 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
   // Drop only regions whose samples cannot be resolved. The rest of the instrument can
   // still produce a useful partial export.
   std::vector<ResolvedSynthInstrument> instruments;
-  const SynthInstrumentSet selected{selectedInstruments.begin(), selectedInstruments.end()};
+  std::map<const Instrument*, InstrumentAddress> selected;
+  for (const auto& entry : selectedInstruments) selected.emplace(entry.instrument, entry.address);
   for (const auto* bank : input.soundBanks) {
     if (!bank) {
       continue;
@@ -169,7 +149,7 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
       }
       ResolvedSynthInstrument resolvedInstrument{
           .instrument = &instrument,
-          .address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity),
+          .address = selected.at(&instrument),
           .modulation = lowerModulation(instrument.modulation),
       };
       for (auto& region : sampleRegionResponses(instrument.regions, step)) {
@@ -259,45 +239,15 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
 
 }  // namespace
 
-std::vector<const Instrument*> selectSynthInstruments(std::span<const SoundBankAsset* const> soundBanks,
-                                                      const PerformanceSequence* sequenceUsage) {
-  std::vector<const Instrument*> instruments;
-  for (const auto* soundBank : soundBanks) {
-    if (soundBank == nullptr) {
-      continue;
-    }
-    for (const auto& instrument : soundBank->instruments) {
-      instruments.push_back(&instrument);
-    }
+std::vector<SynthInstrumentSelection> selectSynthInstruments(
+    const ResolvedPerformance& performance, const InstrumentAddressPlan& layout, bool onlyUsed) {
+  std::vector<SynthInstrumentSelection> result;
+  if (!layout.valid) return result;
+  const auto used = onlyUsed ? performance.usedInstruments() : std::set<InstrumentHandle>{};
+  for (const auto& [handle, address] : layout.instruments) {
+    if (!onlyUsed || used.contains(handle)) result.push_back({performance.instrument(handle), address});
   }
-  if (sequenceUsage == nullptr) {
-    return instruments;
-  }
-
-  SynthInstrumentSet used;
-  for (const auto& track : sequenceUsage->tracks) {
-    const auto continuedNotes = performanceNotePredecessors(track);
-    // A track uses bank/program zero until its first instrument change.
-    InstrumentSelection selection;
-    bool hasVoice = false;
-    for (const auto& event : track.events) {
-      if (const auto* change = std::get_if<InstrumentPerformanceEvent>(&event)) {
-        selection = change->instrument;
-      } else if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
-        if (hasVoice && (note->extendsPrevious || continuedNotes.contains(note->note))) {
-          continue;
-        }
-        hasVoice = true;
-        if (note->instrumentAddress) {
-          markSelectedInstrument(*note->instrumentAddress, instruments, used);
-        } else {
-          markSelectedInstrument(selection, instruments, used);
-        }
-      }
-    }
-  }
-  std::erase_if(instruments, [&](const Instrument* instrument) { return !used.contains(instrument); });
-  return instruments;
+  return result;
 }
 
 Envelope approximateEnvelopeAsAdsr(Envelope envelope, double attenuationRangeDb) {
@@ -437,7 +387,19 @@ std::vector<Region> sampleRegionResponses(std::span<const Region> regions, u32 s
 PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceStore& sources,
                                    const SynthSampleDecodeOptions& options) {
   PreparedSynthData prepared;
-  const auto instruments = selectSynthInstruments(input.soundBanks, input.sequenceUsage);
+  std::vector<SynthInstrumentSelection> selected;
+  if (input.instrumentSelections) {
+    selected.assign(input.instrumentSelections->begin(), input.instrumentSelections->end());
+  } else {
+    for (const auto* bank : input.soundBanks) {
+      if (!bank) continue;
+      for (const auto& instrument : bank->instruments) {
+        selected.push_back({&instrument, resolveInstrumentAddress(instrument.explicitAddress, instrument.identity)});
+      }
+    }
+  }
+  std::vector<const Instrument*> instruments;
+  for (const auto& entry : selected) instruments.push_back(entry.instrument);
   auto samplesByReference = referencedSamples(instruments);
   for (const auto* bank : input.soundBanks) {
     if (bank != nullptr) {
@@ -449,7 +411,7 @@ PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceSt
       decodeSynthPool(prepared, samplesByReference, pool->metadata.id, pool->pool, input, sources, options);
     }
   }
-  prepared.instruments = resolveSynthInstruments(instruments, samplesByReference, input, prepared.diagnostics);
+  prepared.instruments = resolveSynthInstruments(selected, samplesByReference, input, prepared.diagnostics);
   return prepared;
 }
 

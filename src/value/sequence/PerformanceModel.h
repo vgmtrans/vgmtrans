@@ -77,10 +77,10 @@ struct NotePerformanceEvent {
   // Native portamento may need another MIDI note to continue a source voice.
   // This distinguishes that synthetic note from a genuine envelope restart.
   bool restartsEnvelope = true;
-  // A fresh attack may override the track's selected instrument. Performance
-  // preparation uses this for generated presets; tied continuations inherit
-  // the sounding voice.
-  std::optional<InstrumentAddress> instrumentAddress;
+  // Formats may override the track selection at an attack. Preparation fills
+  // every note with a concrete handle or external preset; continuations inherit
+  // their attack's selection, including any generated variant.
+  std::optional<InstrumentSelection> instrument;
   // Source voices normally restart their LFOs on a fresh attack, but some
   // drivers can disable that reset or suppress it for legato notes.
   bool restartsLfoPhase = true;

@@ -9,7 +9,7 @@
 #include "DiagnosticTestSupport.h"
 #include "SequenceTestSupport.h"
 
-#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "../PerformanceTestSupport.h"
 #include "value/validation/SequenceValidation.h"
 
 #include <algorithm>
@@ -465,7 +465,7 @@ void sequenceVmPreservesLoopsAsPerformanceMarkers() {
   expect(loopEnd != nullptr && loopEnd->header.sourceCommand.id == jumpCommand,
          "preserve-loop VM should link loop-end marker to the command that jumped back");
 
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi = renderTestMidi(performance);
   const auto countMidiMarkers = [&](std::string_view text, u64 tick) {
     return std::ranges::count_if(midi.tracks[0].events, [text, tick](const MidiEvent& event) {
       const auto* marker = midiMeta(event, 6);
@@ -602,7 +602,7 @@ void sequenceVmEmitsProgramInitialChannelState() {
              !instrument->header.sourceCommand.valid(),
          "initial source instrument should preserve its identity without inventing a source command");
 
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi = renderTestMidi(performance);
   const auto renderedPort = ::midiPort(midi.tracks[0].events[0]);
   expect(renderedPort && *renderedPort == 0, "performance renderer should emit MIDI port metadata");
   const auto* midiReverb = midiController(midi.tracks[0].events[1], MidiController::Reverb);

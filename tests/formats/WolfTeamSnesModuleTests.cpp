@@ -8,7 +8,6 @@
 #include "../PerformanceTestSupport.h"
 #include "../TestSupport.h"
 
-#include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/formats/WolfTeamSnes/WolfTeamSnes.h"
 #include "value/platform/SnesSampleDirectory.h"
 #include "value/sequence/SequenceVm.h"
@@ -522,7 +521,7 @@ void sameKeyTimedNotesMoveThePendingNoteOff() {
       notes.size() == 1 && notes[0]->header.tick == 0 && notes[0]->durationTicks == 192 && !notes[0]->extendsPrevious,
       "Freeze's 0x47dc note must move the pending 0x4753 note-off without another attack");
 
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi = renderTestMidi(performance);
   std::vector<std::pair<u64, NoteDuration>> midiNotes;
   for (const MidiEvent& event : midi.tracks.front().events) {
     if (const auto* note = std::get_if<NoteDuration>(&event.payload)) {

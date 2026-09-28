@@ -7,6 +7,7 @@
 #include <exception>
 #include <iostream>
 
+void runResolvedInstrumentTests();
 void runValueRegistryTests();
 void runValueCompilerCursorTests();
 void runValueAssetResolutionTests();
@@ -30,6 +31,7 @@ void runValuePsxTests();
 
 int main() {
   try {
+    runResolvedInstrumentTests();
     runValueRegistryTests();
     runValueCompilerCursorTests();
     runValueAssetResolutionTests();

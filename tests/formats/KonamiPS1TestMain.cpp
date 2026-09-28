@@ -6,7 +6,7 @@
 
 #include "value/formats/ValueFormats.h"
 #include "value/export/CollectionBinding.h"
-#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "../PerformanceTestSupport.h"
 #include "value/session/Session.h"
 #include "value/sequence/SequenceVm.h"
 
@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
       }
       bindingFailures += !binding.collection.has_value();
       const auto midi =
-          renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, soundBanks);
+          renderTestMidi(performance, {}, ModulationConversionPolicy::SynthModulators, soundBanks);
       midiFailures += midi.tracks.empty() || !midi.diagnostics.empty();
       missingBanks += soundBanks.empty();
     }

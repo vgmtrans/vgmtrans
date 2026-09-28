@@ -7,7 +7,7 @@
 #pragma once
 
 #include "value/export/midi/MidiModel.h"
-#include "value/sequence/PerformanceModel.h"
+#include "value/export/ResolvedPerformance.h"
 #include "value/export/ExportTypes.h"
 #include "value/synth/SynthModel.h"
 
@@ -17,12 +17,9 @@ namespace vgmtrans::core {
 
 struct SequenceModulationProfile;
 
-// Converts SequenceVm output into MIDI events. This is where parsed performance
-// values become MIDI channels, ports, controller numbers, and quantized controller values.
 [[nodiscard]] MidiSequence renderMidiSequence(
-    const PerformanceSequence& performance, MidiExportOptions options = {},
+    const ResolvedPerformance& performance, const InstrumentAddressPlan& layout, MidiExportOptions options = {},
     ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators,
-    std::span<const SoundBankAsset* const> soundBanks = {},
     const SequenceModulationProfile* modulationProfile = nullptr);
 
 }  // namespace vgmtrans::core

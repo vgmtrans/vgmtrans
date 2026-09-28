@@ -7,7 +7,7 @@
 #include "../MidiTestSupport.h"
 #include "../TestSupport.h"
 
-#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "../PerformanceTestSupport.h"
 #include "value/formats/ChunSnes/ChunSnes.h"
 #include "value/sequence/SequenceVm.h"
 
@@ -105,7 +105,7 @@ void runChunSnesModuleTests() {
   expect(transition.startKey == 24.0 && transition.targetKey == 25.0 && transition.timing.timelineTicks == 48,
          "pitch slides should retain their direction, distance, and duration");
 
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi = renderTestMidi(performance);
   const bool upwardSlide = std::ranges::any_of(midi.tracks.front().events, [](const MidiEvent& event) {
     const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
     return bend != nullptr && event.tick <= 48 && bend->value > 0;

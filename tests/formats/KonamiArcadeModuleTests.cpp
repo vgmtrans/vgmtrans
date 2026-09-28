@@ -8,9 +8,9 @@
 #include "../TestSupport.h"
 #include "ValueFormatTestSupport.h"
 
-#include "value/export/InstrumentVariants.h"
+#include "value/export/ResolvedPerformance.h"
 #include "value/export/SequenceModulationProfile.h"
-#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "../PerformanceTestSupport.h"
 #include "value/extractors/MameRomSetExtractor.h"
 #include "value/formats/KonamiArcade/KonamiArcade.h"
 #include "value/sequence/SequenceVm.h"
@@ -342,29 +342,31 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
          "the full signed range of loop loudness deltas should survive attenuation-domain conversion");
 
   std::array<SoundBankAsset, 1> dynamicInstruments{*instruments};
-  const auto materialized = materializeInstrumentVariants(performance, dynamicInstruments,
+  const auto materialized = preparePerformance(performance, {dynamicInstruments.begin(), dynamicInstruments.end()},
                                                           InstrumentVariantOptions{.dynamicEnvelopes = true});
   const auto selectedAddress = [&](PerformanceNoteId note) {
-    for (const auto& event : materialized.performance.tracks[0].events) {
+    for (const auto& event : materialized.performance().tracks[0].events) {
       if (const auto* noteEvent = std::get_if<NotePerformanceEvent>(&event);
-          noteEvent != nullptr && noteEvent->note == note && noteEvent->instrumentAddress) {
-        return *noteEvent->instrumentAddress;
+          noteEvent != nullptr && noteEvent->note == note && noteEvent->instrument) {
+        return planInstrumentAddresses(materialized).address(*noteEvent->instrument);
       }
     }
     return InstrumentAddress{.bank = invalidIdValue, .program = invalidIdValue};
   };
   const auto finiteRelease = selectedAddress(notes[5]->note);
   const auto restoredRelease =
-      std::ranges::find_if(materialized.performance.tracks[0].events, [&](const PerformanceEvent& event) {
+      std::ranges::find_if(materialized.performance().tracks[0].events, [&](const PerformanceEvent& event) {
         const auto* note = std::get_if<NotePerformanceEvent>(&event);
         return note != nullptr && note->note == notes.back()->note;
       });
-  expect(finiteRelease != resolveInstrumentAddress(dynamicInstruments[0].instruments[1].explicitAddress,
-                                                   dynamicInstruments[0].instruments[1].identity) &&
-             restoredRelease != materialized.performance.tracks[0].events.end() &&
-             !std::get<NotePerformanceEvent>(*restoredRelease).instrumentAddress,
-         "FA zero should leave later notes on the instant-release instrument selected after percussion mode");
-  expect(std::ranges::all_of(dynamicInstruments[0].instruments,
+  expect(finiteRelease != resolveInstrumentAddress(materialized.soundBanks()[0].instruments[1].explicitAddress,
+                                                   materialized.soundBanks()[0].instruments[1].identity) &&
+             restoredRelease != materialized.performance().tracks[0].events.end() &&
+             selectedAddress(notes.back()->note) ==
+                 resolveInstrumentAddress(materialized.soundBanks()[0].instruments[0].explicitAddress,
+                                          materialized.soundBanks()[0].instruments[0].identity),
+         "FA zero should leave later notes on the instant-release melodic instrument after percussion mode");
+  expect(std::ranges::all_of(materialized.soundBanks()[0].instruments,
                              [](const Instrument& instrument) {
                                return std::ranges::all_of(instrument.regions, [](const Region& region) {
                                  return !region.envelope.releaseSeconds || !std::isinf(*region.envelope.releaseSeconds);
@@ -415,7 +417,7 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
          "KonamiArcade format code should not preselect a MIDI slide representation");
 
   const std::array<const SoundBankAsset*, 1> soundBanks{instruments};
-  const MidiSequence midi = renderMidiSequence(
+  const MidiSequence midi = renderTestMidi(
       performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PreserveFormat},
       ModulationConversionPolicy::SynthModulators, soundBanks, &modulationProfile);
   expect(
@@ -459,7 +461,7 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
          "MysticWarrior F3 timing should overlap the fully transposed source and target notes by one tick");
 
   const MidiSequence pitchBendMidi =
-      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend},
+      renderTestMidi(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend},
                          ModulationConversionPolicy::SynthModulators, soundBanks);
   expect(std::ranges::none_of(pitchBendMidi.tracks[0].events,
                               [](const MidiEvent& event) {
@@ -946,7 +948,7 @@ void konamiArcadeMysticDrumPitchSlidesUseTablePitch() {
          "MysticWarrior drum F3 should slide from the table pitch toward the target instead of from the selector key");
 
   const MidiSequence midi =
-      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+      renderTestMidi(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   expect(std::ranges::any_of(midi.tracks[0].events,
                              [](const MidiEvent& event) {
                                const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);

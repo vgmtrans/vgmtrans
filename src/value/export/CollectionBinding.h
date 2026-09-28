@@ -7,6 +7,7 @@
 #pragma once
 
 #include "value/export/ExportTypes.h"
+#include "value/export/ResolvedPerformance.h"
 #include "value/export/SequenceModulationProfile.h"
 #include "value/export/midi/ModulationAnalysis.h"
 #include "value/model/SessionSnapshot.h"
@@ -77,17 +78,19 @@ public:
   CollectionWorkspace(CollectionWorkspace&&) noexcept = default;
 
   void render(const SequenceRenderOptions& options, DynamicEnvelopePolicy dynamicEnvelopes,
-              bool materializeSignedStereo = false);
-  // MIDI and synth export share one observed controller range.
-  void prepareModulation(ModulationConversionPolicy conversion, ModulationScalingPolicy scaling);
+              bool materializeSignedStereo = false,
+              ModulationConversionPolicy conversion = ModulationConversionPolicy::SynthModulators,
+              ModulationScalingPolicy scaling = ModulationScalingPolicy::FullFormatRange);
 
   [[nodiscard]] const PerformanceSequence* performance() const noexcept;
   [[nodiscard]] std::vector<const SoundBankAsset*> soundBankView() const;
-  [[nodiscard]] std::vector<SoundBankAsset>& soundBanks() noexcept { return collection.soundBanks_; }
+  [[nodiscard]] const std::vector<SoundBankAsset>& soundBanks() const noexcept {
+    return exportPerformance ? exportPerformance->soundBanks() : collection.soundBanks_;
+  }
 
   BoundCollection collection;
   RenderedCollection rendering;
-  std::optional<PerformanceSequence> exportPerformance;
+  std::optional<ResolvedPerformance> exportPerformance;
   MidiModulationUsage modulationUsage;
   std::vector<Diagnostic> diagnostics;
 };

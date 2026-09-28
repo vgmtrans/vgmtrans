@@ -8,7 +8,6 @@
 #include "../PerformanceTestSupport.h"
 #include "../TestSupport.h"
 
-#include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/formats/CompileSnes/CompileSnes.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
@@ -256,7 +255,7 @@ void pitchSweepAdvancesThroughThePitchTable() {
              downSlide->preferredRendering == PitchTransitionRenderingHint::PitchBend,
          "positive pitch-sweep rates should become smooth transitions over the note-table-derived range");
 
-  const MidiSequence midi = renderMidiSequence(downward);
+  const MidiSequence midi = renderTestMidi(downward);
   const auto hasBendAt = [&](u64 tick) {
     return std::ranges::any_of(midi.tracks.front().events, [tick](const MidiEvent& event) {
       const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
@@ -281,7 +280,7 @@ void portamentoUsesDriverRateAndRetriggersFirstNote() {
                           : pitchTransitionIntent(performance.tracks.front().automations.back());
   const auto* timing = slide == nullptr ? nullptr : std::get_if<FixedDurationPitchSlideTiming>(&slide->timing.physical);
   const MidiSequence midi =
-      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+      renderTestMidi(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   const auto noteCount = std::ranges::count_if(midi.tracks.front().events, [](const MidiEvent& event) {
     return std::holds_alternative<NoteDuration>(event.payload);
   });
