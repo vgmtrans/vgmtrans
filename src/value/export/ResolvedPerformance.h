@@ -37,6 +37,7 @@ public:
   [[nodiscard]] std::set<InstrumentHandle> usedInstruments() const;
 
 private:
+  friend class PreparedCollection;
   friend ResolvedPerformance preparePerformance(PerformanceSequence, std::vector<SoundBankAsset>,
                                                  InstrumentVariantOptions);
   friend ResolvedPerformance lowerMidiPerformanceAutomation(ResolvedPerformance, const MidiExportOptions&,

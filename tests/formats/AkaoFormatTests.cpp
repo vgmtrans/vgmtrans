@@ -698,13 +698,13 @@ void ff7CollectionBindsNativeEnvelopesAndPreservesDrumDefaults() {
   expect(snapshot.collections().size() == 1, "FF7 fixture should resolve its split sample pool");
   const auto bound = bindCollection(snapshot, snapshot.collections()[0].id);
   expect(bound.collection.has_value(), "FF7 envelope fixture should bind successfully");
-  CollectionWorkspace workspace{*bound.collection, {}};
-  workspace.render({}, DynamicEnvelopePolicy::InstrumentVariants);
-  expect(workspace.rendering.performance.has_value(), "FF7 prepared runtime should render successfully");
-  const auto envelopes = fixtureEvents<EnvelopePerformanceEvent>(*workspace.rendering.performance);
+  const PreparedCollection prepared{*bound.collection, {
+      .sequence = SequenceRenderOptions{}, .variants = {.dynamicEnvelopes = true}}};
+  expect(prepared.rendering.performance.has_value(), "FF7 prepared runtime should render successfully");
+  const auto envelopes = fixtureEvents<EnvelopePerformanceEvent>(*prepared.rendering.performance);
   expect(!envelopes.empty() && envelopes[0].update.values == psxSpuEnvelope(0x00ff, 0x5005),
          "collection preparation should supply the selected sample's native registers to B1");
-  const auto& bank = workspace.soundBanks()[0];
+  const auto& bank = prepared.soundBanks()[0];
   expect(std::ranges::all_of(bank.instruments, [](const Instrument& instrument) { return instrument.reverb == 0.0; }),
          "FF7 melodic, drum and ADSR-variant instruments must not add reverb independently of sequence commands");
   const auto drum = std::ranges::find_if(bank.instruments, [](const Instrument& instrument) {

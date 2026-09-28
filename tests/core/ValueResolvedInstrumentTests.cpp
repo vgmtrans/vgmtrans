@@ -6,6 +6,7 @@
 #include "../TestSupport.h"
 #include "SessionSnapshotBuilder.h"
 #include "SynthExportTestSupport.h"
+#include "value/export/CollectionBinding.h"
 #include "value/export/Export.h"
 #include "value/export/ResolvedPerformance.h"
 #include "value/export/midi/PitchTransitionMidiLowering.h"
@@ -294,6 +295,86 @@ void collectionExportsRequireACompanionForVariants() {
          "repeated exports must not add variants to the snapshot's source bank");
 }
 
+void completedCollectionsRetainInputsAcrossRenderingOutcomes() {
+  SourceStore sources;
+  const auto source = sources.add(SourceFile{.name = "lifetime.pcm"}, {0, 32, 64, 96});
+  enum class Scenario { NoSequence, Skipped, Failed, Rendered };
+  for (const auto scenario : {Scenario::NoSequence, Scenario::Skipped, Scenario::Failed, Scenario::Rendered}) {
+    size_t executions = 0;
+    auto prepared = [&] {
+      test::SessionSnapshotBuilder builder;
+      builder.sources = sources.sourceFiles();
+      builder.assets = {
+          SequenceProgramAsset{
+              .metadata = {.id = AssetId{0}, .name = "Song"},
+              .program = {
+                  .runtime = {.createProgramState = [&, scenario](const SequenceProgram&) -> std::any {
+                    ++executions;
+                    if (scenario == Scenario::Failed) throw std::runtime_error("lifecycle failure");
+                    return {};
+                  }, .execute = [](const SourceCommand&, std::any&, std::any&, PerformanceEmitter& out, VmApi&) {
+                    out.instrument(0, 5);
+                    out.updateEnvelope(Envelope{.attackSeconds = 0.25}, EnvelopeFields::Attack);
+                    out.note(60, 1, 4);
+                    return Effects::wait(4);
+                  }},
+                  .tracks = {TrackProgram{.startAddress = Address{0}, .commands = {
+                      SourceCommand{.address = Address{0}, .flow = CommandFlow::end(Address{1})}}}}}},
+          SoundBankAsset{
+              .metadata = {.id = AssetId{1}, .name = "Bank"},
+              .instruments = {Instrument{.explicitAddress = InstrumentAddress{0, 5}, .regions = {
+                  Region{.sample = SampleRef::resolved(AssetId{2}, 0), .envelope = {.attackSeconds = 1.0}}}}}},
+          SamplePoolAsset{
+              .metadata = {.id = AssetId{2}, .name = "Samples"},
+              .pool = {.samples = {Sample{.codec = AudioCodec::PcmS8, .encodedData = {source, 0, 4},
+                                          .sampleRate = 16000}}}},
+      };
+      builder.collections = {{.id = CollectionId{0}, .name = "Collection", .members = {
+          .sequence = scenario == Scenario::NoSequence ? std::nullopt : std::optional{AssetId{0}},
+          .soundBanks = {AssetId{1}}, .samplePools = {AssetId{2}}}}};
+      const auto snapshot = builder.finish();
+      auto binding = bindCollection(snapshot, CollectionId{0});
+      expect(binding.collection.has_value(), "the lifetime fixture should bind successfully");
+      const PreparedCollection original{std::move(*binding.collection), {
+          .sequence = scenario == Scenario::Skipped || scenario == Scenario::NoSequence
+              ? std::nullopt : std::optional{SequenceRenderOptions{}},
+          .variants = {.dynamicEnvelopes = true},
+      }};
+      expect(snapshot.asset<SoundBankAsset>(AssetId{1})->instruments.size() == 1,
+             "preparation must leave the snapshot's bank unchanged");
+      std::vector<PreparedCollection> copies;
+      copies.push_back(original);
+      copies.push_back(original);
+      return std::move(copies.back());
+    }();  // The binding, snapshot, original result, and other copies are gone.
+
+    const bool rendered = scenario == Scenario::Rendered;
+    expect(executions == (scenario == Scenario::Failed || rendered ? 1 : 0),
+           "construction must execute the sequence only when requested, once even on failure");
+    expect(bool(prepared.performance()) == rendered && bool(prepared.rendering.performance) == rendered &&
+               prepared.rendering.diagnostics.empty() == (scenario != Scenario::Failed),
+           "the completed result must distinguish a usable performance from skipped or failed rendering");
+    expect(prepared.id == CollectionId{0} && prepared.baseName == "Collection" &&
+               prepared.sequenceId.has_value() == (scenario != Scenario::NoSequence) &&
+               prepared.samplePools[0]->metadata.name == "Samples" && prepared.soundBanks().size() == 1 &&
+               prepared.soundBanks()[0].instruments.size() == (rendered ? 2 : 1),
+           "moves and copies must retain bank data, metadata, and external sample owners in every outcome");
+    const auto banks = prepared.soundBankView();
+    const auto synth = buildSoundFont2({.soundBanks = banks, .samplePools = prepared.samplePools}, sources);
+    expect(!synth.bytes.empty() && synth.diagnostics.empty(),
+           "retained inputs must remain usable for synth export after their original owners are destroyed");
+    if (rendered) {
+      const auto& performance = *prepared.performance();
+      expect(&prepared.soundBanks() == &performance.soundBanks() &&
+                 !noteById(*prepared.rendering.performance, PerformanceNoteId{0}).instrument &&
+                 noteById(performance.performance(), PerformanceNoteId{0}).instrument.has_value(),
+             "resolved events must share the final banks while source events remain available for inspection");
+      expect(!renderMidiSequence(performance, planInstrumentAddresses(performance)).tracks.empty(),
+             "the retained resolved performance must still render after owner moves and destruction");
+    }
+  }
+}
+
 }  // namespace
 
 void runResolvedInstrumentTests() {
@@ -303,4 +384,5 @@ void runResolvedInstrumentTests() {
   preparedOwnershipSurvivesMovesAndLowering();
   laterSourceSelectionsCannotFindGeneratedVariants();
   collectionExportsRequireACompanionForVariants();
+  completedCollectionsRetainInputsAcrossRenderingOutcomes();
 }

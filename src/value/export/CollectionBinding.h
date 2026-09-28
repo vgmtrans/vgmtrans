@@ -12,6 +12,7 @@
 #include "value/export/midi/ModulationAnalysis.h"
 #include "value/model/SessionSnapshot.h"
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -20,26 +21,22 @@ namespace vgmtrans::core {
 
 struct CollectionBindingResult;
 struct RenderedCollection;
-class CollectionWorkspace;
+class PreparedCollection;
 
 // Prepared inputs for one collection. It owns the changed bank copies and
 // sequence settings, and keeps the snapshot alive for the assets it references.
 // Playback and export can use it without changing the scanned assets.
 class BoundCollection {
 public:
-  [[nodiscard]] CollectionId id() const noexcept { return id_; }
   [[nodiscard]] const std::string& baseName() const noexcept { return baseName_; }
   [[nodiscard]] bool hasSequence() const noexcept { return sequence_ != nullptr; }
-  [[nodiscard]] std::optional<AssetId> sequenceId() const noexcept {
-    return sequence_ != nullptr ? std::optional{sequence_->metadata.id} : std::nullopt;
-  }
   [[nodiscard]] const std::vector<SoundBankAsset>& soundBanks() const noexcept { return soundBanks_; }
   [[nodiscard]] const std::vector<const SamplePoolAsset*>& samplePools() const noexcept { return samplePools_; }
 
 private:
   friend CollectionBindingResult prepareCollection(const SessionSnapshot&, const Collection&);
   friend RenderedCollection renderCollection(const BoundCollection&, const SequenceRenderOptions&);
-  friend class CollectionWorkspace;
+  friend class PreparedCollection;
 
   BoundCollection(SessionSnapshot snapshot, CollectionId id, std::string baseName, const SequenceProgramAsset* sequence,
                   SequenceRuntime sequenceRuntime, std::vector<SoundBankAsset> soundBanks,
@@ -67,32 +64,40 @@ struct RenderedCollection {
   std::vector<Diagnostic> diagnostics;
 };
 
-// Work shared by playback, export, and stitching. Keep the rendered performance
-// separate from changes needed only for export. Call each preparation step at
-// most once on a fresh workspace.
-class CollectionWorkspace {
+struct CollectionPreparationOptions {
+  // Absent for exports that do not need sequence execution, such as WAV.
+  std::optional<SequenceRenderOptions> sequence;
+  InstrumentVariantOptions variants;
+  ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;
+  ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
+};
+
+// Completed export inputs. Construction consumes the private binding and runs
+// any requested sequence preparation. Banks and sample owners survive even if
+// rendering fails; there is no partially rendered workspace to finish later.
+class PreparedCollection {
 public:
-  CollectionWorkspace(BoundCollection collection, std::vector<Diagnostic> diagnostics);
+  explicit PreparedCollection(BoundCollection collection, const CollectionPreparationOptions& options = {});
 
-  CollectionWorkspace(const CollectionWorkspace&) = delete;
-  CollectionWorkspace(CollectionWorkspace&&) noexcept = default;
-
-  void render(const SequenceRenderOptions& options, DynamicEnvelopePolicy dynamicEnvelopes,
-              bool materializeSignedStereo = false,
-              ModulationConversionPolicy conversion = ModulationConversionPolicy::SynthModulators,
-              ModulationScalingPolicy scaling = ModulationScalingPolicy::FullFormatRange);
-
-  [[nodiscard]] const PerformanceSequence* performance() const noexcept;
-  [[nodiscard]] std::vector<const SoundBankAsset*> soundBankView() const;
-  [[nodiscard]] const std::vector<SoundBankAsset>& soundBanks() const noexcept {
-    return exportPerformance ? exportPerformance->soundBanks() : collection.soundBanks_;
+  [[nodiscard]] const ResolvedPerformance* performance() const noexcept {
+    return performance_ ? &*performance_ : nullptr;
   }
+  [[nodiscard]] std::vector<const SoundBankAsset*> soundBankView() const;
+  [[nodiscard]] const std::vector<SoundBankAsset>& soundBanks() const noexcept { return *soundBanks_; }
 
-  BoundCollection collection;
+  CollectionId id;
+  std::string baseName;
+  std::optional<AssetId> sequenceId;
+  std::vector<const SamplePoolAsset*> samplePools;
+  // Retain source events for inspection independently of export adaptations.
   RenderedCollection rendering;
-  std::optional<ResolvedPerformance> exportPerformance;
   MidiModulationUsage modulationUsage;
-  std::vector<Diagnostic> diagnostics;
+
+private:
+  SessionSnapshot snapshot_;
+  // The performance, when present, shares this same immutable allocation.
+  std::shared_ptr<const std::vector<SoundBankAsset>> soundBanks_;
+  std::optional<ResolvedPerformance> performance_;
 };
 
 [[nodiscard]] CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, CollectionId collection);
