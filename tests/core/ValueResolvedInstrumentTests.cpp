@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 #include "../TestSupport.h"
+#include "../PerformanceTestSupport.h"
 #include "SessionSnapshotBuilder.h"
 #include "SynthExportTestSupport.h"
 #include "value/export/CollectionBinding.h"
@@ -66,24 +67,24 @@ void resolvedVariantsShareAddressesWithBothSynthWriters() {
   const auto fresh = out.at(8).note(67, 1, 4);
   const PerformanceSequence sourcePerformance{.timebase = {.ppqn = 48}, .tracks = {track}};
   const auto unadapted = preparePerformance(sourcePerformance, {banks.begin(), banks.end()});
-  expect(noteById(unadapted.performance(), first).instrument == InstrumentSelection{InstrumentHandle{0, 0}} &&
-             noteById(unadapted.performance(), continuation).instrument == InstrumentSelection{InstrumentHandle{0, 0}} &&
-             noteById(unadapted.performance(), fresh).instrument == InstrumentSelection{InstrumentHandle{0, 1}},
+  expect(unadapted.voiceFor(noteById(unadapted.performance(), first)).instrument == InstrumentSelection{InstrumentHandle{0, 0}} &&
+             unadapted.voiceFor(noteById(unadapted.performance(), continuation)).instrument == InstrumentSelection{InstrumentHandle{0, 0}} &&
+             unadapted.voiceFor(noteById(unadapted.performance(), fresh)).instrument == InstrumentSelection{InstrumentHandle{0, 1}},
          "resolution must retain the attack's instrument through an intervening program change");
   const auto resolved = preparePerformance(sourcePerformance, {banks.begin(), banks.end()},
       {.dynamicEnvelopes = true, .onlyUsedInstruments = true, .firstBank = 11});
   const auto& preparedBanks = resolved.soundBanks();
-  const auto variant = *noteById(resolved.performance(), first).instrument;
+  const auto variant = resolved.voiceFor(noteById(resolved.performance(), first)).instrument;
   expect(std::get<InstrumentHandle>(variant) == InstrumentHandle{0, 2} &&
-             noteById(resolved.performance(), continuation).instrument == variant &&
-             noteById(resolved.performance(), fresh).instrument == InstrumentSelection{InstrumentHandle{0, 1}} &&
+             resolved.voiceFor(noteById(resolved.performance(), continuation)).instrument == variant &&
+             resolved.voiceFor(noteById(resolved.performance(), fresh)).instrument == InstrumentSelection{InstrumentHandle{0, 1}} &&
              !preparedBanks[0].instruments[2].explicitAddress,
          "variants must propagate stable handles without overwriting the instrument's source address preference");
   expect(!noteById(sourcePerformance, first).instrument && banks[0].instruments[0].regions[0].envelope.attackSeconds == 1.0,
          "preparation must leave the source performance and original instrument envelope intact");
 
   expect(resolved.valid() && resolved.bankMapping().at(0) == 11 && resolved.bankMapping().at(9) == 12 &&
-             noteById(resolved.performance(), first).instrument == variant,
+             resolved.voiceFor(noteById(resolved.performance(), first)).instrument == variant,
          "completed preparation must retain handles while assigning the requested bank namespace");
   const auto selected = selectSynthBanks(resolved);
   expect(selected.size() == 1 && selected[0].bank == &preparedBanks[0] &&
@@ -149,11 +150,11 @@ void resolutionChoosesAndDiagnosesOneDefinition() {
       NotePerformanceEvent{.header = {.tick = 2}, .instrument = InstrumentAddress{7, 9}, .note = PerformanceNoteId{2}},
   };
   const auto resolved = preparePerformance(PerformanceSequence{.tracks = {track}}, {bank}, {.onlyUsedInstruments = true});
-  expect(noteById(resolved.performance(), PerformanceNoteId{0}).instrument ==
+  expect(resolved.voiceFor(noteById(resolved.performance(), PerformanceNoteId{0})).instrument ==
              InstrumentSelection{InstrumentHandle{0, 0}} &&
-             noteById(resolved.performance(), PerformanceNoteId{1}).instrument ==
+             resolved.voiceFor(noteById(resolved.performance(), PerformanceNoteId{1})).instrument ==
              InstrumentSelection{InstrumentHandle{0, 0}} &&
-             noteById(resolved.performance(), PerformanceNoteId{2}).instrument ==
+             resolved.voiceFor(noteById(resolved.performance(), PerformanceNoteId{2})).instrument ==
              InstrumentSelection{InstrumentAddress{7, 9}},
          "exact identity, fallback and external presets must resolve consistently");
   expect(std::ranges::count(resolved.performance().diagnostics, std::string("instrument-selection-fallback"),
@@ -244,9 +245,9 @@ void laterSourceSelectionsCannotFindGeneratedVariants() {
   }}}};
   const auto prepared = preparePerformance(source, {bank}, {.dynamicEnvelopes = true});
   expect(prepared.soundBanks()[0].instruments.size() == 2 &&
-             noteById(prepared.performance(), PerformanceNoteId{0}).instrument ==
+             prepared.voiceFor(noteById(prepared.performance(), PerformanceNoteId{0})).instrument ==
                  InstrumentSelection{InstrumentHandle{0, 1}} &&
-             noteById(prepared.performance(), PerformanceNoteId{1}).instrument ==
+             prepared.voiceFor(noteById(prepared.performance(), PerformanceNoteId{1})).instrument ==
                  InstrumentSelection{InstrumentAddress{0, 0}},
          "numeric fallback must search original definitions, not an earlier generated variant without an address");
   expect(prepared.selectionFor(InstrumentHandle{0, 1}).address != InstrumentAddress{0, 0},
@@ -386,7 +387,7 @@ void completedCollectionsRetainInputsAcrossRenderingOutcomes() {
       const auto& performance = *prepared.performance();
       expect(&prepared.soundBanks() == &performance.soundBanks() &&
                  !noteById(*prepared.rendering.performance, PerformanceNoteId{0}).instrument &&
-                 noteById(performance.performance(), PerformanceNoteId{0}).instrument.has_value(),
+                 performance.selectionFor(noteById(performance.performance(), PerformanceNoteId{0})).instrument != nullptr,
              "resolved events must share the final banks while source events remain available for inspection");
       expect(!renderMidiSequence(performance).tracks.empty(),
              "the retained resolved performance must still render after owner moves and destruction");
@@ -487,9 +488,82 @@ void synthSelectionsPreserveBankSamplingAndSampleOwners() {
   }
 }
 
+void soundingVoicesOwnSelectionsAndDeadlines() {
+  PerformanceTrack track{.id = TrackId{0}, .endTick = 40};
+  u64 order = 0;
+  u32 nextNote = 0, nextAutomation = 0;
+  PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{1}, 0, order, nextNote, nextAutomation};
+  out.instrument(0, 5);
+  const auto attack = out.note(NotePerformanceEvent{.key = 60, .durationTicks = 4,
+                                                  .maximumDurationMilliseconds = 1000.0});
+  out.at(2).instrument(0, 7);
+  const auto other = out.at(2).note(NotePerformanceEvent{.key = 72, .durationTicks = 38, .lane = PerformanceLaneId{1}});
+  // An explicit tie must find its voice even with an unrelated note interleaved.
+  out.at(4).note(NotePerformanceEvent{.key = 60, .durationTicks = 4, .extendsPrevious = true, .note = attack});
+  const auto continued = out.at(8).continueVoice(attack, NotePerformanceEvent{.key = 64, .durationTicks = 32});
+  out.at(8).tempo(1000000);
+  const auto& firstSource = std::get<NotePerformanceEvent>(track.events[1]);
+  const auto& lastSource = std::get<NotePerformanceEvent>(track.events[5]);
+  expect(firstSource.voice == lastSource.voice && firstSource.note != continued,
+         "key changes and same-pitch ties must share an explicit source voice without sharing every note identity");
+  const SoundBankAsset bank{.instruments = {
+      Instrument{.explicitAddress = InstrumentAddress{0, 5}}, Instrument{.explicitAddress = InstrumentAddress{0, 7}}}};
+  const auto prepared = preparePerformance({.timebase = {.ppqn = 10}, .tracks = {track, track}}, {bank});
+  const auto& first = noteById(prepared.performance(), attack);
+  const auto& last = noteById(prepared.performance(), continued);
+  const auto& overlap = noteById(prepared.performance(), other);
+  const auto& voice = prepared.voiceFor(first);
+  expect(&voice == &prepared.voiceFor(last) && &voice != &prepared.voiceFor(overlap) &&
+             voice.startTick == 0 && voice.endTick == 40 && voice.endLimit == 14 &&
+             !prepared.voiceFor(overlap).endLimit &&
+             prepared.selectionFor(last).address.program == 5 && prepared.selectionFor(overlap).address.program == 7,
+         "one voice must own the attack instrument and tempo-aware deadline across interleaved segments");
+  const auto secondTrackNotes = eventsOfType<NotePerformanceEvent>(prepared.performance().tracks[1]);
+  expect(secondTrackNotes.front()->voice != first.voice,
+         "track-local source voice IDs must become distinct prepared voices across tracks");
+  for (const auto mode : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
+    const auto lowered = lowerMidiPerformanceAutomation(prepared, {.pitchTransitions = mode},
+                                                         PerformanceTempoMap{prepared.performance()});
+    for (const auto& event : lowered.performance().tracks[0].events) {
+      if (const auto* note = std::get_if<NotePerformanceEvent>(&event); note && note->voice == first.voice) {
+        expect(lowered.voiceFor(*note).endLimit == 14 && lowered.selectionFor(*note).address.program == 5,
+               "every lowered physical fragment must retain the source voice's selection and absolute deadline");
+      }
+    }
+    const auto midi = renderMidiSequence(prepared, {.pitchTransitions = mode});
+    for (const auto& event : midi.tracks[0].events) {
+      if (const auto* note = std::get_if<NoteDuration>(&event.payload)) {
+        expect(note->key == 72 ? event.tick + note->duration == 40 : event.tick + note->duration <= 14,
+               "a hardware stop must limit only fragments of its own voice");
+      }
+    }
+  }
+}
+
+void canceledOrDelayedPitchMotionDoesNotJoinAttacks() {
+  for (const bool delayed : {false, true}) {
+    PerformanceTrack track{.id = TrackId{0}};
+    u64 order = 0;
+    u32 nextNote = 0, nextAutomation = 0;
+    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{1}, 0, order, nextNote, nextAutomation};
+    out.instrument(0, 5);
+    const auto first = out.note(60, 1.0, 4);
+    out.at(4).instrument(0, 7);
+    const auto second = out.at(4).note(64, 1.0, 4);
+    auto slide = out.at(delayed ? 5 : 4).pitchSlide(second, 60, 64, 2).continueFrom(first);
+    if (!delayed) slide.stop(out.at(4));
+    const auto prepared = preparePerformance({.tracks = {track}});
+    expect(noteById(prepared.performance(), first).voice != noteById(prepared.performance(), second).voice &&
+               prepared.selectionFor(noteById(prepared.performance(), second)).address.program == 7,
+           "mid-note or canceled-before-onset motion must preserve the target's fresh attack and instrument");
+  }
+}
+
 }  // namespace
 
 void runResolvedInstrumentTests() {
+  soundingVoicesOwnSelectionsAndDeadlines();
+  canceledOrDelayedPitchMotionDoesNotJoinAttacks();
   resolvedVariantsShareAddressesWithBothSynthWriters();
   resolutionChoosesAndDiagnosesOneDefinition();
   layoutSeparatesCollisionsAndRejectsOverflow();

@@ -173,8 +173,9 @@ bool matchesInstrumentSelection(const Instrument& instrument, const InstrumentSe
 }  // namespace
 
 ResolvedPerformance::ResolvedPerformance(PerformanceSequence performance, std::vector<SoundBankAsset> soundBanks,
-                                         InstrumentSelection initialInstrument, const InstrumentPreparationOptions& options)
-    : performance_(std::move(performance)),
+                                         InstrumentSelection initialInstrument, std::vector<SoundingVoice> voices,
+                                         const InstrumentPreparationOptions& options)
+    : performance_(std::move(performance)), voices_(std::move(voices)),
       soundBanks_(std::make_shared<const std::vector<SoundBankAsset>>(std::move(soundBanks))),
       onlyUsedInstruments_(options.onlyUsedInstruments) {
   if (const auto* handle = std::get_if<InstrumentHandle>(&initialInstrument)) {
@@ -191,14 +192,8 @@ std::vector<const SoundBankAsset*> ResolvedPerformance::soundBankView() const {
 
 std::set<InstrumentHandle> ResolvedPerformance::usedInstruments() const {
   std::set<InstrumentHandle> used;
-  for (const auto& track : performance_.tracks) {
-    for (const auto& event : track.events) {
-      if (const auto* note = std::get_if<NotePerformanceEvent>(&event); note && note->instrument) {
-        if (const auto* handle = std::get_if<InstrumentHandle>(&*note->instrument)) {
-          used.insert(*handle);
-        }
-      }
-    }
+  for (const auto& voice : voices_) {
+    if (const auto* handle = std::get_if<InstrumentHandle>(&voice.instrument)) used.insert(*handle);
   }
   return used;
 }
@@ -206,6 +201,8 @@ std::set<InstrumentHandle> ResolvedPerformance::usedInstruments() const {
 ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vector<SoundBankAsset> soundBanks,
                                          InstrumentPreparationOptions options) {
   auto& diagnostics = performance.diagnostics;
+  const PerformanceTempoMap tempos{performance};
+  std::vector<SoundingVoice> voices;
   struct CachedSelection {
     InstrumentSelection resolved;
     bool fallback = false;
@@ -273,13 +270,11 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
     std::ranges::stable_sort(track.events, {}, [](const PerformanceEvent& event) {
       return performanceEventHeader(event).order();
     });
-    const auto continuedNotes = performanceNotePredecessors(track);
+    std::unordered_map<PerformanceVoiceId, PerformanceVoiceId> resolvedVoices;
     InstrumentSelection selected = InstrumentAddress{};
     // Once a track uses signed channel gain, all of its pan must be baked into
     // variants so ordinary MIDI pan does not also affect the layered output.
     const bool materializeStereo = options.signedStereo && requiresSignedStereoVariants(track);
-    std::unordered_map<PerformanceNoteId, InstrumentSelection> attacks;
-    std::optional<InstrumentSelection> previous;
     std::unordered_map<PerformanceLaneId, LaneState> lanes;
     double leftGain = 1.0;
     double rightGain = 1.0;
@@ -358,37 +353,36 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
 
       const u64 noteEnd = addTicks(note->header.tick, note->durationTicks);
       auto& lane = lanes[note->lane];
-      std::optional<InstrumentSelection> inherited;
-      if (note->extendsPrevious) inherited = previous;
-      if (const auto predecessor = continuedNotes.find(note->note); predecessor != continuedNotes.end()) {
-        if (const auto found = attacks.find(predecessor->second); found != attacks.end()) inherited = found->second;
+      // A missing source identity is a fresh attack, never an implicit link to
+      // whichever note happened to precede it in the event vector.
+      const auto sourceVoice = note->voice;
+      const auto found = resolvedVoices.find(sourceVoice);
+      const bool fresh = !sourceVoice.valid() || found == resolvedVoices.end();
+      note->voice = fresh ? PerformanceVoiceId{static_cast<u32>(voices.size())} : found->second;
+      if (fresh) {
+        if (sourceVoice.valid()) resolvedVoices.emplace(sourceVoice, note->voice);
+        voices.push_back({.startTick = note->header.tick});
       }
-      if (note->note.valid()) {
-        if (const auto found = attacks.find(note->note); found != attacks.end()) inherited = found->second;
+      auto& voice = voices[note->voice.value];
+      voice.endTick = std::max(voice.endTick, noteEnd);
+      if (note->maximumDurationMilliseconds) {
+        const u64 limit = addTicks(note->header.tick,
+            tempos.durationTicksForMilliseconds(note->header.tick, *note->maximumDurationMilliseconds));
+        voice.endLimit = std::min(voice.endLimit.value_or(limit), limit);
       }
-      const bool continuesVoice = inherited.has_value();
-      lane.voiceEnd = continuesVoice ? std::max(lane.voiceEnd, noteEnd) : noteEnd;
-      if (continuesVoice) {
-        note->instrument = *inherited;
-        if (note->note.valid()) attacks.insert_or_assign(note->note, *inherited);
-        previous = inherited;
-        continue;
-      }
-      note->instrument = resolve(note->instrument.value_or(selected), &note->header);
-      const auto remember = [&] {
-        if (note->note.valid()) attacks.insert_or_assign(note->note, *note->instrument);
-        previous = note->instrument;
-      };
+      lane.voiceEnd = fresh ? noteEnd : std::max(lane.voiceEnd, noteEnd);
+      const auto sourceInstrument = std::exchange(note->instrument, std::nullopt);
+      if (!fresh) continue;
+      voice.instrument = resolve(sourceInstrument.value_or(selected), &note->header);
 
       const bool hasEnvelope = options.dynamicEnvelopes && lane.envelope.fields != EnvelopeFields::None;
       const bool envelopeOnly = hasEnvelope && !materializeStereo;
-      const auto* baseRef = std::get_if<InstrumentHandle>(&*note->instrument);
+      const auto* baseRef = std::get_if<InstrumentHandle>(&voice.instrument);
       if (!baseRef) {
         if ((hasEnvelope || materializeStereo) && !warnedMissingInstrument) {
           diagnostics.push_back(instrumentNotFoundWarning(envelopeOnly, note->header));
           warnedMissingInstrument = true;
         }
-        remember();
         continue;
       }
 
@@ -449,8 +443,7 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
         }
       }
 
-      if (variantHandle) note->instrument = *variantHandle;
-      remember();
+      if (variantHandle) voice.instrument = *variantHandle;
     }
 
     if (materializeStereo) {
@@ -460,7 +453,7 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
       });
     }
   }
-  return ResolvedPerformance{std::move(performance), std::move(soundBanks), initialInstrument, options};
+  return ResolvedPerformance{std::move(performance), std::move(soundBanks), initialInstrument, std::move(voices), options};
 }
 
 ResolvedInstrument ResolvedPerformance::selectionFor(InstrumentHandle handle) const {
@@ -477,7 +470,7 @@ ResolvedInstrument ResolvedPerformance::selectedInstrument(const InstrumentSelec
 }
 
 ResolvedInstrument ResolvedPerformance::selectionFor(const NotePerformanceEvent& note) const {
-  return selectedInstrument(note.instrument.value());
+  return selectedInstrument(voiceFor(note).instrument);
 }
 
 ResolvedInstrument ResolvedPerformance::selectionFor(const InstrumentPerformanceEvent& change) const {
@@ -501,10 +494,10 @@ void ResolvedPerformance::assignAddresses(const InstrumentPreparationOptions& op
       external.emplace(value.bank, value.program);
     }
   };
+  for (const auto& voice : voices_) observe(voice.instrument);
   for (const auto& track : performance_.tracks) {
     for (const auto& event : track.events) {
       if (const auto* change = std::get_if<InstrumentPerformanceEvent>(&event)) observe(change->instrument);
-      if (const auto* note = std::get_if<NotePerformanceEvent>(&event); note && note->instrument) observe(*note->instrument);
     }
   }
 

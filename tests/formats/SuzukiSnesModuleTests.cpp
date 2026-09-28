@@ -422,7 +422,7 @@ void laterE0UsesTheSustainRateAsAGatedRelease() {
   const auto materialized =
       preparePerformance(performance, {sets.begin(), sets.end()}, InstrumentPreparationOptions{.dynamicEnvelopes = true});
   const auto notes = eventsOfType<NotePerformanceEvent>(materialized.performance().tracks.front());
-  expect(notes.size() == 1 && notes.front()->instrument,
+  expect(notes.size() == 1 && notes.front()->voice.valid(),
          "E0 should select a materialized envelope variant for the following attack");
   const auto* variant = materialized.selectionFor(*notes.front()).instrument;
   expect(variant != nullptr && variant->regions.size() == 1 &&

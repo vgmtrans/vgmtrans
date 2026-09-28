@@ -347,7 +347,7 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
   const auto selectedAddress = [&](PerformanceNoteId note) {
     for (const auto& event : materialized.performance().tracks[0].events) {
       if (const auto* noteEvent = std::get_if<NotePerformanceEvent>(&event);
-          noteEvent != nullptr && noteEvent->note == note && noteEvent->instrument) {
+          noteEvent != nullptr && noteEvent->note == note && noteEvent->voice.valid()) {
         return materialized.selectionFor(*noteEvent).address;
       }
     }

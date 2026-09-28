@@ -15,7 +15,6 @@
 #include <limits>
 #include <optional>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -33,6 +32,11 @@ namespace vgmtrans::core {
 
 struct PerformanceNoteIdTag;
 using PerformanceNoteId = Id<PerformanceNoteIdTag>;
+
+// Track-local identity of a sounding voice. Several note segments can share it.
+// Export preparation remaps these to the voices owned by ResolvedPerformance.
+struct PerformanceVoiceIdTag;
+using PerformanceVoiceId = Id<PerformanceVoiceIdTag>;
 
 struct PerformanceAutomationIdTag;
 using PerformanceAutomationId = Id<PerformanceAutomationIdTag>;
@@ -69,17 +73,16 @@ struct NotePerformanceEvent {
   // Some hardware stops a voice after a fixed real-time counter even when the
   // sequence gate remains open. Renderers clamp durationTicks to this limit.
   std::optional<double> maximumDurationMilliseconds;
-  // Extend the previously emitted voice at the same pitch without another
-  // attack. Key-changing continuations are pitch transitions linked with
-  // continueFrom(previousNote); target-specific lowering may then use this
-  // flag for the resulting same-voice MIDI representation.
+  // Extend the current physical note instead of emitting another Note On.
+  // Source ties set this; MIDI pitch lowering also sets it for held bends.
+  // Voice identity is independent: native portamento emits new physical notes
+  // while retaining the same voice.
   bool extendsPrevious = false;
   // Native portamento may need another MIDI note to continue a source voice.
   // This distinguishes that synthetic note from a genuine envelope restart.
   bool restartsEnvelope = true;
-  // Formats may override the track selection at an attack. Preparation fills
-  // every note with a concrete handle or external preset; continuations inherit
-  // their attack's selection, including any generated variant.
+  // Source override for a fresh attack. Preparation consumes this into the
+  // sounding voice's resolved instrument; continuations keep that instrument.
   std::optional<InstrumentSelection> instrument;
   // Source voices normally restart their LFOs on a fresh attack, but some
   // drivers can disable that reset or suppress it for legato notes.
@@ -97,6 +100,7 @@ struct NotePerformanceEvent {
   // The explicit lane leaves room for formats that multiplex voices in one
   // source track.
   PerformanceLaneId lane{0};
+  PerformanceVoiceId voice;
 };
 
 struct TempoPerformanceEvent {
@@ -651,14 +655,6 @@ private:
 [[nodiscard]] const PerformanceEventHeader& performanceEventHeader(const PerformanceEvent& event);
 [[nodiscard]] const PitchTransitionIntent* pitchTransitionIntent(const PerformanceAutomation& automation);
 [[nodiscard]] PitchTransitionIntent* pitchTransitionIntent(PerformanceAutomation& automation);
-// Only links active by the note's onset carry the preceding source voice.
-// Mid-note slides and transitions canceled before starting preserve the attack.
-[[nodiscard]] bool pitchTransitionContinuesVoice(const PerformanceAutomation& automation,
-                                                 const NotePerformanceEvent& note,
-                                                 const NotePerformanceEvent& previous);
-// Maps each key-changing continuation to the preceding note in its voice.
-[[nodiscard]] std::unordered_map<PerformanceNoteId, PerformanceNoteId> performanceNotePredecessors(
-    const PerformanceTrack& track);
 [[nodiscard]] double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elapsedTicks);
 [[nodiscard]] const PerformanceTrack* performanceTrackById(const PerformanceSequence& sequence, TrackId id);
 [[nodiscard]] std::vector<const PerformanceEvent*> performanceEventsForCommand(const PerformanceTrack& track,

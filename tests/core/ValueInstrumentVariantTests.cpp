@@ -53,7 +53,7 @@ PerformanceSequence sequenceWithEvents(std::vector<PerformanceEvent> events, u64
 InstrumentHandle selectedHandleForNote(const ResolvedPerformance& prepared, PerformanceNoteId note) {
   for (const auto& event : prepared.performance().tracks.front().events) {
     if (const auto* value = std::get_if<NotePerformanceEvent>(&event); value && value->note == note) {
-      return std::get<InstrumentHandle>(*value->instrument);
+      return std::get<InstrumentHandle>(prepared.voiceFor(*value).instrument);
     }
   }
   throw std::runtime_error("Test note instrument was not found");
@@ -360,6 +360,7 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero(MidiPitchTran
           .key = 60,
           .durationTicks = 4,
           .note = PerformanceNoteId{1},
+          .voice = PerformanceVoiceId{1},
       },
       NotePerformanceEvent{
           .header = eventHeader(4, 3),
@@ -367,6 +368,7 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero(MidiPitchTran
           .durationTicks = 4,
           .extendsPrevious = true,
           .note = PerformanceNoteId{1},
+          .voice = PerformanceVoiceId{1},
       },
       EnvelopePerformanceEvent{
           .header = eventHeader(6, 4),
@@ -377,6 +379,7 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero(MidiPitchTran
           .key = 62,
           .durationTicks = 2,
           .note = PerformanceNoteId{2},
+          .voice = PerformanceVoiceId{1},
       },
       NotePerformanceEvent{
           .header = eventHeader(10, 7),
@@ -482,6 +485,7 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(bool changesInstr
           .key = 60,
           .durationTicks = 4,
           .note = PerformanceNoteId{1},
+          .voice = PerformanceVoiceId{1},
       },
       NotePerformanceEvent{
           .header = eventHeader(4, 2),
@@ -489,6 +493,7 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(bool changesInstr
           .durationTicks = 4,
           .extendsPrevious = true,
           .note = PerformanceNoteId{1},
+          .voice = PerformanceVoiceId{1},
       },
       EnvelopePerformanceEvent{
           .header = eventHeader(8, 3),
@@ -499,6 +504,7 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(bool changesInstr
           .key = 62,
           .durationTicks = 4,
           .note = PerformanceNoteId{2},
+          .voice = PerformanceVoiceId{1},
       },
   });
   performance.tracks[0].automations.push_back(PerformanceAutomation{

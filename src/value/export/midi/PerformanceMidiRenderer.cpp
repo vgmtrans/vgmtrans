@@ -281,17 +281,6 @@ class PitchBendLayers {
   std::map<u32, PitchBendPerformanceEvent> layers;
 };
 
-[[nodiscard]] u64 physicalNoteEnd(const NotePerformanceEvent& note, const PerformanceTempoMap& tempos) {
-  const auto ticks = tempos.durationTicksForMilliseconds(note.header.tick, *note.maximumDurationMilliseconds);
-  return addTicks(note.header.tick, ticks);
-}
-
-// Only these physical MIDI notes belong to this source voice.
-struct RenderVoice {
-  std::optional<u64> endLimit;
-  std::vector<size_t> fragments;
-};
-
 using PerformanceTimeline = std::vector<const PerformanceEvent*>;
 using PerformanceTimelines = std::vector<PerformanceTimeline>;
 
@@ -730,20 +719,9 @@ void flushLfo(SimulatedLfoState& lfo, u64 upToTick, const PerformanceTempoMap& t
 // Renders one MIDI channel using its output track, controller state, and timing context.
 class MidiTrackRenderer {
 public:
-  MidiTrackRenderer(MidiTrack& track, u8 channel, const PerformanceTrack& source, const PerformanceTempoMap& tempos,
+  MidiTrackRenderer(MidiTrack& track, u8 channel, const PerformanceTempoMap& tempos,
                     const MidiExportOptions& options, double headroom)
-      : track(track), channel(channel), options(options), tempos(tempos),
-        notePredecessors(performanceNotePredecessors(source)), levelHeadroom(headroom) {
-    // Use original limits: pitch lowering merges extensions and changes fragment ticks.
-    for (const auto& event : source.events) {
-      const auto* note = std::get_if<NotePerformanceEvent>(&event);
-      if (note != nullptr && note->note.valid() && note->maximumDurationMilliseconds) {
-        const u64 limit = physicalNoteEnd(*note, tempos);
-        auto& end = sourceNoteEndLimits.try_emplace(note->note, limit).first->second;
-        end = std::min(end, limit);
-      }
-    }
-  }
+      : track(track), channel(channel), options(options), tempos(tempos), levelHeadroom(headroom) {}
 
   void render(const PerformanceTrack& lowered, const PerformanceTimeline& timeline,
               std::span<const GlobalTransposePerformanceEvent* const> globalTransposes,
@@ -796,11 +774,7 @@ private:
   u8 channel;
   const MidiExportOptions& options;
   const PerformanceTempoMap& tempos;
-  std::unordered_map<PerformanceNoteId, u64> sourceNoteEndLimits;
-  std::unordered_map<PerformanceNoteId, PerformanceNoteId> notePredecessors;
-  std::unordered_map<PerformanceNoteId, size_t> noteVoices;
-  std::vector<RenderVoice> voices;
-  std::optional<size_t> lastVoice;
+  std::unordered_map<PerformanceVoiceId, size_t> lastVoiceNotes;
   bool hasNote = false;
   // MIDI starts in bank/program zero.
   u16 midiBank = 0;
@@ -840,29 +814,6 @@ private:
   std::optional<u8> lastPanValue;
   std::optional<u8> lastReverbValue;
   SimulatedLfoState panLfo;
-
-  RenderVoice& voiceForNote(const NotePerformanceEvent& note) {
-    auto id = note.note;
-    for (auto previous = notePredecessors.find(id); !noteVoices.contains(id) && previous != notePredecessors.end();
-         previous = notePredecessors.find(id)) {
-      id = previous->second;
-    }
-    const auto found = noteVoices.find(id);
-    size_t voice = voices.size();
-    if (found != noteVoices.end()) {
-      voice = found->second;
-    } else if (note.extendsPrevious && !notePredecessors.contains(note.note) && lastVoice) {
-      voice = *lastVoice;
-    }
-    if (voice == voices.size()) {
-      voices.emplace_back();
-    }
-    if (note.note.valid()) {
-      noteVoices.emplace(note.note, voice);
-    }
-    lastVoice = voice;
-    return voices[voice];
-  }
 
   void addController(u64 tick, MidiController controller, s32 value, int priority = 20,
                      std::optional<double> normalizedAmount = std::nullopt) {
@@ -912,41 +863,26 @@ private:
     state = value;
   }
 
-  [[nodiscard]] std::optional<u32> physicalNoteDuration(RenderVoice& voice, const NotePerformanceEvent& note) {
-    const bool freshAttack = !note.extendsPrevious && note.restartsEnvelope;
-    const auto sourceLimit = sourceNoteEndLimits.find(note.note);
-    if (sourceLimit != sourceNoteEndLimits.end() || note.maximumDurationMilliseconds) {
-      const u64 limit = sourceLimit != sourceNoteEndLimits.end() ? sourceLimit->second : physicalNoteEnd(note, tempos);
-      if (!voice.endLimit || limit < *voice.endLimit) {
-        voice.endLimit = limit;
-        for (const size_t i : voice.fragments) {
-          auto& event = track.events[i];
-          auto& fragment = std::get<NoteDuration>(event.payload);
-          fragment.duration = static_cast<u32>(std::min<u64>(fragment.duration, limit - std::min(limit, event.tick)));
-        }
-      }
-    }
+  [[nodiscard]] std::optional<u32> physicalNoteDuration(const SoundingVoice& voice, const NotePerformanceEvent& note) {
     if (!voice.endLimit) {
       return note.durationTicks;
     }
-    if (!freshAttack && note.header.tick >= *voice.endLimit) {
+    if ((note.extendsPrevious || !note.restartsEnvelope) && note.header.tick >= *voice.endLimit) {
       return std::nullopt;
     }
-    return static_cast<u32>(std::min<u64>(note.durationTicks, *voice.endLimit - note.header.tick));
+    const u64 remaining = *voice.endLimit - std::min(*voice.endLimit, note.header.tick);
+    return static_cast<u32>(std::min<u64>(note.durationTicks, remaining));
   }
 
-  bool extendPreviousNote(RenderVoice& voice, const NotePerformanceEvent& note, u32 duration) {
-    if (!note.extendsPrevious || voice.fragments.empty()) {
+  bool extendVoiceNote(const NotePerformanceEvent& note, u32 duration) {
+    const auto found = lastVoiceNotes.find(note.voice);
+    if (!note.extendsPrevious || found == lastVoiceNotes.end()) {
       return false;
     }
-
-    MidiEvent& previousEvent = track.events[voice.fragments.back()];
+    MidiEvent& previousEvent = track.events[found->second];
     auto& previous = std::get<NoteDuration>(previousEvent.payload);
-    const u64 previousEnd = previousEvent.tick + previous.duration;
     const u64 extensionEnd = note.header.tick + duration;
-    if (extensionEnd > previousEnd) {
-      previous.duration = static_cast<u32>(extensionEnd - previousEvent.tick);
-    }
+    previous.duration = static_cast<u32>(std::max<u64>(previous.duration, extensionEnd - previousEvent.tick));
     return true;
   }
 
@@ -1332,8 +1268,7 @@ private:
         [&](const auto& typedEvent) {
           using TypedEvent = std::decay_t<decltype(typedEvent)>;
           if constexpr (std::is_same_v<TypedEvent, NotePerformanceEvent>) {
-            auto& voice = voiceForNote(typedEvent);
-            const auto duration = physicalNoteDuration(voice, typedEvent);
+            const auto duration = physicalNoteDuration(resolved.voiceFor(typedEvent), typedEvent);
             if (!duration) {
               return;
             }
@@ -1358,7 +1293,7 @@ private:
             if (shouldRestartSimulatedPanForNote(typedEvent)) {
               restartSimulatedPanForNote(typedEvent.header.tick);
             }
-            if (extendPreviousNote(voice, typedEvent, *duration)) {
+            if (extendVoiceNote(typedEvent, *duration)) {
               return;
             }
             if (options.terminatePreviousVoice && typedEvent.restartsEnvelope && hasNote) {
@@ -1370,7 +1305,7 @@ private:
               addCombinedLevel(typedEvent.header.tick);
             }
             hasNote = true;
-            voice.fragments.push_back(track.events.size());
+            lastVoiceNotes.insert_or_assign(typedEvent.voice, track.events.size());
             track.events.push_back(
                 midi::note(typedEvent.header.tick, channel, key, midiVelocity(typedEvent.linearVelocity), *duration));
           } else if constexpr (std::is_same_v<TypedEvent, TempoPerformanceEvent>) {
@@ -1607,7 +1542,7 @@ MidiSequence renderMidiSequence(const ResolvedPerformance& resolved,
                                               : performanceTrack.name,
     };
     const auto assignment = midiChannelAssignment(trackIndex, options);
-    MidiTrackRenderer renderer{midiTrack, assignment.channel, performance.tracks[trackIndex],
+    MidiTrackRenderer renderer{midiTrack, assignment.channel,
                                globalTempos, options, levelHeadroom};
     if (assignment.port > 255) {
       sequence.diagnostics.push_back(Diagnostic{

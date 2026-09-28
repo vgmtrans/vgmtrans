@@ -24,18 +24,18 @@ a{color:var(--accent);text-underline-offset:3px}code{font: .84em/1.6 ui-monospac
 <p class="meta">Branch: <code>codex/resolved-instruments-prototype</code><br>
 Comparison base: <code>b531b5abe86e02479b066899ae1f7c845f9d7e67</code> · 28 September 2026</p>
 <p>The migration now uses one preparation operation that resolves source selections, creates instrument variants, and propagates the attack's instrument through continuations. Its result owns its bank data. Preparation also assigns output addresses before returning. MIDI and synth conversion take that completed value, and stitching no longer patches completed MIDI.</p>
-<p>Three follow-ups are complete. Collection preparation constructs a finished result; synth input keeps selected instruments with their banks; and the resolved performance now owns its output addresses and exposes completed instrument selections. Explicit sounding voices are the next major model change.</p>
-<p>This remains a partial simplification. Against <code>core-rewrite</code>, production source and headers have <strong>21 fewer physical lines</strong>, but <strong>1 more nonblank, noncomment line</strong> by a lexical count. The contract stage removes 5 physical lines and 6 noncomment lines relative to its immediate predecessor. Its benefit is fewer caller obligations, not a large deletion. The full change has not yet delivered a substantial reduction in code volume.</p>
-<nav aria-label="Implementation notes"><a href="#flow">The flow</a><a href="#ownership">Ownership and API</a><a href="#contract">Resolved output</a><a href="#synth-input">Synth inputs</a><a href="#simplification">Simplification assessment</a><a href="#policy">Output policy</a><a href="#verification">Verification</a><a href="#limits">Remaining work</a></nav>
+<p>Collection preparation constructs a finished result; synth input keeps selected instruments with their banks; and the resolved performance owns its output addresses. The next model change is now implemented: note segments explicitly identify their sounding voice, which owns the adapted instrument and hardware stop deadline.</p>
+<p>This remains a partial simplification. Against <code>core-rewrite</code>, production source and headers have <strong>92 fewer physical lines</strong>, and <strong>67 fewer nonblank, noncomment lines</strong> by a lexical count. The voice stage removes 71 physical lines and 68 noncomment lines relative to its immediate predecessor. These are measurable deletions, though still modest beside the size of the whole core. The main improvement is that consumers no longer reconstruct voice ownership or repair deadlines after generating MIDI fragments.</p>
+<nav aria-label="Implementation notes"><a href="#flow">The flow</a><a href="#ownership">Ownership and API</a><a href="#contract">Resolved output</a><a href="#voices">Sounding voices</a><a href="#synth-input">Synth inputs</a><a href="#simplification">Simplification assessment</a><a href="#policy">Output policy</a><a href="#verification">Verification</a><a href="#limits">Remaining work</a></nav>
 
 <section id="flow"><h2>The flow</h2>
-<p>Consider an attack on instrument 5 with a changed envelope, followed by a program change to instrument 7 while the first voice continues. Preparation gives the attack and continuation the same variant handle. The next fresh attack receives the handle for instrument 7. Later passes use these decisions directly.</p>
+<p>Consider an attack on instrument 5 with a changed envelope, followed by a program change to instrument 7 while the first voice continues. The emitter assigns the attack and continuation one voice identity. Preparation chooses a variant for that voice. The next fresh attack starts another voice using instrument 7. Later passes use these decisions directly.</p>
 <pre><code>Executed events + private bank copies
     ↓ preparePerformance
 One chronological pass:
-    resolve selections → adapt fresh attacks → inherit continuations
+    group explicit voices → resolve/adapt each voice once
     ↓ assign output addresses after all variants exist
-ResolvedPerformance: events + immutable banks + final addresses
+ResolvedPerformance: segments + voices + banks + final addresses
     ├─ renderMidiSequence(prepared)
     └─ selectSynthBanks(prepared) → SF2 / DLS</code></pre>
 <p><code>InstrumentHandle</code> is a bank index and an instrument index. It remains valid when preparation appends a variant and reallocates an instrument vector. Source identities and preferred addresses are retained on the original instruments. A generated variant starts with neither: preparation assigns its output address after all variants exist.</p>
@@ -46,8 +46,8 @@ ResolvedPerformance: events + immutable banks + final addresses
 
 <section id="ownership"><h2>Ownership and API</h2>
 <p><code>preparePerformance</code> takes ownership of its event and bank values. It is the only public construction path for <code>ResolvedPerformance</code>. The result exposes const access to both, together with its assigned addresses. Consumers cannot replace its events with unresolved selections, remove an instrument behind a handle, or mutate the banks after address planning.</p>
-<p>The frozen bank vector is held by a <code>shared_ptr&lt;const …&gt;</code>. MIDI lowering takes a prepared value, changes its event copy, and returns another prepared value with the same addresses and shared banks. Destroying or moving the original cannot leave the lowered events with dangling bank references, and lowering does not copy the potentially large bank data.</p>
-<p>Source and prepared events still use the same event structures. The invariant is enforced at the owning result's construction and const interface, so the code can reuse the existing event-processing algorithms. The source note field remains optional; preparation fills it on every note before exposing the result.</p>
+<p>The frozen bank vector is held by a <code>shared_ptr&lt;const …&gt;</code>. MIDI lowering takes a prepared value, changes its event copy, and returns another prepared value retaining the voice records and addresses while sharing the banks. Destroying or moving the original cannot leave the lowered events with dangling bank references, and lowering does not copy the potentially large bank data.</p>
+<p>Source and prepared events still use the same structures. Preparation remaps each note's voice ID to an owned <code>SoundingVoice</code> record. It consumes the optional source instrument override into that record, then clears the per-note override. Prepared segments refer to one authoritative selection through their voice. The result exposes the segments, voices, and banks through const access.</p>
 <h3>Completed collection preparation</h3>
 <p><code>PreparedCollection</code> consumes a <code>BoundCollection</code> and the requested preparation options. Its constructor executes the sequence when requested, applies sequence modulation, resolves instruments and variants, assigns addresses, and freezes the banks before returning. The binding's runtime and mutable bank storage are then discarded. There is no public <code>render()</code> step or render-once convention.</p>
 <p>The result always retains one immutable bank allocation and the snapshot owning its external sample-pool metadata. When rendering succeeds, its <code>ResolvedPerformance</code> shares that same bank allocation. Two shared ownership handles refer to the same data; banks are not copied between the two objects. <code>soundBanks()</code> always reads that allocation, and <code>performance()</code> reports whether there is a resolved performance.</p>
@@ -70,9 +70,26 @@ auto midi = renderMidiSequence(prepared);
 auto synthBanks = selectSynthBanks(prepared);</code></pre>
 <p><code>InstrumentPreparationOptions</code> sets adaptation, used-only selection, and the optional first bank for a stitched part. The resolver makes variants first and assigns addresses last, within the same preparation call. <code>PreparedCollection</code> forwards these options through its <code>instruments</code> field. Stitching supplies the next available bank when constructing each distinct part, then reuses that completed result for repeated occurrences.</p>
 <p>Output code calls <code>prepared.selectionFor(note)</code> or <code>prepared.selectionFor(programChange)</code>. The returned <code>ResolvedInstrument</code> contains an instrument pointer and its final bank/program address. An external preset has a null pointer and a usable address. MIDI no longer dereferences the note's optional source-selection field or interprets its variant. Synth selection uses the same pointer/address record.</p>
-<p>Used-only preparation still assigns addresses to program changes with no notes, because MIDI must emit them; synth selection retains only instruments used by notes. The initial instrument can supply pitch-bend context even when it needs no output slot. Address exhaustion sets <code>valid()</code> to false and adds an error to the performance's diagnostics. MIDI rendering returns those diagnostics without tracks, and synth selection returns no banks. Prepared bank data remain available for inspection.</p>
-<p>This narrows the consumer interface without creating a second set of event types. Source and prepared events still share their structures, including the optional instrument field. Construction fills that field and exposes only const events; <code>selectionFor</code> interprets it inside the owning result. Callers must use notes and handles from that result. The interface does not make arbitrary cross-performance event mixing impossible at compile time.</p>
+<p>Used-only preparation still assigns addresses to program changes with no notes, because MIDI must emit them; synth selection collects instrument handles from sounding voices. The initial instrument can supply pitch-bend context even when it needs no output slot. Address exhaustion sets <code>valid()</code> to false and adds an error to the performance's diagnostics. MIDI rendering returns those diagnostics without tracks, and synth selection returns no banks. Prepared bank data remain available for inspection.</p>
+<p>This narrows the consumer interface without creating a second set of event types. Source and prepared events still share their structures; prepared notes identify an owned voice instead of carrying duplicate resolved instrument selections. <code>selectionFor</code> follows that voice inside the result. Callers must use notes and handles from that result. The interface does not make arbitrary cross-performance event mixing impossible at compile time.</p>
 <p>The simplification is the removal of a separately managed plan, a second diagnostics list, repeated plan arguments, and independently supplied used-only policies. Its replacement cost is preparation options and three selection accessors. Address allocation itself remains necessary. Choosing a different bank namespace now happens before preparation; there is no mutable replanning step.</p>
+</section>
+
+<section id="voices"><h2>A note segment belongs to a sounding voice</h2>
+<p>A driver can extend a gate or change pitch while the same instrument continues sounding. <code>PerformanceVoiceId</code> records that identity directly. The emitter gives an attack its own voice ID. Same-pitch ties copy it, and <code>continueFrom</code> attaches a key-changing continuation to it when the transition starts at the note's onset. Continuity is recorded when the source operation is emitted, rather than rediscovered independently by exporters.</p>
+<div class="table"><table><thead><tr><th>Tick</th><th>Source action</th><th>Voice</th></tr></thead><tbody>
+<tr><td>0</td><td>Attack instrument 5 at key 60</td><td>A</td></tr>
+<tr><td>2</td><td>Attack instrument 7 at key 72 on another lane</td><td>B</td></tr>
+<tr><td>4</td><td>Extend the first note at key 60</td><td>A</td></tr>
+<tr><td>8</td><td>Continue the first voice at key 64</td><td>A</td></tr>
+</tbody></table></div>
+<p>Source IDs are local to a track. Preparation assigns distinct indices across the completed performance and builds one <code>SoundingVoice</code> per identity. Each record contains the resolved instrument, the first onset, the latest gate end, and an optional absolute hardware stop tick. A note without a voice ID is a fresh attack; hand-built continuations must name the voice explicitly. Normal format code gets these identities from <code>PerformanceEmitter</code>.</p>
+<p>The hardware limit is calculated from source segment times using the song's tempo map. An initial timer and any later shortening contribute their earliest deadline. A voice limited to 1,000 milliseconds stops at tick 14 if ticks last 50 milliseconds through tick 8 and 100 milliseconds thereafter. Splitting it into portamento notes cannot restart that timer. The overlapping voice B keeps its own deadline and instrument.</p>
+<p>MIDI rendering reads this record directly and keeps only the last physical MIDI note for each voice, so an extension can lengthen that note. It no longer walks note-predecessor chains, guesses the last voice, recovers pre-lowering deadlines, or revisits already-emitted fragments to shorten them. Every fragment is clamped to the completed voice deadline when emitted.</p>
+<p>Segments and pitch automations remain in the ordered event timeline. <code>PerformanceNoteId</code> still anchors a pitch motion and may be reused by same-pitch ties; <code>PerformanceVoiceId</code> groups all those anchors into the one sounding lifetime. <code>previousNote</code> remains useful for expressing the pitch transition's starting point. MIDI pitch lowering follows that anchor to calculate the physical note's bend base; it uses the explicit voice ID when deciding whether the same MIDI note can be held.</p>
+<p>Envelope and individual LFO restart flags remain independent. <code>extendsPrevious</code> describes extending a physical note; portamento can emit another physical note with the same voice ID. Source command headers and playback spans remain available for highlighting. A mid-note slide does not join two attacks, and canceling a boundary slide before it starts restores the target's independent voice. These decisions are handled at emission, including retroactive source lookahead.</p>
+<p>The model deliberately keeps pitch segments in the existing timeline rather than storing a second pitch list on the voice. MIDI lowering still copies the common event model to build destination fragments. Replacing that copy with a dedicated MIDI fragment representation would be a separate refactor; this stage removes the reconstruction and deadline-repair machinery without requiring it.</p>
+<p class="meta">Source identity: <a href="../../src/value/sequence/PerformanceEmitter.cpp">PerformanceEmitter.cpp</a>. Prepared records: <a href="../../src/value/export/ResolvedPerformance.h">ResolvedPerformance.h</a>. Physical note output: <a href="../../src/value/export/midi/PerformanceMidiRenderer.cpp">PerformanceMidiRenderer.cpp</a>.</p>
 </section>
 
 <section id="synth-input"><h2>Keep selected instruments with their bank</h2>
@@ -93,12 +110,14 @@ auto synthBanks = selectSynthBanks(prepared);</code></pre>
 <section id="simplification"><h2>Simplification assessment</h2>
 <p>The useful improvement is that a consumer can ask which instrument a note plays without reconstructing program changes and continuation rules. These are the changes relative to <code>core-rewrite</code>:</p>
 <div class="table"><table><thead><tr><th>Removed responsibility</th><th>Current behavior</th></tr></thead><tbody>
-<tr><td>Separate selection lookup in variant generation and output consumers</td><td>Preparation resolves the source selection once; consumers follow a handle</td></tr>
-<tr><td>Instrument selection and inheritance reconstruction in pitch-transition lowering</td><td>Lowering copies the instrument already attached to each note</td></tr>
-<tr><td>MIDI's separate source-selection state</td><td>Each attack supplies its resolved instrument; MIDI still tracks the bank/program it emits</td></tr>
-<tr><td>Synth filtering's replay of program changes and continuation rules</td><td>Used instruments are collected from resolved note handles</td></tr>
+<tr><td>Separate selection lookup in variant generation and output consumers</td><td>Preparation resolves the source selection once; consumers follow the voice's instrument handle</td></tr>
+<tr><td>Instrument selection and inheritance reconstruction in pitch-transition lowering</td><td>Lowered fragments retain the source voice ID and access its instrument</td></tr>
+<tr><td>MIDI's separate source-selection state</td><td>Each voice supplies its resolved instrument; MIDI still tracks the bank/program it emits</td></tr>
+<tr><td>Synth filtering's replay of program changes and continuation rules</td><td>Used instruments are collected from the owned voice records</td></tr>
 <tr><td>Post-render bank scanning/remapping and repeated collection preparation in stitching</td><td>Prepare and plan each distinct collection before rendering</td></tr>
 <tr><td>The mutable collection workspace and its separate modulation step</td><td>Construction returns completed inputs with immutable bank storage</td></tr>
+<tr><td>Note-predecessor maps, MIDI voice chain walk, and last-voice fallback</td><td>Source segments carry an explicit voice ID</td></tr>
+<tr><td>Original-deadline recovery and retroactive fragment shortening</td><td>Every fragment reads the prepared voice's absolute stop limit</td></tr>
 <tr><td>Separate mutable address plan and repeated policy arguments</td><td>One prepared performance owns its addresses and used-only policy</td></tr>
 <tr><td>Synth pointer/address reconstruction and selected-bank membership searches</td><td>Explicit selected instruments grouped under their bank</td></tr>
 </tbody></table></div>
@@ -106,13 +125,13 @@ auto synthBanks = selectSynthBanks(prepared);</code></pre>
 <h3>Source-size audit</h3>
 <p>These totals compare the implementation through the instrument-handoff refactor against local <code>core-rewrite</code> at <code>b531b5abe86e02479b066899ae1f7c845f9d7e67</code>. Earlier checkpoints are <code>0c24c8f42</code> for initial instrument resolution and <code>aecf170b5</code> for the collection lifecycle.</p>
 <div class="table"><table><thead><tr><th>Counting scope</th><th>Net change</th></tr></thead><tbody>
-<tr><td>Production C++ source and headers, all physical lines</td><td>−21</td></tr>
-<tr><td>The same files, excluding blank lines</td><td>−1</td></tr>
-<tr><td>The same files, excluding blank and comment-only lines</td><td>+1</td></tr>
-<tr><td>Production files including the CMake change, all physical lines</td><td>−22</td></tr>
-<tr><td>Tests and their CMake file, counted separately</td><td>+532 physical lines</td></tr>
+<tr><td>Production C++ source and headers, all physical lines</td><td>−92</td></tr>
+<tr><td>The same files, excluding blank lines</td><td>−68</td></tr>
+<tr><td>The same files, excluding blank and comment-only lines</td><td>−67</td></tr>
+<tr><td>Production files including the CMake change, all physical lines</td><td>−93</td></tr>
+<tr><td>Tests and their CMake file, counted separately</td><td>+617 physical lines</td></tr>
 </tbody></table></div>
-<p>The physical-line arithmetic is 652 new lines, 526 lines removed with the old variant implementation/header and lookup helper, 147 net lines removed elsewhere in production C++, and one removed from CMake. Equivalently, the production/build diff is 987 additions and 1009 deletions. These counts exclude tests, documentation, and the pre-existing dependency change. The noncomment count uses a C++ lexical comment stripper; like any line count, it remains sensitive to formatting and is not a count of operations or decisions.</p>
+<p>The physical-line arithmetic is 656 new lines, 526 lines removed with the old variant implementation/header and lookup helper, 222 net lines removed elsewhere in production C++, and one removed from CMake. Equivalently, the production/build diff is 1056 additions and 1149 deletions. These counts exclude tests, documentation, and the pre-existing dependency change. The noncomment count uses a C++ lexical comment stripper; like any line count, it remains sensitive to formatting and is not a count of operations or decisions.</p>
 <p>The first prototype also had temporary compatibility paths. Removing those improves the prototype, but those removals must not be presented as savings against <code>core-rewrite</code>. The assessment above uses the original branch as its baseline.</p>
 <p>Format and MIDI tests use a small fixture helper to prepare raw test events before rendering. No production compatibility overload remains, and no helper converts resolved notes back to addresses. MIDI still tracks channel state, and pitch conversion still schedules voices; those responsibilities are distinct from deciding which instrument a note plays.</p>
 </section>
@@ -129,11 +148,12 @@ auto synthBanks = selectSynthBanks(prepared);</code></pre>
 </section>
 
 <section id="verification"><h2>Verification</h2>
-<p>The headless build succeeds and <strong>all 43 CTest entries pass</strong>. The new instrument and stitching tests also pass against a fully instrumented core with AddressSanitizer and UndefinedBehaviorSanitizer, with container checks enabled.</p>
+<p>The headless build succeeds and <strong>all 43 CTest entries pass</strong>. The instrument, voice, sequence-model, MIDI rendering, MIDI pitch, variant, and stitching tests also pass against a fully instrumented core with AddressSanitizer and UndefinedBehaviorSanitizer, with container checks enabled.</p>
 <p>Coverage includes variant deduplication; linked continuations across program changes; both pitch-bend and portamento rendering; SF2/DLS preset-table agreement; external-address reservation; conflicts and exhaustion; copies, moves and destruction of prepared owners; repeated collections prepared once; preservation of local WAV samples; and synth modulation when MIDI rendering fails.</p>
 <p>The lifecycle regressions exercise collections without sequences, skipped execution, failed execution, and successful execution. Each result is copied and moved beyond the lifetime of its binding and original snapshot, then used for synth export and, when available, MIDI rendering. They also verify that raw inspection events remain unadapted and that resolved events share the result's bank allocation. All six saved fixture outputs remain byte-identical to the pre-lifecycle checkpoint.</p>
 <p>The handoff regressions cover two banks with different sampling budgets and colliding source addresses; local and external sample references; unfiltered samples from a bank with no selected instruments; a completely empty used-instrument selection; and exporting one used bank from a larger collection in both SF2 and DLS. All six saved fixture outputs and their diagnostics remain unchanged from the lifecycle checkpoint.</p>
 <p>The contract regressions additionally preserve independent stitched bank namespaces through copies, moves, source destruction, and both lowering modes. They verify program-only MIDI addresses, omitted used-only synth entries, initial pitch context without an assigned slot, external preset access, and rejection of failed preparation by both output paths. All six saved outputs and their diagnostics remain unchanged from the handoff checkpoint.</p>
+<p>The voice regressions add an explicit tie interleaved with another lane, shared instrument/deadline ownership across changed-pitch segments, separation of identical source voice IDs on different tracks, and canceled or delayed pitch motion. Existing format and MIDI tests cover FF7/Itikiti restart rules, hardware caps introduced on later segments, tempo changes, zero-length limits, and both output pitch modes. The six saved output files and diagnostics are unchanged from the contract checkpoint.</p>
 <div class="table"><table><thead><tr><th>Review fixture</th><th>Output comparison</th></tr></thead><tbody>
 <tr><td>Paired MIDI and SF2, standalone SF2, MIDI with envelopes ignored</td><td>Byte-identical to the original pre-prototype executable</td></tr>
 <tr><td>Direct MIDI export</td><td>Byte-identical to the prototype's correction: program 5 only, with one explanatory diagnostic</td></tr>
@@ -141,14 +161,14 @@ auto synthBanks = selectSynthBanks(prepared);</code></pre>
 </tbody></table></div>
 <pre><code>cmake --build build/core-migration-headless -j 6
 ctest --test-dir build/core-migration-headless --output-on-failure -j 6</code></pre>
-<p class="meta">Ownership and integration regressions: <a href="../../tests/core/ValueResolvedInstrumentTests.cpp">ValueResolvedInstrumentTests.cpp</a>. Latest build, test, and sanitizer logs: <code>/tmp/vgmtrans-resolved-instruments/contract-*</code>. The comparison fixture uses silent PCM and establishes references and bytes, not audible fidelity.</p>
+<p class="meta">Ownership and integration regressions: <a href="../../tests/core/ValueResolvedInstrumentTests.cpp">ValueResolvedInstrumentTests.cpp</a>. Latest build, test, and sanitizer logs: <code>/tmp/vgmtrans-resolved-instruments/voices-*</code>. The comparison fixture uses silent PCM and establishes references and bytes, not audible fidelity.</p>
 </section>
 
 <section id="limits"><h2>Remaining work</h2>
-<p>The preparation lifecycle, instrument handoffs, and resolved output contract are complete for these stages. The following work remains, in order:</p>
+<p>The preparation lifecycle, instrument handoffs, resolved output contract, and explicit voice ownership are implemented. The following work remains:</p>
 <ul>
 
-<li><strong>Next major model change: explicit sounding voices.</strong> Represent a voice across ties and pitch changes so consumers can stop rebuilding predecessor links and inferring voice continuity. Test same-pitch ties, changed-pitch slurs, program changes during a sounding voice, independent envelope/LFO restarts, and duration limits in both MIDI pitch modes. The instrument refactor has not implemented this proposal.</li>
+<li><strong>Further voice/output separation.</strong> The source interface still uses note and pitch-slide bindings, and MIDI lowering still rewrites a copied performance. A future change could make destination fragments entirely local to MIDI conversion. It should replace these mechanisms, not add another parallel event model.</li>
 <li><strong>Separate collection-input redesign.</strong> Distinguish user choices from resolved bank/sample uses and move SegSat's mapping into preparation, preserving manual and ambiguous selections.</li>
 </ul>
 <p>These are deletion targets, not implemented improvements or a promise of a particular line saving. Complete and validate each stage before implementing the next. The <a href="../VALUE_CORE_REVIEW.md">architecture review</a> retains the broader design rationale and now tracks this sequence.</p>

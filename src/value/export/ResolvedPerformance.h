@@ -31,10 +31,18 @@ struct ResolvedInstrument {
   InstrumentAddress address;
 };
 
+struct SoundingVoice {
+  // Always a handle or an external address after preparation.
+  InstrumentSelection instrument;
+  u64 startTick = 0;
+  u64 endTick = 0;  // Sequence gate end, before the hardware limit.
+  std::optional<u64> endLimit;  // Absolute tick; computed with the source tempo map.
+};
+
 struct MidiExportOptions;
 
-// Preparation is the only way to construct this value: every note has a resolved
-// instrument and continuations retain their attack's adapted instrument. Bank
+// Preparation constructs one sounding voice for each explicit source identity.
+// Its segments share an adapted instrument and a hardware stop deadline. Bank
 // copies and output addresses are owned and frozen together. MIDI lowering
 // copies events and addresses but shares the banks. Address exhaustion retains
 // the prepared data and diagnostics, but prevents MIDI/synth output.
@@ -48,6 +56,7 @@ public:
   [[nodiscard]] ResolvedInstrument selectionFor(InstrumentHandle handle) const;
   [[nodiscard]] ResolvedInstrument selectionFor(const NotePerformanceEvent& note) const;
   [[nodiscard]] ResolvedInstrument selectionFor(const InstrumentPerformanceEvent& change) const;
+  [[nodiscard]] const SoundingVoice& voiceFor(const NotePerformanceEvent& note) const { return voices_.at(note.voice.value); }
   [[nodiscard]] bool valid() const noexcept { return valid_; }
   [[nodiscard]] bool onlyUsedInstruments() const noexcept { return onlyUsedInstruments_; }
   [[nodiscard]] const std::map<InstrumentHandle, InstrumentAddress>& instrumentAddresses() const { return addresses_; }
@@ -62,11 +71,13 @@ private:
   friend ResolvedPerformance lowerMidiPerformanceAutomation(ResolvedPerformance, const MidiExportOptions&,
                                                             const PerformanceTempoMap&);
   ResolvedPerformance(PerformanceSequence performance, std::vector<SoundBankAsset> soundBanks,
-                      InstrumentSelection initialInstrument, const InstrumentPreparationOptions& options);
+                      InstrumentSelection initialInstrument, std::vector<SoundingVoice> voices,
+                      const InstrumentPreparationOptions& options);
   void assignAddresses(const InstrumentPreparationOptions& options);
   [[nodiscard]] ResolvedInstrument selectedInstrument(const InstrumentSelection& selection) const;
 
   PerformanceSequence performance_;
+  std::vector<SoundingVoice> voices_;
   std::shared_ptr<const std::vector<SoundBankAsset>> soundBanks_;
   const Instrument* initialInstrument_ = nullptr;  // Points into the shared immutable banks.
   std::map<InstrumentHandle, InstrumentAddress> addresses_;

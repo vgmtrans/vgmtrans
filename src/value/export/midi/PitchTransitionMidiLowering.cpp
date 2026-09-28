@@ -40,7 +40,7 @@ struct NoteSpan {
   u64 endTick = 0;
   // A boundary pitch bend can carry the preceding MIDI voice into this
   // logical note instead of retriggering its attack.
-  bool continuesPreviousVoice = false;
+  bool extendsMidiNote = false;
   double bendBaseKey = 0.0;
   // Empty unless MIDI portamento must replace this source note.
   std::vector<PortamentoSegment> portamentoSegments;
@@ -559,7 +559,7 @@ void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
   }
 }
 
-void linkPitchBendVoices(std::vector<NoteSpan>& notes, const std::vector<const PerformanceAutomation*>& transitions) {
+void inheritMidiBendBases(std::vector<NoteSpan>& notes, const std::vector<const PerformanceAutomation*>& transitions) {
   for (const auto* automation : transitions) {
     const auto& transition = *pitchTransitionIntent(*automation);
     if (!transition.previousNote) {
@@ -569,12 +569,12 @@ void linkPitchBendVoices(std::vector<NoteSpan>& notes, const std::vector<const P
     auto* note = findNote(notes, transition.note);
     auto* previous = findNote(notes, *transition.previousNote);
     if (note == nullptr || previous == nullptr ||
-        !pitchTransitionContinuesVoice(*automation, note->source, previous->source)) {
+        note->source.voice != previous->source.voice || automation->realization.startTick > note->source.header.tick) {
       continue;
     }
 
     const double baseKey = bendBaseKeyAt(*previous, automation->realization.startTick);
-    note->continuesPreviousVoice = true;
+    note->extendsMidiNote = true;
     note->bendBaseKey = baseKey;
     if (!note->portamentoSegments.empty()) {
       auto& first = note->portamentoSegments.front();
@@ -650,8 +650,7 @@ void appendSourceEvents(std::vector<PerformanceEvent>& events, const Performance
       }
       if (span != nullptr) {
         auto resolved = *note;
-        resolved.instrument = span->source.instrument;
-        resolved.extendsPrevious |= span->continuesPreviousVoice;
+        resolved.extendsPrevious |= span->extendsMidiNote;
         events.emplace_back(std::move(resolved));
         continue;
       }
@@ -758,7 +757,7 @@ ResolvedPerformance lowerMidiPerformanceAutomation(ResolvedPerformance resolved,
       lowerPortamento(lowered, events, track.events, notes, portamentoTransitions, tempos, nextSequence,
                       *pitchBendRanges);
     }
-    linkPitchBendVoices(notes, pitchBendTransitions);
+    inheritMidiBendBases(notes, pitchBendTransitions);
     const bool renderPortamentoSettings =
         !portamentoTransitions.empty() || options.pitchTransitions == MidiPitchTransitionRendering::Portamento ||
         (options.pitchTransitions == MidiPitchTransitionRendering::PreserveFormat &&

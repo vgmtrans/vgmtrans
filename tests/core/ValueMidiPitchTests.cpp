@@ -102,7 +102,7 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
   const auto bendLoweringInput = preparePerformance(performance);
   const auto bendLoweringResult = lowerMidiPerformanceAutomation(bendLoweringInput, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend}, PerformanceTempoMap{bendLoweringInput.performance()});
   const auto& bendLowering = bendLoweringResult.performance();
-  const auto sourceNote = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+  const auto sourceNote = std::ranges::find_if(bendLoweringInput.performance().tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<NotePerformanceEvent>(event);
   });
   const auto loweredNote = std::ranges::find_if(bendLowering.tracks[0].events, [](const PerformanceEvent& event) {
@@ -114,13 +114,13 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
            lhs.header.tick == rhs.header.tick && lhs.header.sequence == rhs.header.sequence &&
            lhs.header.automation == rhs.header.automation && lhs.key == rhs.key &&
            lhs.linearVelocity == rhs.linearVelocity && lhs.durationTicks == rhs.durationTicks &&
-           lhs.extendsPrevious == rhs.extendsPrevious && lhs.instrument == rhs.instrument &&
+           lhs.extendsPrevious == rhs.extendsPrevious && lhs.voice == rhs.voice && lhs.instrument == rhs.instrument &&
            lhs.restartsLfoPhase == rhs.restartsLfoPhase && lhs.restartsVibratoLfoPhase == rhs.restartsVibratoLfoPhase &&
            lhs.restartsTremoloLfoPhase == rhs.restartsTremoloLfoPhase && lhs.note == rhs.note && lhs.lane == rhs.lane;
   };
-  expect(sourceNote != performance.tracks[0].events.end() && loweredNote != bendLowering.tracks[0].events.end() &&
+  expect(sourceNote != bendLoweringInput.performance().tracks[0].events.end() && loweredNote != bendLowering.tracks[0].events.end() &&
              notesMatch(std::get<NotePerformanceEvent>(*sourceNote), std::get<NotePerformanceEvent>(*loweredNote)),
-         "pitch-bend lowering should preserve the source note event verbatim");
+         "pitch-bend lowering should preserve the prepared note segment verbatim");
   const auto noteEvent = std::ranges::find_if(bent.tracks[0].events, [](const MidiEvent& event) {
     return std::holds_alternative<NoteDuration>(event.payload);
   });

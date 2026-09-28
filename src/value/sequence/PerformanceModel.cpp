@@ -11,7 +11,6 @@
 #include <iterator>
 #include <limits>
 #include <optional>
-#include <unordered_map>
 
 namespace vgmtrans::core {
 
@@ -34,43 +33,6 @@ const PitchTransitionIntent* pitchTransitionIntent(const PerformanceAutomation& 
 
 PitchTransitionIntent* pitchTransitionIntent(PerformanceAutomation& automation) {
   return std::get_if<PitchTransitionIntent>(&automation.intent);
-}
-
-bool pitchTransitionContinuesVoice(const PerformanceAutomation& automation, const NotePerformanceEvent& note,
-                                   const NotePerformanceEvent& previous) {
-  const auto* transition = pitchTransitionIntent(automation);
-  return transition != nullptr && transition->note == note.note && transition->previousNote == previous.note &&
-         note.note != previous.note && previous.header.order() < note.header.order() && previous.lane == note.lane &&
-         automation.realization.startTick <= note.header.tick &&
-         (automation.realization.endReason == PerformanceAutomationEndReason::Completed ||
-          automation.realization.endTick > automation.realization.startTick);
-}
-
-std::unordered_map<PerformanceNoteId, PerformanceNoteId> performanceNotePredecessors(const PerformanceTrack& track) {
-  std::unordered_map<PerformanceNoteId, PerformanceNoteId> continued;
-  if (track.automations.empty()) {
-    return continued;
-  }
-
-  std::unordered_map<PerformanceNoteId, const NotePerformanceEvent*> notes;
-  for (const auto& event : track.events) {
-    if (const auto* note = std::get_if<NotePerformanceEvent>(&event); note != nullptr && note->note.valid()) {
-      notes.try_emplace(note->note, note);
-    }
-  }
-  for (const auto& automation : track.automations) {
-    const auto* transition = pitchTransitionIntent(automation);
-    if (transition == nullptr || !transition->previousNote) {
-      continue;
-    }
-    const auto note = notes.find(transition->note);
-    const auto previous = notes.find(*transition->previousNote);
-    if (note != notes.end() && previous != notes.end() &&
-        pitchTransitionContinuesVoice(automation, *note->second, *previous->second)) {
-      continued.try_emplace(transition->note, *transition->previousNote);
-    }
-  }
-  return continued;
 }
 
 double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elapsedTicks) {
