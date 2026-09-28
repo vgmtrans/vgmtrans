@@ -699,7 +699,7 @@ void ff7CollectionBindsNativeEnvelopesAndPreservesDrumDefaults() {
   const auto bound = bindCollection(snapshot, snapshot.collections()[0].id);
   expect(bound.collection.has_value(), "FF7 envelope fixture should bind successfully");
   const PreparedCollection prepared{*bound.collection, {
-      .sequence = SequenceRenderOptions{}, .variants = {.dynamicEnvelopes = true}}};
+      .sequence = SequenceRenderOptions{}, .instruments = {.dynamicEnvelopes = true}}};
   expect(prepared.rendering.performance.has_value(), "FF7 prepared runtime should render successfully");
   const auto envelopes = fixtureEvents<EnvelopePerformanceEvent>(*prepared.rendering.performance);
   expect(!envelopes.empty() && envelopes[0].update.values == psxSpuEnvelope(0x00ff, 0x5005),

@@ -23,10 +23,10 @@ a{color:var(--accent);text-underline-offset:3px}code{font: .84em/1.6 ui-monospac
 <h1>Resolve the instrument.<br>Then choose its output address.</h1>
 <p class="meta">Branch: <code>codex/resolved-instruments-prototype</code><br>
 Comparison base: <code>b531b5abe86e02479b066899ae1f7c845f9d7e67</code> · 28 September 2026</p>
-<p>The migration now uses one preparation operation that resolves source selections, creates instrument variants, and propagates the attack's instrument through continuations. Its result owns its bank data. MIDI and synth conversion consume the same address plan, and stitching no longer patches completed MIDI.</p>
-<p>Two follow-ups are complete. Collection preparation constructs a finished result, replacing the mutable render-once workspace. Synth input now groups selected instruments with their banks, removing the maps and searches that recovered that relationship. Tightening the resolved-data contract is next; explicit sounding voices remain the next major model change.</p>
-<p>This remains a partial simplification. Against <code>core-rewrite</code>, production source and headers have <strong>16 fewer physical lines</strong>, but <strong>7 more nonblank, noncomment lines</strong> by a lexical count. The instrument-handoff stage removes 17 physical lines and 18 noncomment lines relative to its immediate predecessor. The full change has not yet delivered a substantial reduction in code volume.</p>
-<nav aria-label="Implementation notes"><a href="#flow">The flow</a><a href="#ownership">Ownership and API</a><a href="#synth-input">Synth inputs</a><a href="#simplification">Simplification assessment</a><a href="#policy">Output policy</a><a href="#verification">Verification</a><a href="#limits">Remaining work</a></nav>
+<p>The migration now uses one preparation operation that resolves source selections, creates instrument variants, and propagates the attack's instrument through continuations. Its result owns its bank data. Preparation also assigns output addresses before returning. MIDI and synth conversion take that completed value, and stitching no longer patches completed MIDI.</p>
+<p>Three follow-ups are complete. Collection preparation constructs a finished result; synth input keeps selected instruments with their banks; and the resolved performance now owns its output addresses and exposes completed instrument selections. Explicit sounding voices are the next major model change.</p>
+<p>This remains a partial simplification. Against <code>core-rewrite</code>, production source and headers have <strong>21 fewer physical lines</strong>, but <strong>1 more nonblank, noncomment line</strong> by a lexical count. The contract stage removes 5 physical lines and 6 noncomment lines relative to its immediate predecessor. Its benefit is fewer caller obligations, not a large deletion. The full change has not yet delivered a substantial reduction in code volume.</p>
+<nav aria-label="Implementation notes"><a href="#flow">The flow</a><a href="#ownership">Ownership and API</a><a href="#contract">Resolved output</a><a href="#synth-input">Synth inputs</a><a href="#simplification">Simplification assessment</a><a href="#policy">Output policy</a><a href="#verification">Verification</a><a href="#limits">Remaining work</a></nav>
 
 <section id="flow"><h2>The flow</h2>
 <p>Consider an attack on instrument 5 with a changed envelope, followed by a program change to instrument 7 while the first voice continues. Preparation gives the attack and continuation the same variant handle. The next fresh attack receives the handle for instrument 7. Later passes use these decisions directly.</p>
@@ -34,24 +34,22 @@ Comparison base: <code>b531b5abe86e02479b066899ae1f7c845f9d7e67</code> · 28 Sep
     ↓ preparePerformance
 One chronological pass:
     resolve selections → adapt fresh attacks → inherit continuations
-    ↓
-ResolvedPerformance: events + immutable, owned banks
-    ↓ planInstrumentAddresses
-One handle → one output bank/program
-    ├─ MIDI rendering
-    └─ SF2 / DLS instrument selection</code></pre>
-<p><code>InstrumentHandle</code> is a bank index and an instrument index. It remains valid when preparation appends a variant and reallocates an instrument vector. Source identities and preferred addresses are retained on the original instruments. A generated variant starts with neither: it receives an output address only when planning is complete.</p>
+    ↓ assign output addresses after all variants exist
+ResolvedPerformance: events + immutable banks + final addresses
+    ├─ renderMidiSequence(prepared)
+    └─ selectSynthBanks(prepared) → SF2 / DLS</code></pre>
+<p><code>InstrumentHandle</code> is a bank index and an instrument index. It remains valid when preparation appends a variant and reallocates an instrument vector. Source identities and preferred addresses are retained on the original instruments. A generated variant starts with neither: preparation assigns its output address after all variants exist.</p>
 <p>Preparation records the original instruments' preferred numeric addresses before creating variants. This also distinguishes an original instrument with an implicit bank/program zero from an unassigned variant. Later source lookups cannot accidentally select a generated variant.</p>
-<p>For stitching, each distinct collection is prepared once and receives a compact, disjoint bank range. Repeated occurrences share the frozen instruments and reuse their address plan. MIDI is then rendered with those final addresses. Output filtering selects instruments without erasing handle targets.</p>
+<p>For stitching, each distinct collection is prepared once and receives a compact, disjoint bank range. Repeated occurrences share the frozen instruments and reuse their completed performance and addresses. MIDI is then rendered with those final addresses. Output filtering selects instruments without erasing handle targets.</p>
 <p class="meta">Entry point: <a href="../../src/value/export/ResolvedPerformance.h">ResolvedPerformance.h</a>. Implementation: <a href="../../src/value/export/ResolvedPerformance.cpp">ResolvedPerformance.cpp</a>. Integration: <a href="../../src/value/export/CollectionBinding.cpp">CollectionBinding.cpp</a>, <a href="../../src/value/export/Export.cpp">Export.cpp</a>, and <a href="../../src/value/export/CollectionStitch.cpp">CollectionStitch.cpp</a>.</p>
 </section>
 
 <section id="ownership"><h2>Ownership and API</h2>
-<p><code>preparePerformance</code> takes ownership of its event and bank values. It is the only public construction path for <code>ResolvedPerformance</code>. The result exposes const access to both. Consumers cannot replace its events with unresolved selections, remove an instrument behind a handle, or mutate the banks after address planning.</p>
-<p>The frozen bank vector is held by a <code>shared_ptr&lt;const …&gt;</code>. MIDI lowering takes a prepared value, changes its event copy, and returns another prepared value sharing the same banks. Destroying or moving the original cannot leave the lowered events with dangling bank references, and lowering does not copy the potentially large bank data.</p>
+<p><code>preparePerformance</code> takes ownership of its event and bank values. It is the only public construction path for <code>ResolvedPerformance</code>. The result exposes const access to both, together with its assigned addresses. Consumers cannot replace its events with unresolved selections, remove an instrument behind a handle, or mutate the banks after address planning.</p>
+<p>The frozen bank vector is held by a <code>shared_ptr&lt;const …&gt;</code>. MIDI lowering takes a prepared value, changes its event copy, and returns another prepared value with the same addresses and shared banks. Destroying or moving the original cannot leave the lowered events with dangling bank references, and lowering does not copy the potentially large bank data.</p>
 <p>Source and prepared events still use the same event structures. The invariant is enforced at the owning result's construction and const interface, so the code can reuse the existing event-processing algorithms. The source note field remains optional; preparation fills it on every note before exposing the result.</p>
 <h3>Completed collection preparation</h3>
-<p><code>PreparedCollection</code> consumes a <code>BoundCollection</code> and the requested preparation options. Its constructor executes the sequence when requested, applies sequence modulation, resolves instruments and variants, and freezes the banks before returning. The binding's runtime and mutable bank storage are then discarded. There is no public <code>render()</code> step or render-once convention.</p>
+<p><code>PreparedCollection</code> consumes a <code>BoundCollection</code> and the requested preparation options. Its constructor executes the sequence when requested, applies sequence modulation, resolves instruments and variants, assigns addresses, and freezes the banks before returning. The binding's runtime and mutable bank storage are then discarded. There is no public <code>render()</code> step or render-once convention.</p>
 <p>The result always retains one immutable bank allocation and the snapshot owning its external sample-pool metadata. When rendering succeeds, its <code>ResolvedPerformance</code> shares that same bank allocation. Two shared ownership handles refer to the same data; banks are not copied between the two objects. <code>soundBanks()</code> always reads that allocation, and <code>performance()</code> reports whether there is a resolved performance.</p>
 <div class="table"><table><thead><tr><th>Preparation outcome</th><th>Completed result</th></tr></thead><tbody>
 <tr><td>Sequence execution not requested</td><td>Banks and sample inputs are available; no performance is invented</td></tr>
@@ -60,6 +58,21 @@ One handle → one output bank/program
 </tbody></table></div>
 <p>This preserves bank-only and WAV exports as well as paired output. Encoded sample bytes still belong to <code>SourceStore</code>; retaining sample metadata does not change that lifetime contract. Stitching retains a shared completed result for each distinct collection, so repeated occurrences share its events, banks, modulation data, and sample owners instead of copying or extracting them independently.</p>
 <p>The result replaces <code>CollectionWorkspace</code>. The implementation removes its mutating render method, the fallback between two bank owners, and the separate sample/performance/modulation fields in <code>StitchPart</code>. Its replacement cost is a preparation-options value, completed collection metadata, and an additional shared ownership handle for the bank allocation. Relative to checkpoint <code>0c24c8f42</code>, this stage is neutral in physical and noncomment production lines; the improvement is the simpler lifetime contract, not a source-size reduction.</p>
+</section>
+
+<section id="contract"><h2>One completed input for output conversion</h2>
+<p>An instrument selection and its output address answer different questions: which definition plays, and where the destination can find it. Both answers now belong to <code>ResolvedPerformance</code>. There is no separate public <code>InstrumentAddressPlan</code> to construct, mutate, or pass alongside the performance.</p>
+<pre><code>auto prepared = preparePerformance(events, banks, {
+    .dynamicEnvelopes = true,
+    .onlyUsedInstruments = true,
+});
+auto midi = renderMidiSequence(prepared);
+auto synthBanks = selectSynthBanks(prepared);</code></pre>
+<p><code>InstrumentPreparationOptions</code> sets adaptation, used-only selection, and the optional first bank for a stitched part. The resolver makes variants first and assigns addresses last, within the same preparation call. <code>PreparedCollection</code> forwards these options through its <code>instruments</code> field. Stitching supplies the next available bank when constructing each distinct part, then reuses that completed result for repeated occurrences.</p>
+<p>Output code calls <code>prepared.selectionFor(note)</code> or <code>prepared.selectionFor(programChange)</code>. The returned <code>ResolvedInstrument</code> contains an instrument pointer and its final bank/program address. An external preset has a null pointer and a usable address. MIDI no longer dereferences the note's optional source-selection field or interprets its variant. Synth selection uses the same pointer/address record.</p>
+<p>Used-only preparation still assigns addresses to program changes with no notes, because MIDI must emit them; synth selection retains only instruments used by notes. The initial instrument can supply pitch-bend context even when it needs no output slot. Address exhaustion sets <code>valid()</code> to false and adds an error to the performance's diagnostics. MIDI rendering returns those diagnostics without tracks, and synth selection returns no banks. Prepared bank data remain available for inspection.</p>
+<p>This narrows the consumer interface without creating a second set of event types. Source and prepared events still share their structures, including the optional instrument field. Construction fills that field and exposes only const events; <code>selectionFor</code> interprets it inside the owning result. Callers must use notes and handles from that result. The interface does not make arbitrary cross-performance event mixing impossible at compile time.</p>
+<p>The simplification is the removal of a separately managed plan, a second diagnostics list, repeated plan arguments, and independently supplied used-only policies. Its replacement cost is preparation options and three selection accessors. Address allocation itself remains necessary. Choosing a different bank namespace now happens before preparation; there is no mutable replanning step.</p>
 </section>
 
 <section id="synth-input"><h2>Keep selected instruments with their bank</h2>
@@ -71,7 +84,7 @@ One handle → one output bank/program
                  selected instrument + output address
         bank B → no selected instruments
     samplePools → external sample owners</code></pre>
-<p>The two <code>selectSynthBanks</code> overloads construct that list explicitly. Standalone export selects all instruments at their source address preferences. Performance export follows the shared address plan and can retain only note-used handles. An empty selection always means no instruments; conversion has no absent-selection mode that silently selects an entire bank.</p>
+<p>The two <code>selectSynthBanks</code> overloads construct that list explicitly. Standalone export selects all instruments at their source address preferences. Performance export follows the addresses and used-only policy already stored in the completed performance. An empty selection always means no instruments; conversion has no absent-selection mode that silently selects an entire bank.</p>
 <p>The bank reference has two remaining jobs. It supplies local samples, and it determines a common region-sampling step across the entire bank, including unselected instruments. Banks with empty selections remain available for unfiltered sample export. External sample pools retain their existing order and filtering rules. These are required inputs, not membership information to reconstruct.</p>
 <p>The selection lists are owned by <code>SynthExportInput</code>, so a builder's temporary return value cannot leave a dangling selection span. Instrument and bank data remain borrowed from the prepared collection or standalone bank, which must outlive conversion. Sample-reference gathering reads the entries directly and no longer creates an intermediate list of instrument pointers.</p>
 <p>The replacement cost is one bank-group record and its instrument list, plus an explicit standalone selection builder. It removes the optional flat selection, the pointer/address map, bank-membership searches, the pointer-only projection, and the per-conversion copy of the flat selection. See <a href="../../src/value/export/synth/SynthExportData.h">SynthExportData.h</a> and <a href="../../src/value/export/synth/SynthExportData.cpp">SynthExportData.cpp</a>.</p>
@@ -86,19 +99,20 @@ One handle → one output bank/program
 <tr><td>Synth filtering's replay of program changes and continuation rules</td><td>Used instruments are collected from resolved note handles</td></tr>
 <tr><td>Post-render bank scanning/remapping and repeated collection preparation in stitching</td><td>Prepare and plan each distinct collection before rendering</td></tr>
 <tr><td>The mutable collection workspace and its separate modulation step</td><td>Construction returns completed inputs with immutable bank storage</td></tr>
+<tr><td>Separate mutable address plan and repeated policy arguments</td><td>One prepared performance owns its addresses and used-only policy</td></tr>
 <tr><td>Synth pointer/address reconstruction and selected-bank membership searches</td><td>Explicit selected instruments grouped under their bank</td></tr>
 </tbody></table></div>
 <p>Those are real reductions in independent decisions. They do not remove the envelope/stereo algorithms, and combining those algorithms with resolution does not by itself make them easier to understand. The new owning result, address planner, conflict/fallback diagnostics, and export coordination add code. Some of that is useful policy and correctness work beyond the structural refactor.</p>
 <h3>Source-size audit</h3>
 <p>These totals compare the implementation through the instrument-handoff refactor against local <code>core-rewrite</code> at <code>b531b5abe86e02479b066899ae1f7c845f9d7e67</code>. Earlier checkpoints are <code>0c24c8f42</code> for initial instrument resolution and <code>aecf170b5</code> for the collection lifecycle.</p>
 <div class="table"><table><thead><tr><th>Counting scope</th><th>Net change</th></tr></thead><tbody>
-<tr><td>Production C++ source and headers, all physical lines</td><td>−16</td></tr>
-<tr><td>The same files, excluding blank lines</td><td>+2</td></tr>
-<tr><td>The same files, excluding blank and comment-only lines</td><td>+7</td></tr>
-<tr><td>Production files including the CMake change, all physical lines</td><td>−17</td></tr>
-<tr><td>Tests and their CMake file, counted separately</td><td>+515 physical lines</td></tr>
+<tr><td>Production C++ source and headers, all physical lines</td><td>−21</td></tr>
+<tr><td>The same files, excluding blank lines</td><td>−1</td></tr>
+<tr><td>The same files, excluding blank and comment-only lines</td><td>+1</td></tr>
+<tr><td>Production files including the CMake change, all physical lines</td><td>−22</td></tr>
+<tr><td>Tests and their CMake file, counted separately</td><td>+532 physical lines</td></tr>
 </tbody></table></div>
-<p>The physical-line arithmetic is 639 new lines, 526 lines removed with the old variant implementation/header and lookup helper, 129 net lines removed elsewhere in production C++, and one removed from CMake. Equivalently, the production/build diff is 990 additions and 1007 deletions. These counts exclude tests, documentation, and the pre-existing dependency change. The noncomment count uses a C++ lexical comment stripper; like any line count, it remains sensitive to formatting and is not a count of operations or decisions.</p>
+<p>The physical-line arithmetic is 652 new lines, 526 lines removed with the old variant implementation/header and lookup helper, 147 net lines removed elsewhere in production C++, and one removed from CMake. Equivalently, the production/build diff is 987 additions and 1009 deletions. These counts exclude tests, documentation, and the pre-existing dependency change. The noncomment count uses a C++ lexical comment stripper; like any line count, it remains sensitive to formatting and is not a count of operations or decisions.</p>
 <p>The first prototype also had temporary compatibility paths. Removing those improves the prototype, but those removals must not be presented as savings against <code>core-rewrite</code>. The assessment above uses the original branch as its baseline.</p>
 <p>Format and MIDI tests use a small fixture helper to prepare raw test events before rendering. No production compatibility overload remains, and no helper converts resolved notes back to addresses. MIDI still tracks channel state, and pitch conversion still schedules voices; those responsibilities are distinct from deciding which instrument a note plays.</p>
 </section>
@@ -107,7 +121,7 @@ One handle → one output bank/program
 <ul>
 <li><strong>Selection:</strong> exact native identity first, then numeric-address fallback. The first matching definition in selected bank order wins. Fallbacks and conflicts are diagnosed once per source selection. Used-only export retains the same winner.</li>
 <li><strong>Missing instruments:</strong> notes retain external preset addresses, allowing standalone MIDI without bank data. Those addresses reserve output slots and participate in stitched bank planning.</li>
-<li><strong>Address planning:</strong> preserve preferred addresses where possible; allocate unused portable addresses for variants and conflicting definitions. Exhaustion rejects the plan before paired output is written.</li>
+<li><strong>Address planning:</strong> preserve preferred addresses where possible; allocate unused portable addresses for variants and conflicting definitions. Exhaustion marks preparation invalid before paired output is written.</li>
 <li><strong>MIDI without a companion:</strong> retain original instruments and report envelope events that would require private SF2/DLS variants. Do not emit references to those absent variants.</li>
 <li><strong>Failed MIDI rendering:</strong> a surviving full-bank export retains native synth modulation. The requested MIDI simulation policy only replaces it when a performance was actually prepared.</li>
 </ul>
@@ -119,6 +133,7 @@ One handle → one output bank/program
 <p>Coverage includes variant deduplication; linked continuations across program changes; both pitch-bend and portamento rendering; SF2/DLS preset-table agreement; external-address reservation; conflicts and exhaustion; copies, moves and destruction of prepared owners; repeated collections prepared once; preservation of local WAV samples; and synth modulation when MIDI rendering fails.</p>
 <p>The lifecycle regressions exercise collections without sequences, skipped execution, failed execution, and successful execution. Each result is copied and moved beyond the lifetime of its binding and original snapshot, then used for synth export and, when available, MIDI rendering. They also verify that raw inspection events remain unadapted and that resolved events share the result's bank allocation. All six saved fixture outputs remain byte-identical to the pre-lifecycle checkpoint.</p>
 <p>The handoff regressions cover two banks with different sampling budgets and colliding source addresses; local and external sample references; unfiltered samples from a bank with no selected instruments; a completely empty used-instrument selection; and exporting one used bank from a larger collection in both SF2 and DLS. All six saved fixture outputs and their diagnostics remain unchanged from the lifecycle checkpoint.</p>
+<p>The contract regressions additionally preserve independent stitched bank namespaces through copies, moves, source destruction, and both lowering modes. They verify program-only MIDI addresses, omitted used-only synth entries, initial pitch context without an assigned slot, external preset access, and rejection of failed preparation by both output paths. All six saved outputs and their diagnostics remain unchanged from the handoff checkpoint.</p>
 <div class="table"><table><thead><tr><th>Review fixture</th><th>Output comparison</th></tr></thead><tbody>
 <tr><td>Paired MIDI and SF2, standalone SF2, MIDI with envelopes ignored</td><td>Byte-identical to the original pre-prototype executable</td></tr>
 <tr><td>Direct MIDI export</td><td>Byte-identical to the prototype's correction: program 5 only, with one explanatory diagnostic</td></tr>
@@ -126,13 +141,13 @@ One handle → one output bank/program
 </tbody></table></div>
 <pre><code>cmake --build build/core-migration-headless -j 6
 ctest --test-dir build/core-migration-headless --output-on-failure -j 6</code></pre>
-<p class="meta">Ownership and integration regressions: <a href="../../tests/core/ValueResolvedInstrumentTests.cpp">ValueResolvedInstrumentTests.cpp</a>. Latest build, test, and sanitizer logs: <code>/tmp/vgmtrans-resolved-instruments/handoffs-*</code>. The comparison fixture uses silent PCM and establishes references and bytes, not audible fidelity.</p>
+<p class="meta">Ownership and integration regressions: <a href="../../tests/core/ValueResolvedInstrumentTests.cpp">ValueResolvedInstrumentTests.cpp</a>. Latest build, test, and sanitizer logs: <code>/tmp/vgmtrans-resolved-instruments/contract-*</code>. The comparison fixture uses silent PCM and establishes references and bytes, not audible fidelity.</p>
 </section>
 
 <section id="limits"><h2>Remaining work</h2>
-<p>The preparation lifecycle and instrument handoffs are complete for these stages. The following work remains, in order:</p>
+<p>The preparation lifecycle, instrument handoffs, and resolved output contract are complete for these stages. The following work remains, in order:</p>
 <ul>
-<li><strong>Next: the prepared-data contract.</strong> Source and prepared events share an optional selection variant that still admits unresolved identities, while the address plan is a separate mutable object. Correctness depends on construction and on passing the matching objects together. Narrow resolved access and an associated address plan should remove some of these conventions without duplicating the entire event model.</li>
+
 <li><strong>Next major model change: explicit sounding voices.</strong> Represent a voice across ties and pitch changes so consumers can stop rebuilding predecessor links and inferring voice continuity. Test same-pitch ties, changed-pitch slurs, program changes during a sounding voice, independent envelope/LFO restarts, and duration limits in both MIDI pitch modes. The instrument refactor has not implemented this proposal.</li>
 <li><strong>Separate collection-input redesign.</strong> Distinguish user choices from resolved bank/sample uses and move SegSat's mapping into preparation, preserving manual and ambiguous selections.</li>
 </ul>

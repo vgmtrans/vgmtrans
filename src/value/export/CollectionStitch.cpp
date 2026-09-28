@@ -35,7 +35,6 @@ constexpr u32 kMaximumPpqn = 1920;
 struct StitchPart {
   std::shared_ptr<const PreparedCollection> prepared;
   u64 startTick = 0;
-  InstrumentAddressPlan layout;
   MidiSequence midi;
   std::vector<CollectionStitchBank> banks;
 };
@@ -59,7 +58,7 @@ void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulation
 
 [[nodiscard]] std::shared_ptr<const PreparedCollection> preparePart(
     CollectionId collection, const SessionSnapshot& snapshot, const ExportRequest& request,
-    std::vector<Diagnostic>& diagnostics) {
+    u32 firstBank, std::vector<Diagnostic>& diagnostics) {
   auto binding = bindCollection(snapshot, collection);
   append(diagnostics, binding.diagnostics);
   if (!binding.collection) {
@@ -77,13 +76,19 @@ void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulation
 
   auto prepared = std::make_shared<PreparedCollection>(std::move(*binding.collection), CollectionPreparationOptions{
       .sequence = request.sequence,
-      .variants = {.dynamicEnvelopes = request.dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants,
-                   .signedStereo = true},
+      .instruments = {.dynamicEnvelopes = request.dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants,
+                      .signedStereo = true,
+                      .onlyUsedInstruments = request.exportOnlyUsedInstruments,
+                      .firstBank = firstBank},
       .modulationConversion = request.modulationConversion,
       .modulationScaling = request.modulationScaling,
   });
   if (!prepared->performance()) {
     append(diagnostics, prepared->rendering.diagnostics);
+    return nullptr;
+  }
+  if (!prepared->performance()->valid()) {
+    append(diagnostics, prepared->performance()->performance().diagnostics);
     return nullptr;
   }
   return prepared;
@@ -255,20 +260,15 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
       parts.push_back(*previous);
       continue;
     }
-    auto prepared = preparePart(collection, snapshot, request, result.midi.diagnostics);
+    auto prepared = preparePart(collection, snapshot, request, nextBank, result.midi.diagnostics);
     if (!prepared) {
       result.soundFont.diagnostics = result.midi.diagnostics;
       return result;
     }
     StitchPart part{.prepared = std::move(prepared)};
-    part.layout = planInstrumentAddresses(*part.prepared->performance(), request.exportOnlyUsedInstruments, nextBank);
-    append(result.midi.diagnostics, part.layout.diagnostics);
-    if (!part.layout.valid) {
-      result.soundFont.diagnostics = result.midi.diagnostics;
-      return result;
-    }
-    nextBank = part.layout.nextBank();
-    for (const auto& [source, target] : part.layout.banks) part.banks.push_back({source, target});
+    const auto& performance = *part.prepared->performance();
+    nextBank = performance.nextBank();
+    for (const auto& [source, target] : performance.bankMapping()) part.banks.push_back({source, target});
     parts.push_back(std::move(part));
   }
 
@@ -277,7 +277,7 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
     mergeModulationUsage(modulationUsage, part.prepared->modulationUsage);
   }
   for (auto& part : parts) {
-    part.midi = renderMidiSequence(*part.prepared->performance(), part.layout, request.sequence.midi,
+    part.midi = renderMidiSequence(*part.prepared->performance(), request.sequence.midi,
                                   request.modulationConversion, &part.prepared->rendering.modulation);
     applyMidiModulationScaling(part.midi, modulationUsage, request.modulationScaling);
   }
@@ -298,7 +298,7 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
     if (!includedCollections.insert(part.prepared->id.value).second) {
       continue;
     }
-    auto selected = selectSynthBanks(*part.prepared->performance(), part.layout, request.exportOnlyUsedInstruments);
+    auto selected = selectSynthBanks(*part.prepared->performance());
     synthBanks.insert(synthBanks.end(), std::make_move_iterator(selected.begin()), std::make_move_iterator(selected.end()));
     for (const auto* collection : part.prepared->samplePools) {
       if (includedSamples.insert(collection->metadata.id.value).second) {

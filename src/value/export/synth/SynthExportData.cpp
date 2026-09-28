@@ -247,14 +247,15 @@ std::vector<SynthBankSelection> selectSynthBanks(std::span<const SoundBankAsset*
 }
 
 std::vector<SynthBankSelection> selectSynthBanks(
-    const ResolvedPerformance& performance, const InstrumentAddressPlan& layout, bool onlyUsed) {
+    const ResolvedPerformance& performance) {
   std::vector<SynthBankSelection> result;
-  if (!layout.valid) return result;
+  if (!performance.valid()) return result;
   for (const auto& bank : performance.soundBanks()) result.push_back({.bank = &bank});
+  const bool onlyUsed = performance.onlyUsedInstruments();
   const auto used = onlyUsed ? performance.usedInstruments() : std::set<InstrumentHandle>{};
-  for (const auto& [handle, address] : layout.instruments) {
+  for (const auto& [handle, address] : performance.instrumentAddresses()) {
     if (!onlyUsed || used.contains(handle)) {
-      result.at(handle.bank).instruments.push_back({performance.instrument(handle), address});
+      result.at(handle.bank).instruments.push_back(performance.selectionFor(handle));
     }
   }
   return result;

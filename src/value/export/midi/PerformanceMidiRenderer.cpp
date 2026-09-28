@@ -193,13 +193,11 @@ struct MidiInstrumentSelection {
   std::optional<u16> pitchBendRangeCents;
 };
 
-[[nodiscard]] MidiInstrumentSelection instrumentSelection(const InstrumentSelection& selection,
-                                                          const ResolvedPerformance& performance,
-                                                          const InstrumentAddressPlan& layout,
+[[nodiscard]] MidiInstrumentSelection instrumentSelection(const ResolvedInstrument& selection,
                                                           bool forceBankSelect = false) {
-  const Instrument* instrument = performance.instrument(selection);
+  const Instrument* instrument = selection.instrument;
   return MidiInstrumentSelection{
-      .address = layout.address(selection),
+      .address = selection.address,
       .forceBankSelect = forceBankSelect,
       .pitchBendRangeCents = instrument != nullptr ? instrument->pitchBendRangeCents : std::nullopt,
   };
@@ -750,11 +748,10 @@ public:
   void render(const PerformanceTrack& lowered, const PerformanceTimeline& timeline,
               std::span<const GlobalTransposePerformanceEvent* const> globalTransposes,
               ModulationConversionPolicy modulationConversion, const ResolvedPerformance& resolved,
-              const InstrumentAddressPlan& layout,
               const SequenceModulationProfile* modulationProfile) {
     const auto pitchBendRangeChanges = planVoicePitchBendRanges(timeline, options.tuning, resolved);
     size_t nextPitchBendRangeChange = 0;
-    const auto* initialInstrument = resolved.instrument(resolved.initialInstrument());
+    const auto* initialInstrument = resolved.initialInstrument();
     applyInstrumentPitchBendRange(0, initialInstrument ? initialInstrument->pitchBendRangeCents : std::nullopt,
                                   modulationConversion);
     for (const auto* event : timeline) {
@@ -784,7 +781,7 @@ public:
         flushSimulatedTremolo(otherFlushTick, modulationConversion);
       }
       flushSimulatedPan(otherFlushTick);
-      addMidiEvent(*event, lowered.sourceTrackNumber, globalTransposes, modulationConversion, resolved, layout,
+      addMidiEvent(*event, lowered.sourceTrackNumber, globalTransposes, modulationConversion, resolved,
                    modulationProfile);
     }
     flushSimulatedVibrato(lowered.endTick);
@@ -1329,7 +1326,6 @@ private:
   void addMidiEvent(const PerformanceEvent& event, u32 sourceTrackNumber,
                     std::span<const GlobalTransposePerformanceEvent* const> globalTransposes,
                     ModulationConversionPolicy modulationConversion, const ResolvedPerformance& resolved,
-                    const InstrumentAddressPlan& layout,
                     const SequenceModulationProfile* modulationProfile) {
     const bool forceControllers = !performanceEventHeader(event).automation;
     std::visit(
@@ -1342,7 +1338,7 @@ private:
               return;
             }
             if (!typedEvent.extendsPrevious) {
-              auto selection = instrumentSelection(*typedEvent.instrument, resolved, layout);
+              auto selection = instrumentSelection(resolved.selectionFor(typedEvent));
               applyInstrumentSelection(typedEvent.header.tick, selection, modulationConversion, false);
             }
             const u8 key = midiKey(typedEvent.key + globalTransposeAt(globalTransposes, typedEvent.header.tick));
@@ -1384,7 +1380,7 @@ private:
             // Standard MIDI treats time signatures as global metadata. They are collected
             // once and written to the first MIDI track by renderMidiSequence.
           } else if constexpr (std::is_same_v<TypedEvent, InstrumentPerformanceEvent>) {
-            const auto selection = instrumentSelection(typedEvent.instrument, resolved, layout,
+            const auto selection = instrumentSelection(resolved.selectionFor(typedEvent),
                                                        typedEvent.forceBankSelect);
             applyInstrumentSelection(typedEvent.header.tick, selection, modulationConversion, true);
           } else if constexpr (std::is_same_v<TypedEvent, LevelPerformanceEvent>) {
@@ -1579,15 +1575,11 @@ private:
 
 }  // namespace
 
-MidiSequence renderMidiSequence(const ResolvedPerformance& resolved, const InstrumentAddressPlan& layout,
+MidiSequence renderMidiSequence(const ResolvedPerformance& resolved,
                                 MidiExportOptions options, ModulationConversionPolicy modulationConversion,
-                                const SequenceModulationProfile* modulationProfile) {
+                          const SequenceModulationProfile* modulationProfile) {
   const auto& performance = resolved.performance();
-  if (!layout.valid) {
-    MidiSequence failed{.diagnostics = performance.diagnostics};
-    failed.diagnostics.insert(failed.diagnostics.end(), layout.diagnostics.begin(), layout.diagnostics.end());
-    return failed;
-  }
+  if (!resolved.valid()) return MidiSequence{.diagnostics = performance.diagnostics};
   std::optional<SequenceModulationProfile> derivedModulationProfile;
   if (modulationProfile == nullptr) {
     derivedModulationProfile = analyzeSequenceModulation(performance);
@@ -1626,7 +1618,7 @@ MidiSequence renderMidiSequence(const ResolvedPerformance& resolved, const Instr
     if (options.writePortMetaEvents) {
       midiTrack.events.push_back(midi::meta(0, 0x21, {midiPortByte(assignment.port)}, -5));
     }
-    renderer.render(performanceTrack, timelines[trackIndex], globalTransposes, modulationConversion, resolved, layout,
+    renderer.render(performanceTrack, timelines[trackIndex], globalTransposes, modulationConversion, lowered,
                     modulationProfile);
     u64 endTick = performanceTrack.endTick;
     if (trackIndex == 0) {

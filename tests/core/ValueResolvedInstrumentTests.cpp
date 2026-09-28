@@ -70,22 +70,22 @@ void resolvedVariantsShareAddressesWithBothSynthWriters() {
              noteById(unadapted.performance(), continuation).instrument == InstrumentSelection{InstrumentHandle{0, 0}} &&
              noteById(unadapted.performance(), fresh).instrument == InstrumentSelection{InstrumentHandle{0, 1}},
          "resolution must retain the attack's instrument through an intervening program change");
-  const auto resolved = preparePerformance(sourcePerformance, {banks.begin(), banks.end()}, {.dynamicEnvelopes = true});
+  const auto resolved = preparePerformance(sourcePerformance, {banks.begin(), banks.end()},
+      {.dynamicEnvelopes = true, .onlyUsedInstruments = true, .firstBank = 11});
   const auto& preparedBanks = resolved.soundBanks();
   const auto variant = *noteById(resolved.performance(), first).instrument;
   expect(std::get<InstrumentHandle>(variant) == InstrumentHandle{0, 2} &&
              noteById(resolved.performance(), continuation).instrument == variant &&
              noteById(resolved.performance(), fresh).instrument == InstrumentSelection{InstrumentHandle{0, 1}} &&
              !preparedBanks[0].instruments[2].explicitAddress,
-         "variants must propagate stable handles without allocating an output preset");
+         "variants must propagate stable handles without overwriting the instrument's source address preference");
   expect(!noteById(sourcePerformance, first).instrument && banks[0].instruments[0].regions[0].envelope.attackSeconds == 1.0,
          "preparation must leave the source performance and original instrument envelope intact");
 
-  const auto layout = planInstrumentAddresses(resolved, true, 11);
-  expect(layout.valid && layout.banks.at(0) == 11 && layout.banks.at(9) == 12 &&
+  expect(resolved.valid() && resolved.bankMapping().at(0) == 11 && resolved.bankMapping().at(9) == 12 &&
              noteById(resolved.performance(), first).instrument == variant,
-         "late bank assignment must leave instrument references unchanged");
-  const auto selected = selectSynthBanks(resolved, layout, true);
+         "completed preparation must retain handles while assigning the requested bank namespace");
+  const auto selected = selectSynthBanks(resolved);
   expect(selected.size() == 1 && selected[0].bank == &preparedBanks[0] &&
              selected[0].instruments.size() == 2 &&
              selected[0].instruments[0].instrument == &preparedBanks[0].instruments[1] &&
@@ -115,7 +115,7 @@ void resolvedVariantsShareAddressesWithBothSynthWriters() {
   expect(dlsPresets == expected, "DLS and SF2 must agree on every planned preset");
 
   for (const auto mode : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
-    const auto midi = renderMidiSequence(resolved, layout, {.pitchTransitions = mode});
+    const auto midi = renderMidiSequence(resolved, {.pitchTransitions = mode});
     expect(midi.diagnostics.empty(), "resolved MIDI should not repeat lookup or adaptation diagnostics");
     auto events = midi.tracks[0].events;
     std::ranges::stable_sort(events, {}, [](const MidiEvent& event) { return std::pair{event.tick, event.priority}; });
@@ -127,7 +127,7 @@ void resolvedVariantsShareAddressesWithBothSynthWriters() {
           message && message->kind == MidiChannelMessageKind::ProgramChange) current.program = message->value;
       if (std::holds_alternative<NoteDuration>(event.payload)) {
         ++count;
-        const auto wanted = event.tick < 8 ? layout.address(variant) : layout.address(InstrumentHandle{0, 1});
+        const auto wanted = event.tick < 8 ? resolved.selectionFor(noteById(resolved.performance(), first)).address : resolved.selectionFor(InstrumentHandle{0, 1}).address;
         expect(current == wanted && sfPresets.contains({current.bank, current.program}),
                "every MIDI attack and portamento fragment must select the matching serialized synth preset");
       }
@@ -148,7 +148,7 @@ void resolutionChoosesAndDiagnosesOneDefinition() {
       NotePerformanceEvent{.header = {.tick = 1}, .note = PerformanceNoteId{1}},
       NotePerformanceEvent{.header = {.tick = 2}, .instrument = InstrumentAddress{7, 9}, .note = PerformanceNoteId{2}},
   };
-  const auto resolved = preparePerformance(PerformanceSequence{.tracks = {track}}, {bank});
+  const auto resolved = preparePerformance(PerformanceSequence{.tracks = {track}}, {bank}, {.onlyUsedInstruments = true});
   expect(noteById(resolved.performance(), PerformanceNoteId{0}).instrument ==
              InstrumentSelection{InstrumentHandle{0, 0}} &&
              noteById(resolved.performance(), PerformanceNoteId{1}).instrument ==
@@ -161,10 +161,12 @@ void resolutionChoosesAndDiagnosesOneDefinition() {
              std::ranges::count(resolved.performance().diagnostics, std::string("instrument-selection-conflict"),
                                &Diagnostic::code) == 2,
          "fallback and conflicting definitions must be reported once per source selection");
-  const auto layout = planInstrumentAddresses(resolved, true);
-  expect(selectSynthBanks(resolved, layout, true)[0].instruments.size() == 1,
+  expect(selectSynthBanks(resolved)[0].instruments.size() == 1,
          "filtering must use the same single definition as notes, leaving external presets external");
-  const auto midi = renderMidiSequence(resolved, layout);
+  const auto external = resolved.selectionFor(noteById(resolved.performance(), PerformanceNoteId{2}));
+  expect(external.instrument == nullptr && external.address == InstrumentAddress{7, 9},
+         "the resolved output view must distinguish external presets from owned instrument definitions");
+  const auto midi = renderMidiSequence(resolved);
   expect(!midi.tracks.empty(), "a missing companion instrument must not prevent standalone MIDI");
 }
 
@@ -173,44 +175,61 @@ void layoutSeparatesCollisionsAndRejectsOverflow() {
       Instrument{.explicitAddress = InstrumentAddress{0, 5}, .identity = InstrumentIdentity{"a", 1}},
       Instrument{.explicitAddress = InstrumentAddress{0, 5}, .identity = InstrumentIdentity{"b", 1}}}};
   const auto resolved = preparePerformance({.diagnostics = {{.code = "source-warning"}}}, {bank});
-  const auto layout = planInstrumentAddresses(resolved);
-  expect(layout.valid && layout.address(InstrumentHandle{0, 0}) != layout.address(InstrumentHandle{0, 1}),
+  expect(resolved.valid() && resolved.selectionFor(InstrumentHandle{0, 0}).address != resolved.selectionFor(InstrumentHandle{0, 1}).address,
          "distinct definitions must receive distinct output slots even when their preferred addresses collide");
   const auto implicitZero = preparePerformance({}, {SoundBankAsset{
       .instruments = {Instrument{}, Instrument{.explicitAddress = InstrumentAddress{0, 0}}}}});
-  const auto zeroPlan = planInstrumentAddresses(implicitZero);
-  expect(zeroPlan.address(InstrumentHandle{0, 0}) == InstrumentAddress{0, 0} &&
-             zeroPlan.address(InstrumentHandle{0, 1}) == InstrumentAddress{0, 1},
+  expect(implicitZero.selectionFor(InstrumentHandle{0, 0}).address == InstrumentAddress{0, 0} &&
+             implicitZero.selectionFor(InstrumentHandle{0, 1}).address == InstrumentAddress{0, 1},
          "an original instrument's implicit zero address is a preference, not an unassigned generated variant");
-  const auto failed = planInstrumentAddresses(resolved, false, 128);
-  const auto failedMidi = renderMidiSequence(resolved, failed);
-  expect(!failed.valid && failed.diagnostics.size() == 1 &&
-             failedMidi.tracks.empty() && failedMidi.diagnostics.size() == 2 &&
+  const auto failed = preparePerformance({.diagnostics = {{.code = "source-warning"}}}, {bank}, {.firstBank = 128});
+  const auto failedMidi = renderMidiSequence(failed);
+  expect(!failed.valid() && failed.performance().diagnostics.size() == 2 &&
+             selectSynthBanks(failed).empty() && failedMidi.tracks.empty() && failedMidi.diagnostics.size() == 2 &&
              failedMidi.diagnostics.front().code == "source-warning",
          "bank exhaustion must reject a partial plan while preserving earlier preparation diagnostics");
 }
 
 void preparedOwnershipSurvivesMovesAndLowering() {
-  const auto makePrepared = [] {
-    SoundBankAsset bank{.instruments = {Instrument{.explicitAddress = InstrumentAddress{0, 5}, .name = "Owned"}}};
+  const auto makePrepared = [](u32 firstBank) {
+    SoundBankAsset bank{.instruments = {
+        Instrument{.explicitAddress = InstrumentAddress{0, 0}, .pitchBendRangeCents = 700, .name = "Initial"},
+        Instrument{.explicitAddress = InstrumentAddress{0, 5}, .name = "Owned"},
+        Instrument{.explicitAddress = InstrumentAddress{0, 7}, .name = "Program only"}}};
     PerformanceSequence performance{.tracks = {PerformanceTrack{.events = {
         InstrumentPerformanceEvent{.instrument = InstrumentAddress{0, 5}},
         NotePerformanceEvent{.key = 60, .durationTicks = 4, .note = PerformanceNoteId{0}},
+        InstrumentPerformanceEvent{.header = {.tick = 4}, .instrument = InstrumentAddress{0, 7}},
     }}}};
-    return preparePerformance(std::move(performance), {std::move(bank)});
+    return preparePerformance(std::move(performance), {std::move(bank)},
+                              {.onlyUsedInstruments = true, .firstBank = firstBank});
   };
-  auto original = makePrepared();
-  const auto* instrument = original.instrument(InstrumentHandle{0, 0});
-  auto lowered = lowerMidiPerformanceAutomation(original, {}, PerformanceTempoMap{original.performance()});
-  expect(lowered.instrument(InstrumentHandle{0, 0}) == instrument,
-         "lowering must share immutable banks rather than copying them or borrowing the input's lifetime");
-  original = preparePerformance({});
+  auto original = makePrepared(23);
+  const auto* instrument = original.selectionFor(InstrumentHandle{0, 1}).instrument;
+  expect(!original.instrumentAddresses().contains(InstrumentHandle{0, 0}) &&
+             original.initialInstrument()->pitchBendRangeCents == 700 &&
+             original.selectionFor(InstrumentHandle{0, 2}).address == InstrumentAddress{23, 7} &&
+             selectSynthBanks(original)[0].instruments.size() == 1,
+         "initial pitch context needs no preset slot; a program-only selection needs a MIDI slot but no synth entry");
   std::vector<ResolvedPerformance> moved;
-  moved.push_back(std::move(lowered));
-  for (size_t index = 0; index < 8; ++index) moved.push_back(makePrepared());
-  expect(moved[0].instrument(InstrumentHandle{0, 0})->name == "Owned" &&
-             !renderMidiSequence(moved[0], planInstrumentAddresses(moved[0])).tracks.empty(),
-         "prepared handles must remain usable after source destruction, lowering, moves and container growth");
+  for (const auto mode : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
+    auto lowered = lowerMidiPerformanceAutomation(original, {.pitchTransitions = mode},
+                                                   PerformanceTempoMap{original.performance()});
+    expect(lowered.selectionFor(InstrumentHandle{0, 1}).instrument == instrument,
+           "lowering must share immutable banks rather than borrowing the input's lifetime");
+    moved.push_back(std::move(lowered));
+  }
+  original = makePrepared(61);
+  for (size_t index = 0; index < 8; ++index) moved.push_back(original);
+  for (size_t index = 0; index < 2; ++index) {
+    const auto& retained = moved[index];
+    const auto selection = retained.selectionFor(noteById(retained.performance(), PerformanceNoteId{0}));
+    expect(selection.instrument->name == "Owned" && selection.address == InstrumentAddress{23, 5} &&
+               retained.initialInstrument()->name == "Initial" && retained.bankMapping().at(0) == 23 &&
+               retained.nextBank() == 24 && original.selectionFor(InstrumentHandle{0, 1}).address.bank == 61 &&
+               !renderMidiSequence(retained).tracks.empty(),
+           "copies and lowered events must retain their own banks and addresses after replacement, moves and growth");
+  }
 }
 
 void laterSourceSelectionsCannotFindGeneratedVariants() {
@@ -230,8 +249,7 @@ void laterSourceSelectionsCannotFindGeneratedVariants() {
              noteById(prepared.performance(), PerformanceNoteId{1}).instrument ==
                  InstrumentSelection{InstrumentAddress{0, 0}},
          "numeric fallback must search original definitions, not an earlier generated variant without an address");
-  const auto plan = planInstrumentAddresses(prepared);
-  expect(plan.address(InstrumentHandle{0, 1}) != InstrumentAddress{0, 0},
+  expect(prepared.selectionFor(InstrumentHandle{0, 1}).address != InstrumentAddress{0, 0},
          "the external preset must reserve its address before any generated variant receives an output slot");
 }
 
@@ -339,7 +357,7 @@ void completedCollectionsRetainInputsAcrossRenderingOutcomes() {
       const PreparedCollection original{std::move(*binding.collection), {
           .sequence = scenario == Scenario::Skipped || scenario == Scenario::NoSequence
               ? std::nullopt : std::optional{SequenceRenderOptions{}},
-          .variants = {.dynamicEnvelopes = true},
+          .instruments = {.dynamicEnvelopes = true},
       }};
       expect(snapshot.asset<SoundBankAsset>(AssetId{1})->instruments.size() == 1,
              "preparation must leave the snapshot's bank unchanged");
@@ -370,7 +388,7 @@ void completedCollectionsRetainInputsAcrossRenderingOutcomes() {
                  !noteById(*prepared.rendering.performance, PerformanceNoteId{0}).instrument &&
                  noteById(performance.performance(), PerformanceNoteId{0}).instrument.has_value(),
              "resolved events must share the final banks while source events remain available for inspection");
-      expect(!renderMidiSequence(performance, planInstrumentAddresses(performance)).tracks.empty(),
+      expect(!renderMidiSequence(performance).tracks.empty(),
              "the retained resolved performance must still render after owner moves and destruction");
     }
   }
@@ -412,18 +430,17 @@ void synthSelectionsPreserveBankSamplingAndSampleOwners() {
       NotePerformanceEvent{.instrument = InstrumentIdentity{"A", 1}, .note = PerformanceNoteId{0}},
       NotePerformanceEvent{.header = {.tick = 1}, .instrument = InstrumentIdentity{"B", 1},
                            .note = PerformanceNoteId{1}},
-  }}}}, banks);
-  const auto layout = planInstrumentAddresses(resolved, true);
+  }}}}, banks, {.onlyUsedInstruments = true});
   // The input owns the selection returned by the builder; no temporary view is retained.
-  SynthExportInput input{.soundBanks = selectSynthBanks(resolved, layout, true), .samplePools = pools};
+  SynthExportInput input{.soundBanks = selectSynthBanks(resolved), .samplePools = pools};
   auto prepared = prepareSynthData(input, sources);
   expect(prepared.instruments.size() == 2 && prepared.instruments[0].regions.size() == 4 &&
              prepared.instruments[1].regions.size() == 16 && prepared.diagnostics.size() == 1 &&
              prepared.instruments[0].regions[0].region.attenuationDb == 82 &&
              prepared.instruments[1].regions[0].region.attenuationDb == 80,
          "selected instruments must use their own bank's sampling budget, including its unselected regions");
-  expect(prepared.instruments[0].address == layout.address(InstrumentHandle{0, 0}) &&
-             prepared.instruments[1].address == layout.address(InstrumentHandle{1, 0}) &&
+  expect(prepared.instruments[0].address == resolved.selectionFor(InstrumentHandle{0, 0}).address &&
+             prepared.instruments[1].address == resolved.selectionFor(InstrumentHandle{1, 0}).address &&
              prepared.instruments[0].address != prepared.instruments[1].address,
          "synth selection must preserve planned collision addresses instead of reusing source preferences");
   expect(prepared.samples.size() == 4 && prepared.samples[0].decoded.pcm == std::vector<s16>{2560} &&
@@ -439,8 +456,8 @@ void synthSelectionsPreserveBankSamplingAndSampleOwners() {
              prepared.samples[1].decoded.pcm == std::vector<s16>{10240},
          "used-only sample filtering must follow the selected entries' local and external sample references");
 
-  const auto silent = preparePerformance({}, banks);
-  const auto empty = prepareSynthData({.soundBanks = selectSynthBanks(silent, planInstrumentAddresses(silent, true), true),
+  const auto silent = preparePerformance({}, banks, {.onlyUsedInstruments = true});
+  const auto empty = prepareSynthData({.soundBanks = selectSynthBanks(silent),
                                        .samplePools = pools, .filterSamplesToReferencedInstruments = true}, sources);
   expect(empty.instruments.empty() && empty.samples.empty(),
          "a sequence using no instruments must not fall back to exporting its entire bank");

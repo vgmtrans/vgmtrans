@@ -48,7 +48,7 @@ using InstrumentSelection = std::variant<InstrumentAddress, InstrumentIdentity, 
 // Export addresses are explicit policy when a format needs a particular bank;
 // otherwise a source identity receives a stable sequential 128-program address.
 // These are source-address preferences. Resolved output consumers use the shared
-// InstrumentAddressPlan, which may relocate a conflicting or generated preset.
+// ResolvedPerformance, which may relocate a conflicting or generated preset.
 [[nodiscard]] inline InstrumentAddress resolveInstrumentAddress(const InstrumentIdentity& identity) noexcept {
   return InstrumentAddress{.bank = identity.key >> 7, .program = identity.key & 0x7f};
 }

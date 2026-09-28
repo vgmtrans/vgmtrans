@@ -60,7 +60,7 @@ InstrumentHandle selectedHandleForNote(const ResolvedPerformance& prepared, Perf
 }
 
 InstrumentAddress selectedAddressForNote(const ResolvedPerformance& prepared, PerformanceNoteId note) {
-  return planInstrumentAddresses(prepared).address(selectedHandleForNote(prepared, note));
+  return prepared.selectionFor(selectedHandleForNote(prepared, note)).address;
 }
 
 size_t selectedInstrumentForNote(const ResolvedPerformance& prepared, PerformanceNoteId note) {
@@ -101,15 +101,15 @@ void instrumentSelectionUsesOneResolutionPolicy() {
                              .note = PerformanceNoteId{1}},
     });
     const std::array<const SoundBankAsset*, 2> inputs{nullptr, &bank};
-    const auto resolved = prepareTestPerformance(performance, inputs);
-    const auto selected = selectSynthBanks(resolved, planInstrumentAddresses(resolved), true);
+    const auto resolved = prepareTestPerformance(performance, inputs, {.onlyUsedInstruments = true});
+    const auto selected = selectSynthBanks(resolved);
     const size_t first = test.firstMatch;
     expect(selected.size() == 2 && selected[0].instruments.empty() && selected[1].instruments.size() == 1 &&
                selected[1].instruments[0].instrument == &resolved.soundBanks()[1].instruments[first],
            "all consumers must use the first resolved definition, including numeric fallback and note overrides");
 
     std::array banks{bank};
-    const auto materialized = preparePerformance(performance, {banks.begin(), banks.end()}, InstrumentVariantOptions{.dynamicEnvelopes = true});
+    const auto materialized = preparePerformance(performance, {banks.begin(), banks.end()}, InstrumentPreparationOptions{.dynamicEnvelopes = true});
   const auto& preparedBanks = materialized.soundBanks();
     expect(
         std::ranges::any_of(materialized.performance().diagnostics, [](const Diagnostic& diagnostic) {
@@ -209,7 +209,7 @@ void dynamicEnvelopeMaterializationIsIncrementalAndDeduplicated() {
       },
   });
 
-  const auto materialized = preparePerformance(performance, {sets.begin(), sets.end()}, InstrumentVariantOptions{.dynamicEnvelopes = true});
+  const auto materialized = preparePerformance(performance, {sets.begin(), sets.end()}, InstrumentPreparationOptions{.dynamicEnvelopes = true});
   const auto& preparedBanks = materialized.soundBanks();
   expect(materialized.performance().diagnostics.empty(), "valid future-note envelope updates should not warn");
   expect(preparedBanks[0].instruments.size() == 5, "only four distinct effective envelopes should create variants");
@@ -291,7 +291,7 @@ void dynamicEnvelopeInstrumentSelectionControlsOverrideCarry() {
       },
   });
 
-  const auto materialized = preparePerformance(performance, {sets.begin(), sets.end()}, InstrumentVariantOptions{.dynamicEnvelopes = true});
+  const auto materialized = preparePerformance(performance, {sets.begin(), sets.end()}, InstrumentPreparationOptions{.dynamicEnvelopes = true});
   const auto& preparedBanks = materialized.soundBanks();
   const size_t first = selectedInstrumentForNote(materialized, PerformanceNoteId{1});
   const size_t preserved = selectedInstrumentForNote(materialized, PerformanceNoteId{3});
@@ -326,7 +326,7 @@ void dynamicEnvelopeActiveVoiceLimitationIsExplicit() {
       },
   });
 
-  const auto materialized = preparePerformance(performance, {sets.begin(), sets.end()}, InstrumentVariantOptions{.dynamicEnvelopes = true});
+  const auto materialized = preparePerformance(performance, {sets.begin(), sets.end()}, InstrumentPreparationOptions{.dynamicEnvelopes = true});
   const auto& preparedBanks = materialized.soundBanks();
   expect(std::ranges::any_of(
              materialized.performance().diagnostics,
@@ -393,13 +393,13 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero(MidiPitchTran
       .realization = {.startTick = 8, .endTick = 8},
   });
 
-  const auto materialized = preparePerformance(performance, {sets.begin(), sets.end()}, InstrumentVariantOptions{.dynamicEnvelopes = true});
+  const auto materialized = preparePerformance(performance, {sets.begin(), sets.end()}, InstrumentPreparationOptions{.dynamicEnvelopes = true});
   const auto& preparedBanks = materialized.soundBanks();
   expect(preparedBanks[0].instruments.size() == 129 &&
-             planInstrumentAddresses(materialized).address(InstrumentHandle{0, 128}) == InstrumentAddress{.bank = 1, .program = 0},
+             materialized.selectionFor(InstrumentHandle{0, 128}).address == InstrumentAddress{.bank = 1, .program = 0},
          "the allocator should move to the next free bank after bank zero is occupied");
 
-  const MidiSequence midi = renderMidiSequence(materialized, planInstrumentAddresses(materialized), {.pitchTransitions = rendering});
+  const MidiSequence midi = renderMidiSequence(materialized, {.pitchTransitions = rendering});
   std::vector<std::pair<u64, u16>> banks;
   for (const auto& event : midi.tracks[0].events) {
     if (const auto* bank = std::get_if<BankSelect>(&event.payload)) {
@@ -456,10 +456,9 @@ void variantAddressesRespectExportProjectionsAndExhaustion() {
                                             {.dynamicEnvelopes = true});
   expect(resolved.soundBanks()[0].instruments.size() == 5 && !resolved.soundBanks()[0].instruments.back().explicitAddress,
          "variant preparation must be independent of available output addresses");
-  const auto layout = planInstrumentAddresses(resolved);
-  expect(!layout.valid && layout.diagnostics.size() == 1 &&
-             layout.diagnostics[0].code == "instrument-addresses-exhausted" &&
-             renderMidiSequence(resolved, layout).tracks.empty(),
+  expect(!resolved.valid() && resolved.performance().diagnostics.size() == 1 &&
+             resolved.performance().diagnostics[0].code == "instrument-addresses-exhausted" &&
+             renderMidiSequence(resolved).tracks.empty(),
          "address exhaustion must reject the shared output plan instead of silently dropping one envelope variant");
 
 }
@@ -516,7 +515,7 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(bool changesInstr
     performance.tracks[0].events.emplace_back(NotePerformanceEvent{
         .header = eventHeader(12, 6), .key = 64, .durationTicks = 4, .note = PerformanceNoteId{3}});
   }
-  const auto materialized = preparePerformance(performance, {sets.begin(), sets.end()}, InstrumentVariantOptions{.dynamicEnvelopes = true});
+  const auto materialized = preparePerformance(performance, {sets.begin(), sets.end()}, InstrumentPreparationOptions{.dynamicEnvelopes = true, .onlyUsedInstruments = true});
   const auto& preparedBanks = materialized.soundBanks();
   const size_t selected = selectedInstrumentForNote(materialized, PerformanceNoteId{1});
   expect(selected == (changesInstrument ? 2 : 1), "the dynamic note should select its generated prepared instrument");
@@ -532,18 +531,18 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(bool changesInstr
                          }}},
   };
   std::vector<const SamplePoolAsset*> sampleViews{&samples};
-  const auto selectedInstruments = selectSynthBanks(materialized, planInstrumentAddresses(materialized), true);
+  const auto selectedInstruments = selectSynthBanks(materialized);
   const SynthExportInput input{
       .soundBanks = selectedInstruments, .samplePools = sampleViews,
       .filterSamplesToReferencedInstruments = true};
   const auto prepared = prepareSynthData(input, sources);
   const size_t count = changesInstrument ? 2 : 1;
-  const auto variant = planInstrumentAddresses(materialized).address(InstrumentHandle{0, static_cast<u32>(selected)});
+  const auto variant = materialized.selectionFor(InstrumentHandle{0, static_cast<u32>(selected)}).address;
   expect(prepared.instruments.size() == count && prepared.instruments.back().address == variant,
          "used-only synth export should retain the attack's variant and any subsequent independent attack");
 
   for (const auto rendering : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
-    const auto midi = renderMidiSequence(materialized, planInstrumentAddresses(materialized), {.pitchTransitions = rendering});
+    const auto midi = renderMidiSequence(materialized, {.pitchTransitions = rendering});
     u16 program = 0;
     size_t noteCount = 0;
     for (const auto& event : midi.tracks[0].events) {
@@ -565,7 +564,7 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(bool changesInstr
   expect(sf2.diagnostics.empty() && dls.diagnostics.empty() && chunkSize(sf2.bytes, "phdr") == (count + 1) * 38 &&
              readLe16(sf2.bytes, presets + (count - 1) * 38 + 20) == variant.program &&
              readLe32(dls.bytes, asciiOffset(dls.bytes, "colh") + 8) == count &&
-             readLe32(dls.bytes, asciiOffset(dls.bytes, "insh") + 16) == 1,
+             readLe32(dls.bytes, asciiOffset(dls.bytes, "insh") + 16) == (changesInstrument ? 1 : variant.program),
          "both serialized banks must retain exactly the presets used by the paired MIDI");
 
   const auto leadingTie = sequenceWithEvents({NotePerformanceEvent{.extendsPrevious = true}});
@@ -621,7 +620,7 @@ void signedStereoMaterializationUsesAttackTimeVariants() {
   });
 
   const auto materialized = preparePerformance(
-      performance, {sets.begin(), sets.end()}, InstrumentVariantOptions{.dynamicEnvelopes = true, .signedStereo = true});
+      performance, {sets.begin(), sets.end()}, InstrumentPreparationOptions{.dynamicEnvelopes = true, .signedStereo = true, .onlyUsedInstruments = true});
   const auto& preparedBanks = materialized.soundBanks();
   expect(preparedBanks[0].instruments.size() == 2, "attack-time state should create one combined instrument variant");
   expect(std::ranges::none_of(materialized.performance().tracks[0].events,
@@ -643,7 +642,7 @@ void signedStereoMaterializationUsesAttackTimeVariants() {
              invertedRegions[0].attenuationDb < invertedRegions[1].attenuationDb,
          "the combined variant should retain its envelope and bake signed pan into two hard-panned layers");
 
-  const auto selectedInstruments = selectSynthBanks(materialized, planInstrumentAddresses(materialized), true);
+  const auto selectedInstruments = selectSynthBanks(materialized);
   const auto prepared = prepareSynthData(
       SynthExportInput{
           .soundBanks = selectedInstruments,
@@ -730,7 +729,7 @@ void signedStereoMaterializationLeavesOrdinaryTracksAlone() {
   });
 
   const auto materialized = preparePerformance(
-      performance, {sets.begin(), sets.end()}, InstrumentVariantOptions{.dynamicEnvelopes = true, .signedStereo = true});
+      performance, {sets.begin(), sets.end()}, InstrumentPreparationOptions{.dynamicEnvelopes = true, .signedStereo = true});
   const auto& preparedBanks = materialized.soundBanks();
   expect(materialized.performance().diagnostics.empty() && preparedBanks[0].instruments[0].regions.size() == 1 &&
              preparedBanks[0].instruments[0].regions[0].response.evaluate,

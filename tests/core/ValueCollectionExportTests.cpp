@@ -311,8 +311,8 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
       }},
   };
   const std::array<const SamplePoolAsset*, 1> sampleSets{&samples};
-  const auto semanticPrepared = preparePerformance(semanticPerformance, {semanticInstruments});
-  const auto semanticSelection = selectSynthBanks(semanticPrepared, planInstrumentAddresses(semanticPrepared), true);
+  const auto semanticPrepared = preparePerformance(semanticPerformance, {semanticInstruments}, {.onlyUsedInstruments = true});
+  const auto semanticSelection = selectSynthBanks(semanticPrepared);
   const auto semanticData = prepareSynthData(
       SynthExportInput{
           .soundBanks = semanticSelection,
@@ -335,8 +335,8 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
               },
       }},
   };
-  const auto logicalBankPrepared = preparePerformance(logicalBankPerformance, {logicalBankInstruments});
-  const auto logicalBankSelection = selectSynthBanks(logicalBankPrepared, planInstrumentAddresses(logicalBankPrepared), true);
+  const auto logicalBankPrepared = preparePerformance(logicalBankPerformance, {logicalBankInstruments}, {.onlyUsedInstruments = true});
+  const auto logicalBankSelection = selectSynthBanks(logicalBankPrepared);
   const auto logicalBankData = prepareSynthData(
       SynthExportInput{
           .soundBanks = logicalBankSelection,
@@ -359,8 +359,8 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
               },
       }},
   };
-  const auto exactBankPrepared = preparePerformance(exactBankPerformance, {exactBankInstruments});
-  const auto exactBankSelection = selectSynthBanks(exactBankPrepared, planInstrumentAddresses(exactBankPrepared), true);
+  const auto exactBankPrepared = preparePerformance(exactBankPerformance, {exactBankInstruments}, {.onlyUsedInstruments = true});
+  const auto exactBankSelection = selectSynthBanks(exactBankPrepared);
   const auto exactBankData = prepareSynthData(
       SynthExportInput{
           .soundBanks = exactBankSelection,

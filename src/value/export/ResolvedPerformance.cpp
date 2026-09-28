@@ -173,25 +173,20 @@ bool matchesInstrumentSelection(const Instrument& instrument, const InstrumentSe
 }  // namespace
 
 ResolvedPerformance::ResolvedPerformance(PerformanceSequence performance, std::vector<SoundBankAsset> soundBanks,
-                                         InstrumentSelection initialInstrument)
+                                         InstrumentSelection initialInstrument, const InstrumentPreparationOptions& options)
     : performance_(std::move(performance)),
       soundBanks_(std::make_shared<const std::vector<SoundBankAsset>>(std::move(soundBanks))),
-      initialInstrument_(std::move(initialInstrument)) {}
+      onlyUsedInstruments_(options.onlyUsedInstruments) {
+  if (const auto* handle = std::get_if<InstrumentHandle>(&initialInstrument)) {
+    initialInstrument_ = &soundBanks_->at(handle->bank).instruments.at(handle->instrument);
+  }
+  assignAddresses(options);
+}
 
 std::vector<const SoundBankAsset*> ResolvedPerformance::soundBankView() const {
   std::vector<const SoundBankAsset*> view;
   for (const auto& bank : *soundBanks_) view.push_back(&bank);
   return view;
-}
-
-const Instrument* ResolvedPerformance::instrument(const InstrumentSelection& selection) const {
-  if (const auto* handle = std::get_if<InstrumentHandle>(&selection)) {
-    return &soundBanks_->at(handle->bank).instruments.at(handle->instrument);
-  }
-  if (std::holds_alternative<InstrumentIdentity>(selection)) {
-    throw std::logic_error("Unresolved native instrument reached output conversion");
-  }
-  return nullptr;
 }
 
 std::set<InstrumentHandle> ResolvedPerformance::usedInstruments() const {
@@ -209,7 +204,7 @@ std::set<InstrumentHandle> ResolvedPerformance::usedInstruments() const {
 }
 
 ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vector<SoundBankAsset> soundBanks,
-                                         InstrumentVariantOptions options) {
+                                         InstrumentPreparationOptions options) {
   auto& diagnostics = performance.diagnostics;
   struct CachedSelection {
     InstrumentSelection resolved;
@@ -465,26 +460,37 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
       });
     }
   }
-  return ResolvedPerformance{std::move(performance), std::move(soundBanks), initialInstrument};
+  return ResolvedPerformance{std::move(performance), std::move(soundBanks), initialInstrument, options};
 }
 
-InstrumentAddress InstrumentAddressPlan::address(const InstrumentSelection& selection) const {
-  if (!valid) throw std::logic_error("Cannot use a failed instrument layout");
-  if (const auto* handle = std::get_if<InstrumentHandle>(&selection)) return instruments.at(*handle);
-  auto value = std::get<InstrumentAddress>(selection);
-  if (!banks.empty()) value.bank = banks.at(value.bank);
-  return value;
+ResolvedInstrument ResolvedPerformance::selectionFor(InstrumentHandle handle) const {
+  if (!valid_) throw std::logic_error("Cannot use failed instrument preparation");
+  return {&soundBanks_->at(handle.bank).instruments.at(handle.instrument), addresses_.at(handle)};
 }
 
-u32 InstrumentAddressPlan::nextBank() const {
+ResolvedInstrument ResolvedPerformance::selectedInstrument(const InstrumentSelection& selection) const {
+  if (const auto* handle = std::get_if<InstrumentHandle>(&selection)) return selectionFor(*handle);
+  if (!valid_) throw std::logic_error("Cannot use failed instrument preparation");
+  auto address = std::get<InstrumentAddress>(selection);
+  if (!banks_.empty()) address.bank = banks_.at(address.bank);
+  return {nullptr, address};
+}
+
+ResolvedInstrument ResolvedPerformance::selectionFor(const NotePerformanceEvent& note) const {
+  return selectedInstrument(note.instrument.value());
+}
+
+ResolvedInstrument ResolvedPerformance::selectionFor(const InstrumentPerformanceEvent& change) const {
+  return selectedInstrument(change.instrument);
+}
+
+u32 ResolvedPerformance::nextBank() const {
   u32 next = 0;
-  for (const auto& [source, target] : banks) next = std::max(next, target + 1);
+  for (const auto& [source, target] : banks_) next = std::max(next, target + 1);
   return next;
 }
 
-InstrumentAddressPlan planInstrumentAddresses(const ResolvedPerformance& performance, bool onlyUsed,
-                                               std::optional<u32> compactBanks) {
-  InstrumentAddressPlan result;
+void ResolvedPerformance::assignAddresses(const InstrumentPreparationOptions& options) {
   std::set<InstrumentHandle> needed;
   std::set<std::pair<u32, u32>> external;
   const auto observe = [&](const InstrumentSelection& selection) {
@@ -495,7 +501,7 @@ InstrumentAddressPlan planInstrumentAddresses(const ResolvedPerformance& perform
       external.emplace(value.bank, value.program);
     }
   };
-  for (const auto& track : performance.performance().tracks) {
+  for (const auto& track : performance_.tracks) {
     for (const auto& event : track.events) {
       if (const auto* change = std::get_if<InstrumentPerformanceEvent>(&event)) observe(change->instrument);
       if (const auto* note = std::get_if<NotePerformanceEvent>(&event); note && note->instrument) observe(*note->instrument);
@@ -510,11 +516,11 @@ InstrumentAddressPlan planInstrumentAddresses(const ResolvedPerformance& perform
     if (sfBank < 128) reserved.set(sfBank * 128 + program);
   };
   std::map<InstrumentHandle, std::optional<InstrumentAddress>> preferred;
-  for (u32 bank = 0; bank < performance.soundBanks().size(); ++bank) {
-    const auto& instruments = performance.soundBanks()[bank].instruments;
+  for (u32 bank = 0; bank < soundBanks().size(); ++bank) {
+    const auto& instruments = soundBanks()[bank].instruments;
     for (u32 index = 0; index < instruments.size(); ++index) {
       const InstrumentHandle handle{bank, index};
-      if (onlyUsed && !needed.contains(handle)) continue;
+      if (options.onlyUsedInstruments && !needed.contains(handle)) continue;
       const auto& instrument = instruments[index];
       const auto address = instrument.explicitAddress;
       preferred.emplace(handle, address);
@@ -527,35 +533,34 @@ InstrumentAddressPlan planInstrumentAddresses(const ResolvedPerformance& perform
   std::set<std::pair<u32, u32>> assigned;
   for (const auto& [handle, preferredAddress] : preferred) {
     if (preferredAddress && assigned.emplace(preferredAddress->bank, preferredAddress->program).second) {
-      result.instruments.emplace(handle, *preferredAddress);
+      addresses_.emplace(handle, *preferredAddress);
       continue;
     }
     while (next < reserved.size() && reserved[next]) ++next;
     if (next == reserved.size()) {
-      result.valid = false;
-      result.diagnostics.push_back({.severity = Severity::Error, .code = "instrument-addresses-exhausted",
+      valid_ = false;
+      performance_.diagnostics.push_back({.severity = Severity::Error, .code = "instrument-addresses-exhausted",
                                     .message = "Cannot allocate another portable bank/program address"});
-      return result;
+      return;
     }
     reserved.set(next);
-    result.instruments.emplace(handle, InstrumentAddress{next / 128, next % 128});
+    addresses_.emplace(handle, InstrumentAddress{next / 128, next % 128});
     ++next;
   }
-  if (compactBanks) {
+  if (options.firstBank) {
     std::set<u32> sourceBanks{0};
-    for (const auto& [handle, address] : result.instruments) sourceBanks.insert(address.bank);
+    for (const auto& [handle, address] : addresses_) sourceBanks.insert(address.bank);
     for (const auto& [bank, program] : external) sourceBanks.insert(bank);
-    if (*compactBanks > 128 || sourceBanks.size() > 128 - *compactBanks) {
-      result.valid = false;
-      result.diagnostics.push_back({.severity = Severity::Error, .code = "instrument-banks-exhausted",
+    if (*options.firstBank > 128 || sourceBanks.size() > 128 - *options.firstBank) {
+      valid_ = false;
+      performance_.diagnostics.push_back({.severity = Severity::Error, .code = "instrument-banks-exhausted",
                                     .message = "Stitched collections require more than 128 preset banks"});
-      return result;
+      return;
     }
-    u32 bank = *compactBanks;
-    for (const u32 source : sourceBanks) result.banks.emplace(source, bank++);
-    for (auto& [handle, address] : result.instruments) address.bank = result.banks.at(address.bank);
+    u32 bank = *options.firstBank;
+    for (const u32 source : sourceBanks) banks_.emplace(source, bank++);
+    for (auto& [handle, address] : addresses_) address.bank = banks_.at(address.bank);
   }
-  return result;
 }
 
 }  // namespace vgmtrans::core

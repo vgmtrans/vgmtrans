@@ -67,7 +67,7 @@ struct RenderedCollection {
 struct CollectionPreparationOptions {
   // Absent for exports that do not need sequence execution, such as WAV.
   std::optional<SequenceRenderOptions> sequence;
-  InstrumentVariantOptions variants;
+  InstrumentPreparationOptions instruments;
   ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;
   ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
 };

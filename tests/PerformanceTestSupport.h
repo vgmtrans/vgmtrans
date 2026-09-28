@@ -28,10 +28,11 @@ std::vector<const Event*> eventsOfType(const vgmtrans::core::PerformanceTrack& t
 // Preparation/ownership tests call the production boundary directly.
 inline vgmtrans::core::ResolvedPerformance prepareTestPerformance(
     const vgmtrans::core::PerformanceSequence& performance,
-    std::span<const vgmtrans::core::SoundBankAsset* const> banks = {}) {
+    std::span<const vgmtrans::core::SoundBankAsset* const> banks = {},
+    vgmtrans::core::InstrumentPreparationOptions options = {}) {
   std::vector<vgmtrans::core::SoundBankAsset> copies;
   for (const auto* bank : banks) copies.push_back(bank ? *bank : vgmtrans::core::SoundBankAsset{});
-  return vgmtrans::core::preparePerformance(performance, std::move(copies));
+  return vgmtrans::core::preparePerformance(performance, std::move(copies), options);
 }
 
 inline vgmtrans::core::MidiSequence renderTestMidi(
@@ -40,6 +41,6 @@ inline vgmtrans::core::MidiSequence renderTestMidi(
     std::span<const vgmtrans::core::SoundBankAsset* const> banks = {},
     const vgmtrans::core::SequenceModulationProfile* modulation = nullptr) {
   const auto prepared = prepareTestPerformance(performance, banks);
-  return vgmtrans::core::renderMidiSequence(prepared, vgmtrans::core::planInstrumentAddresses(prepared), options,
+  return vgmtrans::core::renderMidiSequence(prepared, options,
                                            conversion, modulation);
 }

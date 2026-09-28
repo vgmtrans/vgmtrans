@@ -1446,7 +1446,7 @@ void capcomSnesReleaseRateIsStickyAcrossInstrumentChanges() {
           },
   }};
   const auto materialized =
-      preparePerformance(performance, {sets.begin(), sets.end()}, InstrumentVariantOptions{.dynamicEnvelopes = true});
+      preparePerformance(performance, {sets.begin(), sets.end()}, InstrumentPreparationOptions{.dynamicEnvelopes = true});
   std::vector<const NotePerformanceEvent*> notes;
   for (const auto& event : materialized.performance().tracks.front().events) {
     if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
@@ -1457,7 +1457,7 @@ void capcomSnesReleaseRateIsStickyAcrossInstrumentChanges() {
              notes[1]->instrument && materialized.soundBanks().front().instruments.size() == 4,
          "CapcomSnes sticky release should materialize a dynamic variant for both selected instruments");
   for (const NotePerformanceEvent* note : notes) {
-    const auto* variant = materialized.instrument(*note->instrument);
+    const auto* variant = materialized.selectionFor(*note).instrument;
     expect(variant != nullptr && variant->regions.size() == 1 &&
                variant->regions.front().envelope.releaseSeconds &&
                std::abs(*variant->regions.front().envelope.releaseSeconds - expectedReleaseSeconds) < 0.000001,

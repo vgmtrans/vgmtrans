@@ -19,7 +19,7 @@ class PerformancePitchBendContext {
  public:
   PerformancePitchBendContext() = default;
   explicit PerformancePitchBendContext(const ResolvedPerformance& performance) {
-    selectInstrument(performance.initialInstrument(), performance);
+    selectInstrument(performance.initialInstrument());
   }
 
   // Returns true only when the effective pitch context changes.
@@ -28,10 +28,10 @@ class PerformancePitchBendContext {
     if (const auto* range = std::get_if<PitchBendRangePerformanceEvent>(&event)) {
       sourceRangeCents_ = range->cents;
     } else if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event)) {
-      selectInstrument(selection->instrument, performance);
+      selectInstrument(performance.selectionFor(*selection).instrument);
     } else if (const auto* note = std::get_if<NotePerformanceEvent>(&event);
-               note != nullptr && !note->extendsPrevious && note->instrument) {
-      selectInstrument(*note->instrument, performance);
+               note != nullptr && !note->extendsPrevious) {
+      selectInstrument(performance.selectionFor(*note).instrument);
     }
     return *this != previous;
   }
@@ -51,8 +51,7 @@ class PerformancePitchBendContext {
   friend bool operator==(const PerformancePitchBendContext&, const PerformancePitchBendContext&) noexcept = default;
 
  private:
-  void selectInstrument(const InstrumentSelection& selection, const ResolvedPerformance& performance) {
-    const auto* instrument = performance.instrument(selection);
+  void selectInstrument(const Instrument* instrument) {
     instrumentRangeCents_ = instrument == nullptr ? std::nullopt : instrument->pitchBendRangeCents;
   }
 

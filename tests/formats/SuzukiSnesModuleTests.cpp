@@ -420,11 +420,11 @@ void laterE0UsesTheSustainRateAsAGatedRelease() {
       }},
   }};
   const auto materialized =
-      preparePerformance(performance, {sets.begin(), sets.end()}, InstrumentVariantOptions{.dynamicEnvelopes = true});
+      preparePerformance(performance, {sets.begin(), sets.end()}, InstrumentPreparationOptions{.dynamicEnvelopes = true});
   const auto notes = eventsOfType<NotePerformanceEvent>(materialized.performance().tracks.front());
   expect(notes.size() == 1 && notes.front()->instrument,
          "E0 should select a materialized envelope variant for the following attack");
-  const auto* variant = materialized.instrument(*notes.front()->instrument);
+  const auto* variant = materialized.selectionFor(*notes.front()).instrument;
   expect(variant != nullptr && variant->regions.size() == 1 &&
              variant->regions.front().envelope.secondDecaySeconds &&
              std::isinf(*variant->regions.front().envelope.secondDecaySeconds) &&

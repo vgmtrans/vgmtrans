@@ -299,7 +299,7 @@ PreparedCollection::PreparedCollection(BoundCollection collection, const Collect
       rendering.modulation.hasSynthModulation()) {
     for (auto& bank : collection.soundBanks_) applySequenceModulation(bank, rendering.modulation);
   }
-  performance_ = preparePerformance(*rendering.performance, std::move(collection.soundBanks_), options.variants);
+  performance_ = preparePerformance(*rendering.performance, std::move(collection.soundBanks_), options.instruments);
   soundBanks_ = performance_->soundBanks_;
   if (options.modulationConversion == ModulationConversionPolicy::SynthModulators &&
       options.modulationScaling == ModulationScalingPolicy::ObservedSequenceRange) {

@@ -18,23 +18,18 @@
 
 namespace vgmtrans::core {
 
-struct SynthInstrumentSelection {
-  const Instrument* instrument = nullptr;
-  InstrumentAddress address;
-};
-
 // A bank supplies local samples and the region-sampling policy for its selected
 // instruments. Keep it even when no instruments are selected: unfiltered sample
 // export still includes its local samples. Builders omit null bank pointers.
 struct SynthBankSelection {
   const SoundBankAsset* bank = nullptr;
-  std::vector<SynthInstrumentSelection> instruments;
+  std::vector<ResolvedInstrument> instruments;
 };
 
 [[nodiscard]] std::vector<SynthBankSelection> selectSynthBanks(
     std::span<const SoundBankAsset* const> soundBanks);
 [[nodiscard]] std::vector<SynthBankSelection> selectSynthBanks(
-    const ResolvedPerformance& performance, const InstrumentAddressPlan& layout, bool onlyUsed = false);
+    const ResolvedPerformance& performance);
 
 struct SynthExportInput {
   std::string name;

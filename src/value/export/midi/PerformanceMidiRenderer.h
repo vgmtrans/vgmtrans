@@ -18,7 +18,7 @@ namespace vgmtrans::core {
 struct SequenceModulationProfile;
 
 [[nodiscard]] MidiSequence renderMidiSequence(
-    const ResolvedPerformance& performance, const InstrumentAddressPlan& layout, MidiExportOptions options = {},
+    const ResolvedPerformance& performance, MidiExportOptions options = {},
     ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators,
     const SequenceModulationProfile* modulationProfile = nullptr);
 

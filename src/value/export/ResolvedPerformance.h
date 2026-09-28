@@ -10,44 +10,69 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
-#include <span>
 #include <vector>
 
 namespace vgmtrans::core {
 
-struct InstrumentVariantOptions {
+struct InstrumentPreparationOptions {
   bool dynamicEnvelopes = false;
   bool signedStereo = false;
+  bool onlyUsedInstruments = false;
+  // Start an independent stitched part's bank namespace here.
+  std::optional<u32> firstBank;
+};
+
+// An instrument definition and its output address. Null means an external
+// preset. The definition is borrowed; its owning bank must outlive conversion.
+struct ResolvedInstrument {
+  const Instrument* instrument = nullptr;
+  InstrumentAddress address;
 };
 
 struct MidiExportOptions;
 
 // Preparation is the only way to construct this value: every note has a resolved
 // instrument and continuations retain their attack's adapted instrument. Bank
-// copies are owned and frozen; MIDI lowering copies events but shares the banks.
+// copies and output addresses are owned and frozen together. MIDI lowering
+// copies events and addresses but shares the banks. Address exhaustion retains
+// the prepared data and diagnostics, but prevents MIDI/synth output.
 class ResolvedPerformance {
 public:
   [[nodiscard]] const PerformanceSequence& performance() const noexcept { return performance_; }
   [[nodiscard]] const std::vector<SoundBankAsset>& soundBanks() const noexcept { return *soundBanks_; }
   [[nodiscard]] std::vector<const SoundBankAsset*> soundBankView() const;
-  [[nodiscard]] const InstrumentSelection& initialInstrument() const noexcept { return initialInstrument_; }
-
-  [[nodiscard]] const Instrument* instrument(const InstrumentSelection& selection) const;
+  [[nodiscard]] const Instrument* initialInstrument() const noexcept { return initialInstrument_; }
+  // Notes, changes and handles must belong to this prepared performance.
+  [[nodiscard]] ResolvedInstrument selectionFor(InstrumentHandle handle) const;
+  [[nodiscard]] ResolvedInstrument selectionFor(const NotePerformanceEvent& note) const;
+  [[nodiscard]] ResolvedInstrument selectionFor(const InstrumentPerformanceEvent& change) const;
+  [[nodiscard]] bool valid() const noexcept { return valid_; }
+  [[nodiscard]] bool onlyUsedInstruments() const noexcept { return onlyUsedInstruments_; }
+  [[nodiscard]] const std::map<InstrumentHandle, InstrumentAddress>& instrumentAddresses() const { return addresses_; }
+  [[nodiscard]] const std::map<u32, u32>& bankMapping() const { return banks_; }
+  [[nodiscard]] u32 nextBank() const;
   [[nodiscard]] std::set<InstrumentHandle> usedInstruments() const;
 
 private:
   friend class PreparedCollection;
   friend ResolvedPerformance preparePerformance(PerformanceSequence, std::vector<SoundBankAsset>,
-                                                 InstrumentVariantOptions);
+                                                 InstrumentPreparationOptions);
   friend ResolvedPerformance lowerMidiPerformanceAutomation(ResolvedPerformance, const MidiExportOptions&,
                                                             const PerformanceTempoMap&);
   ResolvedPerformance(PerformanceSequence performance, std::vector<SoundBankAsset> soundBanks,
-                      InstrumentSelection initialInstrument);
+                      InstrumentSelection initialInstrument, const InstrumentPreparationOptions& options);
+  void assignAddresses(const InstrumentPreparationOptions& options);
+  [[nodiscard]] ResolvedInstrument selectedInstrument(const InstrumentSelection& selection) const;
 
   PerformanceSequence performance_;
   std::shared_ptr<const std::vector<SoundBankAsset>> soundBanks_;
-  InstrumentSelection initialInstrument_;
+  const Instrument* initialInstrument_ = nullptr;  // Points into the shared immutable banks.
+  std::map<InstrumentHandle, InstrumentAddress> addresses_;
+  std::map<u32, u32> banks_;
+  bool onlyUsedInstruments_;
+  bool valid_ = true;
 };
 
 // The only source-selection resolver. Exact identity first, numeric fallback,
@@ -56,23 +81,6 @@ private:
 // are resolved only against original definitions, never newly generated variants.
 [[nodiscard]] ResolvedPerformance preparePerformance(
     PerformanceSequence performance, std::vector<SoundBankAsset> soundBanks = {},
-    InstrumentVariantOptions variants = {});
-
-// Addresses are assigned after variants, before either MIDI or synth conversion.
-// compactBanks starts an independent part's bank namespace at the given number.
-// The same plan is consumed by both outputs; no finished MIDI is patched.
-struct InstrumentAddressPlan {
-  std::map<InstrumentHandle, InstrumentAddress> instruments;
-  std::map<u32, u32> banks;
-  std::vector<Diagnostic> diagnostics;
-  bool valid = true;
-
-  [[nodiscard]] InstrumentAddress address(const InstrumentSelection& selection) const;
-  [[nodiscard]] u32 nextBank() const;
-};
-
-[[nodiscard]] InstrumentAddressPlan planInstrumentAddresses(
-    const ResolvedPerformance& performance, bool onlyUsed = false,
-    std::optional<u32> compactBanks = std::nullopt);
+    InstrumentPreparationOptions options = {});
 
 }  // namespace vgmtrans::core

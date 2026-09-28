@@ -343,12 +343,12 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
 
   std::array<SoundBankAsset, 1> dynamicInstruments{*instruments};
   const auto materialized = preparePerformance(performance, {dynamicInstruments.begin(), dynamicInstruments.end()},
-                                                          InstrumentVariantOptions{.dynamicEnvelopes = true});
+                                                          InstrumentPreparationOptions{.dynamicEnvelopes = true});
   const auto selectedAddress = [&](PerformanceNoteId note) {
     for (const auto& event : materialized.performance().tracks[0].events) {
       if (const auto* noteEvent = std::get_if<NotePerformanceEvent>(&event);
           noteEvent != nullptr && noteEvent->note == note && noteEvent->instrument) {
-        return planInstrumentAddresses(materialized).address(*noteEvent->instrument);
+        return materialized.selectionFor(*noteEvent).address;
       }
     }
     return InstrumentAddress{.bank = invalidIdValue, .program = invalidIdValue};
