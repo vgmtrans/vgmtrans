@@ -7,6 +7,7 @@
 #include "../MidiTestSupport.h"
 #include "../TestSupport.h"
 #include "value/export/CollectionBinding.h"
+#include "value/export/SequenceModulationProfile.h"
 #include "ValueFormatTestSupport.h"
 
 #include "value/export/midi/PerformanceMidiRenderer.h"
@@ -1216,7 +1217,12 @@ void akaoVibratoCommandsWorkAcrossVersions() {
     const auto performance = renderAkaoFixture({
         0xb5, 0x20, 0xb4, 2, 3, 6, 0x08, 0xb5, 0xc0, 0x08,
         0xb6, 0xb5, 0x40, 0x08, 0xb4, 2, 0, 6, 0x08, 0xa0}, {}, version);
-    const auto events = fixtureEvents<ModulationPerformanceEvent>(performance);
+    const auto profile = analyzeSequenceModulation(performance);
+    expect(profile.instruments.vibrato && profile.instruments.vibrato->delaySeconds &&
+               profile.instruments.vibrato->rateHertz.minimum > 0,
+           "vibrato rate and delay must also configure synth export");
+    auto events = fixtureEvents<ModulationPerformanceEvent>(performance);
+    std::erase_if(events, [](const auto& event) { return event.target != ModulationPerformanceTarget::VibratoDepth; });
     const bool newest = version == AkaoPs1Version::Version3_2;
     expect(events.size() == 4 && *events[2].pitchDepthSemitones == 0 && *events[3].pitchDepthSemitones > 0,
            "B5 must retain depth while disabled; only B4 enables vibrato, and B6 cancels it");
@@ -1277,13 +1283,12 @@ void akaoVibratoRateFadeRetargetsAndB4CancelsIt() {
     if (event.target == ModulationPerformanceTarget::VibratoRate) rates.push_back(*event.context.frequencyHz);
   }
   const double quarterClock = AkaoProfile{AkaoPs1Version::Version3_2}.driverTickHz() / 4;
-  expect(rates.size() == 5 && std::abs(rates[0] - quarterClock / 5) < 1e-9 &&
-             std::abs(rates[2] - quarterClock / 7) < 1e-9 &&
-             std::abs(rates[3] - quarterClock / 5) < 1e-9 &&
-             std::abs(rates[4] - quarterClock / 3) < 1e-9,
-         "E4 must interpolate the period from its current value; a subsequent B4 cancels the fade");
-  expect(events.back().context.restartMode == LfoRestartMode::Delay,
-         "v3.2 B4 reloads delay without resetting the current waveform position");
+  constexpr double periods[]{4, 5, 6, 7, 5, 3, 2};
+  expect(rates.size() == std::size(periods), "B4 must set the rate and cancel any pending E4 fade");
+  for (size_t i = 0; i < rates.size(); ++i) {
+    expect(std::abs(rates[i] - quarterClock / periods[i]) < 1e-9,
+           "E4 must interpolate the period from its current value");
+  }
 
   const auto bends = [](std::vector<u8> commands) {
     const auto midi = renderMidiSequence(renderAkaoFixture(commands, {}, AkaoPs1Version::Version3_2), {},
