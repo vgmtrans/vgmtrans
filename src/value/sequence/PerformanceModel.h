@@ -33,8 +33,8 @@ namespace vgmtrans::core {
 struct PerformanceNoteIdTag;
 using PerformanceNoteId = Id<PerformanceNoteIdTag>;
 
-// Track-local identity of a sounding voice. Several note segments can share it.
-// Export preparation remaps these to the voices owned by ResolvedPerformance.
+// Index of a sounding voice owned by ResolvedPerformance, assigned during
+// preparation after source note/continuation bindings are final.
 struct PerformanceVoiceIdTag;
 using PerformanceVoiceId = Id<PerformanceVoiceIdTag>;
 
@@ -100,7 +100,7 @@ struct NotePerformanceEvent {
   // The explicit lane leaves room for formats that multiplex voices in one
   // source track.
   PerformanceLaneId lane{0};
-  PerformanceVoiceId voice;
+  PerformanceVoiceId voice;  // Prepared events only; source events use note/pitch bindings.
 };
 
 struct TempoPerformanceEvent {

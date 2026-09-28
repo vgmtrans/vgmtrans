@@ -360,7 +360,6 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero(MidiPitchTran
           .key = 60,
           .durationTicks = 4,
           .note = PerformanceNoteId{1},
-          .voice = PerformanceVoiceId{1},
       },
       NotePerformanceEvent{
           .header = eventHeader(4, 3),
@@ -368,7 +367,6 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero(MidiPitchTran
           .durationTicks = 4,
           .extendsPrevious = true,
           .note = PerformanceNoteId{1},
-          .voice = PerformanceVoiceId{1},
       },
       EnvelopePerformanceEvent{
           .header = eventHeader(6, 4),
@@ -379,7 +377,6 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero(MidiPitchTran
           .key = 62,
           .durationTicks = 2,
           .note = PerformanceNoteId{2},
-          .voice = PerformanceVoiceId{1},
       },
       NotePerformanceEvent{
           .header = eventHeader(10, 7),
@@ -485,7 +482,6 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(bool changesInstr
           .key = 60,
           .durationTicks = 4,
           .note = PerformanceNoteId{1},
-          .voice = PerformanceVoiceId{1},
       },
       NotePerformanceEvent{
           .header = eventHeader(4, 2),
@@ -493,7 +489,6 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(bool changesInstr
           .durationTicks = 4,
           .extendsPrevious = true,
           .note = PerformanceNoteId{1},
-          .voice = PerformanceVoiceId{1},
       },
       EnvelopePerformanceEvent{
           .header = eventHeader(8, 3),
@@ -504,7 +499,6 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(bool changesInstr
           .key = 62,
           .durationTicks = 4,
           .note = PerformanceNoteId{2},
-          .voice = PerformanceVoiceId{1},
       },
   });
   performance.tracks[0].automations.push_back(PerformanceAutomation{

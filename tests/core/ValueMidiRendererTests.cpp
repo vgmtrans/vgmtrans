@@ -32,7 +32,7 @@ void performanceMidiRendererTrustsSourceNoteExtensions() {
                       .key = 60.0,
                       .linearVelocity = 0.75,
                       .durationTicks = 12,
-                      .voice = PerformanceVoiceId{0},
+                      .note = PerformanceNoteId{0},
                   },
                   NotePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 12},
@@ -40,7 +40,7 @@ void performanceMidiRendererTrustsSourceNoteExtensions() {
                       .linearVelocity = 0.5,
                       .durationTicks = 6,
                       .extendsPrevious = true,
-                      .voice = PerformanceVoiceId{0},
+                      .note = PerformanceNoteId{0},
                   },
                   GlobalTransposePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 18},
@@ -52,7 +52,7 @@ void performanceMidiRendererTrustsSourceNoteExtensions() {
                       .linearVelocity = 0.5,
                       .durationTicks = 6,
                       .extendsPrevious = true,
-                      .voice = PerformanceVoiceId{0},
+                      .note = PerformanceNoteId{0},
                   },
                   NotePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 24},
@@ -664,7 +664,7 @@ void performanceMidiRendererCanTerminatePreviousVoices() {
                       .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 8, .sequence = 1},
                       .key = 62.0,
                       .durationTicks = 4,
-                      .voice = PerformanceVoiceId{0},
+                      .note = PerformanceNoteId{0},
                   },
                   PitchBendPerformanceEvent{
                       .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 8, .sequence = 2},
@@ -675,7 +675,7 @@ void performanceMidiRendererCanTerminatePreviousVoices() {
                       .key = 62.0,
                       .durationTicks = 4,
                       .extendsPrevious = true,
-                      .voice = PerformanceVoiceId{0},
+                      .note = PerformanceNoteId{0},
                   },
               },
       }},

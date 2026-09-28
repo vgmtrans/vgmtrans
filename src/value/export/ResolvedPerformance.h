@@ -34,14 +34,12 @@ struct ResolvedInstrument {
 struct SoundingVoice {
   // Always a handle or an external address after preparation.
   InstrumentSelection instrument;
-  u64 startTick = 0;
-  u64 endTick = 0;  // Sequence gate end, before the hardware limit.
   std::optional<u64> endLimit;  // Absolute tick; computed with the source tempo map.
 };
 
 struct MidiExportOptions;
 
-// Preparation constructs one sounding voice for each explicit source identity.
+// Preparation resolves the source's final note/continuation bindings into voices.
 // Its segments share an adapted instrument and a hardware stop deadline. Bank
 // copies and output addresses are owned and frozen together. MIDI lowering
 // copies events and addresses but shares the banks. Address exhaustion retains
@@ -50,7 +48,6 @@ class ResolvedPerformance {
 public:
   [[nodiscard]] const PerformanceSequence& performance() const noexcept { return performance_; }
   [[nodiscard]] const std::vector<SoundBankAsset>& soundBanks() const noexcept { return *soundBanks_; }
-  [[nodiscard]] std::vector<const SoundBankAsset*> soundBankView() const;
   [[nodiscard]] const Instrument* initialInstrument() const noexcept { return initialInstrument_; }
   // Notes, changes and handles must belong to this prepared performance.
   [[nodiscard]] ResolvedInstrument selectionFor(InstrumentHandle handle) const;

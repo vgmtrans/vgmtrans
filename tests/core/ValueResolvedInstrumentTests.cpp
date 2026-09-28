@@ -502,10 +502,6 @@ void soundingVoicesOwnSelectionsAndDeadlines() {
   out.at(4).note(NotePerformanceEvent{.key = 60, .durationTicks = 4, .extendsPrevious = true, .note = attack});
   const auto continued = out.at(8).continueVoice(attack, NotePerformanceEvent{.key = 64, .durationTicks = 32});
   out.at(8).tempo(1000000);
-  const auto& firstSource = std::get<NotePerformanceEvent>(track.events[1]);
-  const auto& lastSource = std::get<NotePerformanceEvent>(track.events[5]);
-  expect(firstSource.voice == lastSource.voice && firstSource.note != continued,
-         "key changes and same-pitch ties must share an explicit source voice without sharing every note identity");
   const SoundBankAsset bank{.instruments = {
       Instrument{.explicitAddress = InstrumentAddress{0, 5}}, Instrument{.explicitAddress = InstrumentAddress{0, 7}}}};
   const auto prepared = preparePerformance({.timebase = {.ppqn = 10}, .tracks = {track, track}}, {bank});
@@ -514,13 +510,13 @@ void soundingVoicesOwnSelectionsAndDeadlines() {
   const auto& overlap = noteById(prepared.performance(), other);
   const auto& voice = prepared.voiceFor(first);
   expect(&voice == &prepared.voiceFor(last) && &voice != &prepared.voiceFor(overlap) &&
-             voice.startTick == 0 && voice.endTick == 40 && voice.endLimit == 14 &&
+             voice.endLimit == 14 &&
              !prepared.voiceFor(overlap).endLimit &&
              prepared.selectionFor(last).address.program == 5 && prepared.selectionFor(overlap).address.program == 7,
          "one voice must own the attack instrument and tempo-aware deadline across interleaved segments");
   const auto secondTrackNotes = eventsOfType<NotePerformanceEvent>(prepared.performance().tracks[1]);
   expect(secondTrackNotes.front()->voice != first.voice,
-         "track-local source voice IDs must become distinct prepared voices across tracks");
+         "track-local source note IDs must become distinct prepared voices across tracks");
   for (const auto mode : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
     const auto lowered = lowerMidiPerformanceAutomation(prepared, {.pitchTransitions = mode},
                                                          PerformanceTempoMap{prepared.performance()});
@@ -559,9 +555,44 @@ void canceledOrDelayedPitchMotionDoesNotJoinAttacks() {
   }
 }
 
+void editedContinuationsPreserveIndependentBranches() {
+  for (const bool clearBinding : {false, true}) {
+    for (const bool followsMiddle : {false, true}) {
+      PerformanceTrack track{.id = TrackId{0}};
+      u64 order = 0;
+      u32 nextNote = 0, nextAutomation = 0;
+      PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{1}, 0, order, nextNote, nextAutomation};
+      out.instrument(0, 5);
+      const auto first = out.note(NotePerformanceEvent{.key = 60, .durationTicks = 16,
+                                                     .maximumDurationMilliseconds = 500.0});
+      out.at(4).instrument(0, 7);
+      const auto middle = out.at(4).note(64, 1.0, 12);
+      auto slide = out.at(4).pitchSlide(middle, 60, 64, 4).continueFrom(first);
+      const auto last = out.at(8).note(67, 1.0, 8);
+      out.at(8).pitchSlide(last, followsMiddle ? 64 : 60, 67, 0).continueFrom(followsMiddle ? middle : first);
+
+      // Source lookahead may revise one connection after later notes were emitted.
+      if (clearBinding) slide.continueFrom({});
+      else slide.stop(out.at(4));
+      const auto prepared = preparePerformance({.timebase = {.ppqn = 10}, .tracks = {track}});
+      const auto& attack = noteById(prepared.performance(), first);
+      const auto& detached = noteById(prepared.performance(), middle);
+      const auto& continued = noteById(prepared.performance(), last);
+      expect(attack.voice != detached.voice && prepared.selectionFor(detached).address.program == 7 &&
+                 !prepared.voiceFor(detached).endLimit,
+             "canceling or clearing a boundary continuation must restore its own attack instrument and deadline");
+      expect(continued.voice == (followsMiddle ? detached.voice : attack.voice) &&
+                 prepared.selectionFor(continued).address.program == (followsMiddle ? 7u : 5u) &&
+                 prepared.voiceFor(continued).endLimit == (followsMiddle ? std::nullopt : std::optional<u64>{10}),
+             "editing one connection must follow declared descendants, not relabel every later segment of a voice");
+    }
+  }
+}
+
 }  // namespace
 
 void runResolvedInstrumentTests() {
+  editedContinuationsPreserveIndependentBranches();
   soundingVoicesOwnSelectionsAndDeadlines();
   canceledOrDelayedPitchMotionDoesNotJoinAttacks();
   resolvedVariantsShareAddressesWithBothSynthWriters();

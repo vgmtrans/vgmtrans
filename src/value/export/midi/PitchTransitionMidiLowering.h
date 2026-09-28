@@ -9,8 +9,6 @@
 #include "value/export/ExportTypes.h"
 #include "value/export/ResolvedPerformance.h"
 
-#include <span>
-
 namespace vgmtrans::core {
 
 // Lowering preserves resolved handles and ownership of their immutable banks.

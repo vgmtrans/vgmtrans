@@ -40,32 +40,6 @@ void reviseNoteEnd(NotePerformanceEvent& note, u64 endTick) {
   return found;
 }
 
-// Capture or revoke a source driver's continuation decision where it is made.
-// Canceling a slide before its onset preserves the target's independent attack.
-void updatePitchVoice(PerformanceTrack& track, const PerformanceAutomation& automation) {
-  const auto* transition = pitchTransitionIntent(automation);
-  if (!transition || !transition->previousNote || transition->note == *transition->previousNote) return;
-  const NotePerformanceEvent* previous = nullptr;
-  const NotePerformanceEvent* target = nullptr;
-  for (const auto& event : track.events) {
-    const auto* note = std::get_if<NotePerformanceEvent>(&event);
-    if (!note) continue;
-    if (!previous && note->note == *transition->previousNote) previous = note;
-    if (!target && note->note == transition->note) target = note;
-  }
-  if (!previous || !target || previous->header.order() >= target->header.order() || previous->lane != target->lane) return;
-  const auto& motion = automation.realization;
-  if (motion.startTick > target->header.tick) return;
-  const bool continues = motion.endReason == PerformanceAutomationEndReason::Completed || motion.endTick > motion.startTick;
-  const auto oldVoice = target->voice;
-  const auto newVoice = continues ? previous->voice : PerformanceVoiceId{target->note.value};
-  const auto start = target->header.order();
-  for (auto& event : track.events) {
-    if (auto* note = std::get_if<NotePerformanceEvent>(&event);
-        note && note->voice == oldVoice && note->header.order() >= start) note->voice = newVoice;
-  }
-}
-
 [[nodiscard]] ScalarPerformanceAutomationIntent scalarAutomationIntent(PerformanceAutomationTarget target,
                                                                        PerformanceAutomationMotion motion,
                                                                        double targetValue, u32 durationTicks,
@@ -105,7 +79,6 @@ PerformanceNoteId PerformanceEmitter::note(NotePerformanceEvent event) {
     for (auto previous = track_.events.rbegin(); previous != track_.events.rend(); ++previous) {
       if (const auto* note = std::get_if<NotePerformanceEvent>(&*previous);
           note && (!event.note.valid() || event.note == note->note)) {
-        event.voice = note->voice;
         event.note = note->note;
         event.lane = note->lane;
         break;
@@ -115,7 +88,6 @@ PerformanceNoteId PerformanceEmitter::note(NotePerformanceEvent event) {
   if (!event.note.valid()) {
     event.note = PerformanceNoteId{nextNote_++};
   }
-  if (!event.voice.valid()) event.voice = PerformanceVoiceId{event.note.value};
   if (!event.extendsPrevious) {
     interruptPitchSlidesForNewNote(event.lane);
   }
@@ -728,7 +700,6 @@ void PerformanceAutomationBinding::stopAt(u64 tick) const {
   }
   realization.endTick = std::max(realization.startTick, tick);
   realization.endReason = PerformanceAutomationEndReason::Interrupted;
-  updatePitchVoice(*owner_, owner_->automations[automation_]);
 }
 
 void PerformanceAutomationBinding::replaceWith(PerformanceAutomationBinding binding) {
@@ -810,14 +781,12 @@ void PitchSlideBinding::makeImmediate() {
     auto& realization = owner_->automations[automation_].realization;
     realization.endTick = realization.startTick;
     realization.endReason = PerformanceAutomationEndReason::Completed;
-    updatePitchVoice(*owner_, owner_->automations[automation_]);
   }
 }
 
 PitchSlideBinding& PitchSlideBinding::continueFrom(PerformanceNoteId previousNote) {
   if (auto* transition = intent()) {
     transition->previousNote = previousNote.valid() ? std::optional{previousNote} : std::nullopt;
-    updatePitchVoice(*owner_, owner_->automations[automation_]);
   }
   return *this;
 }
@@ -881,7 +850,6 @@ void PerformanceEmitter::interruptPitchSlidesForNewNote(PerformanceLaneId lane) 
     }
     automation.realization.endTick = std::max(automation.realization.startTick, tick_);
     automation.realization.endReason = PerformanceAutomationEndReason::Interrupted;
-    updatePitchVoice(track_, automation);
   }
 }
 
