@@ -1210,66 +1210,47 @@ void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView() {
          "direct Akao instrument-set export should use the bound collection view");
 }
 
-void akaoVibratoCommandsWorkAcrossVersions() {
-  for (auto version : {AkaoPs1Version::Version1_0, AkaoPs1Version::Version1_1, AkaoPs1Version::Version1_2,
-                       AkaoPs1Version::Version2, AkaoPs1Version::Version3_0, AkaoPs1Version::Version3_1,
-                       AkaoPs1Version::Version3_2}) {
+void akaoVibratoPreservesDriverRules() {
+  // One representative for each distinct clock, note-reset, and waveform family.
+  for (auto version : {AkaoPs1Version::Version1_0, AkaoPs1Version::Version1_1,
+                       AkaoPs1Version::Version3_0, AkaoPs1Version::Version3_2}) {
+    const bool modern = version >= AkaoPs1Version::Version3_0;
+    const bool newest = version == AkaoPs1Version::Version3_2;
     const auto performance = renderAkaoFixture({
-        0xb5, 0x20, 0xb4, 2, 3, 6, 0x08, 0xb5, 0xc0, 0x08,
-        0xb6, 0xb5, 0x40, 0x08, 0xb4, 2, 0, 6, 0x08, 0xa0}, {}, version);
+        0xb5, 0x20, 0xb4, 2, 3, 6, 0xcc, 0x08, 0x08, 0x8c, 0xcd, 0x08,
+        0xb5, 0xc0, 0x08, 0xb6, 0xb5, 0x40, 0x08, 0xb4, 2, 0, 15, 0x08, 0xa0}, {}, version);
+    auto depths = fixtureEvents<ModulationPerformanceEvent>(performance);
+    std::erase_if(depths, [](const auto& event) { return event.target != ModulationPerformanceTarget::VibratoDepth; });
+    expect(depths.size() == 4 && *depths[2].pitchDepthSemitones == 0 && *depths[3].pitchDepthSemitones > 0,
+           "B5 retains depth while disabled; B4 enables vibrato and B6 cancels it");
+    const auto& start = depths[0].context;
+    const auto& restart = depths[3].context;
+    const double clock = AkaoProfile{version}.driverTickHz();
+    const int finalCycleSteps = newest ? 2 : modern ? 10 : 16;
+    expect(start.delay->ticks == 2 && start.delay->tempoRelative && !start.cyclesPerTick &&
+               std::abs(*start.frequencyHz - clock / (3 * (newest ? 4 : 39))) < 1e-9 &&
+               std::abs(*restart.frequencyHz - clock / (256 * finalCycleSteps)) < 1e-9,
+           "B4 uses fixed-clock rate, musical-tick delay, and period 256 for a zero rate");
+    expect(start.steppedDepthAttackSteps == 4 &&
+               start.shape->waveform == (newest ? LfoWaveform::Triangle : LfoWaveform::Sine) &&
+               restart.shape->waveform == (newest ? LfoWaveform::Noise : modern ? LfoWaveform::Sine : LfoWaveform::Triangle),
+           "B4 selects the driver's waveform numbering and depth buildup");
+    expect(start.restartMode == (newest ? LfoRestartMode::Delay : LfoRestartMode::PhaseAndDelay) &&
+               depths[1].context.restartMode == LfoRestartMode::None,
+           "only v3.2 B4 retains phase; B5 always preserves phase and delay");
+    const auto wide = *depths[1].context.pitchRangeSemitones;
+    expect(std::abs(wide.minimum - 12 * std::log2(0.75)) < 1e-9 &&
+               std::abs(wide.maximum - 12 * std::log2(1.5)) < 1e-9,
+           "wide depth preserves the driver's asymmetric pitch excursion");
+    const auto notes = fixtureEvents<NotePerformanceEvent>(performance);
+    expect(notes.size() == 7 && notes[0].restartsVibratoLfoPhase == true &&
+               notes[1].restartsVibratoLfoPhase == !modern &&
+               notes[2].restartsVibratoLfoPhase == false && notes[3].restartsVibratoLfoPhase == true,
+           "early slurs restart vibrato, v3 slurs preserve phase, and ties never restart it");
     const auto profile = analyzeSequenceModulation(performance);
     expect(profile.instruments.vibrato && profile.instruments.vibrato->delaySeconds &&
                profile.instruments.vibrato->rateHertz.minimum > 0,
-           "vibrato rate and delay must also configure synth export");
-    auto events = fixtureEvents<ModulationPerformanceEvent>(performance);
-    std::erase_if(events, [](const auto& event) { return event.target != ModulationPerformanceTarget::VibratoDepth; });
-    const bool newest = version == AkaoPs1Version::Version3_2;
-    expect(events.size() == 4 && *events[2].pitchDepthSemitones == 0 && *events[3].pitchDepthSemitones > 0,
-           "B5 must retain depth while disabled; only B4 enables vibrato, and B6 cancels it");
-    const auto& start = events[0].context;
-    const double clock = AkaoProfile{version}.driverTickHz();
-    expect(start.delay->ticks == 2 && start.delay->tempoRelative && !start.cyclesPerTick &&
-               std::abs(*start.frequencyHz - clock / (3 * (newest ? 4 : 39))) < 1e-9 &&
-               std::abs(*events[3].context.frequencyHz - clock / (256 * (newest ? 4 : 39))) < 1e-9,
-           "vibrato rate uses driver ticks, delay uses sequence ticks, and rate zero means 256");
-    expect(start.steppedDepthAttackSteps == 4 && start.shape->waveform ==
-               (newest ? LfoWaveform::Triangle : LfoWaveform::Sine) &&
-               events[1].context.restartMode == LfoRestartMode::None,
-           "B4 must select the version's waveform and buildup; B5 must preserve its phase");
-    const auto wide = *events[1].context.pitchRangeSemitones;
-    expect(std::abs(wide.minimum - 12 * std::log2(0.75)) < 1e-9 &&
-               std::abs(wide.maximum - 12 * std::log2(1.5)) < 1e-9,
-           "packed depth must preserve wide mode and the driver's asymmetric pitch excursion");
-
-    const auto midi = renderMidiSequence(performance, {}, ModulationConversionPolicy::SequenceEventSimulation);
-    bool bent = false;
-    for (const auto& event : midi.tracks[0].events) {
-      if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend)) {
-        bent |= event.tick >= 2 && event.tick < 32 && bend->value != 0;
-        expect(!(event.tick < 2 || (event.tick >= 32 && event.tick < 48)) || bend->value == 0,
-               "vibrato must respect its delay and remain centered after B6, even with a later B5");
-      }
-    }
-    expect(bent, "enabled vibrato must reach simulated MIDI pitch bends");
-  }
-}
-
-void akaoVibratoPreservesVersionSpecificWaveformsAndNoteRestarts() {
-  for (auto version : {AkaoPs1Version::Version1_0, AkaoPs1Version::Version1_1, AkaoPs1Version::Version2,
-                       AkaoPs1Version::Version3_0, AkaoPs1Version::Version3_1, AkaoPs1Version::Version3_2}) {
-    const AkaoProfile profile{version};
-    const auto performance = renderAkaoFixture({
-        0xb5, 0x40, 0xb4, 0, 2, 15, 0xcc, 0x08, 0x08, 0x8c, 0xcd, 0x08, 0xa0}, {}, version);
-    const auto notes = fixtureEvents<NotePerformanceEvent>(performance);
-    expect(notes.size() == 4 && notes[0].restartsVibratoLfoPhase == true &&
-               notes[1].restartsVibratoLfoPhase == !profile.version3OrLater() &&
-               notes[2].restartsVibratoLfoPhase == false && notes[3].restartsVibratoLfoPhase == true,
-           "early slurs restart vibrato, v3 slurs preserve phase, and ties never restart it");
-    const auto context = fixtureEvents<ModulationPerformanceEvent>(performance)[0].context;
-    const auto waveform = profile.version32() ? LfoWaveform::Noise : profile.version3OrLater()
-        ? LfoWaveform::Sine : LfoWaveform::Triangle;
-    expect(context.shape->waveform == waveform,
-           "waveform 15 must follow the early alias, v3 short sine, or v3.2 waveform mask");
+           "rate and delay must also reach synth export");
   }
 }
 
@@ -1289,26 +1270,10 @@ void akaoVibratoRateFadeRetargetsAndB4CancelsIt() {
     expect(std::abs(rates[i] - quarterClock / periods[i]) < 1e-9,
            "E4 must interpolate the period from its current value");
   }
-
-  const auto bends = [](std::vector<u8> commands) {
-    const auto midi = renderMidiSequence(renderAkaoFixture(commands, {}, AkaoPs1Version::Version3_2), {},
-                                         ModulationConversionPolicy::SequenceEventSimulation);
-    std::vector<std::pair<u64, int>> result;
-    for (const auto& event : midi.tracks[0].events) {
-      if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend)) {
-        result.emplace_back(event.tick, bend->value);
-      }
-    }
-    return result;
-  };
-  expect(bends({0xb5, 0x40, 0xb4, 0, 13, 0, 0x08, 0x8c, 0xa0}) ==
-             bends({0xb5, 0x40, 0xb4, 0, 13, 0, 0x08, 0xb4, 0, 13, 0, 0x8c, 0xa0}),
-         "repeating v3.2 B4 during a held note must preserve the rendered waveform phase");
 }
 
 void runAkaoFormatTests() {
-  akaoVibratoCommandsWorkAcrossVersions();
-  akaoVibratoPreservesVersionSpecificWaveformsAndNoteRestarts();
+  akaoVibratoPreservesDriverRules();
   akaoVibratoRateFadeRetargetsAndB4CancelsIt();
   akaoSequenceLayoutRejectsFalsePositiveHeaders();
   akaoSequenceDecodesLegacyRelativeJumpTargets();

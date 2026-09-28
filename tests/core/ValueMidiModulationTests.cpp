@@ -357,8 +357,11 @@ void performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes() {
          "sequence-event vibrato simulation should restart the delay and phase for each new note");
 }
 
-void performanceMidiRendererClearsVibratoOutputWhenEventsRestartItsDelay() {
-  for (const auto target : {ModulationPerformanceTarget::VibratoRate, ModulationPerformanceTarget::VibratoDepth}) {
+void performanceMidiRendererRestartsVibratoDelayWithOrWithoutPhaseReset() {
+  for (const auto [target, restartMode] : {
+           std::pair{ModulationPerformanceTarget::VibratoRate, LfoRestartMode::PhaseAndDelay},
+           std::pair{ModulationPerformanceTarget::VibratoDepth, LfoRestartMode::PhaseAndDelay},
+           std::pair{ModulationPerformanceTarget::VibratoDepth, LfoRestartMode::Delay}}) {
     for (const bool milliseconds : {false, true}) {
       PerformanceTrack track{.id = TrackId{0}, .sourceTrackNumber = 0, .endTick = 8};
       u64 nextSequence = 0;
@@ -374,7 +377,7 @@ void performanceMidiRendererClearsVibratoOutputWhenEventsRestartItsDelay() {
           .delay = milliseconds ? LfoDelay{.milliseconds = 20.0} : LfoDelay{.ticks = 2, .tempoRelative = true},
           .shape = LfoShape{.samples = {-1.0, -1.0, 1.0, 1.0}},
           .sampleImmediatelyOnNote = true,
-          .restartMode = LfoRestartMode::PhaseAndDelay,
+          .restartMode = restartMode,
       };
       out.modulation(ModulationPerformanceEvent{
           .target = ModulationPerformanceTarget::VibratoDepth,
@@ -402,9 +405,12 @@ void performanceMidiRendererClearsVibratoOutputWhenEventsRestartItsDelay() {
         return value;
       };
       expect(bendAt(3) == -3072, "the oscillator must produce a nonzero offset before its explicit restart");
-      expect(bendAt(4) == 1024 && bendAt(5) == 1024,
-             "restarting vibrato's delay must clear its old output while preserving the source pitch bend");
+      const s32 delayedBend = restartMode == LfoRestartMode::Delay ? -3072 : 1024;
+      expect(bendAt(4) == delayedBend && bendAt(5) == delayedBend,
+             "a phase reset clears vibrato during the delay; a delay-only restart holds the previous offset");
       expect(bendAt(6) == -3072, "the restarted oscillator must resume when its tick or physical delay expires");
+      expect(bendAt(7) == (restartMode == LfoRestartMode::Delay ? 5120 : -3072),
+             "a delay-only restart must retain waveform phase");
     }
   }
 }
@@ -666,7 +672,7 @@ void runValueMidiModulationTests() {
   performanceMidiRendererReplacesSampledLfoWithNamedWaveform();
   performanceMidiRendererDoesNotDoubleDelayVibrato();
   performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes();
-  performanceMidiRendererClearsVibratoOutputWhenEventsRestartItsDelay();
+  performanceMidiRendererRestartsVibratoDelayWithOrWithoutPhaseReset();
   performanceMidiRendererReplacesSavedNoteDelay();
   performanceMidiRendererSimulatesTremoloUsingGlobalTempo();
   performanceMidiRendererUsesGlobalTempoOrderAtTrackBoundaries();
