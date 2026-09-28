@@ -6,10 +6,12 @@
 
 #include "value/formats/Akao/Akao.h"
 #include "value/formats/Akao/AkaoFF7Voice.h"
+#include "value/formats/Akao/AkaoVibrato.h"
 
 #include "value/base/LevelScale.h"
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompilerCursor.h"
+#include "value/sequence/SequenceMotion.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/PsxSpu.h"
 
@@ -62,8 +64,9 @@ struct PendingPitchSlide {
 struct TrackState {
   explicit TrackState(const AkaoRuntimeConfig& config) : envelopes(config.articulationEnvelopes) { loadEnvelope(); }
 
-  // Load the selected articulation's ADSR defaults; leave ADSR unset if that
-  // articulation is unavailable or the program selects articulations by key.
+  // Load the selected articulation's ADSR defaults from the bound sample pool.
+  // Dynamic ADSR currently supports direct melodic articulations; per-key drum
+  // articulations and secondary overlay voices still need separate ADSR state.
   void loadEnvelope() {
     const auto found = articulation ? envelopes.find(*articulation) : envelopes.end();
     envelope = found != envelopes.end() ? std::optional{found->second} : std::nullopt;
@@ -79,6 +82,8 @@ struct TrackState {
   bool slur = false;
   bool legato = false;
   AkaoFF7Voice ff7Voice;
+  AkaoVibrato vibrato;
+  bool slurContinues = false;
   u16 portamentoTicks = 0;
   bool drum = false;
   bool useOneTimeDuration = false;
@@ -87,6 +92,7 @@ struct TrackState {
   u16 fixedDuration = 0;
   u16 volume = 127;
   u16 expression = 127;
+  PerformanceBoundValue<SequenceLinearMotion<double>> ff7Expression{127.0};
   u16 pan = 64;
   RepeatStack repeats;
   double tempoBpm = 120.0;
@@ -104,6 +110,7 @@ struct TrackState {
   return rawValue == 0 ? 256 : rawValue;
 }
 
+// FF7's mixer multiplies channel volume and expression as linear gains.
 [[nodiscard]] double akaoLinearControllerGain(u8 value) {
   return LevelScale::linearFromLinear(value / 127.0);
 }
@@ -116,6 +123,16 @@ struct TrackState {
 // SequenceVm executes these handlers to build a PerformanceSequence.
 // Shared command operations are methods; other handlers stay with their opcodes.
 struct Playback : SequencePlayback<TrackState> {
+  // FF7 advances fades after decoding each tick's commands. The VM's wait hook
+  // runs on arrival at the next tick, so emit the update at the tick just completed.
+  void tick() {
+    track.ff7Expression.tickChanged([&](double value) {
+      track.ff7Expression.output(out.at(vm.tick() - 1))
+          .expression(akaoLinearControllerGain(static_cast<u8>(std::clamp(std::round(value), 0.0, 127.0))));
+    });
+    track.vibrato.tick(out.at(vm.tick() - 1));
+  }
+
   // Reset ADSR on program changes. Banks 0 and 2 address articulations directly;
   // key-split and drum programs select an articulation per key.
   void instrument(u32 bank, u32 program) {
@@ -136,6 +153,8 @@ struct Playback : SequencePlayback<TrackState> {
 
   // FF7 commands modify masked fields of ADSR1 or ADSR2. Preserve all other
   // register bits, then emit the resulting ADSR for active and future notes.
+  // SoundFont export approximates SPU ADSR curves and uses instrument variants;
+  // variants cannot apply these updates to a note that is already sounding.
   void adsr(u16 AkaoAdsr::* reg, u16 mask, u16 value) {
     // Partial ADSR updates require the articulation's defaults for the unchanged fields.
     if (!track.envelope) {
@@ -183,6 +202,7 @@ struct Playback : SequencePlayback<TrackState> {
     if (noteByte >= 0x8f) {
       if (ff7) track.ff7Voice.rest(out);
       track.tieKey.reset();
+      track.slurContinues = false;
     } else {
       const bool tie = noteByte >= 0x84;
       // Before v3, drum notes use keys 24..35 before transposition, ignoring the octave.
@@ -191,13 +211,20 @@ struct Playback : SequencePlayback<TrackState> {
                          : static_cast<u8>(std::clamp<int>(sourceKey + track.transpose, 0, 127));
       if (!tie || track.tieKey) {
         const auto note = ff7 ? track.ff7Voice.note(out, vm.tick(), key, duration, track.drum, tie)
-                              : out.note(key, LevelScale::linearFromMidi7(kNoteVelocity),
-                                         soundingTicks(duration, modern), tie);
+                              : out.note(NotePerformanceEvent{
+                                  .key = static_cast<double>(key),
+                                  .linearVelocity = LevelScale::linearFromMidi7(kNoteVelocity),
+                                  .durationTicks = soundingTicks(duration, modern),
+                                  .extendsPrevious = tie,
+                                  // V3 preserves vibrato phase across slurred notes.
+                                  .restartsVibratoLfoPhase = !tie && !(modern && track.slurContinues),
+                              });
         if (!ff7 && !tie && track.portamentoTicks != 0 && track.previousKey && *track.previousKey != key) {
           out.pitchSlide(note, *track.previousKey, key, track.portamentoTicks);
         }
         applyPendingPitchSlide(note, key);
         if (!tie) track.previousKey = track.tieKey = key;
+        track.slurContinues = track.slur;
       }
     }
     return Effects::wait(duration);
@@ -456,6 +483,25 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
   switch (status) {
     case 0xa0:
       return cursor.command("End", SequenceSemantic::End).invoke(endConnection).end();
+    case 0xa8: {
+      auto event = cursor.command("Expression", SequenceSemantic::Level);
+      const u8 expression = cursor.u8("expression");
+      return event.invoke([](Playback& playback, u8 value) {
+        playback.track.ff7Expression.setCurrentAt(playback.vm.tick(), value);
+        playback.out.expression(akaoLinearControllerGain(value));
+      }, {expression});
+    }
+    case 0xa9: {
+      auto event = cursor.command("Expression Fade", SequenceSemantic::Level);
+      const u16 duration = cursor.resolved("duration_ticks", cursor.rawU8("duration"), akaoZeroAs256);
+      const u8 target = cursor.u8("target_expression");
+      // Retarget from the current value; A8 cancels the fade. Fractional values
+      // still use floating-point interpolation rather than FF7's fixed-point accumulator.
+      return event.invoke([](Playback& playback, u16 ticks, u8 value) {
+        playback.track.ff7Expression.begin(playback.out, PerformanceAutomationTarget::Expression,
+            akaoLinearControllerGain(value), SequenceMotionPlan<double>::targetOverTicks(value, ticks));
+      }, {duration, target});
+    }
     case 0xad:
       return field("Attack Rate", &AkaoAdsr::adsr1, 0x7f00, 8);
     case 0xae:
@@ -493,6 +539,21 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
       const u8 mode = cursor.u8("mode");
       return event.invoke<&Playback::adsr>({&AkaoAdsr::adsr2, 0x0020, mode == 7 ? 0x0020 : 0});
     }
+    // Approximate the SPU voice's reverb enable bit with the MIDI wet-send controller.
+    // Reverb depth and the SPU reverb algorithm remain unimplemented.
+    case 0xc2:
+      return cursor.command("Reverb On", SequenceSemantic::State).emitReverb(1.0);
+    case 0xc3:
+      return cursor.command("Reverb Off", SequenceSemantic::State).emitReverb(0.0);
+    case 0xcb:
+      return cursor.command("Reset Effects", SequenceSemantic::State).invoke([](Playback& playback) {
+        // CB is both a lookahead boundary and an explicit reset of connection modes.
+        // Its noise, pitch modulation and tremolo resets remain unimplemented.
+        playback.track.ff7Voice.end(playback.out);
+        playback.track.ff7Voice.start(AkaoFF7Voice::Mode::Normal);
+        playback.out.reverb(0.0);
+        playback.track.vibrato.stop(playback.out);
+      });
     case 0xcc:
       return cursor.command("Slur On", SequenceSemantic::State).invoke([](Playback& playback) {
         playback.track.ff7Voice.start(AkaoFF7Voice::Mode::Slur);
@@ -513,7 +574,8 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
     case 0xdb:
       return cursor.command("Portamento Off", SequenceSemantic::Portamento).invoke(endConnection);
     case 0xf4: {
-      // F4 starts two SPU voices; the converter currently emits only the primary articulation.
+      // F4 starts two SPU voices; only the primary articulation is emitted.
+      // The secondary voice and F5-F7 overlay controls remain unimplemented.
       auto event = cursor.command("Overlay Voice On", SequenceSemantic::Program);
       const u8 primaryArt = cursor.u8("primary_articulation", SemanticOperandRole::InstrumentProgram);
       cursor.u8("secondary_articulation", SemanticOperandRole::InstrumentProgram);
@@ -552,7 +614,6 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
     const u8 noteByte = inlineDuration ? static_cast<u8>((status - 0xf0) * 11) : status;
     const bool rest = noteByte >= 0x8f;
     // Twelve pitches each have eleven durations: 0x83 is the final B note.
-    // SaGa Frontier SCUS_942.30 compares against 0x84 at 0x8004934c.
     const bool tie = !rest && noteByte >= 0x84;
     const u32 fallbackDelta = kDeltaTimeTable[noteByte % 11];
     auto event = cursor.command(rest ? "Rest" : tie ? "Tie" : "Note",
@@ -651,6 +712,26 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
           },
           {duration, target});
     }
+    case 0xb4: {
+      auto event = cursor.command("Vibrato", SequenceSemantic::Pitch);
+      const u8 delay = cursor.u8("delay_ticks");
+      const u16 period = cursor.resolved("period", cursor.rawU8("rate"), akaoZeroAs256);
+      const u8 type = cursor.u8("waveform");
+      return event.invoke([](Playback& playback, AkaoProfile profile, u8 delay, u16 period, u8 type) {
+        playback.track.vibrato.start(playback.out, profile, delay, period, type);
+      }, {profile, delay, period, type});
+    }
+    case 0xb5: {
+      auto event = cursor.command("Vibrato Depth", SequenceSemantic::Pitch);
+      const u8 depth = cursor.u8("depth");
+      return event.invoke([](Playback& playback, u8 depth) {
+        playback.track.vibrato.setDepth(playback.out, depth);
+      }, {depth});
+    }
+    case 0xb6:
+      return cursor.command("Vibrato Off", SequenceSemantic::Pitch).invoke([](Playback& playback) {
+        playback.track.vibrato.stop(playback.out);
+      });
     case 0xc0:
       return cursor.command("Transpose", SequenceSemantic::Pitch).set<&TrackState::transpose>(cursor.s8("semitones"));
     case 0xc1: {
@@ -663,6 +744,7 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
           },
           {semitones});
     }
+    // Reverb On/Off remain source annotations for drivers other than FF7.
     case 0xc2:
       return cursor.sourceOnly("Reverb On");
     case 0xc3:
@@ -703,9 +785,11 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
       return event.loopCandidate(target);
     }
     case 0xcc:
-      return cursor.command("Slur On", SequenceSemantic::State).set<&TrackState::slur>(true);
+      return cursor.command("Slur On", SequenceSemantic::State)
+          .set<&TrackState::slur>(true).set<&TrackState::slurContinues>(false);
     case 0xcd:
-      return cursor.command("Slur Off", SequenceSemantic::State).set<&TrackState::slur>(false);
+      return cursor.command("Slur Off", SequenceSemantic::State)
+          .set<&TrackState::slur>(false).set<&TrackState::slurContinues>(false);
     case 0xd0:
       return cursor.command("Legato On", SequenceSemantic::State).set<&TrackState::legato>(true);
     case 0xd1:
@@ -751,6 +835,24 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
           },
           {relativeLength});
     }
+    case 0xdd: {
+      // DD depth fades are not implemented. Their step and counter continue
+      // across B5 depth changes.
+      auto event = cursor.sourceOnly("Vibrato Depth Fade");
+      cursor.u8("duration");
+      cursor.u8("depth");
+      return event;
+    }
+    case 0xe4:
+      if (profile.version32()) {
+        auto event = cursor.command("Vibrato Rate Fade", SequenceSemantic::Pitch);
+        const u16 duration = cursor.resolved("duration_ticks", cursor.rawU8("duration"), akaoZeroAs256);
+        const u8 target = cursor.u8("target_rate");
+        return event.invoke([](Playback& playback, u16 ticks, u8 target) {
+          playback.track.vibrato.fadeRate(ticks, target);
+        }, {duration, target});
+      }
+      break;
     case 0xe8:
       if (profile.legacyFamily()) {
         return tempo(cursor, profile);
@@ -758,6 +860,7 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
       break;
     case 0xea:
       if (profile.legacyFamily()) {
+        // Native reverb depth is not yet mapped to the destination synth's reverb.
         auto event = cursor.sourceOnly("Reverb Depth");
         cursor.u16le("depth");
         return event;
@@ -921,6 +1024,7 @@ SequenceProgramConfig makeAkaoConfig(AkaoPs1Version version) {
               .commandLimit = kAkaoMaxTrackCommands,
               .panLaw = panLaw,
               .initialLevel = 1.0,
+              .initialReverbSend = version == AkaoPs1Version::Version1_0 ? std::optional{0.0} : std::nullopt,
               .initialStereoBalance =
                   panLaw == PanLaw::ConstantSum ? std::optional{StereoBalance{0.5, 0.5}} : std::nullopt,
               .initialPitchBendRangeSemitones = 12,

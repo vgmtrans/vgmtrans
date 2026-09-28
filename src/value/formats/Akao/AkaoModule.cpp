@@ -68,7 +68,7 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
     parsed.analysis.requiredArticulations.erase(std::ranges::unique(parsed.analysis.requiredArticulations).begin(),
                                                 parsed.analysis.requiredArticulations.end());
     sequence.useBank(bank).prepare(prepareAkaoSequence).program(std::move(parsed.program));
-    bank.data(AkaoSoundBankData{.binding = std::move(built.binding)})
+    bank.data(AkaoSoundBankData{.version = parsed.analysis.header.version, .binding = std::move(built.binding)})
         .useSamples(AkaoSamples{.sampleSetId = parsed.analysis.header.sampleSetId,
                                 .requiredArticulations = std::move(parsed.analysis.requiredArticulations)})
         .prepare<AkaoSoundBankData>(prepareAkaoBank);

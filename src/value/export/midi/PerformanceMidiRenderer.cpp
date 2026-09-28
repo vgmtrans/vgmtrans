@@ -544,11 +544,14 @@ void applyLfoRestart(SimulatedLfoState& lfo, u64 tick, LfoRestartMode mode,
   if (mode == LfoRestartMode::None) {
     return;
   }
-  if (mode == LfoRestartMode::PhaseAndDelay) {
+  if (mode == LfoRestartMode::PhaseAndDelay || mode == LfoRestartMode::Delay) {
     lfo.delayCounterTicks = 0;
     lfo.delayCounterMilliseconds = 0.0;
   }
   lfo.cursorTick = tick;
+  if (mode == LfoRestartMode::Delay) {
+    return;
+  }
   lfo.phaseCycles = initialLfoPhase(lfo, fallback);
   lfo.activeSteppedDepthAttackSteps = lfo.steppedDepthAttackSteps;
   lfo.steppedDepthAttackStep = lfo.activeSteppedDepthAttackSteps == 0 ? 0 : 1;

@@ -15,7 +15,7 @@
 
 namespace vgmtrans::formats::akao {
 
-// FF7 driver's key-on and lookahead rules (SCUS_941.63: 80030e7c, 800318bc).
+// FF7 driver's key-on and lookahead rules.
 // Bytecode decoding, instruments, and ADSR commands remain in AkaoSequence.cpp.
 class AkaoFF7Voice {
 public:
@@ -38,12 +38,13 @@ public:
   }
 
   // Before starting a note, the FF7 driver scans subsequent sequence commands,
-  // following repeat and jump targets. CD (Slur Off), D1 (Legato Off), DB (Portamento
-  // Off), a rest, or A0 (End Track) restores that note's two-tick gap and disables
-  // its portamento glide, leaving an immediate pitch change.
+  // following repeat and jump targets. CB (Reset Effects), CD (Slur Off), D1 (Legato
+  // Off), DB (Portamento Off), a rest, or A0 (End Track) restores that note's two-tick
+  // gap and disables its portamento glide, leaving an immediate pitch change.
   // SequenceVm processes those commands after emitting the note, so this method
   // corrects that note's duration and pitch transition in the PerformanceSequence.
   void end(core::PerformanceEmitter& out) {
+    // The driver's CD/D1 handlers are no-ops; their effect comes from lookahead.
     // CC/D0/DA after the preceding note execute after the driver's lookahead.
     // Preserve their settings: NOTE, CC, CD leaves slur enabled for the next note.
     settings_ = sinceNote_;
@@ -91,10 +92,13 @@ public:
         .restartsEnvelope = !connected,
         // FF7 resets modulation phase even when key-on is suppressed.
         .restartsLfoPhase = true,
+        .restartsVibratoLfoPhase = !tie,
         .note = tie || samePitch ? last_.id : core::PerformanceNoteId{},
     });
     core::PitchSlideBinding pendingGlide;
     if (glide || (connected && !samePitch)) {
+      // Smooth slides currently interpolate semitones; FF7's driver interpolates
+      // the fixed-point SPU pitch register. Immediate slurs are unaffected by this approximation.
       auto slide = out.pitchSlide(id, startKey, key, glide ? settings_.portamentoTicks : 0);
       if (connected) {
         // Prefer one held MIDI note plus pitch bend. MIDI portamento emits a new

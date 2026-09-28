@@ -320,6 +320,8 @@ struct LfoShape {
 enum class LfoRestartMode {
   // Continue from the current waveform position and current delay progress.
   None,
+  // Begin the delay again while retaining the waveform position.
+  Delay,
   // Jump to the waveform's starting position, but keep the current delay
   // progress.
   Phase,
@@ -374,8 +376,7 @@ struct LfoPerformanceContext {
   // Reverse the oscillator's phase advance after this many active source
   // ticks. Folded accumulator LFOs use this to alternate sawtooth direction.
   std::optional<u32> directionReversalTicks;
-  // Controls whether this event continues the LFO, moves it back to the start
-  // of its waveform, or also begins its delay again.
+  // Controls whether this event restarts phase, delay, both, or neither.
   LfoRestartMode restartMode = LfoRestartMode::None;
   // Voice LFOs normally restart on a fresh attack. Channel-wide oscillators
   // can opt out and keep their phase while notes come and go.

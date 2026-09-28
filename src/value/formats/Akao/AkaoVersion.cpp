@@ -342,12 +342,16 @@ u32 AkaoProfile::sequenceLength(ByteReader reader, u32 offset) const {
   return version3OrLater() ? stored : stored + 0x10;
 }
 
+double AkaoProfile::driverTickHz() const {
+  const u16 period = version == AkaoPs1Version::Version1_0 ? 0x43d1 : 0x44e8;
+  return (33868800.0 / 8) / period;
+}
+
 double AkaoProfile::tempoBpm(u16 tempo) const {
   if (tempo == 0) {
     return 1.0;
   }
-  const u16 frequency = version == AkaoPs1Version::Version1_0 ? 0x43d1 : 0x44e8;
-  return 60.0 / (kAkaoPpqn * (65536.0 / tempo) * (frequency / (33868800.0 / 8)));
+  return 60.0 * driverTickHz() * tempo / (kAkaoPpqn * 65536.0);
 }
 
 u32 AkaoProfile::tempoMicrosPerQuarter(u16 tempo) const {

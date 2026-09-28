@@ -18,9 +18,11 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -510,7 +512,7 @@ void akaoTieAfterRestDoesNotExtendPreviousNote() {
 }
 
 void ff7SlurChangesPitchWithoutAnotherAttack() {
-  // Underneath the Rotting Pizza, track 11, extracted offsets 1c04bb..1c04ca:
+  // Underneath the Rotting Pizza, track 11:
   // B -> D -> B is one voice, followed by three separately attacked notes.
   const auto performance = renderAkaoFixture({
       0xa5, 4, 0xcc, 0xa8, 84, 0x7d, 0xa6, 0xa8, 126, 0x1a, 0xa7, 0x7d,
@@ -560,12 +562,14 @@ void ff7SlurBoundariesRespectRestsTiesLegatoAndRepeats() {
   check("CC resets continuation", {0xcc, 0x08, 0xcc, 0x13, 0xcd, 0x1e, 0xa0}, {16, 14, 14});
   check("Separate slurs", {0xcc, 0x08, 0xcd, 0xcc, 0x13, 0x1e, 0xcd, 0xa0}, {14, 30});
   check("CD lookahead", {0xcc, 0x08, 0xcc, 0xcd, 0x13, 0x1e, 0xcd, 0xa0}, {14, 30});
+  check("CB clears intervening CC", {0xcc, 0x08, 0xcc, 0xcb, 0x13, 0x1e, 0xa0}, {14, 14, 14});
+  check("CB clears legato", {0xd0, 0x08, 0x13, 0xcb, 0x1e, 0xa0}, {16, 14, 14});
   check("Tie retains voice", {0xcc, 0x08, 0x8c, 0x13, 0xcd, 0xa0}, {46});
   check("Repeat stays connected", {0xcc, 0xc8, 0x08, 0x13, 0xc9, 2, 0xcd, 0xa0}, {62});
 }
 
-void ff7PortamentoEnablesSlurAndStartsWithAFreshAttack() {
-  const auto performance = renderAkaoFixture({0x29, 0xda, 4, 0x08, 0x13, 0x1e, 0xdb, 0x29, 0xa0});
+void ff7PortamentoEnablesSlurAndStartsWithAFreshAttack(u8 boundary) {
+  const auto performance = renderAkaoFixture({0x29, 0xda, 4, 0x08, 0x13, 0x1e, boundary, 0x29, 0xa0});
   const auto& slides = performance.tracks[0].automations;
   expect(!slides.empty(), "FF7 DA must produce pitch transitions");
   const auto* slide = pitchTransitionIntent(slides.front());
@@ -575,15 +579,50 @@ void ff7PortamentoEnablesSlurAndStartsWithAFreshAttack() {
   const auto* finalPitch = pitchTransitionIntent(slides.back());
   expect(finalPitch && finalPitch->previousNote && finalPitch->startKey == 49 && finalPitch->targetKey == 50 &&
              finalPitch->timing.timelineTicks == 0,
-         "FF7 DB lookahead must make the preceding note's pitch change immediate");
+         "FF7 DB/CB lookahead must make the preceding note's pitch change immediate");
   const auto notes = midiNotes(renderMidiSequence(performance).tracks[0].events);
   expect(notes.size() == 3 && notes[1].key == 48 && notes[1].duration == 46 && notes[2].key == 51,
-         "FF7 DB must end portamento and restore a fresh attack");
+         "FF7 DB/CB must end portamento and restore a fresh attack");
+}
+
+void ff7ExpressionFadesRetargetAndCancel() {
+  const auto performance = renderAkaoFixture({
+      0xa8, 0, 0xa9, 8, 64, 0xa2, 2, 0x08, 0xa9, 4, 48, 0xa2, 2, 0x13, 0xa8, 40, 0x08, 0xa0,
+  });
+  std::vector<std::pair<u64, int>> values;
+  for (const auto& event : fixtureEvents<ExpressionPerformanceEvent>(performance)) {
+    values.emplace_back(event.header.tick, static_cast<int>(std::round(event.linearGain * 127)));
+  }
+  expect(values == std::vector<std::pair<u64, int>>{{0, 0}, {0, 8}, {1, 16}, {2, 24}, {3, 32}, {4, 40}},
+         "FF7 A9 must start from the current expression; A8 must stop all subsequent fade updates");
+  const auto& fades = performance.tracks[0].automations;
+  expect(fades.size() == 2 && fades[0].realization.endTick == 2 && fades[1].realization.endTick == 4 &&
+             fades[0].realization.endReason == PerformanceAutomationEndReason::Interrupted &&
+             fades[1].realization.endReason == PerformanceAutomationEndReason::Interrupted,
+         "FF7 expression automation must end when replaced or cancelled");
+  const auto longFade = renderAkaoFixture({0xa8, 0, 0xa9, 0, 127, 0x00, 0x01, 0xa0});
+  const auto expression = fixtureEvents<ExpressionPerformanceEvent>(longFade);
+  expect(expression.back().header.tick == 255 && expression.back().linearGain == 1.0,
+         "FF7 zero fade duration means 256 ticks, beginning on the command's tick");
+}
+
+void ff7ReverbSwitchesAndResetReachMidi() {
+  const std::vector<u8> commands{0xc2, 0x08, 0xc3, 0x08, 0xc2, 0x08, 0xcb, 0x08, 0xa0};
+  const auto midi = renderMidiSequence(renderAkaoFixture(commands));
+  std::vector<std::pair<u64, int>> sends;
+  for (const auto& event : midi.tracks[0].events) {
+    if (const auto* cc = midiController(event, MidiController::Reverb)) sends.emplace_back(event.tick, cc->value);
+  }
+  expect(sends == std::vector<std::pair<u64, int>>{{0, 0}, {0, 127}, {16, 0}, {32, 127}, {48, 0}},
+         "FF7 starts dry; C2 enables reverb, and C3/CB disable it");
+  expect(fixtureEvents<ReverbPerformanceEvent>(
+             renderAkaoFixture(commands, {}, AkaoPs1Version::Version1_1)).empty(),
+         "FF7 reverb support must not change unaudited later drivers");
 }
 
 void ff7EnvelopeCommandsKeepNativeStateAndResetOnProgramChange() {
-  // The guitar in Underneath the Rotting Pizza changes SR from 0x3b to
-  // 0x40. Also exercise a change during a tied note, B3, and a new program.
+  // Underneath the Rotting Pizza sets guitar SR from 0x3b to 0x40/0x45 before
+  // the note attacks. Also exercise a change during a tied note, B3, and a new program.
   const std::vector<u8> bytes{
       0xa1, 27, 0xb1, 0x40, 0x02, 0xb1, 0x45, 0x86, 0xb3, 0x02,
       0xb1, 0x40, 0xa1, 28, 0xb2, 8, 0x02, 0xa0,
@@ -665,6 +704,8 @@ void ff7CollectionBindsNativeEnvelopesAndPreservesDrumDefaults() {
   expect(!envelopes.empty() && envelopes[0].update.values == psxSpuEnvelope(0x00ff, 0x5005),
          "collection preparation should supply the selected sample's native registers to B1");
   const auto& bank = workspace.soundBanks()[0];
+  expect(std::ranges::all_of(bank.instruments, [](const Instrument& instrument) { return instrument.reverb == 0.0; }),
+         "FF7 melodic, drum and ADSR-variant instruments must not add reverb independently of sequence commands");
   const auto drum = std::ranges::find_if(bank.instruments, [](const Instrument& instrument) {
     return instrument.explicitAddress && instrument.explicitAddress->bank == 127;
   });
@@ -1168,7 +1209,102 @@ void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView() {
          "direct Akao instrument-set export should use the bound collection view");
 }
 
+void akaoVibratoCommandsWorkAcrossVersions() {
+  for (auto version : {AkaoPs1Version::Version1_0, AkaoPs1Version::Version1_1, AkaoPs1Version::Version1_2,
+                       AkaoPs1Version::Version2, AkaoPs1Version::Version3_0, AkaoPs1Version::Version3_1,
+                       AkaoPs1Version::Version3_2}) {
+    const auto performance = renderAkaoFixture({
+        0xb5, 0x20, 0xb4, 2, 3, 6, 0x08, 0xb5, 0xc0, 0x08,
+        0xb6, 0xb5, 0x40, 0x08, 0xb4, 2, 0, 6, 0x08, 0xa0}, {}, version);
+    const auto events = fixtureEvents<ModulationPerformanceEvent>(performance);
+    const bool newest = version == AkaoPs1Version::Version3_2;
+    expect(events.size() == 4 && *events[2].pitchDepthSemitones == 0 && *events[3].pitchDepthSemitones > 0,
+           "B5 must retain depth while disabled; only B4 enables vibrato, and B6 cancels it");
+    const auto& start = events[0].context;
+    const double clock = AkaoProfile{version}.driverTickHz();
+    expect(start.delay->ticks == 2 && start.delay->tempoRelative && !start.cyclesPerTick &&
+               std::abs(*start.frequencyHz - clock / (3 * (newest ? 4 : 39))) < 1e-9 &&
+               std::abs(*events[3].context.frequencyHz - clock / (256 * (newest ? 4 : 39))) < 1e-9,
+           "vibrato rate uses driver ticks, delay uses sequence ticks, and rate zero means 256");
+    expect(start.steppedDepthAttackSteps == 4 && start.shape->waveform ==
+               (newest ? LfoWaveform::Triangle : LfoWaveform::Sine) &&
+               events[1].context.restartMode == LfoRestartMode::None,
+           "B4 must select the version's waveform and buildup; B5 must preserve its phase");
+    const auto wide = *events[1].context.pitchRangeSemitones;
+    expect(std::abs(wide.minimum - 12 * std::log2(0.75)) < 1e-9 &&
+               std::abs(wide.maximum - 12 * std::log2(1.5)) < 1e-9,
+           "packed depth must preserve wide mode and the driver's asymmetric pitch excursion");
+
+    const auto midi = renderMidiSequence(performance, {}, ModulationConversionPolicy::SequenceEventSimulation);
+    bool bent = false;
+    for (const auto& event : midi.tracks[0].events) {
+      if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend)) {
+        bent |= event.tick >= 2 && event.tick < 32 && bend->value != 0;
+        expect(!(event.tick < 2 || (event.tick >= 32 && event.tick < 48)) || bend->value == 0,
+               "vibrato must respect its delay and remain centered after B6, even with a later B5");
+      }
+    }
+    expect(bent, "enabled vibrato must reach simulated MIDI pitch bends");
+  }
+}
+
+void akaoVibratoPreservesVersionSpecificWaveformsAndNoteRestarts() {
+  for (auto version : {AkaoPs1Version::Version1_0, AkaoPs1Version::Version1_1, AkaoPs1Version::Version2,
+                       AkaoPs1Version::Version3_0, AkaoPs1Version::Version3_1, AkaoPs1Version::Version3_2}) {
+    const AkaoProfile profile{version};
+    const auto performance = renderAkaoFixture({
+        0xb5, 0x40, 0xb4, 0, 2, 15, 0xcc, 0x08, 0x08, 0x8c, 0xcd, 0x08, 0xa0}, {}, version);
+    const auto notes = fixtureEvents<NotePerformanceEvent>(performance);
+    expect(notes.size() == 4 && notes[0].restartsVibratoLfoPhase == true &&
+               notes[1].restartsVibratoLfoPhase == !profile.version3OrLater() &&
+               notes[2].restartsVibratoLfoPhase == false && notes[3].restartsVibratoLfoPhase == true,
+           "early slurs restart vibrato, v3 slurs preserve phase, and ties never restart it");
+    const auto context = fixtureEvents<ModulationPerformanceEvent>(performance)[0].context;
+    const auto waveform = profile.version32() ? LfoWaveform::Noise : profile.version3OrLater()
+        ? LfoWaveform::Sine : LfoWaveform::Triangle;
+    expect(context.shape->waveform == waveform,
+           "waveform 15 must follow the early alias, v3 short sine, or v3.2 waveform mask");
+  }
+}
+
+void akaoVibratoRateFadeRetargetsAndB4CancelsIt() {
+  const auto performance = renderAkaoFixture({
+      0xb5, 0x40, 0xb4, 0, 4, 1, 0xe4, 6, 10, 0x06,
+      0xe4, 2, 3, 0x06, 0xe4, 8, 20, 0xb4, 0, 2, 1, 0x08, 0xa0}, {}, AkaoPs1Version::Version3_2);
+  const auto events = fixtureEvents<ModulationPerformanceEvent>(performance);
+  std::vector<double> rates;
+  for (const auto& event : events) {
+    if (event.target == ModulationPerformanceTarget::VibratoRate) rates.push_back(*event.context.frequencyHz);
+  }
+  const double quarterClock = AkaoProfile{AkaoPs1Version::Version3_2}.driverTickHz() / 4;
+  expect(rates.size() == 5 && std::abs(rates[0] - quarterClock / 5) < 1e-9 &&
+             std::abs(rates[2] - quarterClock / 7) < 1e-9 &&
+             std::abs(rates[3] - quarterClock / 5) < 1e-9 &&
+             std::abs(rates[4] - quarterClock / 3) < 1e-9,
+         "E4 must interpolate the period from its current value; a subsequent B4 cancels the fade");
+  expect(events.back().context.restartMode == LfoRestartMode::Delay,
+         "v3.2 B4 reloads delay without resetting the current waveform position");
+
+  const auto bends = [](std::vector<u8> commands) {
+    const auto midi = renderMidiSequence(renderAkaoFixture(commands, {}, AkaoPs1Version::Version3_2), {},
+                                         ModulationConversionPolicy::SequenceEventSimulation);
+    std::vector<std::pair<u64, int>> result;
+    for (const auto& event : midi.tracks[0].events) {
+      if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend)) {
+        result.emplace_back(event.tick, bend->value);
+      }
+    }
+    return result;
+  };
+  expect(bends({0xb5, 0x40, 0xb4, 0, 13, 0, 0x08, 0x8c, 0xa0}) ==
+             bends({0xb5, 0x40, 0xb4, 0, 13, 0, 0x08, 0xb4, 0, 13, 0, 0x8c, 0xa0}),
+         "repeating v3.2 B4 during a held note must preserve the rendered waveform phase");
+}
+
 void runAkaoFormatTests() {
+  akaoVibratoCommandsWorkAcrossVersions();
+  akaoVibratoPreservesVersionSpecificWaveformsAndNoteRestarts();
+  akaoVibratoRateFadeRetargetsAndB4CancelsIt();
   akaoSequenceLayoutRejectsFalsePositiveHeaders();
   akaoSequenceDecodesLegacyRelativeJumpTargets();
   akaoSequenceDecodesConditionalBranchSideTargets();
@@ -1183,7 +1319,10 @@ void runAkaoFormatTests() {
   akaoTieAfterRestDoesNotExtendPreviousNote();
   ff7SlurChangesPitchWithoutAnotherAttack();
   ff7SlurBoundariesRespectRestsTiesLegatoAndRepeats();
-  ff7PortamentoEnablesSlurAndStartsWithAFreshAttack();
+  ff7PortamentoEnablesSlurAndStartsWithAFreshAttack(0xdb);
+  ff7PortamentoEnablesSlurAndStartsWithAFreshAttack(0xcb);
+  ff7ExpressionFadesRetargetAndCancel();
+  ff7ReverbSwitchesAndResetReachMidi();
   ff7EnvelopeCommandsKeepNativeStateAndResetOnProgramChange();
   ff7EnvelopeRatesModesAndCombinedCommandCompose();
   ff7CollectionBindsNativeEnvelopesAndPreservesDrumDefaults();

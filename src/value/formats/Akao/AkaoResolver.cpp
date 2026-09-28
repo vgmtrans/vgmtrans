@@ -146,6 +146,11 @@ void prepareAkaoBank(BankPreparationContext& context, const AkaoSoundBankData& d
   if (!applyAkaoArticulations(context.bank, data.binding, articulations)) {
     context.fail("Akao retained instrument recipe does not match its structural bank");
   }
+  if (data.version == AkaoPs1Version::Version1_0) {
+    // FF7 controls reverb per track. A fixed SoundFont send would remain audible
+    // even after C3 (Reverb Off) sets the MIDI reverb controller to zero.
+    for (auto& instrument : context.bank.instruments) instrument.reverb = 0.0;
+  }
 
   std::set<u32> missing;
   for (const auto& regions : data.binding.regions) {

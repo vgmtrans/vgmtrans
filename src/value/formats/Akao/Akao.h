@@ -71,6 +71,7 @@ struct AkaoProfile {
   [[nodiscard]] u32 trackHeaderOffset() const noexcept;
   [[nodiscard]] u32 sequenceLength(core::ByteReader reader, u32 offset) const;
   [[nodiscard]] double tempoBpm(u16 tempo) const;
+  [[nodiscard]] double driverTickHz() const;
   [[nodiscard]] u32 tempoMicrosPerQuarter(u16 tempo) const;
 };
 
@@ -157,6 +158,7 @@ struct AkaoRuntimeConfig {
 };
 
 struct AkaoSoundBankData {
+  AkaoPs1Version version = AkaoPs1Version::Unknown;
   AkaoInstrumentSetBindingData binding;
   // Filled on the prepared bank after its sample pools have been selected.
   AkaoRuntimeConfig runtime;
