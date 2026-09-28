@@ -7,7 +7,6 @@
 #include "value/export/synth/SynthExportData.h"
 
 #include "value/export/ExportDiagnostics.h"
-#include "value/sequence/PerformanceModel.h"
 #include "value/synth/SampleDecoder.h"
 
 #include <fmt/format.h>
@@ -112,20 +111,21 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
   }
 }
 
-[[nodiscard]] SynthSampleIndexMap referencedSamples(std::span<const Instrument* const> instruments) {
+[[nodiscard]] SynthSampleIndexMap referencedSamples(std::span<const SynthBankSelection> banks) {
   SynthSampleIndexMap samples;
-  for (const auto* instrument : instruments) {
-    for (const auto& region : instrument->regions) {
-      samples.try_emplace(SynthSampleIndexKey{region.sample.owner().value, region.sample.index(),
-                                              region.invertSamplePhase, region.sampleStartFrame});
+  for (const auto& bank : banks) {
+    for (const auto& selected : bank.instruments) {
+      for (const auto& region : selected.instrument->regions) {
+        samples.try_emplace(SynthSampleIndexKey{region.sample.owner().value, region.sample.index(),
+                                                region.invertSamplePhase, region.sampleStartFrame});
+      }
     }
   }
   return samples;
 }
 
 [[nodiscard]] std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
-    std::span<const SynthInstrumentSelection> selectedInstruments, const SynthSampleIndexMap& samples,
-    const SynthExportInput& input, std::vector<Diagnostic>& diagnostics) {
+    const SynthSampleIndexMap& samples, const SynthExportInput& input, std::vector<Diagnostic>& diagnostics) {
   const auto lowerModulation = [&](const InstrumentModulation& modulation) {
     auto lowered = lowerSynthModulation(modulation, input.modulationConversion);
     for (auto& modulator : lowered.modulators) {
@@ -136,20 +136,13 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
   // Drop only regions whose samples cannot be resolved. The rest of the instrument can
   // still produce a useful partial export.
   std::vector<ResolvedSynthInstrument> instruments;
-  std::map<const Instrument*, InstrumentAddress> selected;
-  for (const auto& entry : selectedInstruments) selected.emplace(entry.instrument, entry.address);
-  for (const auto* bank : input.soundBanks) {
-    if (!bank) {
-      continue;
-    }
-    const u32 step = regionSamplingStep(*bank, diagnostics);
-    for (const auto& instrument : bank->instruments) {
-      if (!selected.contains(&instrument)) {
-        continue;
-      }
+  for (const auto& selectedBank : input.soundBanks) {
+    const u32 step = regionSamplingStep(*selectedBank.bank, diagnostics);
+    for (const auto& selected : selectedBank.instruments) {
+      const auto& instrument = *selected.instrument;
       ResolvedSynthInstrument resolvedInstrument{
           .instrument = &instrument,
-          .address = selected.at(&instrument),
+          .address = selected.address,
           .modulation = lowerModulation(instrument.modulation),
       };
       for (auto& region : sampleRegionResponses(instrument.regions, step)) {
@@ -239,13 +232,30 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
 
 }  // namespace
 
-std::vector<SynthInstrumentSelection> selectSynthInstruments(
+std::vector<SynthBankSelection> selectSynthBanks(std::span<const SoundBankAsset* const> soundBanks) {
+  std::vector<SynthBankSelection> result;
+  for (const auto* bank : soundBanks) {
+    if (!bank) continue;
+    SynthBankSelection selected{.bank = bank};
+    for (const auto& instrument : bank->instruments) {
+      selected.instruments.push_back(
+          {&instrument, resolveInstrumentAddress(instrument.explicitAddress, instrument.identity)});
+    }
+    result.push_back(std::move(selected));
+  }
+  return result;
+}
+
+std::vector<SynthBankSelection> selectSynthBanks(
     const ResolvedPerformance& performance, const InstrumentAddressPlan& layout, bool onlyUsed) {
-  std::vector<SynthInstrumentSelection> result;
+  std::vector<SynthBankSelection> result;
   if (!layout.valid) return result;
+  for (const auto& bank : performance.soundBanks()) result.push_back({.bank = &bank});
   const auto used = onlyUsed ? performance.usedInstruments() : std::set<InstrumentHandle>{};
   for (const auto& [handle, address] : layout.instruments) {
-    if (!onlyUsed || used.contains(handle)) result.push_back({performance.instrument(handle), address});
+    if (!onlyUsed || used.contains(handle)) {
+      result.at(handle.bank).instruments.push_back({performance.instrument(handle), address});
+    }
   }
   return result;
 }
@@ -387,31 +397,17 @@ std::vector<Region> sampleRegionResponses(std::span<const Region> regions, u32 s
 PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceStore& sources,
                                    const SynthSampleDecodeOptions& options) {
   PreparedSynthData prepared;
-  std::vector<SynthInstrumentSelection> selected;
-  if (input.instrumentSelections) {
-    selected.assign(input.instrumentSelections->begin(), input.instrumentSelections->end());
-  } else {
-    for (const auto* bank : input.soundBanks) {
-      if (!bank) continue;
-      for (const auto& instrument : bank->instruments) {
-        selected.push_back({&instrument, resolveInstrumentAddress(instrument.explicitAddress, instrument.identity)});
-      }
-    }
-  }
-  std::vector<const Instrument*> instruments;
-  for (const auto& entry : selected) instruments.push_back(entry.instrument);
-  auto samplesByReference = referencedSamples(instruments);
-  for (const auto* bank : input.soundBanks) {
-    if (bank != nullptr) {
-      decodeSynthPool(prepared, samplesByReference, bank->metadata.id, bank->localSamples, input, sources, options);
-    }
+  auto samplesByReference = referencedSamples(input.soundBanks);
+  for (const auto& selected : input.soundBanks) {
+    const auto& bank = *selected.bank;
+    decodeSynthPool(prepared, samplesByReference, bank.metadata.id, bank.localSamples, input, sources, options);
   }
   for (const auto* pool : input.samplePools) {
     if (pool != nullptr) {
       decodeSynthPool(prepared, samplesByReference, pool->metadata.id, pool->pool, input, sources, options);
     }
   }
-  prepared.instruments = resolveSynthInstruments(selected, samplesByReference, input, prepared.diagnostics);
+  prepared.instruments = resolveSynthInstruments(samplesByReference, input, prepared.diagnostics);
   return prepared;
 }
 

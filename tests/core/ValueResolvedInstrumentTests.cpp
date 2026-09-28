@@ -72,7 +72,6 @@ void resolvedVariantsShareAddressesWithBothSynthWriters() {
          "resolution must retain the attack's instrument through an intervening program change");
   const auto resolved = preparePerformance(sourcePerformance, {banks.begin(), banks.end()}, {.dynamicEnvelopes = true});
   const auto& preparedBanks = resolved.soundBanks();
-  const auto preparedViews = resolved.soundBankView();
   const auto variant = *noteById(resolved.performance(), first).instrument;
   expect(std::get<InstrumentHandle>(variant) == InstrumentHandle{0, 2} &&
              noteById(resolved.performance(), continuation).instrument == variant &&
@@ -86,12 +85,14 @@ void resolvedVariantsShareAddressesWithBothSynthWriters() {
   expect(layout.valid && layout.banks.at(0) == 11 && layout.banks.at(9) == 12 &&
              noteById(resolved.performance(), first).instrument == variant,
          "late bank assignment must leave instrument references unchanged");
-  const auto selected = selectSynthInstruments(resolved, layout, true);
-  expect(selected.size() == 2 && selected[0].instrument == &preparedBanks[0].instruments[1] &&
-             selected[1].instrument == &preparedBanks[0].instruments[2],
+  const auto selected = selectSynthBanks(resolved, layout, true);
+  expect(selected.size() == 1 && selected[0].bank == &preparedBanks[0] &&
+             selected[0].instruments.size() == 2 &&
+             selected[0].instruments[0].instrument == &preparedBanks[0].instruments[1] &&
+             selected[0].instruments[1].instrument == &preparedBanks[0].instruments[2],
          "used-only selection must consume handles and retain the attack variant, not its unused base");
-  const SynthExportInput input{.soundBanks = preparedViews, .samplePools = pools,
-                               .instrumentSelections = selected, .filterSamplesToReferencedInstruments = true};
+  const SynthExportInput input{.soundBanks = selected, .samplePools = pools,
+                               .filterSamplesToReferencedInstruments = true};
   const auto sf2 = buildSoundFont2(input, sources);
   const auto dls = buildDls(input, sources);
   expect(sf2.diagnostics.empty() && dls.diagnostics.empty(), "both synth writers should accept the shared selection");
@@ -101,7 +102,7 @@ void resolvedVariantsShareAddressesWithBothSynthWriters() {
     sfPresets.emplace(readLe16(sf2.bytes, phdr + index * 38 + 22), readLe16(sf2.bytes, phdr + index * 38 + 20));
   }
   std::set<std::pair<u32, u32>> expected;
-  for (const auto& item : selected) expected.emplace(item.address.bank, item.address.program);
+  for (const auto& item : selected[0].instruments) expected.emplace(item.address.bank, item.address.program);
   expect(sfPresets == expected && readLe32(dls.bytes, asciiOffset(dls.bytes, "colh") + 8) == expected.size(),
          "serialized synth preset tables must use the shared late address plan");
   // Inspect DLS instrument headers independently of the production model.
@@ -161,7 +162,7 @@ void resolutionChoosesAndDiagnosesOneDefinition() {
                                &Diagnostic::code) == 2,
          "fallback and conflicting definitions must be reported once per source selection");
   const auto layout = planInstrumentAddresses(resolved, true);
-  expect(selectSynthInstruments(resolved, layout, true).size() == 1,
+  expect(selectSynthBanks(resolved, layout, true)[0].instruments.size() == 1,
          "filtering must use the same single definition as notes, leaving external presets external");
   const auto midi = renderMidiSequence(resolved, layout);
   expect(!midi.tracks.empty(), "a missing companion instrument must not prevent standalone MIDI");
@@ -360,7 +361,7 @@ void completedCollectionsRetainInputsAcrossRenderingOutcomes() {
                prepared.soundBanks()[0].instruments.size() == (rendered ? 2 : 1),
            "moves and copies must retain bank data, metadata, and external sample owners in every outcome");
     const auto banks = prepared.soundBankView();
-    const auto synth = buildSoundFont2({.soundBanks = banks, .samplePools = prepared.samplePools}, sources);
+    const auto synth = buildSoundFont2({.soundBanks = selectSynthBanks(banks), .samplePools = prepared.samplePools}, sources);
     expect(!synth.bytes.empty() && synth.diagnostics.empty(),
            "retained inputs must remain usable for synth export after their original owners are destroyed");
     if (rendered) {
@@ -375,6 +376,100 @@ void completedCollectionsRetainInputsAcrossRenderingOutcomes() {
   }
 }
 
+void synthSelectionsPreserveBankSamplingAndSampleOwners() {
+  SourceStore sources;
+  const auto source = sources.add(SourceFile{.name = "banks.pcm"}, {10, 20, 30, 40});
+  const auto sample = [&](u32 offset) {
+    return Sample{.codec = AudioCodec::PcmS8, .encodedData = {source, offset, 1}, .sampleRate = 16000};
+  };
+  const auto response = [](AssetId owner) {
+    return Region{.keyRange = {60, 63}, .velocityRange = {20, 23}, .sample = SampleRef::resolved(owner, 0),
+                  .response = {.keyDependent = true, .velocityDependent = true,
+                               .evaluate = [](Region& region, u8 key, u8 velocity) {
+                                 region.attenuationDb = key + velocity;
+                               }}};
+  };
+  auto unusedResponse = response(AssetId{10});
+  unusedResponse.keyRange = {};
+  unusedResponse.velocityRange = {};
+  const std::vector<SoundBankAsset> banks{
+      {.metadata = {.id = AssetId{10}},
+       .instruments = {
+           Instrument{.explicitAddress = InstrumentAddress{0, 5}, .identity = InstrumentIdentity{"A", 1},
+                      .name = "Selected A", .regions = {response(AssetId{10})}},
+           Instrument{.explicitAddress = InstrumentAddress{0, 7}, .name = "Unused A", .regions = {unusedResponse}}},
+       .localSamples = {.samples = {sample(0)}}},
+      {.metadata = {.id = AssetId{20}},
+       .instruments = {
+           Instrument{.explicitAddress = InstrumentAddress{0, 5}, .identity = InstrumentIdentity{"B", 1},
+                      .name = "Selected B", .regions = {response(AssetId{40})}}},
+       .localSamples = {.samples = {sample(1)}}},
+      {.metadata = {.id = AssetId{30}}, .localSamples = {.samples = {sample(2)}}},
+  };
+  const SamplePoolAsset pool{.metadata = {.id = AssetId{40}}, .pool = {.samples = {sample(3)}}};
+  const std::array pools{&pool};
+  const auto resolved = preparePerformance({.tracks = {PerformanceTrack{.events = {
+      NotePerformanceEvent{.instrument = InstrumentIdentity{"A", 1}, .note = PerformanceNoteId{0}},
+      NotePerformanceEvent{.header = {.tick = 1}, .instrument = InstrumentIdentity{"B", 1},
+                           .note = PerformanceNoteId{1}},
+  }}}}, banks);
+  const auto layout = planInstrumentAddresses(resolved, true);
+  // The input owns the selection returned by the builder; no temporary view is retained.
+  SynthExportInput input{.soundBanks = selectSynthBanks(resolved, layout, true), .samplePools = pools};
+  auto prepared = prepareSynthData(input, sources);
+  expect(prepared.instruments.size() == 2 && prepared.instruments[0].regions.size() == 4 &&
+             prepared.instruments[1].regions.size() == 16 && prepared.diagnostics.size() == 1 &&
+             prepared.instruments[0].regions[0].region.attenuationDb == 82 &&
+             prepared.instruments[1].regions[0].region.attenuationDb == 80,
+         "selected instruments must use their own bank's sampling budget, including its unselected regions");
+  expect(prepared.instruments[0].address == layout.address(InstrumentHandle{0, 0}) &&
+             prepared.instruments[1].address == layout.address(InstrumentHandle{1, 0}) &&
+             prepared.instruments[0].address != prepared.instruments[1].address,
+         "synth selection must preserve planned collision addresses instead of reusing source preferences");
+  expect(prepared.samples.size() == 4 && prepared.samples[0].decoded.pcm == std::vector<s16>{2560} &&
+             prepared.samples[1].decoded.pcm == std::vector<s16>{5120} &&
+             prepared.samples[2].decoded.pcm == std::vector<s16>{7680} &&
+             prepared.samples[3].decoded.pcm == std::vector<s16>{10240} &&
+             prepared.instruments[1].regions[0].sampleIndex == 3,
+         "unfiltered samples must preserve bank/pool order, including banks with no selected instruments");
+  input.filterSamplesToReferencedInstruments = true;
+  prepared = prepareSynthData(input, sources);
+  expect(prepared.samples.size() == 2 && prepared.instruments[0].regions[0].sampleIndex == 0 &&
+             prepared.instruments[1].regions[0].sampleIndex == 1 &&
+             prepared.samples[1].decoded.pcm == std::vector<s16>{10240},
+         "used-only sample filtering must follow the selected entries' local and external sample references");
+
+  const auto silent = preparePerformance({}, banks);
+  const auto empty = prepareSynthData({.soundBanks = selectSynthBanks(silent, planInstrumentAddresses(silent, true), true),
+                                       .samplePools = pools, .filterSamplesToReferencedInstruments = true}, sources);
+  expect(empty.instruments.empty() && empty.samples.empty(),
+         "a sequence using no instruments must not fall back to exporting its entire bank");
+
+  test::SessionSnapshotBuilder builder;
+  for (const auto& bank : banks) builder.assets.emplace_back(bank);
+  builder.assets.emplace_back(pool);
+  builder.assets.emplace_back(SequenceProgramAsset{
+      .metadata = {.id = AssetId{0}},
+      .program = {.runtime = {.execute = [](const SourceCommand&, std::any&, std::any&, PerformanceEmitter& out, VmApi&) {
+                    out.instrument(InstrumentIdentity{"A", 1});
+                    out.note(60, 1, 1);
+                    out.instrument(InstrumentIdentity{"B", 1});
+                    out.note(60, 1, 1);
+                    return Effects::wait(1);
+                  }},
+                  .tracks = {TrackProgram{.startAddress = Address{0}, .commands = {
+                      SourceCommand{.address = Address{0}, .flow = CommandFlow::end(Address{1})}}}}}});
+  builder.collections = {{.id = CollectionId{0}, .members = {
+      .sequence = AssetId{0}, .soundBanks = {AssetId{10}, AssetId{20}, AssetId{30}}, .samplePools = {AssetId{40}}}}};
+  const auto snapshot = builder.finish();
+  for (const auto format : {SynthExportFormat::SoundFont2, SynthExportFormat::Dls}) {
+    const auto artifact = exportSoundBank(snapshot, sources, AssetId{20}, format, {.exportOnlyUsedInstruments = true});
+    expect(!artifact.bytes.empty() && artifact.diagnostics.empty() && containsAscii(artifact.bytes, "Selected B") &&
+               !containsAscii(artifact.bytes, "Selected A") && !containsAscii(artifact.bytes, "Unused A"),
+           "exporting one used bank must exclude other banks, their instruments, and their sampling diagnostics");
+  }
+}
+
 }  // namespace
 
 void runResolvedInstrumentTests() {
@@ -385,4 +480,5 @@ void runResolvedInstrumentTests() {
   laterSourceSelectionsCannotFindGeneratedVariants();
   collectionExportsRequireACompanionForVariants();
   completedCollectionsRetainInputsAcrossRenderingOutcomes();
+  synthSelectionsPreserveBankSamplingAndSampleOwners();
 }

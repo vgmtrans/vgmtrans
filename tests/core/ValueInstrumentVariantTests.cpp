@@ -102,9 +102,10 @@ void instrumentSelectionUsesOneResolutionPolicy() {
     });
     const std::array<const SoundBankAsset*, 2> inputs{nullptr, &bank};
     const auto resolved = prepareTestPerformance(performance, inputs);
-    const auto selected = selectSynthInstruments(resolved, planInstrumentAddresses(resolved), true);
+    const auto selected = selectSynthBanks(resolved, planInstrumentAddresses(resolved), true);
     const size_t first = test.firstMatch;
-    expect(selected.size() == 1 && selected[0].instrument == &resolved.soundBanks()[1].instruments[first],
+    expect(selected.size() == 2 && selected[0].instruments.empty() && selected[1].instruments.size() == 1 &&
+               selected[1].instruments[0].instrument == &resolved.soundBanks()[1].instruments[first],
            "all consumers must use the first resolved definition, including numeric fallback and note overrides");
 
     std::array banks{bank};
@@ -530,11 +531,10 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(bool changesInstr
                              .sampleRate = 32000,
                          }}},
   };
-  std::vector<const SoundBankAsset*> instrumentViews{&preparedBanks[0]};
   std::vector<const SamplePoolAsset*> sampleViews{&samples};
-  const auto selectedInstruments = selectSynthInstruments(materialized, planInstrumentAddresses(materialized), true);
+  const auto selectedInstruments = selectSynthBanks(materialized, planInstrumentAddresses(materialized), true);
   const SynthExportInput input{
-      .soundBanks = instrumentViews, .samplePools = sampleViews, .instrumentSelections = selectedInstruments,
+      .soundBanks = selectedInstruments, .samplePools = sampleViews,
       .filterSamplesToReferencedInstruments = true};
   const auto prepared = prepareSynthData(input, sources);
   const size_t count = changesInstrument ? 2 : 1;
@@ -569,7 +569,7 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(bool changesInstr
          "both serialized banks must retain exactly the presets used by the paired MIDI");
 
   const auto leadingTie = sequenceWithEvents({NotePerformanceEvent{.extendsPrevious = true}});
-  expect(prepareTestPerformance(leadingTie, instrumentViews).usedInstruments() == std::set{InstrumentHandle{0, 0}},
+  expect(preparePerformance(leadingTie, preparedBanks).usedInstruments() == std::set{InstrumentHandle{0, 0}},
          "a leading tie with no preceding voice should still retain the selected instrument");
 }
 
@@ -643,12 +643,10 @@ void signedStereoMaterializationUsesAttackTimeVariants() {
              invertedRegions[0].attenuationDb < invertedRegions[1].attenuationDb,
          "the combined variant should retain its envelope and bake signed pan into two hard-panned layers");
 
-  std::vector<const SoundBankAsset*> views{&preparedBanks[0]};
-  const auto selectedInstruments = selectSynthInstruments(materialized, planInstrumentAddresses(materialized), true);
+  const auto selectedInstruments = selectSynthBanks(materialized, planInstrumentAddresses(materialized), true);
   const auto prepared = prepareSynthData(
       SynthExportInput{
-          .soundBanks = views,
-          .instrumentSelections = selectedInstruments,
+          .soundBanks = selectedInstruments,
           .filterSamplesToReferencedInstruments = true,
       },
       sources);

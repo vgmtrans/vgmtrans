@@ -18,23 +18,29 @@
 
 namespace vgmtrans::core {
 
-struct PerformanceSequence;
-
 struct SynthInstrumentSelection {
   const Instrument* instrument = nullptr;
   InstrumentAddress address;
 };
 
-[[nodiscard]] std::vector<SynthInstrumentSelection> selectSynthInstruments(
+// A bank supplies local samples and the region-sampling policy for its selected
+// instruments. Keep it even when no instruments are selected: unfiltered sample
+// export still includes its local samples. Builders omit null bank pointers.
+struct SynthBankSelection {
+  const SoundBankAsset* bank = nullptr;
+  std::vector<SynthInstrumentSelection> instruments;
+};
+
+[[nodiscard]] std::vector<SynthBankSelection> selectSynthBanks(
+    std::span<const SoundBankAsset* const> soundBanks);
+[[nodiscard]] std::vector<SynthBankSelection> selectSynthBanks(
     const ResolvedPerformance& performance, const InstrumentAddressPlan& layout, bool onlyUsed = false);
 
 struct SynthExportInput {
   std::string name;
-  std::span<const SoundBankAsset* const> soundBanks;
+  // Owns the completed selection; bank/instrument data remain borrowed.
+  std::vector<SynthBankSelection> soundBanks;
   std::span<const SamplePoolAsset* const> samplePools;
-  // Present: the completed instrument/address decision shared with MIDI.
-  // Absent: export the entire standalone bank at its source addresses.
-  std::optional<std::span<const SynthInstrumentSelection>> instrumentSelections;
   bool filterSamplesToReferencedInstruments = false;
   const MidiModulationUsage* midiModulationUsage = nullptr;
   ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
@@ -84,8 +90,6 @@ struct PreparedSynthData {
   std::vector<Diagnostic> diagnostics;
 };
 
-// Apply the same performance-based instrument selection used by SF2 and DLS
-// preparation without decoding samples or lowering a container.
 // SF2 and DLS have one decay followed by a fixed sustain level. Approximate a
 // richer envelope using both endpoint timing and perceptual salience, without
 // changing the instrument data kept by the scanner. attenuationRangeDb is the

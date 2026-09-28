@@ -312,13 +312,11 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   };
   const std::array<const SamplePoolAsset*, 1> sampleSets{&samples};
   const auto semanticPrepared = preparePerformance(semanticPerformance, {semanticInstruments});
-  const auto semanticViews = semanticPrepared.soundBankView();
-  const auto semanticSelection = selectSynthInstruments(semanticPrepared, planInstrumentAddresses(semanticPrepared), true);
+  const auto semanticSelection = selectSynthBanks(semanticPrepared, planInstrumentAddresses(semanticPrepared), true);
   const auto semanticData = prepareSynthData(
       SynthExportInput{
-          .soundBanks = semanticViews,
+          .soundBanks = semanticSelection,
           .samplePools = sampleSets,
-          .instrumentSelections = semanticSelection,
           .filterSamplesToReferencedInstruments = true,
       },
       sources);
@@ -338,13 +336,11 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
       }},
   };
   const auto logicalBankPrepared = preparePerformance(logicalBankPerformance, {logicalBankInstruments});
-  const auto logicalBankViews = logicalBankPrepared.soundBankView();
-  const auto logicalBankSelection = selectSynthInstruments(logicalBankPrepared, planInstrumentAddresses(logicalBankPrepared), true);
+  const auto logicalBankSelection = selectSynthBanks(logicalBankPrepared, planInstrumentAddresses(logicalBankPrepared), true);
   const auto logicalBankData = prepareSynthData(
       SynthExportInput{
-          .soundBanks = logicalBankViews,
+          .soundBanks = logicalBankSelection,
           .samplePools = sampleSets,
-          .instrumentSelections = logicalBankSelection,
           .filterSamplesToReferencedInstruments = true,
       },
       sources);
@@ -364,13 +360,11 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
       }},
   };
   const auto exactBankPrepared = preparePerformance(exactBankPerformance, {exactBankInstruments});
-  const auto exactBankViews = exactBankPrepared.soundBankView();
-  const auto exactBankSelection = selectSynthInstruments(exactBankPrepared, planInstrumentAddresses(exactBankPrepared), true);
+  const auto exactBankSelection = selectSynthBanks(exactBankPrepared, planInstrumentAddresses(exactBankPrepared), true);
   const auto exactBankData = prepareSynthData(
       SynthExportInput{
-          .soundBanks = exactBankViews,
+          .soundBanks = exactBankSelection,
           .samplePools = sampleSets,
-          .instrumentSelections = exactBankSelection,
           .filterSamplesToReferencedInstruments = true,
       },
       sources);
@@ -928,7 +922,7 @@ void exportDiagnosticsPreserveSourceRanges() {
   const auto sf2BadRegion = buildSoundFont2(
       SynthExportInput{
           .name = "Probe",
-          .soundBanks = soundBanks,
+          .soundBanks = selectSynthBanks(soundBanks),
           .samplePools = validSamples,
       },
       sources);
@@ -941,7 +935,7 @@ void exportDiagnosticsPreserveSourceRanges() {
   const auto dlsBadRegion = buildDls(
       SynthExportInput{
           .name = "Probe",
-          .soundBanks = soundBanks,
+          .soundBanks = selectSynthBanks(soundBanks),
           .samplePools = validSamples,
       },
       sources);
@@ -1116,7 +1110,7 @@ void synthPreparationKeepsSampleIdentityAndPhaseOrdering() {
   const std::array<const SoundBankAsset*, 1> banks{&bank};
   const std::array<const SamplePoolAsset*, 1> pools{&pool};
   const auto prepared = prepareSynthData(
-      SynthExportInput{.soundBanks = banks, .samplePools = pools, .filterSamplesToReferencedInstruments = true},
+      SynthExportInput{.soundBanks = selectSynthBanks(banks), .samplePools = pools, .filterSamplesToReferencedInstruments = true},
       sources);
   expect(prepared.diagnostics.empty() && prepared.samples.size() == 4 && prepared.instruments.size() == 1,
          "filtered preparation should skip unused invalid samples and share repeated phase references");
@@ -1136,7 +1130,7 @@ void synthPreparationKeepsSampleIdentityAndPhaseOrdering() {
   bank.localSamples.samples[0].loop = {.enabled = true, .start = 1, .length = 1};
   bank.instruments[0].regions[1].sampleStartFrame = 1;
   const auto trimmed = prepareSynthData(
-      SynthExportInput{.soundBanks = banks, .samplePools = pools, .filterSamplesToReferencedInstruments = true},
+      SynthExportInput{.soundBanks = selectSynthBanks(banks), .samplePools = pools, .filterSamplesToReferencedInstruments = true},
       sources);
   const auto& sustain = trimmed.samples[trimmed.instruments[0].regions[1].sampleIndex].decoded;
   expect(trimmed.diagnostics.empty() && sustain.pcm == std::vector<s16>{-1000} &&

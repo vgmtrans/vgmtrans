@@ -2,7 +2,7 @@
 
 Reviewed against b531b5abe86e02479b066899ae1f7c845f9d7e67 on core-rewrite.
 
-**Implementation status, 28 September 2026:** The analysis below describes that baseline. Instrument resolution is implemented on `codex/resolved-instruments-prototype` (initial implementation checkpoint: `0c24c8f42`). The first follow-up replaces the mutable collection workspace with completed preparation results. The remaining work is tracked below; [the HTML implementation notes](value-core-review/resolved-instrument-prototype.html) describe the current code and verification.
+**Implementation status, 28 September 2026:** The analysis below describes that baseline. Instrument resolution is implemented on `codex/resolved-instruments-prototype` (initial checkpoint: `0c24c8f42`). The collection lifecycle now returns completed preparation results (`aecf170b5`), and synth inputs group selected instruments with their banks, removing membership reconstruction. The remaining work is tracked below; [the HTML implementation notes](value-core-review/resolved-instrument-prototype.html) describe the current code and verification.
 
 **The largest opportunity is to make instrument choice and voice continuity explicit before output conversion.** Today, the core executes the source program, but several later passes still have to work out which instrument a note means and whether it continues an earlier voice. Collections have a related problem: preparation reconstructs relationships that resolution has already established.
 
@@ -328,12 +328,12 @@ The useful parts of the rewrite should survive: immutable discovered assets, sha
 Current staged work:
 
 1. **Completed: collection preparation lifecycle.** Construct one completed result from bound inputs. Keep immutable banks available with or without a rendered sequence, retain the snapshot owning external sample metadata, and share the completed result across repeated stitched parts. Remove the public render-once workspace protocol.
-2. **Next: instrument handoffs.** Have synth conversion consume final instrument entries with their bank context. Remove pointer/address reconstruction and repeated bank-membership searches.
-3. **Then: the resolved-data contract.** Narrow the interface used by output consumers and keep a performance associated with its address plan, without duplicating the event model.
+2. **Completed: instrument handoffs.** Synth input owns selected instrument/address entries grouped by bank. Conversion reads them directly; selected-bank export removes whole groups. The pointer/address map, pointer-only projection, and bank-membership searches are removed. Bank-wide sampling, empty selections, and local/external sample behavior are covered by regressions.
+3. **Next: the resolved-data contract.** Narrow the interface used by output consumers and keep a performance associated with its address plan, without duplicating the event model.
 4. **Next major model change: represent a sounding voice explicitly across ties and pitch changes.** The instrument work does not replace this proposal. Target the predecessor reconstruction, voice inference, and repeated continuation handling described in section 2, with the musical cases listed below.
 5. **Separate input-side redesign: collection choices and resolved bank/sample uses.** Preserve the cases in section 3, including SegSat's mapping and manual selections.
 
-Complete and validate each stage before implementing the next. The lifecycle change removes a stateful protocol; the later stages still need to demonstrate their own reductions in logic and conceptual overhead.
+Complete and validate each stage before implementing the next. The completed stages remove a stateful protocol and instrument-membership reconstruction; the remaining stages still need to demonstrate their own reductions in logic and conceptual overhead.
 
 The original implementation rationale follows:
 

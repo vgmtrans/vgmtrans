@@ -60,7 +60,7 @@ void regionResponsesAreSampledAtExport() {
          "even the coarsest sampling must report when native region count exceeds the budget");
 
   const std::array<const SoundBankAsset*, 1> banks{&bank};
-  const SynthExportInput input{.name = "Response", .soundBanks = banks};
+  const SynthExportInput input{.name = "Response", .soundBanks = selectSynthBanks(banks)};
   auto prepared = prepareSynthData(input, sources);
   const auto sf2 = buildSoundFont2(input, sources);
   const auto dls = buildDls(input, sources);
@@ -356,7 +356,7 @@ void regionModulationExportsAtTheRegionScope() {
   const std::array<const SamplePoolAsset*, 1> samplePools{&samples};
   const SynthExportInput input{
       .name = "Region LFO",
-      .soundBanks = soundBanks,
+      .soundBanks = selectSynthBanks(soundBanks),
       .samplePools = samplePools,
   };
 
@@ -487,7 +487,7 @@ void soundFontExporterWritesSfbkRiffFile() {
   const auto result = buildSoundFont2(
       SynthExportInput{
           .name = "Probe",
-          .soundBanks = soundBanks,
+          .soundBanks = selectSynthBanks(soundBanks),
           .samplePools = samples,
           .midiModulationUsage = &midiModulationUsage,
           .modulationScaling = ModulationScalingPolicy::ObservedSequenceRange,
@@ -556,7 +556,7 @@ void soundFontExporterWritesSfbkRiffFile() {
   const auto simulatedResult = buildSoundFont2(
       SynthExportInput{
           .name = "Probe",
-          .soundBanks = soundBanks,
+          .soundBanks = selectSynthBanks(soundBanks),
           .samplePools = samples,
           .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
       },
@@ -575,7 +575,7 @@ void soundFontExporterWritesSfbkRiffFile() {
   variant.regions.front().envelope.attackSeconds = 2.0;
   soundBank.instruments.push_back(std::move(variant));
   const auto shared =
-      buildSoundFont2(SynthExportInput{.name = "Probe", .soundBanks = soundBanks, .samplePools = samples}, sources);
+      buildSoundFont2(SynthExportInput{.name = "Probe", .soundBanks = selectSynthBanks(soundBanks), .samplePools = samples}, sources);
   expect(chunkSize(shared.bytes, "phdr") == 3 * 38 && chunkSize(shared.bytes, "inst") == 2 * 22 &&
              soundFontGeneratorContains(shared.bytes, "pgen", 34, 1200),
          "SoundFont envelope variants should share one sample-mapped instrument through preset ADSR offsets");
@@ -585,7 +585,7 @@ void soundFontExporterWritesSfbkRiffFile() {
        {ModulationConversionPolicy::SynthModulators, ModulationConversionPolicy::SequenceEventSimulation}) {
     const auto distinctModulation = buildSoundFont2(
         SynthExportInput{
-            .name = "Probe", .soundBanks = soundBanks, .samplePools = samples, .modulationConversion = conversion},
+            .name = "Probe", .soundBanks = selectSynthBanks(soundBanks), .samplePools = samples, .modulationConversion = conversion},
         sources);
     const bool simulated = conversion == ModulationConversionPolicy::SequenceEventSimulation;
     expect(distinctModulation.diagnostics.empty() && chunkSize(distinctModulation.bytes, "phdr") == 3 * 38 &&
@@ -598,7 +598,7 @@ void soundFontExporterWritesSfbkRiffFile() {
   const MidiModulationUsage inactiveVibrato{.vibratoDepth = 0.0};
   const auto scaledShared =
       buildSoundFont2(SynthExportInput{.name = "Probe",
-                                       .soundBanks = soundBanks,
+                                       .soundBanks = selectSynthBanks(soundBanks),
                                        .samplePools = samples,
                                        .midiModulationUsage = &inactiveVibrato,
                                        .modulationScaling = ModulationScalingPolicy::ObservedSequenceRange},
@@ -614,7 +614,7 @@ void soundFontExporterWritesSfbkRiffFile() {
   expectThrows<std::overflow_error>(
       [&] {
         static_cast<void>(buildSoundFont2(
-            SynthExportInput{.name = "Too many zones", .soundBanks = soundBanks, .samplePools = samples}, sources));
+            SynthExportInput{.name = "Too many zones", .soundBanks = selectSynthBanks(soundBanks), .samplePools = samples}, sources));
       },
       "SoundFont table offsets must reject generator indexes that exceed 16 bits");
 }
@@ -637,7 +637,7 @@ void soundFontSampleHeadersUseTheFirstReferencingRegion() {
       Region{.sample = SampleRef::resolved(bank.metadata.id, 0), .unityKey = 72.0},
   }});
   const std::array<const SoundBankAsset*, 1> banks{&bank};
-  const auto result = buildSoundFont2(SynthExportInput{.soundBanks = banks}, sources);
+  const auto result = buildSoundFont2(SynthExportInput{.soundBanks = selectSynthBanks(banks)}, sources);
   expect(result.diagnostics.empty() && chunkSize(result.bytes, "shdr") == 3 * 46,
          "SoundFont should retain unreferenced samples when filtering is disabled");
   const size_t first = asciiOffset(result.bytes, "shdr") + 8;
@@ -665,7 +665,7 @@ void synthSampleIndexesRetainTheirRangeUntilContainerExport() {
       .regions = {Region{.sample = SampleRef::resolved(bank.metadata.id, lastSample)}},
   });
   const std::array<const SoundBankAsset*, 1> banks{&bank};
-  const SynthExportInput input{.soundBanks = banks};
+  const SynthExportInput input{.soundBanks = selectSynthBanks(banks)};
   const auto prepared = prepareSynthData(input, sources);
   const u32 resolved = prepared.instruments.at(0).regions.at(0).sampleIndex;
   expect(prepared.diagnostics.empty() && prepared.samples.size() == lastSample + 1 && resolved == lastSample &&
@@ -764,7 +764,7 @@ void dlsExporterWritesDlsRiffFile() {
   const auto result = buildDls(
       SynthExportInput{
           .name = "Probe",
-          .soundBanks = soundBanks,
+          .soundBanks = selectSynthBanks(soundBanks),
           .samplePools = samples,
           .midiModulationUsage = &midiModulationUsage,
           .modulationScaling = ModulationScalingPolicy::ObservedSequenceRange,
@@ -826,7 +826,7 @@ void dlsExporterWritesDlsRiffFile() {
   const auto simulatedResult = buildDls(
       SynthExportInput{
           .name = "Probe",
-          .soundBanks = soundBanks,
+          .soundBanks = selectSynthBanks(soundBanks),
           .samplePools = samples,
           .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
       },
@@ -840,7 +840,7 @@ void dlsExporterWritesDlsRiffFile() {
 
   samplePool.pool.samples.front().sampleRate = std::numeric_limits<u32>::max();
   expectThrows<std::overflow_error>(
-      [&] { static_cast<void>(buildDls(SynthExportInput{.soundBanks = soundBanks, .samplePools = samples}, sources)); },
+      [&] { static_cast<void>(buildDls(SynthExportInput{.soundBanks = selectSynthBanks(soundBanks), .samplePools = samples}, sources)); },
       "DLS must reject a PCM byte rate that would overflow its WAVE format record");
 }
 

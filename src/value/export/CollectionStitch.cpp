@@ -16,6 +16,7 @@
 #include "value/model/SessionSnapshot.h"
 
 #include <algorithm>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <numeric>
@@ -289,8 +290,7 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
   result.midi.bytes = encodeMidiFile(*midi);
   append(result.midi.diagnostics, midi->diagnostics);
 
-  std::vector<const SoundBankAsset*> instruments;
-  std::vector<SynthInstrumentSelection> synthInstruments;
+  std::vector<SynthBankSelection> synthBanks;
   std::vector<const SamplePoolAsset*> samples;
   std::unordered_set<u32> includedCollections;
   std::unordered_set<u32> includedSamples;
@@ -298,10 +298,8 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
     if (!includedCollections.insert(part.prepared->id.value).second) {
       continue;
     }
-    const auto selected =
-        selectSynthInstruments(*part.prepared->performance(), part.layout, request.exportOnlyUsedInstruments);
-    synthInstruments.insert(synthInstruments.end(), selected.begin(), selected.end());
-    for (const auto& set : part.prepared->soundBanks()) instruments.push_back(&set);
+    auto selected = selectSynthBanks(*part.prepared->performance(), part.layout, request.exportOnlyUsedInstruments);
+    synthBanks.insert(synthBanks.end(), std::make_move_iterator(selected.begin()), std::make_move_iterator(selected.end()));
     for (const auto* collection : part.prepared->samplePools) {
       if (includedSamples.insert(collection->metadata.id.value).second) {
         samples.push_back(collection);
@@ -311,9 +309,8 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
   auto soundFont = buildSoundFont2(
       SynthExportInput{
           .name = "Stitched Collections",
-          .soundBanks = instruments,
+          .soundBanks = std::move(synthBanks),
           .samplePools = samples,
-          .instrumentSelections = synthInstruments,
           .filterSamplesToReferencedInstruments = request.exportOnlyUsedInstruments,
           .midiModulationUsage = &modulationUsage,
           .modulationScaling = request.modulationScaling,
