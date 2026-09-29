@@ -523,7 +523,7 @@ void soundingVoicesOwnSelectionsAndDeadlines() {
                                                      PerformanceTempoMap{prepared.performance()}, diagnostics);
     expect(diagnostics.empty(), "lowering valid voice continuations should not add diagnostics");
     for (const auto& event : events) {
-      if (const auto* note = std::get_if<NotePerformanceEvent>(&event); note && note->voice == first.voice) {
+      if (const auto* note = std::get_if<detail::MidiNoteEvent>(&event); note && note->voice == first.voice) {
         expect(prepared.voiceFor(*note).endLimit == 14 && prepared.selectionFor(*note).address.program == 5,
                "every lowered physical fragment must retain the source voice's selection and absolute deadline");
       }

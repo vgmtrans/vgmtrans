@@ -1052,7 +1052,7 @@ void cps3HeldNotesRetargetOneVoiceWithoutLosingPitch() {
   }
 
   const auto hasBend = [&](u64 tick, double semitones) {
-    return std::ranges::any_of(lowered, [&](const PerformanceEvent& event) {
+    return std::ranges::any_of(lowered, [&](const auto& event) {
       const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
       return bend != nullptr && bend->header.tick == tick && std::abs(bend->semitones - semitones) < 0.000001;
     });

@@ -23,13 +23,14 @@ class PerformancePitchBendContext {
   }
 
   // Returns true only when the effective pitch context changes.
-  [[nodiscard]] bool apply(const PerformanceEvent& event, const ResolvedPerformance& performance) {
+  template <class NoteEvent>
+  [[nodiscard]] bool apply(const PerformanceEventWithNote<NoteEvent>& event, const ResolvedPerformance& performance) {
     const auto previous = *this;
     if (const auto* range = std::get_if<PitchBendRangePerformanceEvent>(&event)) {
       sourceRangeCents_ = range->cents;
     } else if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event)) {
       selectInstrument(performance.selectionFor(*selection).instrument);
-    } else if (const auto* note = std::get_if<NotePerformanceEvent>(&event);
+    } else if (const auto* note = std::get_if<NoteEvent>(&event);
                note != nullptr && !note->extendsPrevious) {
       selectInstrument(performance.selectionFor(*note).instrument);
     }

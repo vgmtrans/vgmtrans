@@ -23,10 +23,6 @@ double effectivePitchBendSemitones(const PitchBendPerformanceEvent& bend, u16 so
   return std::clamp(*bend.normalizedWheelPosition, -1.0, 1.0) * range;
 }
 
-const PerformanceEventHeader& performanceEventHeader(const PerformanceEvent& event) {
-  return std::visit([](const auto& typedEvent) -> const PerformanceEventHeader& { return typedEvent.header; }, event);
-}
-
 const PitchTransitionIntent* pitchTransitionIntent(const PerformanceAutomation& automation) {
   return std::get_if<PitchTransitionIntent>(&automation.intent);
 }

@@ -424,14 +424,18 @@ struct MarkerPerformanceEvent {
   std::string text;
 };
 
-using PerformanceEvent =
-    std::variant<NotePerformanceEvent, TempoPerformanceEvent, TimeSignaturePerformanceEvent, InstrumentPerformanceEvent,
+// Source and MIDI timelines share control events, but give notes different responsibilities.
+template <class NoteEvent>
+using PerformanceEventWithNote =
+    std::variant<NoteEvent, TempoPerformanceEvent, TimeSignaturePerformanceEvent, InstrumentPerformanceEvent,
                  EnvelopePerformanceEvent, LevelPerformanceEvent, ExpressionPerformanceEvent, PanPerformanceEvent,
                  ChannelPanPerformanceEvent, StereoBalancePerformanceEvent, MasterLevelPerformanceEvent,
                  ReverbPerformanceEvent, MonoModePerformanceEvent, TuningPerformanceEvent,
                  GlobalTransposePerformanceEvent, PortamentoPerformanceEvent, PortamentoEnablePerformanceEvent,
                  PitchBendPerformanceEvent, PitchBendRangePerformanceEvent, PitchTransitionSettingsPerformanceEvent,
                  LegatoPedalPerformanceEvent, ModulationPerformanceEvent, MarkerPerformanceEvent>;
+
+using PerformanceEvent = PerformanceEventWithNote<NotePerformanceEvent>;
 
 enum class PerformanceAutomationTarget {
   Tempo,
@@ -648,7 +652,10 @@ private:
   std::vector<Point> points_;
 };
 
-[[nodiscard]] const PerformanceEventHeader& performanceEventHeader(const PerformanceEvent& event);
+template <class NoteEvent>
+[[nodiscard]] const PerformanceEventHeader& performanceEventHeader(const PerformanceEventWithNote<NoteEvent>& event) {
+  return std::visit([](const auto& value) -> const PerformanceEventHeader& { return value.header; }, event);
+}
 [[nodiscard]] const PitchTransitionIntent* pitchTransitionIntent(const PerformanceAutomation& automation);
 [[nodiscard]] PitchTransitionIntent* pitchTransitionIntent(PerformanceAutomation& automation);
 [[nodiscard]] std::optional<double> pitchTransitionKeyAt(const PerformanceTrack& track, PerformanceNoteId note,
