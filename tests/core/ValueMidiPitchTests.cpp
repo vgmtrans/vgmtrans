@@ -692,6 +692,53 @@ void performanceMidiRendererUsesWholeSemitonePitchBendRanges() {
          "MIDI renderer should quantize pitch bends using the emitted whole-semitone range");
 }
 
+void performanceMidiRendererPlansRangesAtPhysicalAttacks() {
+  for (bool sharedOrder : {false, true}) {
+    PerformanceTrack track{.id = TrackId{0}, .endTick = 10};
+    u64 order = 0;
+    u32 noteId = 0, automationId = 0;
+    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{1}, 0, order, noteId, automationId};
+    const auto first = out.note(60, 1.0, 2);
+    out.at(2).continueVoice(first, NotePerformanceEvent{.key = 60, .durationTicks = 4});
+    out.at(3).pitchBend(6.0);
+    out.at(6).pitchBend(PitchBendPerformanceEvent{.normalizedWheelPosition = 0.5});
+    out.at(6).pitchBendRange(5);
+    out.at(6).note(67, 1.0, 4);
+    if (sharedOrder) {
+      // Hand-built performances can give the controls and attack the same
+      // tick/sequence. Their stable order still puts the controls first.
+      for (auto& event : track.events) {
+        std::visit([](auto& value) { value.header.sequence = 0; }, event);
+      }
+    }
+    const auto midi = renderTestMidi(PerformanceSequence{.tracks = {track}});
+    const auto& events = midi.tracks.front().events;
+    const std::vector<std::pair<u64, u16>> expectedRanges =
+        sharedOrder ? std::vector<std::pair<u64, u16>>{{0, 600}, {6, 200}, {6, 500}}
+                    : std::vector<std::pair<u64, u16>>{{0, 600}, {6, 500}};
+    expect(midiPitchBendRanges(events) == expectedRanges,
+           "ties must reserve range at the original attack and a new attack must restore current source sensitivity");
+    expect(std::ranges::any_of(events,
+                               [](const MidiEvent& event) {
+                                 const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+                                 return event.tick == 6 && bend && bend->value == 4096;
+                               }),
+           "restoring sensitivity must preserve the normalized wheel's pitch at the new attack");
+  }
+
+  PerformanceTrack chord{.id = TrackId{0}, .endTick = 4};
+  u64 order = 0;
+  u32 noteId = 0, automationId = 0;
+  PerformanceEmitter out{chord, {chord.id, CommandId{2}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+  out.note(60, 1.0, 4);
+  out.pitchBend(-6.0);
+  out.note(67, 1.0, 4);
+  out.at(1).pitchBend(2.0);
+  const auto midi = renderTestMidi(PerformanceSequence{.tracks = {chord}});
+  expect(midiPitchBendRanges(midi.tracks.front().events) == std::vector<std::pair<u64, u16>>{{0, 600}},
+         "simultaneous MIDI attacks must share a range that includes pitch writes between their note events");
+}
+
 void performanceMidiRendererDoesNotRestartVibratoAtAHeldPitchSlideBoundary() {
   PerformanceTrack track{
       .id = TrackId{0},
@@ -1403,6 +1450,7 @@ void runValueMidiPitchTests() {
   performanceMidiRendererSimulatesDeterministicSampleAndHoldNoise();
   performanceMidiRendererUsesOnlyFrozenVibratoOffsetForPitchRange();
   performanceMidiRendererUsesWholeSemitonePitchBendRanges();
+  performanceMidiRendererPlansRangesAtPhysicalAttacks();
   performanceMidiRendererDoesNotRestartVibratoAtAHeldPitchSlideBoundary();
   performanceMidiRendererPreservesExactSamplesAndChainedPitchContinuity();
   performanceMidiRendererKeepsSampledPitchCurvesSparse();

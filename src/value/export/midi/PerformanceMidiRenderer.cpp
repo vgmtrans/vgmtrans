@@ -283,13 +283,6 @@ class PitchBendLayers {
 
 using PerformanceTimeline = std::vector<const PerformanceEvent*>;
 
-struct VoicePitchBendRangeChange {
-  u64 tick = 0;
-  u64 sequence = 0;
-  u16 sourceCents = 200;
-  std::optional<u16> voiceCents;
-};
-
 [[nodiscard]] double tuningBendSemitones(double cents, MidiTuningRendering rendering) {
   switch (rendering) {
     case MidiTuningRendering::PitchBend:
@@ -362,88 +355,65 @@ struct VoicePitchBendRangeChange {
   return 1.0 / maximumGain;
 }
 
-// Pitch-bend sensitivity is channel state. Reserve one stable range from each
-// physical attack through every linked note in that sounding voice.
-[[nodiscard]] std::vector<VoicePitchBendRangeChange> planVoicePitchBendRanges(const PerformanceTimeline& timeline,
-                                                                              MidiTuningRendering tuningRendering,
-                                                                              const ResolvedPerformance& resolved) {
-  struct Voice {
-    u64 startTick = 0;
-    u64 startSequence = 0;
-    u16 sourceCents = 200;
-    double bendExtent = 0.0;
-    bool hasAutomatedBend = false;
-    bool exceedsAvailableRange = false;
+// Sensitivity belongs to the MIDI channel: simultaneous attacks share a range
+// and ties retain it. Measure pitch from each physical attack to the next.
+// Store only range changes; a null range restores source sensitivity.
+[[nodiscard]] std::unordered_map<const PerformanceEvent*, std::optional<u16>> planPitchBendRanges(
+    const PerformanceTimeline& timeline, MidiTuningRendering tuningRendering, const ResolvedPerformance& resolved) {
+  const auto nextAttack = [&](auto from, std::optional<u64> previousTick = std::nullopt) {
+    return std::find_if(from, timeline.end(), [&](const PerformanceEvent* event) {
+      const auto* note = std::get_if<NotePerformanceEvent>(event);
+      return note && !note->extendsPrevious && (!previousTick || note->header.tick != *previousTick);
+    });
   };
-
-  std::vector<Voice> voices;
-  for (const auto* event : timeline) {
-    const auto* note = std::get_if<NotePerformanceEvent>(event);
-    if (note != nullptr && !note->extendsPrevious && (voices.empty() || voices.back().startTick != note->header.tick)) {
-      voices.push_back(Voice{.startTick = note->header.tick, .startSequence = note->header.sequence});
+  // Controls with an equal tick/sequence see the attack's range too, even if
+  // they precede the note. Attach the change to the first such event.
+  const auto beforeAttack = [&](auto from, auto attack) {
+    if (attack == timeline.end()) {
+      return attack;
     }
-  }
-
-  size_t nextVoice = 0;
-  size_t activeVoice = voices.size();
+    return std::lower_bound(from, attack, performanceEventHeader(**attack).order(),
+                            [](const auto* event, auto order) { return performanceEventHeader(*event).order() < order; });
+  };
   PerformancePitchBendContext pitchContext{resolved};
   PitchBendLayers activeBendLayers;
   double activeTuningBend = 0.0;
-  const auto observePitch = [&] {
-    if (activeVoice == voices.size()) {
-      return;
-    }
-    auto& voice = voices[activeVoice];
-    const double bend = activeTuningBend + activeBendLayers.semitones(pitchContext);
-    voice.bendExtent = std::max(voice.bendExtent, std::abs(bend));
-    const u16 availableCents = wholeSemitonePitchBendRangeCents(pitchContext.availableRangeCents());
-    voice.exceedsAvailableRange |= std::abs(bend) * 100.0 > availableCents;
-  };
-  for (const auto* event : timeline) {
-    const auto& header = performanceEventHeader(*event);
-    bool pitchChanged = false;
-    while (nextVoice < voices.size() &&
-           std::pair{voices[nextVoice].startTick, voices[nextVoice].startSequence} <= header.order()) {
-      activeVoice = nextVoice++;
-      voices[activeVoice].sourceCents = pitchContext.sourceRangeCents();
-      pitchChanged = true;
-    }
-    if (pitchContext.apply(*event, resolved)) {
-      pitchChanged = true;
-    } else if (const auto* tuning = std::get_if<TuningPerformanceEvent>(event)) {
+  const auto applyPitch = [&](const PerformanceEvent* event) {
+    (void)pitchContext.apply(*event, resolved);
+    if (const auto* tuning = std::get_if<TuningPerformanceEvent>(event)) {
       activeTuningBend = tuningBendSemitones(tuning->cents, tuningRendering);
-      pitchChanged = true;
     } else if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(event)) {
       activeBendLayers.apply(*bend);
-      if (activeVoice != voices.size()) {
-        voices[activeVoice].hasAutomatedBend |= bend->header.automation.has_value();
-      }
-      pitchChanged = true;
     }
-    if (pitchChanged) {
-      observePitch();
-    }
-  }
-
-  std::vector<VoicePitchBendRangeChange> changes;
+  };
+  auto attack = nextAttack(timeline.begin());
+  auto begin = beforeAttack(timeline.begin(), attack);
+  std::for_each(timeline.begin(), begin, applyPitch);
+  std::unordered_map<const PerformanceEvent*, std::optional<u16>> ranges;
   std::optional<u16> activeRange;
-  for (const auto& voice : voices) {
-    const u16 requiredCents = static_cast<u16>(
-        std::clamp(std::ceil(voice.bendExtent * 100.0), 0.0, 12'700.0));
-    const std::optional<u16> range = voice.hasAutomatedBend || voice.exceedsAvailableRange
-                                         ? std::optional{std::max<u16>(200, requiredCents)}
-                                         : std::nullopt;
+  while (attack != timeline.end()) {
+    attack = nextAttack(std::next(attack), performanceEventHeader(**attack).tick);
+    const auto end = beforeAttack(begin, attack);
+    double extent = 0.0;
+    bool needsRange = false;
+    for (auto event = begin; event != end; ++event) {
+      applyPitch(*event);
+      const double bend = std::abs(activeTuningBend + activeBendLayers.semitones(pitchContext));
+      extent = std::max(extent, bend);
+      needsRange |= bend * 100.0 > wholeSemitonePitchBendRangeCents(pitchContext.availableRangeCents());
+      if (const auto* write = std::get_if<PitchBendPerformanceEvent>(*event)) {
+        needsRange |= write->header.automation.has_value();
+      }
+    }
+    const u16 requiredCents = static_cast<u16>(std::clamp(std::ceil(extent * 100.0), 0.0, 12'700.0));
+    const std::optional<u16> range = needsRange ? std::optional{std::max<u16>(200, requiredCents)} : std::nullopt;
     if (range != activeRange) {
-      changes.push_back(VoicePitchBendRangeChange{
-          .tick = voice.startTick,
-          .sequence = voice.startSequence,
-          .sourceCents = voice.sourceCents,
-          .voiceCents = range,
-      });
+      ranges.emplace(*begin, range);
       activeRange = range;
     }
+    begin = end;
   }
-  return changes;
+  return ranges;
 }
 
 [[nodiscard]] s32 globalTransposeAt(std::span<const GlobalTransposePerformanceEvent* const> changes, u64 tick) {
@@ -730,22 +700,19 @@ public:
               std::span<const GlobalTransposePerformanceEvent* const> globalTransposes,
               ModulationConversionPolicy modulationConversion, const ResolvedPerformance& resolved,
               const SequenceModulationProfile* modulationProfile) {
-    const auto pitchBendRangeChanges = planVoicePitchBendRanges(timeline, options.tuning, resolved);
-    size_t nextPitchBendRangeChange = 0;
+    const auto pitchBendRanges = planPitchBendRanges(timeline, options.tuning, resolved);
     const auto* initialInstrument = resolved.initialInstrument();
     applyInstrumentPitchBendRange(0, initialInstrument ? initialInstrument->pitchBendRangeCents : std::nullopt,
                                   modulationConversion);
     for (const auto* event : timeline) {
       const auto& header = performanceEventHeader(*event);
-      while (nextPitchBendRangeChange < pitchBendRangeChanges.size() &&
-             std::pair{pitchBendRangeChanges[nextPitchBendRangeChange].tick,
-                       pitchBendRangeChanges[nextPitchBendRangeChange].sequence} <= header.order()) {
-        const auto& change = pitchBendRangeChanges[nextPitchBendRangeChange++];
-        if (change.tick != 0) {
-          // Finish the previous voice before changing the channel sensitivity.
-          flushSimulatedVibrato(change.tick - 1);
+      if (const auto range = pitchBendRanges.find(event); range != pitchBendRanges.end()) {
+        if (header.tick != 0) {
+          // Finish the previous attack's modulation before changing sensitivity.
+          flushSimulatedVibrato(header.tick - 1);
         }
-        applyVoicePitchBendRangeChange(change, modulationConversion);
+        attackPitchBendRangeCents = range->second;
+        refreshPitchBendRange(header.tick, effectivePitchBendRangeCents(modulationConversion));
       }
 
       const auto* note = std::get_if<NotePerformanceEvent>(event);
@@ -786,7 +753,7 @@ private:
   PerformancePitchBendContext pitchBendContext;
   // Slides may replace the sequence range, but they must not reduce the range
   // required by the selected instrument.
-  std::optional<u16> voicePitchBendRangeCents;
+  std::optional<u16> attackPitchBendRangeCents;
   double tuningSemitones = 0.0;
   PitchBendLayers pitchBendLayers;
   std::map<u32, SimulatedPitchLfoState> pitchLfos;
@@ -924,7 +891,7 @@ private:
             ? 0
             : static_cast<u16>(std::clamp(std::ceil(std::abs(tuningSemitones + layeredPitchBendSemitones()) * 100.0),
                                           0.0, static_cast<double>(std::numeric_limits<u16>::max())));
-    const u16 range = std::max({voicePitchBendRangeCents.value_or(pitchBendContext.sourceRangeCents()),
+    const u16 range = std::max({attackPitchBendRangeCents.value_or(pitchBendContext.sourceRangeCents()),
                                 pitchBendContext.instrumentRangeCents().value_or(0), tuningRangeCents});
     const bool simulatesPitchLfo =
         modulationConversion == ModulationConversionPolicy::SequenceEventSimulation ||
@@ -1003,13 +970,6 @@ private:
       track.events.push_back(midi::programChange(tick, channel, program));
     }
     applyInstrumentPitchBendRange(tick, selection.pitchBendRangeCents, modulationConversion);
-  }
-
-  void applyVoicePitchBendRangeChange(const VoicePitchBendRangeChange& change,
-                                      ModulationConversionPolicy modulationConversion) {
-    pitchBendContext.setSourceRangeCents(change.sourceCents);
-    voicePitchBendRangeCents = change.voiceCents;
-    refreshPitchBendRange(change.tick, effectivePitchBendRangeCents(modulationConversion));
   }
 
   void addCurrentPitchBend(u64 tick, ModulationConversionPolicy modulationConversion, bool force = true) {
