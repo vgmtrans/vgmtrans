@@ -375,19 +375,12 @@ struct Playback : SequencePlayback<TrackState> {
     NotePerformanceEvent event{
         .key = static_cast<double>(sourceKey),
         .durationTicks = sounding,
+        .extendsPrevious = continuesVoice && track.previousKey == sourceKey,
         .restartsEnvelope = !continuesVoice,
         .restartsLfoPhase = !continuesVoice,
     };
-    if (continuesVoice && track.previousNote.valid()) {
-      if (track.previousKey == sourceKey) {
-        event.extendsPrevious = true;
-        track.previousNote = out.note(std::move(event));
-      } else {
-        track.previousNote = out.continueVoice(track.previousNote, std::move(event));
-      }
-    } else {
-      track.previousNote = out.note(std::move(event));
-    }
+    track.previousNote = continuesVoice ? out.continueVoice(track.previousNote, std::move(event))
+                                       : out.note(std::move(event));
     track.previousKey = sourceKey;
     track.previousPitchKey = pitchKey;
     track.previousSlur = slur;

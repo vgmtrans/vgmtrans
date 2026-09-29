@@ -37,8 +37,8 @@ struct SoundingVoice {
   std::optional<u64> endLimit;  // Absolute tick; computed with the source tempo map.
 };
 
-// Preparation resolves the source's final note/continuation bindings into voices.
-// Its segments share an adapted instrument and a hardware stop deadline. Bank
+// Preparation remaps explicit source voices into this result. Each voice
+// shares an adapted instrument and a hardware stop deadline across its segments. Bank
 // copies and output addresses are owned and frozen together. Output conversion
 // reads this value without modifying it. Address exhaustion retains the prepared
 // data and diagnostics, but prevents MIDI/synth output.

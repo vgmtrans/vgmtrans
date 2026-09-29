@@ -374,22 +374,14 @@ struct Playback : SequencePlayback<TrackState> {
         .key = key,
         .linearVelocity = 1.0,
         .durationTicks = duration,
+        .extendsPrevious = continuesPreviousVoice && previousKey && *previousKey == key,
         .restartsLfoPhase = !continuesPreviousVoice,
     };
+    track.lastNote = continuesPreviousVoice ? out.continueVoice(previousNote, std::move(event))
+                                           : out.note(std::move(event));
     if (automaticPortamento) {
-      track.lastNote = continuesPreviousVoice ? out.continueVoice(previousNote, std::move(event))
-                                              : out.note(std::move(event));
       auto slide = out.pitchSlide(track.lastNote, *previousKey, key, track.automaticPortamentoLength);
       activatePitchSlide(slide, track.lastNote, *previousKey, key, track.automaticPortamentoLength);
-    } else if (continuesPreviousVoice) {
-      track.lastNote = previousKey && *previousKey == key ? out.note(NotePerformanceEvent{.key = key,
-                                                                                          .linearVelocity = 1.0,
-                                                                                          .durationTicks = duration,
-                                                                                          .extendsPrevious = true,
-                                                                                          .restartsLfoPhase = false})
-                                                          : out.continueVoice(track.lastNote, std::move(event));
-    } else {
-      track.lastNote = out.note(std::move(event));
     }
     applyQueuedPitchSlide(key);
     track.lastKey = key;

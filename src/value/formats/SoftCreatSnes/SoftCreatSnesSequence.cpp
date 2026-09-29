@@ -609,18 +609,12 @@ struct Playback : SequencePlayback<TrackState> {
         .key = key,
         .linearVelocity = 1.0,
         .durationTicks = track.remaining,
+        .extendsPrevious = continues && track.lastKey && std::abs(*track.lastKey - key) < 0.000001,
         .restartsEnvelope = !continues,
         .restartsLfoPhase = !continues,
     };
-    if (continues) {
-      if (track.lastKey && std::abs(*track.lastKey - key) < 0.000001) {
-        event.extendsPrevious = true;
-        track.lastNote = out.note(std::move(event));
-      } else {
-        track.lastNote = out.continueVoice(track.lastNote, std::move(event));
-      }
-    } else {
-      track.lastNote = out.note(std::move(event));
+    track.lastNote = continues ? out.continueVoice(track.lastNote, std::move(event)) : out.note(std::move(event));
+    if (!continues) {
       attachGain(track.remaining);
     }
     if (track.gainRetriggers) {

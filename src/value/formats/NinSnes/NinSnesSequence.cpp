@@ -500,8 +500,7 @@ void Playback::emitVoiceNote(double key, u32 duration) {
       .extendsPrevious = extendsPrevious,
       .restartsLfoPhase = !continuesPreviousVoice,
   };
-  const auto note = continuesPreviousVoice && !extendsPrevious ? out.continueVoice(track.lastNote, event)
-                                                              : out.note(event);
+  const auto note = continuesPreviousVoice ? out.continueVoice(track.lastNote, event) : out.note(event);
   if (continuesPreviousVoice && !extendsPrevious) {
     out.pitchSlide(note, *track.lastKey, key, PitchSlideTiming::fromTicks(0))
         .preferPitchBend();

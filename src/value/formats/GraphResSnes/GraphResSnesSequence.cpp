@@ -398,18 +398,12 @@ struct Playback : SequencePlayback<TrackState> {
           .key = noteKey,
           .linearVelocity = 1.0,
           .durationTicks = sounding,
+          .extendsPrevious = continues && track.lastKey &&
+                             std::abs(*track.lastKey - noteKey) < kPitchComparisonTolerance,
           .restartsEnvelope = !continues,
           .restartsLfoPhase = !continues,
       };
-      if (continues && track.lastKey &&
-          std::abs(*track.lastKey - noteKey) < kPitchComparisonTolerance) {
-        event.extendsPrevious = true;
-        track.lastNote = out.note(std::move(event));
-      } else if (continues) {
-        track.lastNote = out.continueVoice(track.lastNote, std::move(event));
-      } else {
-        track.lastNote = out.note(std::move(event));
-      }
+      track.lastNote = continues ? out.continueVoice(track.lastNote, std::move(event)) : out.note(std::move(event));
       track.lastKey = noteKey;
       out.pitchBend(bend);
       track.lastPitchBend = bend;

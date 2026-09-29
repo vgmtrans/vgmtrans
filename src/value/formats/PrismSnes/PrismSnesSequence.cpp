@@ -589,6 +589,7 @@ struct Playback : SequencePlayback<TrackState> {
         .key = key,
         .linearVelocity = 1.0,
         .durationTicks = length,
+        .extendsPrevious = continues && track.lastKey && *track.lastKey == key,
         .restartsEnvelope = !continues,
         .restartsLfoPhase = !continues,
     };
@@ -604,16 +605,7 @@ struct Playback : SequencePlayback<TrackState> {
         stopGainMode();
       }
     }
-    if (continues) {
-      if (track.lastKey && *track.lastKey == key) {
-        event.extendsPrevious = true;
-        track.lastNote = out.note(std::move(event));
-      } else {
-        track.lastNote = out.continueVoice(track.lastNote, std::move(event));
-      }
-    } else {
-      track.lastNote = out.note(std::move(event));
-    }
+    track.lastNote = continues ? out.continueVoice(track.lastNote, std::move(event)) : out.note(std::move(event));
     track.lastKey = key;
     track.suppressAttack = false;
     track.pitchDrift = 0;

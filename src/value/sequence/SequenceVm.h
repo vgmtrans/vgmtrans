@@ -68,6 +68,9 @@ public:
   [[nodiscard]] PerformanceEmitter at(u64 tick) const;
   // Emits relative to this emitter, saturating at the last tick without advancing the VM.
   [[nodiscard]] PerformanceEmitter after(u32 ticks) const;
+  // Fresh note/voice IDs and source headers are assigned by the emitter.
+  // extendsPrevious retains the shorthand for tying event.note, or the latest
+  // note if no ID is supplied. Prefer continueVoice() when the predecessor is known.
   PerformanceNoteId note(NotePerformanceEvent event);
   PerformanceNoteId note(double key, double linearVelocity, u32 durationTicks, bool extendsPrevious = false);
   // The VM pairs separate Note On and Note Off commands into an ordinary
@@ -84,9 +87,11 @@ public:
   void releaseAllNotes();
   // Emits event on an already-sounding source voice and returns the note
   // identity that later automation should address. If event.key is the pitch
-  // currently sounding, the existing note is extended. Otherwise a new note
-  // identity uses the same voice with an attack-free key change. Later pitch
-  // slides may replace that motion without changing voice ownership.
+  // currently sounding, the existing note is extended. A source tie can also
+  // set extendsPrevious to retain the pitch motion even before its target is
+  // reached. Otherwise the key change gets a new note ID on the same voice.
+  // Envelope/LFO restart flags remain the driver's decision. An unknown note
+  // starts a fresh voice.
   PerformanceNoteId continueVoice(PerformanceNoteId previousNote, NotePerformanceEvent event);
   // Formats whose slide command follows its note can revise the most recently
   // emitted note chain once the delayed transition point becomes known.
@@ -187,6 +192,7 @@ private:
   [[nodiscard]] PerformanceEmitter withAutomation(const PerformanceAutomationBinding& automation) const;
   [[nodiscard]] PerformanceEventHeader header();
   void append(PerformanceEvent event);
+  PerformanceNoteId emitNote(NotePerformanceEvent event, const NotePerformanceEvent* previous);
   void interruptPitchSlidesForNewNote(PerformanceLaneId lane);
   [[nodiscard]] detail::ActiveNoteState& activeNotes() const;
   void finishActiveNote(const detail::ActiveNoteState::Note& note, u64 endTick);

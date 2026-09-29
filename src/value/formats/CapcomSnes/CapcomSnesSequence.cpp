@@ -248,24 +248,20 @@ struct Playback : SequencePlayback<TrackState> {
         .key = outputKey,
         .linearVelocity = 1.0,
         .durationTicks = duration + (track.noteSlurred && !repeatsSourcePitch ? 1u : 0u),
+        // Repeating the target preserves any glide still approaching it.
+        .extendsPrevious = repeatsSourcePitch,
         // The driver decides whether this note is a new key-on from the
         // preceding note's slur bit. The current note's slur bit controls
         // whether the following note will be tied to this one.
         .restartsLfoPhase = track.resetLfoPhaseOnNote && !track.lastNoteSlurred,
     };
 
-    if (repeatsSourcePitch) {
-      // Repeating the target extends both the sounding voice and any glide
-      // still approaching that target.
-      event.note = track.lastNote;
-      event.extendsPrevious = true;
-      track.lastNote = out.note(std::move(event));
-    } else {
-      const PerformanceNoteId note = continuesVoice ? out.continueVoice(track.lastNote, std::move(event))
-                                                   : out.note(std::move(event));
+    const PerformanceNoteId note = continuesVoice ? out.continueVoice(track.lastNote, std::move(event))
+                                                 : out.note(std::move(event));
+    if (!repeatsSourcePitch) {
       emitPitchSlideTo(note, key);
-      track.lastNote = note;
     }
+    track.lastNote = note;
 
     track.lastSourceKey = key;
     track.didRest = false;

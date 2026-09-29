@@ -288,7 +288,7 @@ struct Playback : SequencePlayback<TrackState> {
         .restartsVibratoLfoPhase = restart,
         .restartsTremoloLfoPhase = restart,
     };
-    const auto played = track.held && !extends ? out.continueVoice(track.previousNote, event) : out.note(event);
+    const auto played = track.held ? out.continueVoice(track.previousNote, event) : out.note(event);
     if (tied || track.held) {
       emitPortamento(played, key, track.held);
     }
@@ -424,8 +424,7 @@ struct Playback : SequencePlayback<TrackState> {
         .restartsVibratoLfoPhase = restart,
         .restartsTremoloLfoPhase = restart,
     };
-    const auto note = continuesPreviousVoice && !extendsPrevious ? out.continueVoice(track.previousNote, event)
-                                                               : out.note(event);
+    const auto note = continuesPreviousVoice ? out.continueVoice(track.previousNote, event) : out.note(event);
     if (continuesPreviousVoice && !extendsPrevious) {
       emitLateHeldTransition(note, key);
     }

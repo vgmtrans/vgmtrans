@@ -90,9 +90,8 @@ public:
         // FF7 resets modulation phase even when key-on is suppressed.
         .restartsLfoPhase = true,
         .restartsVibratoLfoPhase = !tie,
-        .note = tie || samePitch ? last_.id : core::PerformanceNoteId{},
     };
-    const auto id = connected && !samePitch ? out.continueVoice(last_.id, event) : out.note(event);
+    const auto id = tie || connected ? out.continueVoice(last_.id, event) : out.note(event);
     core::PitchSlideBinding pendingGlide;
     if (glide || (connected && !samePitch)) {
       // Smooth slides currently interpolate semitones; FF7's driver interpolates

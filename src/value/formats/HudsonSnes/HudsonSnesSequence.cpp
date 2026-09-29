@@ -548,7 +548,7 @@ struct Playback : SequencePlayback<TrackState> {
         .restartsTremoloLfoPhase = !continuesPreviousVoice,
     };
     track.lastNote =
-        continuesPreviousVoice && !tie ? out.continueVoice(previousNote, std::move(event)) : out.note(std::move(event));
+        continuesPreviousVoice ? out.continueVoice(previousNote, std::move(event)) : out.note(std::move(event));
     if (!portamentoAnchor && track.portamentoSpeed != 0) {
       applyPortamento(key, driverPitch, previousNote, previousKey);
     }

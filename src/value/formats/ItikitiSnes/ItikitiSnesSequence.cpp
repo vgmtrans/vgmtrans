@@ -288,17 +288,12 @@ struct Playback : SequencePlayback<TrackState> {
 
     if (glide) {
       out.setNoteEnd(previous, vm.tick());
-      if (std::abs(*previousKey - key) < 0.000001) {
-        event.extendsPrevious = true;
-        track.lastNote = out.note(std::move(event));
-      } else {
-        track.lastNote = out.continueVoice(previous, std::move(event));
-        out.pitchSlide(track.lastNote, *previousKey, key, math::ticks(track.portamento))
-            .continueAcrossNotes()
-            .preferPortamento();
-      }
-    } else {
-      track.lastNote = out.note(std::move(event));
+    }
+    track.lastNote = glide ? out.continueVoice(previous, std::move(event)) : out.note(std::move(event));
+    if (glide && std::abs(*previousKey - key) >= 0.000001) {
+      out.pitchSlide(track.lastNote, *previousKey, key, math::ticks(track.portamento))
+          .continueAcrossNotes()
+          .preferPortamento();
     }
     track.lastKey = key;
 

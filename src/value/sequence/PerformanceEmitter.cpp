@@ -18,6 +18,16 @@ namespace vgmtrans::core {
 
 namespace {
 
+[[nodiscard]] const NotePerformanceEvent* lastNote(const PerformanceTrack& track,
+                                                  std::optional<PerformanceNoteId> target) {
+  for (auto event = track.events.rbegin(); event != track.events.rend(); ++event) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&*event); note && (!target || note->note == *target)) {
+      return note;
+    }
+  }
+  return nullptr;
+}
+
 void reviseNoteEnd(NotePerformanceEvent& note, u64 endTick) {
   const u64 duration = endTick > note.header.tick ? endTick - note.header.tick : 0;
   note.durationTicks = static_cast<u32>(std::min<u64>(duration, std::numeric_limits<u32>::max()));
@@ -75,29 +85,25 @@ PerformanceEmitter PerformanceEmitter::after(u32 ticks) const {
 }
 
 PerformanceNoteId PerformanceEmitter::note(NotePerformanceEvent event) {
-  if (event.extendsPrevious) {
-    for (auto previous = track_.events.rbegin(); previous != track_.events.rend(); ++previous) {
-      if (const auto* note = std::get_if<NotePerformanceEvent>(&*previous);
-          note && (!event.note.valid() || event.note == note->note)) {
-        event.note = note->note;
-        event.lane = note->lane;
-        event.voice = note->voice;
-        break;
-      }
-    }
-  }
-  if (!event.note.valid()) {
-    event.note = PerformanceNoteId{nextNote_++};
-  }
-  if (!event.voice.valid()) {
-    event.voice = PerformanceVoiceId{event.note.value};
+  const auto* previous = event.extendsPrevious
+                             ? lastNote(track_, event.note.valid() ? std::optional{event.note} : std::nullopt)
+                             : nullptr;
+  return emitNote(std::move(event), previous);
+}
+
+PerformanceNoteId PerformanceEmitter::emitNote(NotePerformanceEvent event, const NotePerformanceEvent* previous) {
+  event.extendsPrevious = previous && event.extendsPrevious;
+  event.note = event.extendsPrevious ? previous->note : PerformanceNoteId{nextNote_++};
+  event.voice = previous ? previous->voice : PerformanceVoiceId{event.note.value};
+  if (previous) {
+    event.lane = previous->lane;
   }
   if (!event.extendsPrevious) {
     interruptPitchSlidesForNewNote(event.lane);
   }
-  const PerformanceNoteId note = event.note;
+  const PerformanceNoteId id = event.note;
   append(std::move(event));
-  return note;
+  return id;
 }
 
 PerformanceNoteId PerformanceEmitter::note(double key, double linearVelocity, u32 durationTicks, bool extendsPrevious) {
@@ -187,34 +193,12 @@ void PerformanceEmitter::finishActiveNote(const detail::ActiveNoteState::Note& a
 }
 
 PerformanceNoteId PerformanceEmitter::continueVoice(PerformanceNoteId previousNote, NotePerformanceEvent event) {
-  const NotePerformanceEvent* previousEvent = nullptr;
-  for (auto previous = track_.events.rbegin(); previous != track_.events.rend(); ++previous) {
-    const auto* candidate = std::get_if<NotePerformanceEvent>(&*previous);
-    if (candidate != nullptr && candidate->note == previousNote) {
-      previousEvent = candidate;
-      break;
-    }
+  const auto* previous = previousNote.valid() ? lastNote(track_, previousNote) : nullptr;
+  if (previous && !event.extendsPrevious) {
+    const double currentKey = currentPitchTransitionKey(previousNote, previous->lane).value_or(previous->key);
+    event.extendsPrevious = std::abs(currentKey - event.key) < 0.000001;
   }
-  if (previousEvent == nullptr) {
-    event.note = {};
-    event.voice = {};
-    event.extendsPrevious = false;
-    return note(std::move(event));
-  }
-
-  const PerformanceLaneId lane = previousEvent->lane;
-  event.lane = lane;
-  event.voice = previousEvent->voice;
-  const double startKey = currentPitchTransitionKey(previousNote, lane).value_or(previousEvent->key);
-  if (std::abs(startKey - event.key) < 0.000001) {
-    event.note = previousNote;
-    event.extendsPrevious = true;
-    return note(std::move(event));
-  }
-
-  event.note = {};
-  event.extendsPrevious = false;
-  return note(std::move(event));
+  return emitNote(std::move(event), previous);
 }
 
 bool PerformanceEmitter::setPreviousNoteEnd(u64 endTick) {

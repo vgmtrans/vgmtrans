@@ -387,6 +387,71 @@ void continuedVoiceResolvesPriorPitchMotion() {
          "a key change should retain the source voice without fabricating a pitch automation");
 }
 
+void explicitTiesPreserveUnfinishedMotionOnTheirOwnLane() {
+  PerformanceTrack track{.id = TrackId{6}};
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track, {}, {}, 0, nextSequence, nextNote, nextAutomation};
+
+  const auto first = out.note(NotePerformanceEvent{.key = 72, .durationTicks = 4, .lane = PerformanceLaneId{3}});
+  const auto voice = std::get<NotePerformanceEvent>(track.events.back()).voice;
+  out.pitchSlide(first, 60, 72, 12, PerformanceLaneId{3});
+  const auto other = out.at(2).note(NotePerformanceEvent{.key = 48, .durationTicks = 16, .lane = PerformanceLaneId{4}});
+  out.at(2).pitchSlide(other, 48, 60, 16, PerformanceLaneId{4});
+
+  // The driver repeats the target key while its glide is only at key 64.
+  const auto tied = out.at(4).continueVoice(first, NotePerformanceEvent{
+                                                    .key = 72,
+                                                    .durationTicks = 12,
+                                                    .extendsPrevious = true,
+                                                    .restartsEnvelope = false,
+                                                    .restartsLfoPhase = false,
+                                                    .restartsVibratoLfoPhase = true,
+                                                    .restartsTremoloLfoPhase = false,
+                                                });
+  const auto& tie = std::get<NotePerformanceEvent>(track.events.back());
+  expect(tied == first && tie.voice == voice && tie.lane == PerformanceLaneId{3} && tie.extendsPrevious &&
+             track.automations[0].realization.endTick == 12 &&
+             out.at(8).currentPitchTransitionKey(tied, PerformanceLaneId{3}) == 68.0,
+         "an explicit tie must retain its named predecessor and unfinished glide, even after another lane emits");
+  expect(!tie.restartsEnvelope && !tie.restartsLfoPhase && tie.restartsVibratoLfoPhase == true &&
+             tie.restartsTremoloLfoPhase == false,
+         "continuation must preserve the driver's independent envelope and LFO restart decisions");
+
+  const auto changed = out.at(8).continueVoice(tied, NotePerformanceEvent{.key = 74, .durationTicks = 4});
+  const auto& change = std::get<NotePerformanceEvent>(track.events.back());
+  expect(changed != first && changed != other && change.voice == voice && change.lane == PerformanceLaneId{3} &&
+             !change.extendsPrevious && track.automations[0].realization.endTick == 8 &&
+             track.automations[1].realization.endTick == 18,
+         "a subsequent key change must keep voice ownership and interrupt only its own lane's old motion");
+}
+
+void emitterOwnsIdentityForFreshNotesAndMissingPredecessors() {
+  PerformanceTrack track;
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track, {}, {}, 0, nextSequence, nextNote, nextAutomation};
+
+  const auto first = out.note(60, 1.0, 4);
+  auto copied = std::get<NotePerformanceEvent>(track.events.back());
+  const auto firstVoice = copied.voice;
+  const auto fresh = out.at(4).note(copied);
+  const auto freshVoice = std::get<NotePerformanceEvent>(track.events.back()).voice;
+  expect(fresh != first && freshVoice != firstVoice && std::get<NotePerformanceEvent>(track.events.back()).header.tick == 4,
+         "copying note parameters must not copy an earlier attack's identity or source placement");
+
+  copied.extendsPrevious = true;
+  for (const auto missing : {PerformanceNoteId{}, PerformanceNoteId{999}}) {
+    const auto fallback = out.at(8).continueVoice(missing, copied);
+    const auto& event = std::get<NotePerformanceEvent>(track.events.back());
+    expect(fallback != first && fallback != fresh && event.voice != firstVoice && event.voice != freshVoice &&
+               !event.extendsPrevious,
+           "an invalid or unknown predecessor must start a fresh voice, ignoring stale IDs in copied parameters");
+  }
+}
+
 void previousNoteEndRetainsContinuationChainBehavior() {
   PerformanceTrack track{.id = TrackId{7}};
   u64 nextSequence = 0;
@@ -534,6 +599,8 @@ void runValueSequenceModelTests() {
   performanceEmitterResolvesDeclaredPanLawIntoEvents();
   pitchTransitionApiPreservesSamplesAndRealizedLifecycle();
   continuedVoiceResolvesPriorPitchMotion();
+  explicitTiesPreserveUnfinishedMotionOnTheirOwnLane();
+  emitterOwnsIdentityForFreshNotesAndMissingPredecessors();
   previousNoteEndRetainsContinuationChainBehavior();
   tempoMapPreservesOrderingAndBoundsDurationConversion();
   physicalTimingUsesTheFullInternalDivision();

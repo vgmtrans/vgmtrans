@@ -230,6 +230,7 @@ struct Playback : SequencePlayback<TrackState> {
       track.rawLength = *length;
     }
     const double key = static_cast<double>(sourceKey + track.transpose);
+    const bool continues = track.slurNext && track.lastNote.valid();
     NotePerformanceEvent event{
         .key = key,
         .linearVelocity = 1.0,
@@ -237,19 +238,11 @@ struct Playback : SequencePlayback<TrackState> {
         // it suppresses the ordinary gate and performs pseudo key-off only
         // when the rest is dispatched at the end of this delta.
         .durationTicks = followedByRest ? waitTicks() : soundingTicks(),
+        .extendsPrevious = continues && std::abs(track.lastKey - key) < 0.000001,
         .restartsEnvelope = !track.slurNext,
         .restartsLfoPhase = true,
     };
-    if (track.slurNext && track.lastNote.valid()) {
-      if (std::abs(track.lastKey - key) < 0.000001) {
-        event.extendsPrevious = true;
-        track.lastNote = out.note(std::move(event));
-      } else {
-        track.lastNote = out.continueVoice(track.lastNote, std::move(event));
-      }
-    } else {
-      track.lastNote = out.note(std::move(event));
-    }
+    track.lastNote = continues ? out.continueVoice(track.lastNote, std::move(event)) : out.note(std::move(event));
     track.slurNext = false;
     track.lastKey = key;
     track.noteStartTick = vm.tick();

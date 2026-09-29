@@ -371,9 +371,8 @@ struct Playback : SequencePlayback<TrackState> {
           .sustained = track.sustainDown,
       });
     } else {
-      event.note = continued->note;
       event.extendsPrevious = true;
-      out.note(std::move(event));
+      out.continueVoice(continued->note, std::move(event));
       continued->endTick = tick + duration;
       continued->sustained = track.sustainDown;
     }

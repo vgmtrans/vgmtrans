@@ -260,18 +260,10 @@ struct Playback : SequencePlayback<TrackState> {
         .key = outputKey,
         .linearVelocity = math::squaredGain(track.velocity),
         .durationTicks = track.legato ? track.noteLength : duration,
+        .extendsPrevious = continues && track.lastKey && *track.lastKey == outputKey,
         .restartsLfoPhase = true,
     };
-    if (continues) {
-      if (track.lastKey && *track.lastKey == outputKey) {
-        event.extendsPrevious = true;
-        track.lastNote = out.note(std::move(event));
-      } else {
-        track.lastNote = out.continueVoice(track.lastNote, std::move(event));
-      }
-    } else {
-      track.lastNote = out.note(std::move(event));
-    }
+    track.lastNote = continues ? out.continueVoice(track.lastNote, std::move(event)) : out.note(std::move(event));
     track.lastKey = outputKey;
     beginPersistentPitchEnvelope(outputKey);
     beginVibratoFade();

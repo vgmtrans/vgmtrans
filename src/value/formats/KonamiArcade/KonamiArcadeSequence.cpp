@@ -529,7 +529,7 @@ struct Playback : SequencePlayback<TrackState> {
           .restartsVibratoLfoPhase = restartsVibrato,
           .restartsTremoloLfoPhase = restartsTremolo,
       };
-      return continues && !tied ? out.continueVoice(track.previousNote, event) : out.note(event);
+      return continues ? out.continueVoice(track.previousNote, event) : out.note(event);
     };
 
     PerformanceNoteId note;

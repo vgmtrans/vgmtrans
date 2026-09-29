@@ -503,8 +503,8 @@ struct Playback : SequencePlayback<TrackState> {
         .restartsVibratoLfoPhase = true,
         .restartsTremoloLfoPhase = true,
     };
-    track.pitchNote = continuesVoice && !repeatsHeldKey ? out.continueVoice(previousPitchNote, std::move(note))
-                                                        : out.note(std::move(note));
+    track.pitchNote = continuesVoice ? out.continueVoice(previousPitchNote, std::move(note))
+                                    : out.note(std::move(note));
     applyPitchEffectToNote(key, realizedPitch);
     track.previousNoteKey = key;
     track.previousDurationRate = track.noteDurationRate;
