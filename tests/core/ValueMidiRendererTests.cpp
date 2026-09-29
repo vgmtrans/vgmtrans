@@ -860,9 +860,62 @@ void performanceMidiRendererSuppressesRedundantReverbSends() {
          "physical reverb changes should emit CC91 only when their portable wet-send value changes");
 }
 
+void performanceMidiRendererUsesWholeSongContextForEachTrack() {
+  const auto prepared = preparePerformance({
+      .tracks = {
+          PerformanceTrack{.sourceTrackNumber = 0, .endTick = 16, .events = {
+              LevelPerformanceEvent{.linearGain = 1.0},
+              NotePerformanceEvent{.key = 60, .durationTicks = 16},
+              ReverbPerformanceEvent{.header = {.tick = 4}, .send = 0.25},
+          }},
+          PerformanceTrack{.sourceTrackNumber = 1, .endTick = 16, .events = {
+              StereoBalancePerformanceEvent{.leftGain = 1.0, .rightGain = 1.0},
+              GlobalTransposePerformanceEvent{.semitones = 2},
+              ReverbPerformanceEvent{.voiceMask = 1, .send = 1.0},
+              ReverbPerformanceEvent{.header = {.tick = 8}, .voiceMask = 1, .send = 0.0},
+              TempoPerformanceEvent{.header = {.tick = 20}, .microsecondsPerQuarter = 750000},
+          }},
+      },
+      .sourceSpans = {{.annotation = SourceAnnotationId{1}, .beginTick = 0, .endTick = 16}},
+  });
+  const auto midi = renderMidiSequence(prepared);
+  std::vector<std::pair<u64, s32>> reverb;
+  std::optional<s32> level;
+  for (const auto& event : midi.tracks[0].events) {
+    if (const auto* send = midiController(event, MidiController::Reverb)) reverb.emplace_back(event.tick, send->value);
+    if (const auto* volume = midiController(event, MidiController::ChannelVolume)) level = volume->value;
+  }
+  expect(midiNotes(midi.tracks[0].events).front().key == 62 && level == 107 &&
+             reverb == std::vector<std::pair<u64, s32>>{{0, 127}, {4, 32}, {8, 0}} &&
+             midiTempo(midi.tracks[0].events.back()) == 750000 && midi.tracks[0].endTick == 20,
+         "a later track's transpose, reverb, headroom and tempo must affect the first track before it is rendered");
+  expect(prepared.performance().sourceSpans.size() == 1 &&
+             encodeMidiFile(renderMidiSequence(prepared)) == encodeMidiFile(midi),
+         "track rendering must leave prepared inspection data and repeated output unchanged");
+}
+
+void performanceMidiRendererPreservesDiagnosticOrderAcrossTracks() {
+  PerformanceSequence source{.diagnostics = {{.message = "Source warning"}}};
+  source.tracks.resize(4097);  // Last track is on port 256 when channel 10 is included.
+  source.tracks.back().automations.push_back({
+      .header = {.sourceAnnotation = SourceAnnotationId{7}},
+      .intent = PitchTransitionIntent{.note = PerformanceNoteId{99}},
+  });
+  const auto prepared = preparePerformance(std::move(source));
+  const auto midi = renderMidiSequence(prepared, {.skipChannel10 = false});
+  expect(midi.diagnostics.size() == 3 && midi.diagnostics[0].message == "Source warning" &&
+             midi.diagnostics[1].message == "Pitch transition did not reference a rendered note" &&
+             midi.diagnostics[1].annotation == SourceAnnotationId{7} &&
+             midi.diagnostics[2].message == "MIDI port number exceeded the Standard MIDI File port meta-event range" &&
+             prepared.performance().diagnostics.size() == 1,
+         "source and lowering diagnostics must precede channel warnings without mutating the prepared result");
+}
+
 }  // namespace
 
 void runValueMidiRendererTests() {
+  performanceMidiRendererUsesWholeSongContextForEachTrack();
+  performanceMidiRendererPreservesDiagnosticOrderAcrossTracks();
   performanceMidiRendererTrustsSourceNoteExtensions();
   performanceMidiRendererKeepsPhysicalLimitsAcrossPortamentoFragments();
   performanceMidiRendererKeepsPhysicalLimitsAcrossVoiceContinuations();

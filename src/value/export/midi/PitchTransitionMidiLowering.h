@@ -9,12 +9,13 @@
 #include "value/export/ExportTypes.h"
 #include "value/export/ResolvedPerformance.h"
 
-namespace vgmtrans::core {
+namespace vgmtrans::core::detail {
 
-// Lowering preserves resolved handles and ownership of their immutable banks.
-// Taking by value lets callers retain the original or move disposable events.
-[[nodiscard]] ResolvedPerformance lowerMidiPerformanceAutomation(
-    ResolvedPerformance performance, const MidiExportOptions& options,
-    const PerformanceTempoMap& tempos);
+// Temporary events for one MIDI track. Voice IDs and instrument handles refer
+// to the read-only prepared input, which must remain alive through rendering.
+// Source automations, inspection data, banks and address maps stay in that input.
+[[nodiscard]] std::vector<PerformanceEvent> lowerMidiTrackEvents(
+    const ResolvedPerformance& performance, size_t trackIndex, const MidiExportOptions& options,
+    const PerformanceTempoMap& tempos, std::vector<Diagnostic>& diagnostics);
 
-}  // namespace vgmtrans::core
+}  // namespace vgmtrans::core::detail

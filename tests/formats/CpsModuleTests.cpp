@@ -1011,8 +1011,10 @@ void cps3HeldNotesRetargetOneVoiceWithoutLosingPitch() {
 
   const MidiExportOptions bendOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend};
   const auto loweredInput = preparePerformance(performance);
-  const auto loweredResult = lowerMidiPerformanceAutomation(loweredInput, bendOptions, PerformanceTempoMap{loweredInput.performance()});
-  const auto& lowered = loweredResult.performance();
+  std::vector<Diagnostic> loweredDiagnostics;
+  const auto lowered = detail::lowerMidiTrackEvents(
+      loweredInput, 0, bendOptions,
+      PerformanceTempoMap{loweredInput.performance()}, loweredDiagnostics);
   const MidiSequence midi = renderTestMidi(performance, bendOptions);
   const MidiSequence previewMidi =
       renderTestMidi(performance, bendOptions, ModulationConversionPolicy::SequenceEventSimulation);
@@ -1048,7 +1050,7 @@ void cps3HeldNotesRetargetOneVoiceWithoutLosingPitch() {
   }
 
   const auto hasBend = [&](u64 tick, double semitones) {
-    return std::ranges::any_of(lowered.tracks[0].events, [&](const PerformanceEvent& event) {
+    return std::ranges::any_of(lowered, [&](const PerformanceEvent& event) {
       const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
       return bend != nullptr && bend->header.tick == tick && std::abs(bend->semitones - semitones) < 0.000001;
     });

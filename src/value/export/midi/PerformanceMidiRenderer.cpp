@@ -213,7 +213,7 @@ struct SimulatedLfoState {
   double delayCounterMilliseconds = 0.0;
   u64 cursorTick = 0;
   double phaseCycles = 0.0;
-  // The immutable lowered performance owns waveform tables throughout rendering.
+  // The current track's temporary events own waveform tables through the final LFO flush.
   const LfoShape* shape = nullptr;
   LfoPolarity polarity = LfoPolarity::Bipolar;
   std::optional<double> initialPhaseCycles;
@@ -282,7 +282,6 @@ class PitchBendLayers {
 };
 
 using PerformanceTimeline = std::vector<const PerformanceEvent*>;
-using PerformanceTimelines = std::vector<PerformanceTimeline>;
 
 struct VoicePitchBendRangeChange {
   u64 tick = 0;
@@ -301,34 +300,38 @@ struct VoicePitchBendRangeChange {
   throw std::logic_error("Unknown MIDI tuning rendering");
 }
 
-[[nodiscard]] PerformanceTimelines buildPerformanceTimelines(const PerformanceSequence& performance) {
-  PerformanceTimelines timelines;
-  PerformanceTimeline globalReverb;
-  timelines.reserve(performance.tracks.size());
+[[nodiscard]] PerformanceTimeline globalReverbEvents(const PerformanceSequence& performance) {
+  PerformanceTimeline reverb;
   for (const auto& track : performance.tracks) {
-    auto& timeline = timelines.emplace_back();
-    timeline.reserve(track.events.size());
     for (const auto& event : track.events) {
-      const auto* reverb = std::get_if<ReverbPerformanceEvent>(&event);
-      if (reverb != nullptr && reverb->voiceMask) {
-        globalReverb.push_back(&event);
-      } else {
-        timeline.push_back(&event);
+      if (const auto* change = std::get_if<ReverbPerformanceEvent>(&event); change && change->voiceMask) {
+        reverb.push_back(&event);
       }
     }
   }
-  for (auto& timeline : timelines) {
-    timeline.insert(timeline.end(), globalReverb.begin(), globalReverb.end());
-    std::ranges::stable_sort(timeline, {},
-                             [](const PerformanceEvent* event) { return performanceEventHeader(*event).order(); });
+  return reverb;
+}
+
+[[nodiscard]] PerformanceTimeline midiTimeline(const std::vector<PerformanceEvent>& events,
+                                               const PerformanceTimeline& globalReverb) {
+  PerformanceTimeline timeline;
+  timeline.reserve(events.size() + globalReverb.size());
+  for (const auto& event : events) {
+    const auto* reverb = std::get_if<ReverbPerformanceEvent>(&event);
+    if (!reverb || !reverb->voiceMask) {
+      timeline.push_back(&event);
+    }
   }
-  return timelines;
+  timeline.insert(timeline.end(), globalReverb.begin(), globalReverb.end());
+  std::ranges::stable_sort(timeline, {},
+                           [](const PerformanceEvent* event) { return performanceEventHeader(*event).order(); });
+  return timeline;
 }
 
 // MIDI CC7/CC11 cannot encode gain above unity. Reserve the minimum uniform
 // sequence-wide headroom needed by source pan laws so every track keeps its
 // relative level and source expression remains unclipped.
-[[nodiscard]] double panLevelHeadroom(const PerformanceTimelines& timelines) {
+[[nodiscard]] double panLevelHeadroom(const PerformanceSequence& performance) {
   double maximumGain = 1.0;
   const auto observe = [&](double gain) {
     if (std::isfinite(gain)) {
@@ -336,20 +339,20 @@ struct VoicePitchBendRangeChange {
     }
   };
 
-  for (const auto& timeline : timelines) {
+  for (const auto& track : performance.tracks) {
     double sourcePanLinearGain = 1.0;
-    for (const PerformanceEvent* event : timeline) {
-      if (const auto* pan = std::get_if<PanPerformanceEvent>(event)) {
+    for (const auto& event : track.events) {
+      if (const auto* pan = std::get_if<PanPerformanceEvent>(&event)) {
         sourcePanLinearGain = pan->linearGain;
         observe(lowerPositionalPan(pan->law, pan->stereoPosition).gain * sourcePanLinearGain);
-      } else if (const auto* balance = std::get_if<StereoBalancePerformanceEvent>(event)) {
+      } else if (const auto* balance = std::get_if<StereoBalancePerformanceEvent>(&event)) {
         const double left = std::abs(balance->leftGain);
         const double right = std::abs(balance->rightGain);
         sourcePanLinearGain = left + right;
         observe(lowerStereoBalance(left, right).gain);
-      } else if (std::holds_alternative<ChannelPanPerformanceEvent>(*event)) {
+      } else if (std::holds_alternative<ChannelPanPerformanceEvent>(event)) {
         sourcePanLinearGain = 1.0;
-      } else if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(event);
+      } else if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
                  modulation != nullptr && (modulation->target == ModulationPerformanceTarget::PanDepth ||
                                            modulation->target == ModulationPerformanceTarget::PanRate)) {
         observe(sourcePanLinearGain);
@@ -723,7 +726,7 @@ public:
                     const MidiExportOptions& options, double headroom)
       : track(track), channel(channel), options(options), tempos(tempos), levelHeadroom(headroom) {}
 
-  void render(const PerformanceTrack& lowered, const PerformanceTimeline& timeline,
+  void render(const PerformanceTrack& source, const PerformanceTimeline& timeline,
               std::span<const GlobalTransposePerformanceEvent* const> globalTransposes,
               ModulationConversionPolicy modulationConversion, const ResolvedPerformance& resolved,
               const SequenceModulationProfile* modulationProfile) {
@@ -759,14 +762,14 @@ public:
         flushSimulatedTremolo(otherFlushTick, modulationConversion);
       }
       flushSimulatedPan(otherFlushTick);
-      addMidiEvent(*event, lowered.sourceTrackNumber, globalTransposes, modulationConversion, resolved,
+      addMidiEvent(*event, source.sourceTrackNumber, globalTransposes, modulationConversion, resolved,
                    modulationProfile);
     }
-    flushSimulatedVibrato(lowered.endTick);
+    flushSimulatedVibrato(source.endTick);
     if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
-      flushSimulatedTremolo(lowered.endTick, modulationConversion);
+      flushSimulatedTremolo(source.endTick, modulationConversion);
     }
-    flushSimulatedPan(lowered.endTick);
+    flushSimulatedPan(source.endTick);
   }
 
 private:
@@ -1522,21 +1525,20 @@ MidiSequence renderMidiSequence(const ResolvedPerformance& resolved,
   }
 
   const PerformanceTempoMap globalTempos{performance};
-  const std::vector<PerformanceTempoMap::Point> globalTempoPoints = globalTempos.points();
-  const auto lowered = lowerMidiPerformanceAutomation(resolved, options, globalTempos);
-  const auto& loweredPerformance = lowered.performance();
   MidiSequence sequence{
-      .timebase = loweredPerformance.timebase,
-      .diagnostics = loweredPerformance.diagnostics,
+      .timebase = performance.timebase,
+      .diagnostics = performance.diagnostics,
   };
-  sequence.tracks.reserve(loweredPerformance.tracks.size());
-  const PerformanceTimelines timelines = buildPerformanceTimelines(loweredPerformance);
-  const auto globalTransposes = orderedPerformanceEvents<GlobalTransposePerformanceEvent>(loweredPerformance);
-  const auto globalTimeSignatures = orderedPerformanceEvents<TimeSignaturePerformanceEvent>(loweredPerformance);
-  const double levelHeadroom = panLevelHeadroom(timelines);
+  sequence.tracks.reserve(performance.tracks.size());
+  const auto globalReverb = globalReverbEvents(performance);
+  const auto globalTransposes = orderedPerformanceEvents<GlobalTransposePerformanceEvent>(performance);
+  const auto globalTimeSignatures = orderedPerformanceEvents<TimeSignaturePerformanceEvent>(performance);
+  const double levelHeadroom = panLevelHeadroom(performance);
 
-  for (size_t trackIndex = 0; trackIndex < loweredPerformance.tracks.size(); ++trackIndex) {
-    const auto& performanceTrack = loweredPerformance.tracks[trackIndex];
+  for (size_t trackIndex = 0; trackIndex < performance.tracks.size(); ++trackIndex) {
+    const auto& performanceTrack = performance.tracks[trackIndex];
+    const auto events = detail::lowerMidiTrackEvents(resolved, trackIndex, options, globalTempos, sequence.diagnostics);
+    const auto timeline = midiTimeline(events, globalReverb);
     MidiTrack midiTrack{
         .name = performanceTrack.name.empty() ? "Track " + std::to_string(performanceTrack.sourceTrackNumber)
                                               : performanceTrack.name,
@@ -1544,20 +1546,14 @@ MidiSequence renderMidiSequence(const ResolvedPerformance& resolved,
     const auto assignment = midiChannelAssignment(trackIndex, options);
     MidiTrackRenderer renderer{midiTrack, assignment.channel,
                                globalTempos, options, levelHeadroom};
-    if (assignment.port > 255) {
-      sequence.diagnostics.push_back(Diagnostic{
-          .severity = Severity::Warning,
-          .message = "MIDI port number exceeded the Standard MIDI File port meta-event range",
-      });
-    }
     if (options.writePortMetaEvents) {
       midiTrack.events.push_back(midi::meta(0, 0x21, {midiPortByte(assignment.port)}, -5));
     }
-    renderer.render(performanceTrack, timelines[trackIndex], globalTransposes, modulationConversion, lowered,
+    renderer.render(performanceTrack, timeline, globalTransposes, modulationConversion, resolved,
                     modulationProfile);
     u64 endTick = performanceTrack.endTick;
     if (trackIndex == 0) {
-      for (const auto& tempo : globalTempoPoints) {
+      for (const auto& tempo : globalTempos.points()) {
         midiTrack.events.push_back(tempoEvent(tempo.tick, tempo.microsecondsPerQuarter));
         endTick = std::max(endTick, tempo.tick);
       }
@@ -1572,6 +1568,15 @@ MidiSequence renderMidiSequence(const ResolvedPerformance& resolved,
     sequence.tracks.push_back(std::move(midiTrack));
   }
 
+  // Keep source/lowering diagnostics before channel-encoding warnings.
+  for (size_t trackIndex = 0; trackIndex < performance.tracks.size(); ++trackIndex) {
+    if (midiChannelAssignment(trackIndex, options).port > 255) {
+      sequence.diagnostics.push_back(Diagnostic{
+          .severity = Severity::Warning,
+          .message = "MIDI port number exceeded the Standard MIDI File port meta-event range",
+      });
+    }
+  }
   return sequence;
 }
 

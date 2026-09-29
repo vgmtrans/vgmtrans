@@ -37,13 +37,11 @@ struct SoundingVoice {
   std::optional<u64> endLimit;  // Absolute tick; computed with the source tempo map.
 };
 
-struct MidiExportOptions;
-
 // Preparation resolves the source's final note/continuation bindings into voices.
 // Its segments share an adapted instrument and a hardware stop deadline. Bank
-// copies and output addresses are owned and frozen together. MIDI lowering
-// copies events and addresses but shares the banks. Address exhaustion retains
-// the prepared data and diagnostics, but prevents MIDI/synth output.
+// copies and output addresses are owned and frozen together. Output conversion
+// reads this value without modifying it. Address exhaustion retains the prepared
+// data and diagnostics, but prevents MIDI/synth output.
 class ResolvedPerformance {
 public:
   [[nodiscard]] const PerformanceSequence& performance() const noexcept { return performance_; }
@@ -65,8 +63,6 @@ private:
   friend class PreparedCollection;
   friend ResolvedPerformance preparePerformance(PerformanceSequence, std::vector<SoundBankAsset>,
                                                  InstrumentPreparationOptions);
-  friend ResolvedPerformance lowerMidiPerformanceAutomation(ResolvedPerformance, const MidiExportOptions&,
-                                                            const PerformanceTempoMap&);
   ResolvedPerformance(PerformanceSequence performance, std::vector<SoundBankAsset> soundBanks,
                       InstrumentSelection initialInstrument, std::vector<SoundingVoice> voices,
                       const InstrumentPreparationOptions& options);

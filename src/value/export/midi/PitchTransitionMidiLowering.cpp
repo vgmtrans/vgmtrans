@@ -36,7 +36,7 @@ struct PortamentoSegment {
 };
 
 struct NoteSpan {
-  NotePerformanceEvent source;
+  const NotePerformanceEvent& source;
   u64 endTick = 0;
   // A boundary pitch bend can carry the preceding MIDI voice into this
   // logical note instead of retriggering its attack.
@@ -186,8 +186,8 @@ struct PitchBendLayer {
   return header;
 }
 
-void addWarning(PerformanceSequence& performance, const PerformanceAutomation& automation, std::string message) {
-  performance.diagnostics.push_back(Diagnostic{
+void addWarning(std::vector<Diagnostic>& diagnostics, const PerformanceAutomation& automation, std::string message) {
+  diagnostics.push_back(Diagnostic{
       .severity = Severity::Warning,
       .message = std::move(message),
       .annotation = automation.header.sourceAnnotation.valid()
@@ -469,7 +469,7 @@ void resolvePitchBends(std::span<const PitchBendWrite> writes, PitchBendLayerId 
   throw std::overflow_error("Pitch bend layer space exhausted");
 }
 
-void lowerPitchBends(PerformanceSequence& performance, std::vector<PerformanceEvent>& events,
+void lowerPitchBends(std::vector<Diagnostic>& diagnostics, std::vector<PerformanceEvent>& events,
                      const std::vector<NoteSpan>& notes, const std::vector<const PerformanceAutomation*>& transitions,
                      const PitchBendRangeTimeline& ranges) {
   auto bends = takeSourcePitchBends(events);
@@ -478,7 +478,7 @@ void lowerPitchBends(PerformanceSequence& performance, std::vector<PerformanceEv
     const auto& transition = *pitchTransitionIntent(*automation);
     const auto* anchor = findNote(notes, transition.note);
     if (anchor == nullptr) {
-      addWarning(performance, *automation, "Pitch transition did not reference a rendered note");
+      addWarning(diagnostics, *automation, "Pitch transition did not reference a rendered note");
       continue;
     }
 
@@ -584,7 +584,7 @@ void inheritMidiBendBases(std::vector<NoteSpan>& notes, const std::vector<const 
   }
 }
 
-void lowerPortamento(PerformanceSequence& performance, std::vector<PerformanceEvent>& events,
+void lowerPortamento(std::vector<Diagnostic>& diagnostics, std::vector<PerformanceEvent>& events,
                      const std::vector<PerformanceEvent>& sourceEvents, std::vector<NoteSpan>& notes,
                      const std::vector<const PerformanceAutomation*>& transitions, const PerformanceTempoMap& tempos,
                      u64& nextSequence, const PitchBendRangeTimeline& ranges) {
@@ -592,11 +592,11 @@ void lowerPortamento(PerformanceSequence& performance, std::vector<PerformanceEv
     const auto& transition = *pitchTransitionIntent(*automation);
     auto* note = findNote(notes, transition.note);
     if (note == nullptr) {
-      addWarning(performance, *automation, "Pitch transition did not reference a rendered note");
+      addWarning(diagnostics, *automation, "Pitch transition did not reference a rendered note");
       continue;
     }
     if (std::holds_alternative<SampledAutomationCurve>(transition.curve)) {
-      addWarning(performance, *automation,
+      addWarning(diagnostics, *automation,
                  "Native MIDI portamento cannot preserve the transition's exact sampled pitch curve");
     }
 
@@ -640,16 +640,14 @@ void lowerPortamento(PerformanceSequence& performance, std::vector<PerformanceEv
   }
 }
 
-void appendSourceEvents(std::vector<PerformanceEvent>& events, std::vector<PerformanceEvent> sourceEvents,
+void appendSourceEvents(std::vector<PerformanceEvent>& events, const std::vector<PerformanceEvent>& sourceEvents,
                         const std::vector<NoteSpan>& notes, bool renderPortamentoSettings, u64& nextSequence) {
-  for (auto& event : sourceEvents) {
-    if (auto* note = std::get_if<NotePerformanceEvent>(&event); note != nullptr && note->note.valid()) {
-      const auto* span = findNote(notes, note->note);
+  for (const auto& event : sourceEvents) {
+    const NoteSpan* span = nullptr;
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event); note != nullptr && note->note.valid()) {
+      span = findNote(notes, note->note);
       if (span != nullptr && !span->portamentoSegments.empty()) {
         continue;
-      }
-      if (span != nullptr) {
-        note->extendsPrevious |= span->extendsMidiNote;
       }
     }
     const bool midiPortamentoEvent = std::holds_alternative<PortamentoPerformanceEvent>(event) ||
@@ -665,7 +663,10 @@ void appendSourceEvents(std::vector<PerformanceEvent>& events, std::vector<Perfo
         });
       }
     } else {
-      events.push_back(std::move(event));
+      auto& copy = events.emplace_back(event);
+      if (span != nullptr) {
+        std::get<NotePerformanceEvent>(copy).extendsPrevious |= span->extendsMidiNote;
+      }
     }
   }
 
@@ -704,69 +705,64 @@ void appendSourceEvents(std::vector<PerformanceEvent>& events, std::vector<Perfo
 
 }  // namespace
 
-ResolvedPerformance lowerMidiPerformanceAutomation(ResolvedPerformance resolved,
-                                                    const MidiExportOptions& options,
-                                                    const PerformanceTempoMap& tempos) {
-  auto& performance = resolved.performance_;
-
-  for (auto& track : performance.tracks) {
-    u64 nextSequence = 0;
-    std::vector<const PerformanceAutomation*> portamentoTransitions;
-    std::vector<const PerformanceAutomation*> pitchBendTransitions;
-    for (const auto& event : track.events) {
-      nextSequence = std::max(nextSequence, performanceEventHeader(event).sequence + 1);
-    }
-    for (const auto& automation : track.automations) {
-      nextSequence = std::max(nextSequence, automation.header.sequence + 1);
-      if (const auto* transition = pitchTransitionIntent(automation)) {
-        if (automation.realization.endReason != PerformanceAutomationEndReason::Completed &&
-            automation.realization.endTick <= automation.realization.startTick) {
-          continue;
-        }
-        auto& transitions =
-            effectiveRendering(performance, options, *transition) == PitchTransitionRenderingHint::Portamento
-                ? portamentoTransitions
-                : pitchBendTransitions;
-        transitions.push_back(&automation);
-      }
-    }
-    const auto sortTransitions = [](auto& transitions) {
-      std::ranges::stable_sort(transitions, [](const auto* lhs, const auto* rhs) {
-        return std::tie(lhs->realization.startTick, lhs->header.sequence) <
-               std::tie(rhs->realization.startTick, rhs->header.sequence);
-      });
-    };
-    sortTransitions(portamentoTransitions);
-    sortTransitions(pitchBendTransitions);
-
-    std::optional<PitchBendRangeTimeline> pitchBendRanges;
-    if (!portamentoTransitions.empty() || !pitchBendTransitions.empty()) {
-      pitchBendRanges.emplace(track.events, resolved);
-    }
-
-    auto notes = collectNotes(track);
-    std::vector<PerformanceEvent> events;
-    events.reserve(track.events.size() + (portamentoTransitions.size() + pitchBendTransitions.size()) * 4);
-    if (!portamentoTransitions.empty()) {
-      lowerPortamento(performance, events, track.events, notes, portamentoTransitions, tempos, nextSequence,
-                      *pitchBendRanges);
-    }
-    inheritMidiBendBases(notes, pitchBendTransitions);
-    const bool renderPortamentoSettings =
-        !portamentoTransitions.empty() || options.pitchTransitions == MidiPitchTransitionRendering::Portamento ||
-        (options.pitchTransitions == MidiPitchTransitionRendering::PreserveFormat &&
-         performance.preferredPitchTransitionRendering == PitchTransitionRenderingHint::Portamento);
-    appendSourceEvents(events, std::move(track.events), notes, renderPortamentoSettings, nextSequence);
-    if (!pitchBendTransitions.empty()) {
-      lowerPitchBends(performance, events, notes, pitchBendTransitions, *pitchBendRanges);
-    }
-    std::ranges::stable_sort(events, {},
-                             [](const PerformanceEvent& event) { return performanceEventHeader(event).order(); });
-    track.events = std::move(events);
-    std::erase_if(track.automations,
-                  [](const PerformanceAutomation& automation) { return pitchTransitionIntent(automation) != nullptr; });
+std::vector<PerformanceEvent> detail::lowerMidiTrackEvents(
+    const ResolvedPerformance& resolved, size_t trackIndex, const MidiExportOptions& options,
+    const PerformanceTempoMap& tempos, std::vector<Diagnostic>& diagnostics) {
+  const auto& performance = resolved.performance();
+  const auto& track = performance.tracks.at(trackIndex);
+  u64 nextSequence = 0;
+  std::vector<const PerformanceAutomation*> portamentoTransitions;
+  std::vector<const PerformanceAutomation*> pitchBendTransitions;
+  for (const auto& event : track.events) {
+    nextSequence = std::max(nextSequence, performanceEventHeader(event).sequence + 1);
   }
-  return resolved;
+  for (const auto& automation : track.automations) {
+    nextSequence = std::max(nextSequence, automation.header.sequence + 1);
+    if (const auto* transition = pitchTransitionIntent(automation)) {
+      if (automation.realization.endReason != PerformanceAutomationEndReason::Completed &&
+          automation.realization.endTick <= automation.realization.startTick) {
+        continue;
+      }
+      auto& transitions =
+          effectiveRendering(performance, options, *transition) == PitchTransitionRenderingHint::Portamento
+              ? portamentoTransitions
+              : pitchBendTransitions;
+      transitions.push_back(&automation);
+    }
+  }
+  const auto sortTransitions = [](auto& transitions) {
+    std::ranges::stable_sort(transitions, [](const auto* lhs, const auto* rhs) {
+      return std::tie(lhs->realization.startTick, lhs->header.sequence) <
+             std::tie(rhs->realization.startTick, rhs->header.sequence);
+    });
+  };
+  sortTransitions(portamentoTransitions);
+  sortTransitions(pitchBendTransitions);
+
+  std::optional<PitchBendRangeTimeline> pitchBendRanges;
+  if (!portamentoTransitions.empty() || !pitchBendTransitions.empty()) {
+    pitchBendRanges.emplace(track.events, resolved);
+  }
+
+  auto notes = collectNotes(track);
+  std::vector<PerformanceEvent> events;
+  events.reserve(track.events.size() + (portamentoTransitions.size() + pitchBendTransitions.size()) * 4);
+  if (!portamentoTransitions.empty()) {
+    lowerPortamento(diagnostics, events, track.events, notes, portamentoTransitions, tempos, nextSequence,
+                    *pitchBendRanges);
+  }
+  inheritMidiBendBases(notes, pitchBendTransitions);
+  const bool renderPortamentoSettings =
+      !portamentoTransitions.empty() || options.pitchTransitions == MidiPitchTransitionRendering::Portamento ||
+      (options.pitchTransitions == MidiPitchTransitionRendering::PreserveFormat &&
+       performance.preferredPitchTransitionRendering == PitchTransitionRenderingHint::Portamento);
+  appendSourceEvents(events, track.events, notes, renderPortamentoSettings, nextSequence);
+  if (!pitchBendTransitions.empty()) {
+    lowerPitchBends(diagnostics, events, notes, pitchBendTransitions, *pitchBendRanges);
+  }
+  std::ranges::stable_sort(events, {},
+                           [](const PerformanceEvent& event) { return performanceEventHeader(event).order(); });
+  return events;
 }
 
 }  // namespace vgmtrans::core

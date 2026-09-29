@@ -191,7 +191,7 @@ void layoutSeparatesCollisionsAndRejectsOverflow() {
          "bank exhaustion must reject a partial plan while preserving earlier preparation diagnostics");
 }
 
-void preparedOwnershipSurvivesMovesAndLowering() {
+void preparedOwnershipSurvivesCopiesAndMoves() {
   const auto makePrepared = [](u32 firstBank) {
     SoundBankAsset bank{.instruments = {
         Instrument{.explicitAddress = InstrumentAddress{0, 0}, .pitchBendRangeCents = 700, .name = "Initial"},
@@ -212,14 +212,11 @@ void preparedOwnershipSurvivesMovesAndLowering() {
              original.selectionFor(InstrumentHandle{0, 2}).address == InstrumentAddress{23, 7} &&
              selectSynthBanks(original)[0].instruments.size() == 1,
          "initial pitch context needs no preset slot; a program-only selection needs a MIDI slot but no synth entry");
-  std::vector<ResolvedPerformance> moved;
-  for (const auto mode : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
-    auto lowered = lowerMidiPerformanceAutomation(original, {.pitchTransitions = mode},
-                                                   PerformanceTempoMap{original.performance()});
-    expect(lowered.selectionFor(InstrumentHandle{0, 1}).instrument == instrument,
-           "lowering must share immutable banks rather than borrowing the input's lifetime");
-    moved.push_back(std::move(lowered));
-  }
+  std::vector<ResolvedPerformance> moved{original};
+  auto copy = original;
+  moved.push_back(std::move(copy));
+  expect(moved.back().selectionFor(InstrumentHandle{0, 1}).instrument == instrument,
+         "copies and moves must share the immutable bank allocation");
   original = makePrepared(61);
   for (size_t index = 0; index < 8; ++index) moved.push_back(original);
   for (size_t index = 0; index < 2; ++index) {
@@ -229,7 +226,7 @@ void preparedOwnershipSurvivesMovesAndLowering() {
                retained.initialInstrument()->name == "Initial" && retained.bankMapping().at(0) == 23 &&
                retained.nextBank() == 24 && original.selectionFor(InstrumentHandle{0, 1}).address.bank == 61 &&
                !renderMidiSequence(retained).tracks.empty(),
-           "copies and lowered events must retain their own banks and addresses after replacement, moves and growth");
+           "prepared copies must retain their own banks and addresses after replacement, moves and growth");
   }
 }
 
@@ -518,11 +515,13 @@ void soundingVoicesOwnSelectionsAndDeadlines() {
   expect(secondTrackNotes.front()->voice != first.voice,
          "track-local source note IDs must become distinct prepared voices across tracks");
   for (const auto mode : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
-    const auto lowered = lowerMidiPerformanceAutomation(prepared, {.pitchTransitions = mode},
-                                                         PerformanceTempoMap{prepared.performance()});
-    for (const auto& event : lowered.performance().tracks[0].events) {
+    std::vector<Diagnostic> diagnostics;
+    const auto events = detail::lowerMidiTrackEvents(prepared, 0, {.pitchTransitions = mode},
+                                                     PerformanceTempoMap{prepared.performance()}, diagnostics);
+    expect(diagnostics.empty(), "lowering valid voice continuations should not add diagnostics");
+    for (const auto& event : events) {
       if (const auto* note = std::get_if<NotePerformanceEvent>(&event); note && note->voice == first.voice) {
-        expect(lowered.voiceFor(*note).endLimit == 14 && lowered.selectionFor(*note).address.program == 5,
+        expect(prepared.voiceFor(*note).endLimit == 14 && prepared.selectionFor(*note).address.program == 5,
                "every lowered physical fragment must retain the source voice's selection and absolute deadline");
       }
     }
@@ -598,7 +597,7 @@ void runResolvedInstrumentTests() {
   resolvedVariantsShareAddressesWithBothSynthWriters();
   resolutionChoosesAndDiagnosesOneDefinition();
   layoutSeparatesCollisionsAndRejectsOverflow();
-  preparedOwnershipSurvivesMovesAndLowering();
+  preparedOwnershipSurvivesCopiesAndMoves();
   laterSourceSelectionsCannotFindGeneratedVariants();
   collectionExportsRequireACompanionForVariants();
   completedCollectionsRetainInputsAcrossRenderingOutcomes();
