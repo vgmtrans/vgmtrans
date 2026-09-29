@@ -218,10 +218,11 @@ struct Playback : SequencePlayback<PlaybackTrack> {
                        previousKey != track.note && track.portamentoTime != 0;
     if (track.portamento && track.portamentoFresh) out.portamentoEnable(false);
     prepareVoice(glide);
-    const PerformanceNoteId note = out.note(track.note, track.velocity / 127.0, track.duration);
+    NotePerformanceEvent event{.key = static_cast<double>(track.note),
+                               .linearVelocity = track.velocity / 127.0, .durationTicks = track.duration};
+    const auto note = glide ? out.continueVoice(track.lastVoice, event) : out.note(event);
     if (glide) {
       out.pitchSlide(note, previousKey, track.note, track.portamentoTime)
-          .continueFrom(track.lastVoice)
           .requirePortamento();
     } else if (track.portamento && track.portamentoFresh) {
       // Bit 4 in the driver's portamento flags forces this first note to key on.

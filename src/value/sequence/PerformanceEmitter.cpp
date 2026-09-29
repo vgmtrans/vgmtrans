@@ -81,12 +81,16 @@ PerformanceNoteId PerformanceEmitter::note(NotePerformanceEvent event) {
           note && (!event.note.valid() || event.note == note->note)) {
         event.note = note->note;
         event.lane = note->lane;
+        event.voice = note->voice;
         break;
       }
     }
   }
   if (!event.note.valid()) {
     event.note = PerformanceNoteId{nextNote_++};
+  }
+  if (!event.voice.valid()) {
+    event.voice = PerformanceVoiceId{event.note.value};
   }
   if (!event.extendsPrevious) {
     interruptPitchSlidesForNewNote(event.lane);
@@ -193,12 +197,14 @@ PerformanceNoteId PerformanceEmitter::continueVoice(PerformanceNoteId previousNo
   }
   if (previousEvent == nullptr) {
     event.note = {};
+    event.voice = {};
     event.extendsPrevious = false;
     return note(std::move(event));
   }
 
   const PerformanceLaneId lane = previousEvent->lane;
   event.lane = lane;
+  event.voice = previousEvent->voice;
   const double startKey = currentPitchTransitionKey(previousNote, lane).value_or(previousEvent->key);
   if (std::abs(startKey - event.key) < 0.000001) {
     event.note = previousNote;
@@ -208,10 +214,7 @@ PerformanceNoteId PerformanceEmitter::continueVoice(PerformanceNoteId previousNo
 
   event.note = {};
   event.extendsPrevious = false;
-  const double targetKey = event.key;
-  const PerformanceNoteId continuedNote = note(std::move(event));
-  pitchSlide(continuedNote, startKey, targetKey, PitchSlideTiming::fromTicks(0), lane).continueFrom(previousNote);
-  return continuedNote;
+  return note(std::move(event));
 }
 
 bool PerformanceEmitter::setPreviousNoteEnd(u64 endTick) {
@@ -604,18 +607,7 @@ PitchSlideBinding PerformanceEmitter::retargetPitchSlide(PerformanceNoteId note,
 
 std::optional<double> PerformanceEmitter::currentPitchTransitionKey(PerformanceNoteId note,
                                                                     PerformanceLaneId lane) const {
-  for (auto previous = track_.automations.rbegin(); previous != track_.automations.rend(); ++previous) {
-    const auto* transition = pitchTransitionIntent(*previous);
-    if (transition == nullptr || transition->note != note || transition->lane != lane ||
-        previous->realization.startTick > tick_) {
-      continue;
-    }
-    const u64 realizedTick = std::min(tick_, previous->realization.endTick);
-    const u64 elapsed = realizedTick - previous->realization.startTick;
-    return pitchTransitionValueAt(*transition,
-                                  static_cast<u32>(std::min<u64>(elapsed, std::numeric_limits<u32>::max())));
-  }
-  return std::nullopt;
+  return pitchTransitionKeyAt(track_, note, lane, tick_);
 }
 
 PerformanceAutomationBinding PerformanceEmitter::beginAutomation(ScalarPerformanceAutomationIntent intent) {
@@ -782,13 +774,6 @@ void PitchSlideBinding::makeImmediate() {
     realization.endTick = realization.startTick;
     realization.endReason = PerformanceAutomationEndReason::Completed;
   }
-}
-
-PitchSlideBinding& PitchSlideBinding::continueFrom(PerformanceNoteId previousNote) {
-  if (auto* transition = intent()) {
-    transition->previousNote = previousNote.valid() ? std::optional{previousNote} : std::nullopt;
-  }
-  return *this;
 }
 
 PitchSlideBinding& PitchSlideBinding::continueAcrossNotes(bool enabled) {

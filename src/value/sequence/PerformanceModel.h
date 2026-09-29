@@ -33,8 +33,8 @@ namespace vgmtrans::core {
 struct PerformanceNoteIdTag;
 using PerformanceNoteId = Id<PerformanceNoteIdTag>;
 
-// Index of a sounding voice owned by ResolvedPerformance, assigned during
-// preparation after source note/continuation bindings are final.
+// Sounding-voice identity: track-local during emission, then remapped to an
+// index in ResolvedPerformance during preparation. Pitch edits do not change it.
 struct PerformanceVoiceIdTag;
 using PerformanceVoiceId = Id<PerformanceVoiceIdTag>;
 
@@ -100,7 +100,7 @@ struct NotePerformanceEvent {
   // The explicit lane leaves room for formats that multiplex voices in one
   // source track.
   PerformanceLaneId lane{0};
-  PerformanceVoiceId voice;  // Prepared events only; source events use note/pitch bindings.
+  PerformanceVoiceId voice;
 };
 
 struct TempoPerformanceEvent {
@@ -531,10 +531,6 @@ struct PortamentoRenderingHints {
 
 struct PitchTransitionIntent {
   PerformanceNoteId note;
-  // This transition continues the preceding voice without a new attack.
-  // Portamento lowering may express that with overlapping MIDI notes; pitch
-  // bend retains the already-sounding MIDI note.
-  std::optional<PerformanceNoteId> previousNote;
   PerformanceLaneId lane{0};
   double startKey = 0.0;
   double targetKey = 0.0;
@@ -655,6 +651,8 @@ private:
 [[nodiscard]] const PerformanceEventHeader& performanceEventHeader(const PerformanceEvent& event);
 [[nodiscard]] const PitchTransitionIntent* pitchTransitionIntent(const PerformanceAutomation& automation);
 [[nodiscard]] PitchTransitionIntent* pitchTransitionIntent(PerformanceAutomation& automation);
+[[nodiscard]] std::optional<double> pitchTransitionKeyAt(const PerformanceTrack& track, PerformanceNoteId note,
+                                                         PerformanceLaneId lane, u64 tick);
 [[nodiscard]] double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elapsedTicks);
 [[nodiscard]] const PerformanceTrack* performanceTrackById(const PerformanceSequence& sequence, TrackId id);
 [[nodiscard]] std::vector<const PerformanceEvent*> performanceEventsForCommand(const PerformanceTrack& track,

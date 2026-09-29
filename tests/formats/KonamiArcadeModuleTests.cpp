@@ -407,7 +407,7 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
     }
   }
   expect(transitions.size() == 2 && transitions[0]->startKey == 64.0 && transitions[0]->targetKey == 66.0 &&
-             !transitions[0]->previousNote && transitions[0]->portamentoRendering.useCurrentTiming &&
+             notes[0]->voice != notes[1]->voice && transitions[0]->portamentoRendering.useCurrentTiming &&
              transitions[1]->startKey == 70.0 && transitions[1]->targetKey == 72.0 &&
              std::holds_alternative<FixedDurationPitchSlideTiming>(transitions[1]->timing.physical),
          "continuous and delayed slides should retain typed intent without linking across a release gap");
@@ -770,7 +770,8 @@ void konamiArcadeZeroReleaseUsesHardwareVoiceLifetime() {
          "zero release should span Z80 holds, program changes, and rests until a fresh attack");
   const auto tiedPitchChange = std::ranges::find_if(mystic.tracks[0].automations, [&](const auto& automation) {
     const auto* transition = pitchTransitionIntent(automation);
-    return transition != nullptr && transition->previousNote == mysticNotes[2]->note;
+    return transition != nullptr && transition->note == mysticNotes[3]->note &&
+           mysticNotes[2]->voice == mysticNotes[3]->voice;
   });
   expect(tiedPitchChange != mystic.tracks[0].automations.end() &&
              pitchTransitionIntent(*tiedPitchChange)->timing.timelineTicks == 0,

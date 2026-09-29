@@ -519,28 +519,26 @@ struct Playback : SequencePlayback<TrackState> {
     }
 
     const u32 performanceDuration = track.releaseRate == 0 ? std::max<u32>(duration, delta) : duration;
-    const auto emitNote = [&](double noteKey, double linearVelocity, bool extendsPrevious = false) {
-      return out.note(NotePerformanceEvent{
-          .key = noteKey,
-          .linearVelocity = linearVelocity,
+    const auto emitNote = [&](bool continues = false) {
+      NotePerformanceEvent event{
+          .key = key,
+          .linearVelocity = noteGain,
           .durationTicks = performanceDuration,
-          .extendsPrevious = extendsPrevious,
+          .extendsPrevious = continues && tied,
           .restartsLfoPhase = restartsVibrato,
           .restartsVibratoLfoPhase = restartsVibrato,
           .restartsTremoloLfoPhase = restartsTremolo,
-      });
+      };
+      return continues && !tied ? out.continueVoice(track.previousNote, event) : out.note(event);
     };
 
     PerformanceNoteId note;
     if (!isDrum && track.portamentoTime != 0 && track.previousKey && track.previousNote.valid() &&
         std::abs(*track.previousKey - key) >= 0.001) {
-      note = emitNote(key, noteGain);
+      note = emitNote(continuesPreviousVoice);
       if (continuesPreviousVoice || track.previousNoteStart + track.previousGateDuration == vm.tick()) {
         auto slide = out.pitchSlide(note, *track.previousKey, key, track.portamentoTime);
         slide.useCurrentPortamentoTiming();
-        if (continuesPreviousVoice) {
-          slide.continueFrom(track.previousNote);
-        }
       } else if (duration > 2) {
         out.at(vm.tick() + 1)
             .pitchSlide(note, *track.previousKey, key, track.portamentoTime)
@@ -549,16 +547,15 @@ struct Playback : SequencePlayback<TrackState> {
     } else if (track.slideDuration != 0 && track.slideDepth != 0 && !isDrum &&
                duration > static_cast<u32>(track.slideDelay + 1)) {
       const double slideStartKey = std::clamp(key - track.slideDepth, 0.0, 127.0);
-      note = emitNote(key, noteGain);
+      note = emitNote();
       out.at(vm.tick() + static_cast<u32>(track.slideDelay) + 1)
           .pitchSlide(note, slideStartKey, key, slideTiming(track.slideDuration));
     } else if (continuesPreviousVoice && !tied) {
-      note = emitNote(key, noteGain);
+      note = emitNote(true);
       out.pitchSlide(note, *track.previousKey, key, PitchSlideTiming::fromTicks(0))
-          .continueFrom(track.previousNote)
           .preferPitchBend();
     } else {
-      note = emitNote(key, noteGain, tied);
+      note = emitNote(tied);
     }
 
     track.previousNoteStart = vm.tick();

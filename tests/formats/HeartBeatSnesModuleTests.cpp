@@ -186,12 +186,9 @@ void noteGatesLegatoAndMixingMatchTheDriver() {
   const auto notes = eventsOfType<NotePerformanceEvent>(dq3.tracks.front());
   const auto levels = eventsOfType<LevelPerformanceEvent>(dq3.tracks.front());
   const auto instruments = eventsOfType<InstrumentPerformanceEvent>(dq3.tracks.front());
-  const auto* legatoTransition =
-      dq3.tracks.front().automations.empty() ? nullptr : pitchTransitionIntent(dq3.tracks.front().automations.front());
   const double defaultMaster = std::pow(0xc0 / 255.0, 2.0);
   expect(dq3.diagnostics.empty() && notes.size() == 2 && notes[0]->durationTicks == 7 && notes[1]->durationTicks == 8 &&
-             legatoTransition != nullptr && legatoTransition->previousNote &&
-             legatoTransition->timing.timelineTicks == 0 && levels.size() == 2 &&
+             notes[0]->voice == notes[1]->voice && dq3.tracks.front().automations.empty() && levels.size() == 2 &&
              std::abs(levels.back()->linearGain - defaultMaster * std::pow(0x80 / 255.0, 2.0)) < 0.000001 &&
              instruments.size() == 1,
          "DQ3 PMON opcodes, exact gate math, attack-free legato, and squared mixer gain should coexist");

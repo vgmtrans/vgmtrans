@@ -292,9 +292,8 @@ struct Playback : SequencePlayback<TrackState> {
         event.extendsPrevious = true;
         track.lastNote = out.note(std::move(event));
       } else {
-        track.lastNote = out.note(std::move(event));
+        track.lastNote = out.continueVoice(previous, std::move(event));
         out.pitchSlide(track.lastNote, *previousKey, key, math::ticks(track.portamento))
-            .continueFrom(previous)
             .continueAcrossNotes()
             .preferPortamento();
       }

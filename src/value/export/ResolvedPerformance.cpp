@@ -31,40 +31,6 @@ struct LaneState {
   u64 voiceEnd = 0;
 };
 
-struct NoteConnection {
-  const NotePerformanceEvent* first;
-  const NotePerformanceEvent* previous = nullptr;
-};
-
-// Events are sorted. Ties share a note ID; boundary pitch motions declare the
-// preceding note. Read those declarations only after source lookahead has ended.
-// Each predecessor is earlier, so preparation can inherit its completed voice
-// directly in event order, without relabeling groups or walking chains.
-std::unordered_map<PerformanceNoteId, NoteConnection> noteConnections(const PerformanceTrack& track) {
-  std::unordered_map<PerformanceNoteId, NoteConnection> notes;
-  for (const auto& event : track.events) {
-    if (const auto* note = std::get_if<NotePerformanceEvent>(&event); note && note->note.valid()) {
-      notes.try_emplace(note->note, NoteConnection{note});
-    }
-  }
-  for (const auto& automation : track.automations) {
-    const auto* transition = pitchTransitionIntent(automation);
-    if (!transition || !transition->previousNote) continue;
-    const auto target = notes.find(transition->note);
-    const auto previous = notes.find(*transition->previousNote);
-    if (target == notes.end() || previous == notes.end()) continue;
-    const auto& note = *target->second.first;
-    const auto& before = *previous->second.first;
-    const auto& motion = automation.realization;
-    if (before.header.order() < note.header.order() && before.lane == note.lane &&
-        motion.startTick <= note.header.tick &&
-        (motion.endReason == PerformanceAutomationEndReason::Completed || motion.endTick > motion.startTick)) {
-      target->second.previous = &before;
-    }
-  }
-  return notes;
-}
-
 void applyEnvelopeUpdate(EnvelopeOverride& state, const EnvelopeUpdate& update) {
   if (!update.values) {
     state.fields = static_cast<EnvelopeFields>(static_cast<u8>(state.fields) & ~static_cast<u8>(update.fields));
@@ -298,7 +264,7 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
     std::ranges::stable_sort(track.events, {}, [](const PerformanceEvent& event) {
       return performanceEventHeader(event).order();
     });
-    const auto connections = noteConnections(track);
+    std::unordered_map<PerformanceVoiceId, PerformanceVoiceId> voiceIds;
     InstrumentSelection selected = InstrumentAddress{};
     // Once a track uses signed channel gain, all of its pan must be baked into
     // variants so ordinary MIDI pan does not also affect the layered output.
@@ -381,13 +347,15 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
 
       const u64 noteEnd = addTicks(note->header.tick, note->durationTicks);
       auto& lane = lanes[note->lane];
-      const auto found = connections.find(note->note);
-      const NotePerformanceEvent* source = note;
-      if (found != connections.end()) {
-        source = found->second.previous ? found->second.previous : found->second.first;
+      const PerformanceVoiceId nextVoice{static_cast<u32>(voices.size())};
+      bool fresh = true;
+      if (note->voice.valid()) {
+        const auto [found, inserted] = voiceIds.try_emplace(note->voice, nextVoice);
+        note->voice = found->second;
+        fresh = inserted;
+      } else {
+        note->voice = nextVoice;
       }
-      const bool fresh = source == note;
-      note->voice = fresh ? PerformanceVoiceId{static_cast<u32>(voices.size())} : source->voice;
       if (fresh) voices.emplace_back();
       auto& voice = voices[note->voice.value];
       if (note->maximumDurationMilliseconds) {

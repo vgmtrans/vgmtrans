@@ -181,9 +181,6 @@ struct Playback : SequencePlayback<TrackState> {
       timing = PitchSlideTiming::fixedRate(timelineTicks, semitonesPerSecond);
     }
     auto transition = out.pitchSlide(note, startKey, key, timing);
-    if (continuesPreviousVoice) {
-      transition.continueFrom(track.previousNote);
-    }
     transition.preferPortamento();
   }
 
@@ -194,7 +191,6 @@ struct Playback : SequencePlayback<TrackState> {
     }
     const double startKey = out.currentPitchTransitionKey(track.previousNote).value_or(*track.previousKey);
     out.pitchSlide(note, startKey, key, PitchSlideTiming::fromTicks(0))
-        .continueFrom(track.previousNote)
         .preferPitchBend();
   }
 
@@ -283,7 +279,7 @@ struct Playback : SequencePlayback<TrackState> {
     }
     const bool extends = track.held && track.previousKey && std::abs(*track.previousKey - key) < 0.0001;
     const bool restart = track.resetLfoOnNote && !extends;
-    const auto played = out.note(NotePerformanceEvent{
+    NotePerformanceEvent event{
         .key = key,
         .linearVelocity = program.masterVolume / 127.0,
         .durationTicks = duration,
@@ -291,7 +287,8 @@ struct Playback : SequencePlayback<TrackState> {
         .restartsLfoPhase = restart,
         .restartsVibratoLfoPhase = restart,
         .restartsTremoloLfoPhase = restart,
-    });
+    };
+    const auto played = track.held && !extends ? out.continueVoice(track.previousNote, event) : out.note(event);
     if (tied || track.held) {
       emitPortamento(played, key, track.held);
     }
@@ -418,7 +415,7 @@ struct Playback : SequencePlayback<TrackState> {
         std::clamp<double>((encodedKey & 0x7f) + track.transpose + track.transposeAdjustment, 0.0, 127.0);
     const bool extendsPrevious = continuesPreviousVoice && std::abs(*track.previousKey - key) < 0.0001;
     const bool restart = track.resetLfoOnNote && !continuesPreviousVoice;
-    const auto note = out.note(NotePerformanceEvent{
+    NotePerformanceEvent event{
         .key = key,
         .linearVelocity = std::min(velocity * 2, 127) / 127.0,
         .durationTicks = std::max<u32>(1, duration),
@@ -426,7 +423,9 @@ struct Playback : SequencePlayback<TrackState> {
         .restartsLfoPhase = restart,
         .restartsVibratoLfoPhase = restart,
         .restartsTremoloLfoPhase = restart,
-    });
+    };
+    const auto note = continuesPreviousVoice && !extendsPrevious ? out.continueVoice(track.previousNote, event)
+                                                               : out.note(event);
     if (continuesPreviousVoice && !extendsPrevious) {
       emitLateHeldTransition(note, key);
     }

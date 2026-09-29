@@ -454,7 +454,7 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   void applyPortamento(double key, double driverPitch, PerformanceNoteId previousNote,
-                       std::optional<double> previousKey, bool continuesPreviousVoice) {
+                       std::optional<double> previousKey) {
     if (!previousNote.valid() || !previousKey || std::abs(*previousKey - key) < 0.000001) {
       return;
     }
@@ -473,9 +473,6 @@ struct Playback : SequencePlayback<TrackState> {
           math::timelineTicksForMilliseconds(milliseconds, program.tempo, track.timebaseShift), semitonesPerSecond);
     }
     auto slide = out.pitchSlide(track.lastNote, *previousKey, key, timing);
-    if (continuesPreviousVoice) {
-      slide.continueFrom(previousNote);
-    }
     slide.preferPortamento();
   }
 
@@ -550,12 +547,10 @@ struct Playback : SequencePlayback<TrackState> {
         .restartsVibratoLfoPhase = !continuesPreviousVoice,
         .restartsTremoloLfoPhase = !continuesPreviousVoice,
     };
-    const bool continuesWithoutGlide =
-        continuesPreviousVoice && !tie && (track.portamentoSpeed == 0 || portamentoAnchor);
     track.lastNote =
-        continuesWithoutGlide ? out.continueVoice(previousNote, std::move(event)) : out.note(std::move(event));
+        continuesPreviousVoice && !tie ? out.continueVoice(previousNote, std::move(event)) : out.note(std::move(event));
     if (!portamentoAnchor && track.portamentoSpeed != 0) {
-      applyPortamento(key, driverPitch, previousNote, previousKey, continuesPreviousVoice);
+      applyPortamento(key, driverPitch, previousNote, previousKey);
     }
     if (!continuesPreviousVoice) {
       applyAttackEnvelope(key);

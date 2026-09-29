@@ -493,16 +493,17 @@ void Playback::legato(bool enabled) {
 void Playback::emitVoiceNote(double key, u32 duration) {
   const bool continuesPreviousVoice = track.voiceHeld && track.lastNote.valid() && track.lastKey.has_value();
   const bool extendsPrevious = continuesPreviousVoice && std::abs(*track.lastKey - key) < 0.0001;
-  const PerformanceNoteId note = out.note(NotePerformanceEvent{
+  NotePerformanceEvent event{
       .key = key,
       .linearVelocity = math::levelGain(track.velocity),
       .durationTicks = duration,
       .extendsPrevious = extendsPrevious,
       .restartsLfoPhase = !continuesPreviousVoice,
-  });
+  };
+  const auto note = continuesPreviousVoice && !extendsPrevious ? out.continueVoice(track.lastNote, event)
+                                                              : out.note(event);
   if (continuesPreviousVoice && !extendsPrevious) {
     out.pitchSlide(note, *track.lastKey, key, PitchSlideTiming::fromTicks(0))
-        .continueFrom(track.lastNote)
         .preferPitchBend();
   }
   track.lastNote = note;

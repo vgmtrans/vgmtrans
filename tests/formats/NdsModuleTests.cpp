@@ -834,7 +834,7 @@ void ndsSequencePreservesPortamentoTimingIntent() {
 
   const auto* fixed = pitchTransitionIntent(performance.tracks[0].automations[0]);
   const auto* relative = pitchTransitionIntent(performance.tracks[0].automations[1]);
-  expect(fixed != nullptr && fixed->note == notes[0]->note && !fixed->previousNote && fixed->startKey == 60.0 &&
+  expect(fixed != nullptr && fixed->note == notes[0]->note && notes[0]->voice != notes[1]->voice && fixed->startKey == 60.0 &&
              fixed->targetKey == 64.0 && fixed->timing.timelineTicks == 16 &&
              fixed->preferredRendering == PitchTransitionRenderingHint::Portamento &&
              std::holds_alternative<FixedDurationPitchSlideTiming>(fixed->timing.physical) &&

@@ -619,7 +619,6 @@ struct Playback : SequencePlayback<TrackState> {
       const auto timing =
           PitchSlideTiming::fixedDuration((frames * math::ticks(track.tempo) + 0xffu) >> 8, frames * 16.0);
       out.pitchSlide(track.lastNote, keyForPitch(track.currentPitch), key, timing)
-          .continueFrom(previous)
           .preferPortamento();
     } else {
       track.currentPitch = targetPitch;
@@ -638,9 +637,6 @@ struct Playback : SequencePlayback<TrackState> {
         if (targetKey != 0.0) {
           auto slide = out.pitchSlide(track.lastNote, key, targetKey, length);
           slide.preferPitchBend();
-          if (continuesVoice) {
-            slide.continueFrom(previous);
-          }
         }
       }
     }

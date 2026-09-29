@@ -35,6 +35,26 @@ PitchTransitionIntent* pitchTransitionIntent(PerformanceAutomation& automation) 
   return std::get_if<PitchTransitionIntent>(&automation.intent);
 }
 
+std::optional<double> pitchTransitionKeyAt(const PerformanceTrack& track, PerformanceNoteId note,
+                                           PerformanceLaneId lane, u64 tick) {
+  for (auto previous = track.automations.rbegin(); previous != track.automations.rend(); ++previous) {
+    const auto* transition = pitchTransitionIntent(*previous);
+    if (transition == nullptr || transition->note != note || transition->lane != lane ||
+        previous->realization.startTick > tick) {
+      continue;
+    }
+    if (previous->realization.endReason != PerformanceAutomationEndReason::Completed &&
+        previous->realization.endTick <= previous->realization.startTick) {
+      continue;
+    }
+    const u64 realizedTick = std::min(tick, previous->realization.endTick);
+    const u64 elapsed = realizedTick - previous->realization.startTick;
+    return pitchTransitionValueAt(*transition,
+                                  static_cast<u32>(std::min<u64>(elapsed, std::numeric_limits<u32>::max())));
+  }
+  return std::nullopt;
+}
+
 double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elapsedTicks) {
   const u32 duration = transition.timing.timelineTicks;
   const u32 clampedElapsed = std::min(elapsedTicks, duration);

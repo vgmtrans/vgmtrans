@@ -505,7 +505,7 @@ struct Playback : SequencePlayback<TrackState> {
     };
     track.pitchNote = continuesVoice && !repeatsHeldKey ? out.continueVoice(previousPitchNote, std::move(note))
                                                         : out.note(std::move(note));
-    applyPitchEffectToNote(key, continuesVoice ? previousPitchNote : PerformanceNoteId{}, realizedPitch);
+    applyPitchEffectToNote(key, realizedPitch);
     track.previousNoteKey = key;
     track.previousDurationRate = track.noteDurationRate;
     track.previousWasNote = true;
@@ -970,7 +970,7 @@ private:
     }
   }
 
-  void applyPitchEffectToNote(u8 key, PerformanceNoteId continuedNote, std::optional<double> realizedPitch) {
+  void applyPitchEffectToNote(u8 key, std::optional<double> realizedPitch) {
     auto& effect = track.pitchEffect;
     if (track.percussion) {
       effect.previousKey.reset();
@@ -985,10 +985,9 @@ private:
             const double start = realizedPitch.value_or(*effect.previousKey);
             if (track.version <= KONAMISNES_V2) {
               // Early engines count down a linear, tempo-relative glide.
-              out.pitchSlide(track.pitchNote, start, target, PitchSlideTiming::fromTicks(effect.duration))
-                  .continueFrom(continuedNote);
+              out.pitchSlide(track.pitchNote, start, target, PitchSlideTiming::fromTicks(effect.duration));
             } else {
-              beginProportionalPortamento(start, target, effect.duration, continuedNote);
+              beginProportionalPortamento(start, target, effect.duration);
             }
           }
           break;
@@ -1004,7 +1003,7 @@ private:
     effect.previousKey = target;
   }
 
-  void beginProportionalPortamento(double startKey, double targetKey, u8 speed, PerformanceNoteId continuedNote) {
+  void beginProportionalPortamento(double startKey, double targetKey, u8 speed) {
     constexpr double pitchScale = 256.0;
     const s32 start = static_cast<s32>(std::lround(startKey * pitchScale));
     const s32 target = static_cast<s32>(std::lround(targetKey * pitchScale));
@@ -1026,7 +1025,6 @@ private:
     const u32 timelineTicks = std::max<u32>(static_cast<u32>(std::lround(milliseconds / tickMilliseconds)), 1);
     auto transition = out.pitchSlide(track.pitchNote, curve.front() / pitchScale, curve.back() / pitchScale,
                                      PitchSlideTiming::fixedDuration(timelineTicks, milliseconds));
-    transition.continueFrom(continuedNote);
 
     // MIDI cannot place the 250 Hz hardware updates between sequence ticks.
     // Sample the exact integer curve at the nearest representable positions,

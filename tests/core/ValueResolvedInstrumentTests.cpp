@@ -62,8 +62,8 @@ void resolvedVariantsShareAddressesWithBothSynthWriters() {
   out.updateEnvelope(Envelope{.attackSeconds = 0.25}, EnvelopeFields::Attack);
   const auto first = out.note(60, 1, 4);
   out.at(2).instrument(InstrumentIdentity{"prototype", 7});
-  const auto continuation = out.at(4).note(64, 1, 4);
-  out.at(4).pitchSlide(continuation, 60, 64, 2).continueFrom(first);
+  const auto continuation = out.at(4).continueVoice(first, NotePerformanceEvent{.key = 64, .durationTicks = 4});
+  out.at(4).pitchSlide(continuation, 60, 64, 2);
   const auto fresh = out.at(8).note(67, 1, 4);
   const PerformanceSequence sourcePerformance{.timebase = {.ppqn = 48}, .tracks = {track}};
   const auto unadapted = preparePerformance(sourcePerformance, {banks.begin(), banks.end()});
@@ -545,17 +545,17 @@ void canceledOrDelayedPitchMotionDoesNotJoinAttacks() {
     const auto first = out.note(60, 1.0, 4);
     out.at(4).instrument(0, 7);
     const auto second = out.at(4).note(64, 1.0, 4);
-    auto slide = out.at(delayed ? 5 : 4).pitchSlide(second, 60, 64, 2).continueFrom(first);
+    auto slide = out.at(delayed ? 5 : 4).pitchSlide(second, 60, 64, 2);
     if (!delayed) slide.stop(out.at(4));
     const auto prepared = preparePerformance({.tracks = {track}});
     expect(noteById(prepared.performance(), first).voice != noteById(prepared.performance(), second).voice &&
                prepared.selectionFor(noteById(prepared.performance(), second)).address.program == 7,
-           "mid-note or canceled-before-onset motion must preserve the target's fresh attack and instrument");
+           "pitch motion must never join independently emitted attacks");
   }
 }
 
-void editedContinuationsPreserveIndependentBranches() {
-  for (const bool clearBinding : {false, true}) {
+void pitchEditsPreserveDeclaredVoiceOwnership() {
+  for (const bool middleContinues : {false, true}) {
     for (const bool followsMiddle : {false, true}) {
       PerformanceTrack track{.id = TrackId{0}};
       u64 order = 0;
@@ -565,25 +565,28 @@ void editedContinuationsPreserveIndependentBranches() {
       const auto first = out.note(NotePerformanceEvent{.key = 60, .durationTicks = 16,
                                                      .maximumDurationMilliseconds = 500.0});
       out.at(4).instrument(0, 7);
-      const auto middle = out.at(4).note(64, 1.0, 12);
-      auto slide = out.at(4).pitchSlide(middle, 60, 64, 4).continueFrom(first);
-      const auto last = out.at(8).note(67, 1.0, 8);
-      out.at(8).pitchSlide(last, followsMiddle ? 64 : 60, 67, 0).continueFrom(followsMiddle ? middle : first);
+      NotePerformanceEvent event{.key = 64, .durationTicks = 12};
+      const auto middle = middleContinues ? out.at(4).continueVoice(first, event) : out.at(4).note(event);
+      auto slide = out.at(4).pitchSlide(middle, 60, 64, 4);
+      const auto last = out.at(8).continueVoice(followsMiddle ? middle : first,
+                                               NotePerformanceEvent{.key = 67, .durationTicks = 8});
 
-      // Source lookahead may revise one connection after later notes were emitted.
-      if (clearBinding) slide.continueFrom({});
-      else slide.stop(out.at(4));
+      // Lookahead can cancel pitch motion after later continuations exist.
+      // Voice ownership was declared by the note operation and cannot change here.
+      slide.stop(out.at(4));
+      slide.clear();
       const auto prepared = preparePerformance({.timebase = {.ppqn = 10}, .tracks = {track}});
       const auto& attack = noteById(prepared.performance(), first);
-      const auto& detached = noteById(prepared.performance(), middle);
+      const auto& second = noteById(prepared.performance(), middle);
       const auto& continued = noteById(prepared.performance(), last);
-      expect(attack.voice != detached.voice && prepared.selectionFor(detached).address.program == 7 &&
-                 !prepared.voiceFor(detached).endLimit,
-             "canceling or clearing a boundary continuation must restore its own attack instrument and deadline");
-      expect(continued.voice == (followsMiddle ? detached.voice : attack.voice) &&
-                 prepared.selectionFor(continued).address.program == (followsMiddle ? 7u : 5u) &&
-                 prepared.voiceFor(continued).endLimit == (followsMiddle ? std::nullopt : std::optional<u64>{10}),
-             "editing one connection must follow declared descendants, not relabel every later segment of a voice");
+      expect((attack.voice == second.voice) == middleContinues &&
+                 prepared.selectionFor(second).address.program == (middleContinues ? 5u : 7u),
+             "canceling pitch motion must preserve the source's attack or continuation decision");
+      const bool retainsFirst = middleContinues || !followsMiddle;
+      expect(continued.voice == (followsMiddle ? second.voice : attack.voice) &&
+                 prepared.selectionFor(continued).address.program == (retainsFirst ? 5u : 7u) &&
+                 prepared.voiceFor(continued).endLimit == (retainsFirst ? std::optional<u64>{10} : std::nullopt),
+             "pitch edits must not relabel later branches or change their instrument and deadline");
     }
   }
 }
@@ -591,7 +594,7 @@ void editedContinuationsPreserveIndependentBranches() {
 }  // namespace
 
 void runResolvedInstrumentTests() {
-  editedContinuationsPreserveIndependentBranches();
+  pitchEditsPreserveDeclaredVoiceOwnership();
   soundingVoicesOwnSelectionsAndDeadlines();
   canceledOrDelayedPitchMotionDoesNotJoinAttacks();
   resolvedVariantsShareAddressesWithBothSynthWriters();

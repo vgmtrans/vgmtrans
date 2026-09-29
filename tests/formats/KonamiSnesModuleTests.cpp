@@ -1130,9 +1130,11 @@ void konamiSnesZeroNotesAndLegatoMatchDriverGating() {
 
   const auto v1Rate100 = renderKonamiSnesProgram(KONAMISNES_V1, {{0x62, 100, 0x3c, 4, 0xff, 0x3e, 4, 0xff, 0xff}});
   const auto v1Rate101 = renderKonamiSnesProgram(KONAMISNES_V1, {{0x62, 101, 0x3c, 4, 0xff, 0x3e, 4, 0xff, 0xff}});
-  expect(v1Rate100.tracks.front().automations.empty() && v1Rate101.tracks.front().automations.size() == 1,
-         "V1 duration 100 should gate for the full note but only 101 should continue a changing pitch");
+  const auto separateNotes = eventsOfType<NotePerformanceEvent>(v1Rate100.tracks.front());
   const auto continuedNotes = eventsOfType<NotePerformanceEvent>(v1Rate101.tracks.front());
+  expect(separateNotes.size() == 2 && continuedNotes.size() == 2 &&
+             separateNotes[0]->voice != separateNotes[1]->voice && continuedNotes[0]->voice == continuedNotes[1]->voice,
+         "V1 duration 100 should gate for the full note but only 101 should continue a changing pitch");
   expect(continuedNotes.size() == 2 && continuedNotes[1]->restartsLfoPhase &&
              continuedNotes[1]->restartsVibratoLfoPhase == true,
          "a Konami legato source note should still reset its per-note LFO state");
@@ -1159,7 +1161,7 @@ void konamiSnesZeroNotesAndLegatoMatchDriverGating() {
   expect(portamentoNotes.size() == 2 && portamentoNotes[0]->note != portamentoNotes[1]->note &&
              transition != portamentoAfterRest.tracks.front().automations.end() &&
              pitchTransitionIntent(*transition)->note == portamentoNotes[1]->note &&
-             !pitchTransitionIntent(*transition)->previousNote,
+             portamentoNotes[0]->voice != portamentoNotes[1]->voice,
          "V1 portamento after a rest should retain the prior pitch but attack a new voice");
 }
 

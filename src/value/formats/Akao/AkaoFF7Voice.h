@@ -81,10 +81,7 @@ public:
     if (tie || connected) {
       out.setNoteEnd(last_.id, tick);
     }
-    // Ties and same-pitch slurs retain the previous PerformanceNoteId. A slur to
-    // a different pitch gets a new ID; continueFrom(last_.id) records that the
-    // pitch transition continues the previous note without another key-on.
-    const auto id = out.note(core::NotePerformanceEvent{
+    core::NotePerformanceEvent event{
         .key = static_cast<double>(key),
         .linearVelocity = 1.0,
         .durationTicks = fullGate ? std::max<u32>(1, delta) : gate,
@@ -94,7 +91,8 @@ public:
         .restartsLfoPhase = true,
         .restartsVibratoLfoPhase = !tie,
         .note = tie || samePitch ? last_.id : core::PerformanceNoteId{},
-    });
+    };
+    const auto id = connected && !samePitch ? out.continueVoice(last_.id, event) : out.note(event);
     core::PitchSlideBinding pendingGlide;
     if (glide || (connected && !samePitch)) {
       // Smooth slides currently interpolate semitones; FF7's driver interpolates
@@ -103,7 +101,7 @@ public:
       if (connected) {
         // Prefer one held MIDI note plus pitch bend. MIDI portamento emits a new
         // Note On, whose ADSR retrigger behavior depends on the destination synth.
-        slide.continueFrom(last_.id).preferPitchBend();
+        slide.preferPitchBend();
         if (glide) {
           pendingGlide = slide;
         }

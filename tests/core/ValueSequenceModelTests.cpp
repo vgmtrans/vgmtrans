@@ -338,13 +338,12 @@ void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
          "formats should be able to stop a transition explicitly through its opaque handle");
 
   auto configured = out.at(70).pitchSlide(stoppedNote, 81, 84, PitchSlideTiming::fixedDuration(4, 125.0));
-  configured.continueFrom(interruptedNote)
-      .continueAcrossNotes()
+  configured.continueAcrossNotes()
       .preferPitchBend()
       .restorePortamentoTiming(250.0)
       .portamentoOverlap(2);
   const auto& configuredIntent = std::get<PitchTransitionIntent>(track.automations[9].intent);
-  expect(configuredIntent.previousNote == interruptedNote && configuredIntent.continuesAcrossNotes &&
+  expect(configuredIntent.continuesAcrossNotes &&
              configuredIntent.preferredRendering == PitchTransitionRenderingHint::PitchBend &&
              configuredIntent.timing.timelineTicks == 4 &&
              std::get<FixedDurationPitchSlideTiming>(configuredIntent.timing.physical).milliseconds == 125.0 &&
@@ -354,7 +353,7 @@ void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
 
   configured.sample(out.at(72), 82.5);
   configured.makeImmediate();
-  expect(track.automations.size() == 10 && configuredIntent.previousNote == interruptedNote &&
+  expect(track.automations.size() == 10 &&
              configuredIntent.preferredRendering == PitchTransitionRenderingHint::PitchBend &&
              configuredIntent.timing.timelineTicks == 0 &&
              std::holds_alternative<TempoRelativePitchSlideTiming>(configuredIntent.timing.physical) &&
@@ -362,7 +361,7 @@ void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
              track.automations[9].realization.endTick == 70 &&
              track.automations[9].realization.endReason == PerformanceAutomationEndReason::Completed &&
              out.at(70).currentPitchTransitionKey(stoppedNote) == 84.0,
-         "lookahead should make a slide immediate in place, preserving its voice connection and rendering choice");
+         "lookahead should make a slide immediate in place, preserving its rendering choice");
 }
 
 void continuedVoiceResolvesPriorPitchMotion() {
@@ -376,16 +375,16 @@ void continuedVoiceResolvesPriorPitchMotion() {
   const PerformanceNoteId first = out.note(60, 1.0, 8);
   out.pitchSlide(first, 60, 62, 4);
   const PerformanceNoteId samePitch =
-      out.at(4).continueVoice(first, NotePerformanceEvent{.key = 62, .linearVelocity = 1.0, .durationTicks = 4});
+      out.at(4).continueVoice(first, NotePerformanceEvent{.key = 62, .durationTicks = 4});
   expect(samePitch == first && std::get<NotePerformanceEvent>(track.events.back()).extendsPrevious,
          "continuing at a completed slide target should extend the existing note identity");
 
   const PerformanceNoteId changedPitch =
-      out.at(8).continueVoice(samePitch, NotePerformanceEvent{.key = 64, .linearVelocity = 1.0, .durationTicks = 4});
-  const auto& transition = std::get<PitchTransitionIntent>(track.automations.back().intent);
-  expect(changedPitch != samePitch && transition.previousNote == samePitch && transition.startKey == 62 &&
-             transition.targetKey == 64 && transition.timing.timelineTicks == 0,
-         "a continued voice that changes key should emit one attack-free boundary transition");
+      out.at(8).continueVoice(samePitch, NotePerformanceEvent{.key = 64, .durationTicks = 4});
+  const auto& firstEvent = std::get<NotePerformanceEvent>(track.events.front());
+  const auto& continued = std::get<NotePerformanceEvent>(track.events.back());
+  expect(changedPitch != samePitch && continued.voice == firstEvent.voice && track.automations.size() == 1,
+         "a key change should retain the source voice without fabricating a pitch automation");
 }
 
 void previousNoteEndRetainsContinuationChainBehavior() {

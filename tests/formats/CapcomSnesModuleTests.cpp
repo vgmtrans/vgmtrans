@@ -1515,12 +1515,12 @@ void capcomSnesSequenceEmitsStructuredPitchSlides() {
          "CapcomSnes portamento should produce structured pitch transitions between notes");
   const auto* transition = pitchTransitionIntent(performance.tracks[0].automations[0]);
   expect(transition != nullptr && transition->startKey == 0.0 && transition->targetKey == 5.0 &&
-             transition->previousNote == notes[0]->note && transition->timing.timelineTicks == 30 &&
+             notes[1]->voice == notes[0]->voice && transition->timing.timelineTicks == 30 &&
              std::get<FixedDurationPitchSlideTiming>(transition->timing.physical).milliseconds == 160.0,
          "CapcomSnes pitch intent should retain its source key, target, overlap voice, and physical timing");
   const auto* retargeted = pitchTransitionIntent(performance.tracks[0].automations[1]);
   expect(retargeted != nullptr && retargeted->startKey == 5.0 && retargeted->targetKey == 6.0 &&
-             retargeted->previousNote == notes[1]->note && retargeted->timing.timelineTicks == 12 &&
+             notes[2]->voice == notes[1]->voice && retargeted->timing.timelineTicks == 12 &&
              std::get<FixedDurationPitchSlideTiming>(retargeted->timing.physical).milliseconds == 64.0 &&
              !retargeted->portamentoRendering.useCurrentTiming,
          "a new CapcomSnes glide should begin at the preceding note target with its newly selected rate");

@@ -410,7 +410,7 @@ struct Playback : SequencePlayback<TrackState> {
     }
   }
 
-  void emitPortamentoCurve(u16 target, double outputKey, PerformanceNoteId previous, bool continues) {
+  void emitPortamentoCurve(u16 target, double outputKey) {
     const std::vector curve =
         math::portamentoCurve(*track.driverPitch, target, track.liveControls[kPortamento]);
     const auto key = [&](u16 pitch) {
@@ -418,9 +418,6 @@ struct Playback : SequencePlayback<TrackState> {
     };
     auto slide = out.pitchSlide(track.activeNote, key(curve.front()), key(curve.back()),
                                 static_cast<u32>(curve.size() - 1));
-    if (continues) {
-      slide.continueFrom(previous);
-    }
     for (u32 tick = 0; tick < static_cast<u32>(curve.size()); ++tick) {
       slide.sample(out.at(vm.tick() + tick), key(curve[tick]));
     }
@@ -429,7 +426,7 @@ struct Playback : SequencePlayback<TrackState> {
     slide.preferPitchBend();
   }
 
-  void beginPortamento(u16 target, double outputKey, PerformanceNoteId previous, bool continues) {
+  void beginPortamento(u16 target, double outputKey) {
     if (track.liveControls[kPortamento] == 0 || !track.driverPitch) {
       track.driverPitch = target;
       track.portamentoTarget.reset();
@@ -441,7 +438,7 @@ struct Playback : SequencePlayback<TrackState> {
     // is not part of the new note's audible curve.
     advancePortamento();
     if (track.activeNote.valid() && *track.driverPitch != target) {
-      emitPortamentoCurve(target, outputKey, previous, continues);
+      emitPortamentoCurve(target, outputKey);
     }
   }
 
@@ -480,7 +477,7 @@ struct Playback : SequencePlayback<TrackState> {
     }
     emitMix();
     if (track.slur && !previous.valid()) {
-      beginPortamento(target, outputKey, previous, false);
+      beginPortamento(target, outputKey);
       advancePitchModulation();
       return;
     }
@@ -494,7 +491,7 @@ struct Playback : SequencePlayback<TrackState> {
         .restartsLfoPhase = !continues,
     };
     track.activeNote = continues ? out.continueVoice(previous, std::move(event)) : out.note(std::move(event));
-    beginPortamento(target, outputKey, previous, continues);
+    beginPortamento(target, outputKey);
     if (continues) {
       advancePitchModulation();
     }

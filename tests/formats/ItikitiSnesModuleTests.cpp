@@ -298,10 +298,17 @@ void dynamicAdsrPitchAndControlFlowAreAudited() {
   const auto* glide = portamento.tracks.front().automations.empty()
                           ? nullptr
                           : pitchTransitionIntent(portamento.tracks.front().automations.front());
-  expect(portamento.diagnostics.empty() && eventsOfType<NotePerformanceEvent>(portamento.tracks.front()).size() == 2 &&
-             glide && glide->previousNote && glide->startKey == 24.0 && glide->targetKey == 25.0 &&
+  const auto portamentoNotes = eventsOfType<NotePerformanceEvent>(portamento.tracks.front());
+  expect(portamento.diagnostics.empty() && portamentoNotes.size() == 2 &&
+             portamentoNotes[0]->voice == portamentoNotes[1]->voice && glide && glide->startKey == 24.0 && glide->targetKey == 25.0 &&
              glide->timing.timelineTicks == 4,
          "persistent portamento should continue one voice and preserve its exact glide duration");
+
+  const auto replacedGlide = render({0x25, 4, 0x37, 8, 0x29, 2, 2, 0x3f, 8, 0});
+  const auto replacedNotes = eventsOfType<NotePerformanceEvent>(replacedGlide.tracks.front());
+  expect(replacedNotes.size() == 2 && replacedNotes[0]->voice == replacedNotes[1]->voice &&
+             midiNotes(renderTestMidi(replacedGlide).tracks.front().events).size() == 1,
+         "a one-shot slide replacing portamento at note onset must retain the already sounding voice");
 
   const PerformanceSequence chained = render({0x29, 2, 2, 0x37, 8, 0x25, 4, 0x3f, 8, 0});
   const auto* chainedGlide = chained.tracks.front().automations.size() < 2

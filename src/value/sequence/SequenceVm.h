@@ -85,7 +85,8 @@ public:
   // Emits event on an already-sounding source voice and returns the note
   // identity that later automation should address. If event.key is the pitch
   // currently sounding, the existing note is extended. Otherwise a new note
-  // identity is linked to the old one by an attack-free key change.
+  // identity uses the same voice with an attack-free key change. Later pitch
+  // slides may replace that motion without changing voice ownership.
   PerformanceNoteId continueVoice(PerformanceNoteId previousNote, NotePerformanceEvent event);
   // Formats whose slide command follows its note can revise the most recently
   // emitted note chain once the delayed transition point becomes known.
@@ -153,10 +154,8 @@ public:
   // Declares a note-anchored transition between absolute keys, where 60.0 is
   // middle C and 60.5 is halfway to C-sharp. Unlike fade(Pitch, ...), this
   // represents a musical glide that may be lowered as pitch bend or native
-  // portamento. The glide may occur within one note or cross a note boundary;
-  // continueFrom(previousNote) means it continues the previous note without
-  // retriggering the instrument's attack. A zero duration is an immediate
-  // attack-free key change.
+  // portamento. This only changes pitch; note() or continueVoice() determines
+  // whether the instrument is newly selected or continues sounding.
   PitchSlideBinding pitchSlide(PerformanceNoteId note, double startKey, double targetKey, u32 durationTicks,
                                PerformanceLaneId lane = PerformanceLaneId{0});
   PitchSlideBinding pitchSlide(PerformanceNoteId note, double startKey, double targetKey, PitchSlideTiming timing,
@@ -253,7 +252,6 @@ public:
   // Retroactively reach the target at the original start tick. Source drivers
   // with lookahead can discover this only after emitting the transition.
   void makeImmediate();
-  PitchSlideBinding& continueFrom(PerformanceNoteId previousNote);
   PitchSlideBinding& continueAcrossNotes(bool enabled = true);
   // Export preferences; neither changes the source transition's semantics.
   PitchSlideBinding& preferPortamento();

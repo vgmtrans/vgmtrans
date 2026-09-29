@@ -527,7 +527,7 @@ void ff7SlurChangesPitchWithoutAnotherAttack() {
   expect(slides.size() == 2, "FF7 B-D-B slur should retain both immediate pitch changes");
   for (size_t i = 0; i < slides.size(); ++i) {
     const auto* slide = pitchTransitionIntent(slides[i]);
-    expect(slide && slide->previousNote == notes[i].note && slide->note == notes[i + 1].note &&
+    expect(slide && notes[i].voice == notes[i + 1].voice && slide->note == notes[i + 1].note &&
                slide->timing.timelineTicks == 0 &&
                slide->preferredRendering == PitchTransitionRenderingHint::PitchBend,
            "FF7 slurs must link the previous voice without introducing a portamento ramp");
@@ -573,12 +573,16 @@ void ff7PortamentoEnablesSlurAndStartsWithAFreshAttack(u8 boundary) {
   const auto performance = renderAkaoFixture({0x29, 0xda, 4, 0x08, 0x13, 0x1e, boundary, 0x29, 0xa0});
   const auto& slides = performance.tracks[0].automations;
   expect(!slides.empty(), "FF7 DA must produce pitch transitions");
+  const auto sourceNotes = fixtureEvents<NotePerformanceEvent>(performance);
+  expect(sourceNotes.size() == 5 && sourceNotes[1].voice == sourceNotes[2].voice &&
+             sourceNotes[2].voice == sourceNotes[3].voice && sourceNotes[3].voice != sourceNotes[4].voice,
+         "FF7 portamento must declare continued voices before pitch rendering");
   const auto* slide = pitchTransitionIntent(slides.front());
-  expect(slide && slide->previousNote && slide->startKey == 48 && slide->targetKey == 49 &&
+  expect(slide && slide->startKey == 48 && slide->targetKey == 49 &&
              slide->timing.timelineTicks == 4,
          "FF7 DA must enable attack-free portamento for subsequent pitches");
   const auto* finalPitch = pitchTransitionIntent(slides.back());
-  expect(finalPitch && finalPitch->previousNote && finalPitch->startKey == 49 && finalPitch->targetKey == 50 &&
+  expect(finalPitch && finalPitch->startKey == 49 && finalPitch->targetKey == 50 &&
              finalPitch->timing.timelineTicks == 0,
          "FF7 DB/CB lookahead must make the preceding note's pitch change immediate");
   const auto notes = midiNotes(renderTestMidi(performance).tracks[0].events);
@@ -848,7 +852,7 @@ void akaoPortamentoRetainsPitchTransitionIntent() {
   expect(performance.tracks[0].automations.size() == 1,
          "Akao portamento should create transitions only while the persistent setting is active");
   const auto* transition = pitchTransitionIntent(performance.tracks[0].automations.front());
-  expect(transition != nullptr && transition->note == notes[1]->note && !transition->previousNote &&
+  expect(transition != nullptr && transition->note == notes[1]->note && notes[0]->voice != notes[1]->voice &&
              transition->startKey == 48.0 && transition->targetKey == 49.0 && transition->timing.timelineTicks == 4 &&
              std::holds_alternative<TempoRelativePitchSlideTiming>(transition->timing.physical),
          "Akao portamento should retain its note anchor, keys, new attack, and tick-relative duration");

@@ -261,7 +261,8 @@ struct Playback : SequencePlayback<TrackState> {
       event.extendsPrevious = true;
       track.lastNote = out.note(std::move(event));
     } else {
-      const PerformanceNoteId note = out.note(std::move(event));
+      const PerformanceNoteId note = continuesVoice ? out.continueVoice(track.lastNote, std::move(event))
+                                                   : out.note(std::move(event));
       emitPitchSlideTo(note, key);
       track.lastNote = note;
     }
@@ -323,9 +324,6 @@ private:
                                         ? PitchSlideTiming::fromTicks(0)
                                         : PitchSlideTiming::fixedDuration(pitchSlideTicks(milliseconds), milliseconds);
     auto slide = out.pitchSlide(note, startKey, targetKey, timing);
-    if (continuesVoice) {
-      slide.continueFrom(track.lastNote);
-    }
     if (track.lastPortamentoMilliseconds && std::abs(*track.lastPortamentoMilliseconds - milliseconds) < 0.000001) {
       slide.useCurrentPortamentoTiming();
     }

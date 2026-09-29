@@ -782,7 +782,7 @@ void cps2EarlyZeroRateSlursRemainLinked() {
   for (size_t index = 0; index < performance.tracks[0].automations.size(); ++index) {
     const auto* transition = pitchTransitionIntent(performance.tracks[0].automations[index]);
     expect(transition != nullptr && transition->note == notes[index + 2]->note &&
-               transition->previousNote == std::optional{notes[index + 1]->note} &&
+               notes[index + 2]->voice == notes[index + 1]->voice &&
                transition->startKey == expectedKeys[index + 1] && transition->targetKey == expectedKeys[index + 2] &&
                transition->timing.timelineTicks == 0 &&
                transition->preferredRendering == PitchTransitionRenderingHint::Portamento,
@@ -844,7 +844,9 @@ void cps2EarlyPortamentoStartsOnFirstTiedNote() {
                                : pitchTransitionIntent(performance.tracks[0].automations.front());
   const auto* rate =
       transition == nullptr ? nullptr : std::get_if<FixedRatePitchSlideTiming>(&transition->timing.physical);
-  expect(transition != nullptr && !transition->previousNote && transition->startKey == 47.0 &&
+  const auto attacks = eventsOfType<NotePerformanceEvent>(performance.tracks[0]);
+  expect(attacks.size() == 2 && attacks[0]->voice != attacks[1]->voice &&
+             transition != nullptr && transition->startKey == 47.0 &&
              transition->targetKey == 44.0 && transition->timing.timelineTicks == 15 && rate != nullptr &&
              std::abs(rate->semitonesPerSecond - 19.53125) < 0.000001,
          "entering early-CPS tie state with a rate should glide the newly attacked note from the preceding key");
@@ -964,7 +966,7 @@ void cps3ModuleDecodesDelayPrefixesLegatoAndRegions() {
                                ? pitchTransitionIntent(performance.tracks[0].automations.front())
                                : nullptr;
   expect(transition != nullptr && transition->note == notes[2]->note &&
-             transition->previousNote == std::optional{notes[1]->note} && transition->startKey == 62.0 &&
+             notes[2]->voice == notes[1]->voice && transition->startKey == 62.0 &&
              transition->targetKey == 64.0 && transition->timing.timelineTicks == 0 &&
              transition->preferredRendering == PitchTransitionRenderingHint::PitchBend,
          "a CPS3 held-note key change should retain its pitch and attack-free voice linkage");
@@ -1002,7 +1004,7 @@ void cps3HeldNotesRetargetOneVoiceWithoutLosingPitch() {
   for (size_t index = 0; index < destinations.size(); ++index) {
     const auto* transition = pitchTransitionIntent(performance.tracks[0].automations[index]);
     expect(transition != nullptr && transition->note == sourceNotes[destinations[index]]->note &&
-               transition->previousNote == std::optional{sourceNotes[predecessors[index]]->note} &&
+               sourceNotes[destinations[index]]->voice == sourceNotes[predecessors[index]]->voice &&
                transition->startKey == expectedKeys[predecessors[index]] &&
                transition->targetKey == expectedKeys[destinations[index]] &&
                transition->preferredRendering == PitchTransitionRenderingHint::PitchBend,

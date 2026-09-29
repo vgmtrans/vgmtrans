@@ -360,6 +360,7 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero(MidiPitchTran
           .key = 60,
           .durationTicks = 4,
           .note = PerformanceNoteId{1},
+          .voice = PerformanceVoiceId{1},
       },
       NotePerformanceEvent{
           .header = eventHeader(4, 3),
@@ -367,6 +368,7 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero(MidiPitchTran
           .durationTicks = 4,
           .extendsPrevious = true,
           .note = PerformanceNoteId{1},
+          .voice = PerformanceVoiceId{1},
       },
       EnvelopePerformanceEvent{
           .header = eventHeader(6, 4),
@@ -377,19 +379,21 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero(MidiPitchTran
           .key = 62,
           .durationTicks = 2,
           .note = PerformanceNoteId{2},
+          .voice = PerformanceVoiceId{1},
       },
       NotePerformanceEvent{
           .header = eventHeader(10, 7),
           .key = 64,
           .durationTicks = 4,
           .note = PerformanceNoteId{3},
+          .voice = PerformanceVoiceId{3},
       },
   });
   performance.tracks[0].automations.push_back(PerformanceAutomation{
       .header = eventHeader(8, 6),
       .intent =
           PitchTransitionIntent{
-              .note = PerformanceNoteId{2}, .previousNote = PerformanceNoteId{1}, .startKey = 60, .targetKey = 62},
+              .note = PerformanceNoteId{2}, .startKey = 60, .targetKey = 62},
       .realization = {.startTick = 8, .endTick = 8},
   });
 
@@ -482,6 +486,7 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(bool changesInstr
           .key = 60,
           .durationTicks = 4,
           .note = PerformanceNoteId{1},
+          .voice = PerformanceVoiceId{1},
       },
       NotePerformanceEvent{
           .header = eventHeader(4, 2),
@@ -489,6 +494,7 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(bool changesInstr
           .durationTicks = 4,
           .extendsPrevious = true,
           .note = PerformanceNoteId{1},
+          .voice = PerformanceVoiceId{1},
       },
       EnvelopePerformanceEvent{
           .header = eventHeader(8, 3),
@@ -499,13 +505,14 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(bool changesInstr
           .key = 62,
           .durationTicks = 4,
           .note = PerformanceNoteId{2},
+          .voice = PerformanceVoiceId{1},
       },
   });
   performance.tracks[0].automations.push_back(PerformanceAutomation{
       .header = eventHeader(8, 5),
       .intent =
           PitchTransitionIntent{
-              .note = PerformanceNoteId{2}, .previousNote = PerformanceNoteId{1}, .startKey = 60, .targetKey = 62},
+              .note = PerformanceNoteId{2}, .startKey = 60, .targetKey = 62},
       .realization = {.startTick = 8, .endTick = 8},
   });
   if (changesInstrument) {
@@ -513,7 +520,7 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(bool changesInstr
         performance.tracks[0].events.begin() + 3,
         InstrumentPerformanceEvent{.header = eventHeader(6, 3), .instrument = InstrumentAddress{.program = 1}});
     performance.tracks[0].events.emplace_back(NotePerformanceEvent{
-        .header = eventHeader(12, 6), .key = 64, .durationTicks = 4, .note = PerformanceNoteId{3}});
+        .header = eventHeader(12, 6), .key = 64, .durationTicks = 4, .note = PerformanceNoteId{3}, .voice = PerformanceVoiceId{3}});
   }
   const auto materialized = preparePerformance(performance, {sets.begin(), sets.end()}, InstrumentPreparationOptions{.dynamicEnvelopes = true, .onlyUsedInstruments = true});
   const auto& preparedBanks = materialized.soundBanks();

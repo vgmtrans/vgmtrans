@@ -935,10 +935,10 @@ void ninSnesKonamiZeroDurationRateContinuesHeldVoice() {
              notes[1]->header.tick == 4 && notes[1]->durationTicks == 4 && notes[2]->header.tick == 8 &&
              notes[2]->durationTicks == 8 && notes[3]->header.tick == 16 && notes[3]->durationTicks == 2,
          "zero-rate notes and rests should preserve the driver's full held-voice timeline");
-  expect(transitions.size() == 2 && transitions[0]->previousNote == std::optional{notes[1]->note} &&
+  expect(transitions.size() == 2 && notes[1]->voice == notes[2]->voice &&
              transitions[0]->note == notes[2]->note && transitions[0]->startKey == 28.0 &&
              transitions[0]->targetKey == 31.0 && transitions[0]->timing.timelineTicks == 0 &&
-             transitions[1]->previousNote == std::optional{notes[2]->note} && transitions[1]->note == notes[3]->note &&
+             notes[2]->voice == notes[3]->voice && transitions[1]->note == notes[3]->note &&
              transitions[1]->startKey == 31.0 && transitions[1]->targetKey == 33.0 &&
              transitions[1]->timing.timelineTicks == 0,
          "middle and terminal notes should continue the held voice with instant pitch changes");

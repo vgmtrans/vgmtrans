@@ -605,7 +605,6 @@ struct Playback : SequencePlayback<TrackState> {
     const u8 internal = static_cast<u8>(rawNote + coarse(track.srcn) + noteTranspose);
     beginDuration(encodedDuration);
     const bool continues = !track.retrigger && track.lastNote.valid();
-    const PerformanceNoteId previousNote = track.lastNote;
     NotePerformanceEvent event{
         .key = key,
         .linearVelocity = 1.0,
@@ -642,10 +641,7 @@ struct Playback : SequencePlayback<TrackState> {
       const double targetKey = key + math::semitones(outputPitch(track.targetPitch), track.referencePitch);
       const u32 slideTicks = static_cast<u32>(
           std::ceil(std::abs(track.targetPitch - track.currentPitch) / track.portamentoStep));
-      auto slide = out.pitchSlide(track.lastNote, startKey, targetKey, slideTicks).preferPitchBend();
-      if (continues) {
-        slide.continueFrom(previousNote);
-      }
+      out.pitchSlide(track.lastNote, startKey, targetKey, slideTicks).preferPitchBend();
     } else {
       track.currentPitch = track.targetPitch;
     }

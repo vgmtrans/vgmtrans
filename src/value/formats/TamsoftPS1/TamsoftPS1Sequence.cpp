@@ -108,16 +108,10 @@ struct ProgramState {
     // Close that final attack at the rendered boundary instead of publishing
     // an accidental zero-duration note.
     for (auto& track : performance.tracks) {
-      std::set<u32> continuedNotes;
-      for (const auto& automation : track.automations) {
-        const auto* pitch = std::get_if<PitchTransitionIntent>(&automation.intent);
-        if (pitch != nullptr && pitch->previousNote) {
-          continuedNotes.insert(pitch->previousNote->value);
-        }
-      }
-      for (auto& event : track.events) {
-        auto* note = std::get_if<NotePerformanceEvent>(&event);
-        if (note != nullptr && note->durationTicks == 0 && !continuedNotes.contains(note->note.value)) {
+      std::set<u32> finishedVoices;
+      for (auto event = track.events.rbegin(); event != track.events.rend(); ++event) {
+        auto* note = std::get_if<NotePerformanceEvent>(&*event);
+        if (note != nullptr && finishedVoices.insert(note->voice.value).second && note->durationTicks == 0) {
           const u64 available = track.endTick > note->header.tick ? track.endTick - note->header.tick : 1;
           note->durationTicks = static_cast<u32>(std::min<u64>(available, std::numeric_limits<u32>::max()));
         }

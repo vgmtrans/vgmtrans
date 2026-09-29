@@ -344,7 +344,7 @@ void driverDefaultsAndPitchTransitionsAreVersioned() {
                                    ? nullptr
                                    : pitchTransitionIntent(automatic.tracks.front().automations.front());
   expect(automaticNotes.size() == 2 && automaticSlide != nullptr &&
-             automaticSlide->note == automaticNotes.back()->note && !automaticSlide->previousNote &&
+             automaticSlide->note == automaticNotes.back()->note && automaticNotes[0]->voice != automaticNotes[1]->voice &&
              automaticSlide->startKey == 72.0 && automaticSlide->targetKey == 74.0 &&
              automaticSlide->timing.timelineTicks == 4,
          "later-driver F6 should glide each newly attacked note from the preceding note's pitch");

@@ -33,6 +33,7 @@ void performanceMidiRendererTrustsSourceNoteExtensions() {
                       .linearVelocity = 0.75,
                       .durationTicks = 12,
                       .note = PerformanceNoteId{0},
+                      .voice = PerformanceVoiceId{0},
                   },
                   NotePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 12},
@@ -41,6 +42,7 @@ void performanceMidiRendererTrustsSourceNoteExtensions() {
                       .durationTicks = 6,
                       .extendsPrevious = true,
                       .note = PerformanceNoteId{0},
+                      .voice = PerformanceVoiceId{0},
                   },
                   GlobalTransposePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 18},
@@ -53,6 +55,7 @@ void performanceMidiRendererTrustsSourceNoteExtensions() {
                       .durationTicks = 6,
                       .extendsPrevious = true,
                       .note = PerformanceNoteId{0},
+                      .voice = PerformanceVoiceId{0},
                   },
                   NotePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 24},
@@ -141,13 +144,13 @@ void performanceMidiRendererKeepsPhysicalLimitsAcrossVoiceContinuations() {
         if (laterLimit) {
           out.at(2).pitchSlide(held, 60, 62, 2).portamentoOverlap(24);
         }
-        const auto next = out.at(4).note(
-            NotePerformanceEvent{.key = changesKey ? 64.0 : 60.0,
+        NotePerformanceEvent continuation{.key = changesKey ? 64.0 : 60.0,
                                  .durationTicks = 36,
                                  .maximumDurationMilliseconds = laterLimit ? std::optional{1000.0} : std::nullopt,
-                                 .extendsPrevious = !changesKey});
+                                 .extendsPrevious = !changesKey};
+        const auto next = changesKey ? out.at(4).continueVoice(held, continuation) : out.at(4).note(continuation);
         if (changesKey) {
-          out.at(4).pitchSlide(next, laterLimit ? 62 : 60, 64, 8).continueFrom(held).portamentoOverlap(24);
+          out.at(4).pitchSlide(next, laterLimit ? 62 : 60, 64, 8).portamentoOverlap(24);
         }
         out.at(8).tempo(1000000);
         const auto midi = renderTestMidi(PerformanceSequence{.timebase = {.ppqn = 10}, .tracks = {track}},
@@ -182,8 +185,8 @@ void performanceMidiRendererLimitsOnlyTheOwningVoice() {
             .key = 60, .durationTicks = linkedNote ? 10u : 100u, .maximumDurationMilliseconds = 100.0});
         out.at(5).note(NotePerformanceEvent{.key = 72, .durationTicks = 100, .lane = PerformanceLaneId{lane}});
         if (linkedNote) {
-          const auto next = out.at(10).note(64, 1.0, 90);
-          out.at(10).pitchSlide(next, 60, 64, 10).continueFrom(held);
+          const auto next = out.at(10).continueVoice(held, NotePerformanceEvent{.key = 64, .durationTicks = 90});
+          out.at(10).pitchSlide(next, 60, 64, 10);
         } else {
           out.at(10).pitchSlide(held, 60, 64, 10);
         }
@@ -665,6 +668,7 @@ void performanceMidiRendererCanTerminatePreviousVoices() {
                       .key = 62.0,
                       .durationTicks = 4,
                       .note = PerformanceNoteId{0},
+                      .voice = PerformanceVoiceId{0},
                   },
                   PitchBendPerformanceEvent{
                       .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 8, .sequence = 2},
@@ -676,6 +680,7 @@ void performanceMidiRendererCanTerminatePreviousVoices() {
                       .durationTicks = 4,
                       .extendsPrevious = true,
                       .note = PerformanceNoteId{0},
+                      .voice = PerformanceVoiceId{0},
                   },
               },
       }},

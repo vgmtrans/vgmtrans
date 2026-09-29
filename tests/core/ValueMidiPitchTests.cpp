@@ -145,6 +145,69 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
          "MIDI lowering should leave the caller's target-neutral performance intact");
 }
 
+void sourceVoiceKeyChangesNeedNoPitchBinding() {
+  for (bool nativeGlide : {false, true}) {
+    PerformanceTrack track{.id = TrackId{0}, .endTick = 16};
+    u64 order = 0;
+    u32 noteId = 0, automationId = 0;
+    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{1}, 0, order, noteId, automationId};
+    const auto first = out.note(60, 1.0, 4);
+    const auto second = out.at(4).continueVoice(first, NotePerformanceEvent{.key = 64, .durationTicks = 4});
+    if (nativeGlide) {
+      out.at(4).pitchSlide(second, 60, 64, 4).preferPortamento();
+    }
+    const auto third = out.at(8).continueVoice(second, NotePerformanceEvent{.key = 67, .durationTicks = 4});
+    auto canceled = out.at(8).pitchSlide(third, 64, 67, 3);
+    const auto fourth = out.at(12).continueVoice(third, NotePerformanceEvent{.key = 69, .durationTicks = 4});
+    out.at(14).pitchSlide(fourth, 69, 70, 2).preferPitchBend();
+    canceled.stop(out.at(8));
+    const auto prepared = preparePerformance({.preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
+                                               .tracks = {track}});
+    std::vector<Diagnostic> diagnostics;
+    const auto lowered = detail::lowerMidiTrackEvents(prepared, 0, {},
+                                                       PerformanceTempoMap{prepared.performance()}, diagnostics);
+    const auto heldBend = [&](u64 tick, double semitones) {
+      return std::ranges::any_of(lowered, [&](const PerformanceEvent& event) {
+        const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
+        return bend && bend->header.tick == tick && bend->layer != kPrimaryPitchBendLayer &&
+               std::abs(bend->semitones - semitones) < 0.000001;
+      });
+    };
+    const double baseKey = nativeGlide ? 64.0 : 60.0;
+    expect(heldBend(8, 67 - baseKey) && heldBend(12, 69 - baseKey),
+           "key changes must use the held MIDI note's base, even after a canceled slide or native portamento");
+    const auto midi = renderMidiSequence(prepared);
+    const auto attacks = midiNotes(midi.tracks[0].events);
+    expect(attacks.size() == (nativeGlide ? 2u : 1u) && attacks.back().duration == (nativeGlide ? 12u : 16u),
+           "canceling or delaying pitch motion must not retrigger an explicitly continued voice");
+    const auto native = renderMidiSequence(prepared, {.pitchTransitions = MidiPitchTransitionRendering::Portamento});
+    expect(midiNotes(native.tracks[0].events).size() == 5 &&
+               std::ranges::count_if(native.tracks[0].events, [](const MidiEvent& event) {
+                 return isMidiController(event, MidiController::PortamentoControl);
+               }) == 4,
+           "explicit portamento policy must also apply to key changes without source pitch bindings");
+  }
+}
+
+void sourceKeyChangeUsesRealizedPitchWithPortamento() {
+  PerformanceTrack track{.id = TrackId{0}, .endTick = 8};
+  u64 order = 0;
+  u32 noteId = 0, automationId = 0;
+  PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{1}, 0, order, noteId, automationId};
+  const auto first = out.note(60, 1.0, 4);
+  out.pitchSlide(first, 60, 64, 8).preferPitchBend();
+  out.at(4).continueVoice(first, NotePerformanceEvent{.key = 67, .durationTicks = 4});
+  const auto prepared = preparePerformance({.tracks = {track}});
+  std::vector<Diagnostic> diagnostics;
+  const auto lowered = detail::lowerMidiTrackEvents(prepared, 0, {},
+                                                     PerformanceTempoMap{prepared.performance()}, diagnostics);
+  expect(std::ranges::any_of(lowered, [](const PerformanceEvent& event) {
+           const auto* glide = std::get_if<PortamentoPerformanceEvent>(&event);
+           return glide && glide->header.tick == 4 && glide->previousKey == 62.0;
+         }),
+         "an implicit key change must start portamento from the interrupted glide's realized pitch");
+}
+
 void performanceMidiRendererAllowsMixedPitchTransitionRendering() {
   PerformanceTrack track{
       .id = TrackId{0},
@@ -157,10 +220,10 @@ void performanceMidiRendererAllowsMixedPitchTransitionRendering() {
   PerformanceEmitter out{track,         {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence, nextNote,
                          nextAutomation};
   const PerformanceNoteId first = out.note(60, 1.0, 4);
-  const PerformanceNoteId second = out.at(4).note(64, 1.0, 4);
-  out.at(4).pitchSlide(second, 60, 64, 4).continueFrom(first).preferPortamento();
-  const PerformanceNoteId third = out.at(8).note(67, 1.0, 4);
-  out.at(8).pitchSlide(third, 64, 67, 4).continueFrom(second).preferPitchBend();
+  const PerformanceNoteId second = out.at(4).continueVoice(first, NotePerformanceEvent{.key = 64, .durationTicks = 4});
+  out.at(4).pitchSlide(second, 60, 64, 4).preferPortamento();
+  const PerformanceNoteId third = out.at(8).continueVoice(second, NotePerformanceEvent{.key = 67, .durationTicks = 4});
+  out.at(8).pitchSlide(third, 64, 67, 4).preferPitchBend();
 
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
@@ -228,12 +291,12 @@ void performanceMidiRendererRetainsHeldVoiceAcrossChainedPitchBends() {
                          nextAutomation};
   const PerformanceNoteId first = out.note(60, 1.0, 4);
   out.pitchSlide(first, 56, 60, 8);
-  const PerformanceNoteId second = out.at(4).note(62, 1.0, 4);
-  out.at(4).pitchSlide(second, 60, 62, 8).continueFrom(first);
-  const PerformanceNoteId third = out.at(8).note(64, 1.0, 4);
-  out.at(8).pitchSlide(third, 62, 64, 4).continueFrom(second);
-  const PerformanceNoteId fourth = out.at(12).note(67, 1.0, 4);
-  out.at(12).pitchSlide(fourth, 64, 67, 4).continueFrom(third);
+  const PerformanceNoteId second = out.at(4).continueVoice(first, NotePerformanceEvent{.key = 62, .durationTicks = 4});
+  out.at(4).pitchSlide(second, 60, 62, 8);
+  const PerformanceNoteId third = out.at(8).continueVoice(second, NotePerformanceEvent{.key = 64, .durationTicks = 4});
+  out.at(8).pitchSlide(third, 62, 64, 4);
+  const PerformanceNoteId fourth = out.at(12).continueVoice(third, NotePerformanceEvent{.key = 67, .durationTicks = 4});
+  out.at(12).pitchSlide(fourth, 64, 67, 4);
 
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
@@ -314,10 +377,10 @@ void performanceMidiRendererStartsANewVoiceAfterPitchBendContinuationWhenMidiPor
   PerformanceEmitter out{track,         {track.id, CommandId{5}}, SourceAnnotationId{6}, 0, nextSequence, nextNote,
                          nextAutomation};
   const PerformanceNoteId first = out.note(60, 1.0, 4);
-  const PerformanceNoteId second = out.at(4).note(64, 1.0, 4);
-  out.at(4).pitchSlide(second, 60, 64, 3).continueFrom(first).preferPitchBend();
-  const PerformanceNoteId third = out.at(8).note(67, 1.0, 4);
-  out.at(8).pitchSlide(third, 64, 67, 4).continueFrom(second).preferPortamento();
+  const PerformanceNoteId second = out.at(4).continueVoice(first, NotePerformanceEvent{.key = 64, .durationTicks = 4});
+  out.at(4).pitchSlide(second, 60, 64, 3).preferPitchBend();
+  const PerformanceNoteId third = out.at(8).continueVoice(second, NotePerformanceEvent{.key = 67, .durationTicks = 4});
+  out.at(8).pitchSlide(third, 64, 67, 4).preferPortamento();
 
   const MidiSequence midi = renderTestMidi(
       PerformanceSequence{
@@ -348,8 +411,8 @@ void performanceMidiRendererResetsHeldPitchBeforeMidiPortamentoTakesOver() {
   PerformanceEmitter out{track,         {track.id, CommandId{7}}, SourceAnnotationId{8}, 0, nextSequence, nextNote,
                          nextAutomation};
   const PerformanceNoteId first = out.note(60, 1.0, 4);
-  const PerformanceNoteId second = out.at(4).note(64, 1.0, 8);
-  out.at(4).pitchSlide(second, 60, 64, 4).continueFrom(first).preferPitchBend();
+  const PerformanceNoteId second = out.at(4).continueVoice(first, NotePerformanceEvent{.key = 64, .durationTicks = 8});
+  out.at(4).pitchSlide(second, 60, 64, 4).preferPitchBend();
   out.at(8).pitchSlide(second, 64, 67, 4).preferPortamento();
 
   const MidiSequence midi = renderTestMidi(
@@ -653,8 +716,8 @@ void performanceMidiRendererDoesNotRestartVibratoAtAHeldPitchSlideBoundary() {
   });
   out.vibratoDelayTicks(6);
   const PerformanceNoteId first = out.note(60, 1.0, 4);
-  const PerformanceNoteId second = out.at(4).note(64, 1.0, 4);
-  out.at(4).pitchSlide(second, 60, 64, 4).continueFrom(first);
+  const PerformanceNoteId second = out.at(4).continueVoice(first, NotePerformanceEvent{.key = 64, .durationTicks = 4});
+  out.at(4).pitchSlide(second, 60, 64, 4);
 
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 100},
@@ -831,8 +894,8 @@ void performanceMidiLoweringAppliesPitchResetsBeforeLaterTransitions() {
   const PerformanceNoteId oldVoice = out.note(60, 1.0, 4);
   out.pitchSlide(oldVoice, 60, 56, 4);
   const PerformanceNoteId heldStart = out.at(8).note(68, 1.0, 2);
-  const PerformanceNoteId heldTarget = out.at(10).note(70, 1.0, 20);
-  out.at(10).pitchSlide(heldTarget, 68, 70, 5).continueFrom(heldStart);
+  const PerformanceNoteId heldTarget = out.at(10).continueVoice(heldStart, NotePerformanceEvent{.key = 70, .durationTicks = 20});
+  out.at(10).pitchSlide(heldTarget, 68, 70, 5);
   out.at(16).pitchSlide(heldTarget, 70, 48, 4);
 
   const auto loweredInput = preparePerformance(PerformanceSequence{
@@ -905,8 +968,8 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
   out.pitchBendRange(12);
   const PerformanceNoteId first = out.note(60, 1.0, 4);
   out.at(4).pitchBend(0.25);
-  const PerformanceNoteId second = out.at(4).note(64, 1.0, 4);
-  out.at(4).pitchSlide(second, 60, 64, PitchSlideTiming::fromTicks(0)).continueFrom(first);
+  const PerformanceNoteId second = out.at(4).continueVoice(first, NotePerformanceEvent{.key = 64, .durationTicks = 4});
+  out.at(4).pitchSlide(second, 60, 64, PitchSlideTiming::fromTicks(0));
   out.at(6).pitchBend(-0.25);
   out.at(6).pitchBendRange(8);
   out.at(8).note(67, 1.0, 4);
@@ -1075,8 +1138,8 @@ void performanceMidiRendererResolvesNormalizedWheelBeforeLoweringTransitions() {
       .instrument = InstrumentAddress{.bank = 0, .program = 1},
   });
   out.pitchBend(PitchBendPerformanceEvent{.semitones = 1.0, .normalizedWheelPosition = 0.5});
-  const PerformanceNoteId second = out.at(4).note(62, 1.0, 4);
-  out.at(4).pitchSlide(second, 62, 65, 2).continueFrom(first);
+  const PerformanceNoteId second = out.at(4).continueVoice(first, NotePerformanceEvent{.key = 62, .durationTicks = 4});
+  out.at(4).pitchSlide(second, 62, 65, 2);
 
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
@@ -1327,6 +1390,8 @@ void performanceMidiRendererSkipsRedundantPitchBends() {
 }  // namespace
 
 void runValueMidiPitchTests() {
+  sourceVoiceKeyChangesNeedNoPitchBinding();
+  sourceKeyChangeUsesRealizedPitchWithPortamento();
   performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering();
   performanceMidiRendererAllowsMixedPitchTransitionRendering();
   performanceMidiRendererRetainsHeldVoiceAcrossChainedPitchBends();

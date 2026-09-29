@@ -377,11 +377,9 @@ struct Playback : SequencePlayback<TrackState> {
         .restartsLfoPhase = !continuesPreviousVoice,
     };
     if (automaticPortamento) {
-      track.lastNote = out.note(std::move(event));
+      track.lastNote = continuesPreviousVoice ? out.continueVoice(previousNote, std::move(event))
+                                              : out.note(std::move(event));
       auto slide = out.pitchSlide(track.lastNote, *previousKey, key, track.automaticPortamentoLength);
-      if (continuesPreviousVoice) {
-        slide.continueFrom(previousNote);
-      }
       activatePitchSlide(slide, track.lastNote, *previousKey, key, track.automaticPortamentoLength);
     } else if (continuesPreviousVoice) {
       track.lastNote = previousKey && *previousKey == key ? out.note(NotePerformanceEvent{.key = key,
