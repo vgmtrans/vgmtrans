@@ -1233,7 +1233,7 @@ void performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes() {
   PerformanceTrack track{
       .id = TrackId{0},
       .sourceTrackNumber = 0,
-      .endTick = 8,
+      .endTick = 16,
   };
   u64 nextSequence = 0;
   u32 nextNote = 0;
@@ -1243,6 +1243,8 @@ void performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes() {
   const PerformanceNoteId firstNote = out.note(64, 1.0, 4);
   out.pitchSlide(firstNote, 60, 68, 8).continueAcrossNotes();
   out.at(4).note(67, 1.0, 4);
+  out.at(8).note(70, 1.0, 4);
+  out.at(12).note(72, 1.0, 4);
 
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
@@ -1254,13 +1256,42 @@ void performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes() {
   const auto lowered = detail::lowerMidiTrackEvents(
       loweredInput, 0, {},
       PerformanceTempoMap{loweredInput.performance()}, loweredDiagnostics);
-  const auto continuedBend = std::ranges::find_if(lowered, [](const PerformanceEvent& event) {
-    const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
-    return bend != nullptr && bend->header.tick == 4 && std::abs(bend->semitones - (-3.0)) < 0.000001;
-  });
-  expect(
-      performance.tracks[0].automations[0].realization.endTick == 8 && continuedBend != lowered.end(),
-      "a continuing transition should preserve its absolute curve and rebase it to the new note");
+  const auto lastBendAt = [&](u64 tick) -> std::optional<double> {
+    std::optional<double> value;
+    for (const auto& event : lowered) {
+      if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event); bend && bend->header.tick == tick) {
+        value = bend->semitones;
+      }
+    }
+    return value;
+  };
+  expect(performance.tracks[0].automations[0].realization.endTick == 8 && lastBendAt(4) == -3.0,
+         "at a note boundary, the final bend must rebase the curve to the new note even when writes share an order");
+  expect(lastBendAt(8) == -2.0 && lastBendAt(12) == 0.0,
+         "a curve ending on another affected note must retain its pitch until the following independent attack");
+}
+
+void performanceMidiLoweringOrdersDelayedPitchWithSourceWrites() {
+  PerformanceTrack track{.id = TrackId{0}, .endTick = 8};
+  u64 order = 0;
+  u32 noteId = 0, automationId = 0;
+  PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{1}, 0, order, noteId, automationId};
+  const auto note = out.note(64, 1.0, 8);
+  out.at(1).pitchBend(1.0);
+  out.at(4).pitchSlide(note, 60, 64, 2);
+  const auto prepared = preparePerformance(PerformanceSequence{
+      .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend, .tracks = {track}});
+  std::vector<Diagnostic> diagnostics;
+  const auto events =
+      detail::lowerMidiTrackEvents(prepared, 0, {}, PerformanceTempoMap{prepared.performance()}, diagnostics);
+  std::vector<std::pair<u64, double>> bends;
+  for (const auto& event : events) {
+    if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event)) {
+      bends.emplace_back(bend->header.tick, bend->semitones);
+    }
+  }
+  expect(bends == std::vector<std::pair<u64, double>>{{0, -4.0}, {1, 1.0}, {4, -4.0}, {5, -2.0}, {6, 0.0}},
+         "a delayed slide's initial pitch must precede later source writes, which retain their chronological effect");
 }
 
 void performanceMidiRendererResolvesSourceInstrumentIdentityAtExport() {
@@ -1462,6 +1493,7 @@ void runValueMidiPitchTests() {
   performanceMidiRendererExpandsRangeForComposedPitchLayers();
   performanceMidiRendererResolvesNormalizedWheelBeforeLoweringTransitions();
   performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes();
+  performanceMidiLoweringOrdersDelayedPitchWithSourceWrites();
   performanceMidiRendererResolvesSourceInstrumentIdentityAtExport();
   performanceMidiRendererQuantizesPitchBendAndPortamento();
   performanceMidiRendererSkipsRedundantPitchBends();
