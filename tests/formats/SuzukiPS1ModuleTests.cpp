@@ -175,11 +175,11 @@ void suzukiPs1ModuleBuildsFractionallyTunedWdsSynth() {
   const SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.collections().size() == 1, "SuzukiPS1 fixture should produce one collection");
   const Collection& collection = snapshot.collections().front();
-  expect(collection.members.sequence.has_value() && collection.members.soundBanks.size() == 1 &&
-             collection.members.samplePools.empty(),
+  expect(collection.selection.sequence.has_value() && collection.members().soundBanks.size() == 1 &&
+             collection.members().samplePools.empty(),
          "SuzukiPS1 collection should connect its sequence and self-contained WDS sound bank");
 
-  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
+  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members().soundBanks.front());
   expect(instruments != nullptr && instruments->instruments.size() == 1 &&
              instruments->instruments.front().identity == suzukiPs1InstrumentIdentity(3, 0) &&
              instruments->instruments.front().regions.size() == 1,
@@ -189,7 +189,7 @@ void suzukiPs1ModuleBuildsFractionallyTunedWdsSynth() {
          "WDS semitone and 1/256-semitone tuning should remain fractional");
   expect(region.envelope == psxSpuEnvelope(composePsxAdsr1(1, 0x70, 8, 8), composePsxAdsr2(1, 1, 0x40, 1, 0x10)),
          "DWDS mode bytes should feed the exact native PSX ADSR conversion");
-  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.members.sequence);
+  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.selection.sequence);
   const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program);
   const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(performance.tracks.front());
   expect(

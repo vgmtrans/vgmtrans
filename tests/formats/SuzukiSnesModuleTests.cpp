@@ -548,11 +548,11 @@ void scannerBuildsSequenceDerivedDrumKit() {
   const SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.collections().size() == 1, "SuzukiSnes fixture should publish one complete source collection");
   const Collection& collection = snapshot.collections().front();
-  expect(collection.members.sequence && collection.members.soundBanks.size() == 1 &&
-             collection.members.samplePools.empty(),
+  expect(collection.selection.sequence && collection.members().soundBanks.size() == 1 &&
+             collection.members().samplePools.empty(),
          "SuzukiSnes collection should connect its sequence and self-contained sound bank");
 
-  const auto* set = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
+  const auto* set = snapshot.asset<SoundBankAsset>(collection.members().soundBanks.front());
   expect(set != nullptr && set->instruments.size() == 2,
          "one melodic program and its sequence-derived drum kit should share one immutable instrument set");
   const auto kit = std::ranges::find_if(set->instruments, [](const Instrument& instrument) {

@@ -426,10 +426,10 @@ void scannerBuildsTunedSynthAndCollection() {
   const SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.collections().size() == 1, "Wolf Team scanner should publish one source collection");
   const Collection& collection = snapshot.collections().front();
-  expect(collection.members.sequence && collection.members.soundBanks.size() == 1 &&
-             collection.members.samplePools.empty(),
+  expect(collection.selection.sequence && collection.members().soundBanks.size() == 1 &&
+             collection.members().samplePools.empty(),
          "the collection should connect the decoded sequence and self-contained sound bank");
-  const auto* set = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
+  const auto* set = snapshot.asset<SoundBankAsset>(collection.members().soundBanks.front());
   expect(set != nullptr && set->instruments.size() == 1 && set->instruments.front().regions.size() == 1,
          "invalid sparse sample slots must not hide the one valid late instrument");
   const Region& region = set->instruments.front().regions.front();
@@ -437,7 +437,7 @@ void scannerBuildsTunedSynthAndCollection() {
              std::abs(region.attenuationDb - (-20.0 * std::log10(0.5))) < 1e-9 && region.envelope.attackSeconds >= 0.0,
          "late key/tuning bias, sample volume, and fixed-gain DSP ADSR should match the driver tables");
 
-  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.members.sequence);
+  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.selection.sequence);
   expect(sequence != nullptr && !snapshot.sources().empty(), "the scanned collection should retain its sequence asset");
   const SourceId source = snapshot.sources().front().id;
   const SourceMap& sourceMap = snapshot.sourceMap();
@@ -480,8 +480,8 @@ void scannerBuildsArcusPitchModel() {
   const SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.collections().size() == 1, "Arcus scanner fixture should publish one source collection");
   const Collection& collection = snapshot.collections().front();
-  expect(collection.members.soundBanks.size() == 1, "Arcus collection should include its segmented patch set");
-  const auto* set = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
+  expect(collection.members().soundBanks.size() == 1, "Arcus collection should include its segmented patch set");
+  const auto* set = snapshot.asset<SoundBankAsset>(collection.members().soundBanks.front());
   expect(set != nullptr && set->instruments.size() == 1 && set->instruments.front().regions.size() == 1,
          "Arcus SRCN map should retain the one valid BRR-backed patch");
   const Region& region = set->instruments.front().regions.front();

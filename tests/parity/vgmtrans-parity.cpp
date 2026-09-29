@@ -906,8 +906,8 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
   CapcomSnesSummary summary;
   std::map<u32, const SamplePool*> samplePoolsById;
 
-  if (collection.members.sequence) {
-    if (const auto* sequenceProgram = project.asset<SequenceProgramAsset>(*collection.members.sequence)) {
+  if (collection.selection.sequence) {
+    if (const auto* sequenceProgram = project.asset<SequenceProgramAsset>(*collection.selection.sequence)) {
       ++summary.sequenceCount;
       summary.trackCounts.push_back(static_cast<u32>(sequenceProgram->program.tracks.size()));
     }
@@ -934,7 +934,7 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
       });
     }
   };
-  for (const auto samplePoolId : collection.members.samplePools) {
+  for (const auto samplePoolId : collection.members().samplePools) {
     if (const auto* samplePool = project.asset<SamplePoolAsset>(samplePoolId)) {
       appendSamples(samplePool->metadata.id, samplePool->pool);
     }
@@ -942,7 +942,7 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
 
   std::vector<const SoundBankAsset*> soundBanks;
   if (preparedInstrumentSets.empty()) {
-    for (const auto soundBankId : collection.members.soundBanks) {
+    for (const auto soundBankId : collection.members().soundBanks) {
       if (const auto* soundBank = project.asset<SoundBankAsset>(soundBankId)) {
         soundBanks.push_back(soundBank);
       }
@@ -1485,10 +1485,10 @@ std::map<std::string, CapcomSnesSummary> legacyFormatCollectionSummaries(const s
 
 bool valueCollectionHasSequenceFormat(const SessionSnapshot& project, const Collection& collection,
                                       std::string_view formatName) {
-  if (!collection.members.sequence) {
+  if (!collection.selection.sequence) {
     return false;
   }
-  const auto* sequence = project.asset<SequenceProgramAsset>(*collection.members.sequence);
+  const auto* sequence = project.asset<SequenceProgramAsset>(*collection.selection.sequence);
   return sequence != nullptr && sequence->metadata.format == formatName;
 }
 
@@ -1520,7 +1520,7 @@ std::map<std::string, CapcomSnesSummary> valueFormatCollectionSummaries(const st
     CapcomSnesSummary summary;
     if (formatName == "CPS" && cpsSharedSynthSummary) {
       summary = *cpsSharedSynthSummary;
-      if (const auto* sequence = project.asset<SequenceProgramAsset>(*collection.members.sequence)) {
+      if (const auto* sequence = project.asset<SequenceProgramAsset>(*collection.selection.sequence)) {
         summary.sequenceCount = 1;
         summary.trackCounts = {static_cast<u32>(sequence->program.tracks.size())};
       }
@@ -1586,18 +1586,18 @@ AkaoSummary valueAkaoSummary(const std::filesystem::path& path, std::ostream& di
 
   AkaoSummary summary;
   for (const auto& collection : project.collections()) {
-    if (!collection.members.sequence) {
+    if (!collection.selection.sequence) {
       continue;
     }
-    const auto* sequence = project.asset<SequenceProgramAsset>(*collection.members.sequence);
+    const auto* sequence = project.asset<SequenceProgramAsset>(*collection.selection.sequence);
     if (sequence == nullptr || sequence->metadata.format != "Akao") {
       continue;
     }
     AkaoCollectionSummary shape{
         .sequenceOffset = static_cast<u32>(sequence->metadata.range.offset),
         .trackCount = static_cast<u32>(sequence->program.tracks.size()),
-        .soundBankCount = static_cast<u32>(collection.members.soundBanks.size()),
-        .samplePoolCount = static_cast<u32>(collection.members.samplePools.size()),
+        .soundBankCount = static_cast<u32>(collection.members().soundBanks.size()),
+        .samplePoolCount = static_cast<u32>(collection.members().samplePools.size()),
     };
     const auto binding = bindCollection(project, collection.id);
     for (const auto& diagnostic : binding.diagnostics) {
@@ -1779,10 +1779,10 @@ std::map<std::string, std::vector<u8>> valueAkaoCollectionMidis(const std::files
 
   std::map<std::string, std::vector<u8>> midis;
   for (const auto& collection : project.collections()) {
-    if (!collection.members.sequence) {
+    if (!collection.selection.sequence) {
       continue;
     }
-    const auto* sequence = project.asset<SequenceProgramAsset>(*collection.members.sequence);
+    const auto* sequence = project.asset<SequenceProgramAsset>(*collection.selection.sequence);
     if (sequence == nullptr || sequence->metadata.format != "Akao") {
       continue;
     }
@@ -1827,10 +1827,10 @@ std::map<std::string, SynthExportBytes> legacyAkaoCollectionSynthExports(const s
 }
 
 bool valueCollectionHasSamples(const SessionSnapshot& project, const Collection& collection) {
-  if (!collection.members.samplePools.empty()) {
+  if (!collection.members().samplePools.empty()) {
     return true;
   }
-  return std::ranges::any_of(collection.members.soundBanks, [&](AssetId id) {
+  return std::ranges::any_of(collection.members().soundBanks, [&](AssetId id) {
     const auto* bank = project.asset<SoundBankAsset>(id);
     return bank != nullptr && !bank->localSamples.samples.empty();
   });
@@ -1855,11 +1855,11 @@ std::map<std::string, SynthExportBytes> valueAkaoCollectionSynthExports(const st
 
   std::map<std::string, SynthExportBytes> exports;
   for (const auto& collection : project.collections()) {
-    if (!collection.members.sequence || collection.members.soundBanks.empty() ||
+    if (!collection.selection.sequence || collection.members().soundBanks.empty() ||
         !valueCollectionHasSamples(project, collection)) {
       continue;
     }
-    const auto* sequence = project.asset<SequenceProgramAsset>(*collection.members.sequence);
+    const auto* sequence = project.asset<SequenceProgramAsset>(*collection.selection.sequence);
     if (sequence == nullptr || sequence->metadata.format != "Akao") {
       continue;
     }
@@ -1896,10 +1896,10 @@ std::string legacyMidiCollectionKey(const VGMColl& collection) {
 }
 
 std::string valueMidiCollectionKey(const SessionSnapshot& project, const Collection& collection) {
-  if (!collection.members.sequence) {
+  if (!collection.selection.sequence) {
     throw std::runtime_error("value MIDI collection had no sequence: " + collection.name);
   }
-  const auto* sequence = project.asset<SequenceProgramAsset>(*collection.members.sequence);
+  const auto* sequence = project.asset<SequenceProgramAsset>(*collection.selection.sequence);
   if (sequence == nullptr) {
     throw std::runtime_error("value MIDI collection referenced a missing sequence: " + collection.name);
   }
@@ -1985,7 +1985,7 @@ std::map<std::string, std::vector<u8>> valueCollectionMidis(
 
   std::map<std::string, std::vector<u8>> midis;
   for (const auto& collection : project.collections()) {
-    if (!collection.members.sequence) {
+    if (!collection.selection.sequence) {
       continue;
     }
     std::vector<u8> midi;
@@ -2185,7 +2185,7 @@ std::map<std::string, SynthExportBytes> valueCollectionSynthExports(const std::f
 
   std::map<std::string, SynthExportBytes> exports;
   for (const auto& collection : project.collections()) {
-    if (collection.members.soundBanks.empty() || !valueCollectionHasSamples(project, collection)) {
+    if (collection.members().soundBanks.empty() || !valueCollectionHasSamples(project, collection)) {
       continue;
     }
     auto [_, inserted] = exports.emplace(collection.name, valueCapcomSnesSynthExports(session, collection.id));
@@ -2221,7 +2221,7 @@ std::map<std::string, SynthExportBytes> valueFormatCollectionSynthExports(const 
 
   std::map<std::string, SynthExportBytes> exports;
   for (const auto& collection : project.collections()) {
-    if (!valueCollectionHasSequenceFormat(project, collection, formatName) || collection.members.soundBanks.empty() ||
+    if (!valueCollectionHasSequenceFormat(project, collection, formatName) || collection.members().soundBanks.empty() ||
         !valueCollectionHasSamples(project, collection)) {
       continue;
     }
@@ -2255,12 +2255,12 @@ bool endsWith(std::string_view text, std::string_view suffix) {
 
 u32 valueSampleCount(const SessionSnapshot& project, const Collection& collection) {
   u32 sampleCount = 0;
-  for (const auto soundBankId : collection.members.soundBanks) {
+  for (const auto soundBankId : collection.members().soundBanks) {
     if (const auto* soundBank = project.asset<SoundBankAsset>(soundBankId)) {
       sampleCount += static_cast<u32>(soundBank->localSamples.samples.size());
     }
   }
-  for (const auto samplePoolId : collection.members.samplePools) {
+  for (const auto samplePoolId : collection.members().samplePools) {
     if (const auto* samplePool = project.asset<SamplePoolAsset>(samplePoolId)) {
       sampleCount += static_cast<u32>(samplePool->pool.samples.size());
     }
@@ -4121,7 +4121,7 @@ std::map<std::string, PerformanceModulationStats> valueFormatPerformanceModulati
     if (!valueCollectionHasSequenceFormat(project, collection, formatName)) {
       continue;
     }
-    const auto* sequence = project.asset<SequenceProgramAsset>(*collection.members.sequence);
+    const auto* sequence = project.asset<SequenceProgramAsset>(*collection.selection.sequence);
     const std::string key = valueMidiCollectionKey(project, collection);
     auto [_, inserted] = statsByCollection.emplace(key, performanceModulationStats(sequence->program, sequenceLoops));
     if (!inserted) {
@@ -5187,7 +5187,7 @@ int smokeRareSnesDirectExports(const std::filesystem::path& path) {
     if (!valueCollectionHasSequenceFormat(auditProject, collection, kRareSnesSuite.format)) {
       continue;
     }
-    const auto* sequence = auditProject.asset<SequenceProgramAsset>(*collection.members.sequence);
+    const auto* sequence = auditProject.asset<SequenceProgramAsset>(*collection.selection.sequence);
     for (const TrackProgram& track : sequence->program.tracks) {
       for (const SourceCommand& command : track.commands) {
         ++auditedCommands;

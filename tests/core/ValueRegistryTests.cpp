@@ -137,13 +137,13 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
          "every asset draft should retain an immutable typed private payload");
   const auto collections = dependencyCollections(AssetCatalog{sources, SharedSequence<Asset>{result.assets}});
   expect(collections.size() == 1, "scan result builder should declare one sequence collection");
-  expect(collections[0].members.sequence == sequence.id(),
+  expect(collections[0].selection.sequence == sequence.id(),
          "scan result builder should preserve the collection sequence");
-  expect(collections[0].members.soundBanks == std::vector<AssetId>{bank.id()},
+  expect(collections[0].members().soundBanks == std::vector<AssetId>{bank.id()},
          "scan result builder should preserve the collection instrument set");
-  expect(collections[0].members.samplePools == std::vector<AssetId>{samplePool.id()},
+  expect(collections[0].members().samplePools == std::vector<AssetId>{samplePool.id()},
          "scan result builder should preserve the collection sample collection");
-  expect(collections[0].members.miscAssets == std::vector<AssetId>{misc.id()},
+  expect(collections[0].selection.miscAssets == std::vector<AssetId>{misc.id()},
          "scan result builder should preserve the collection misc asset");
   expect(result.diagnostics.size() == 1 && result.diagnostics[0].message == "builder warning",
          "scan result builder should preserve diagnostics");
@@ -192,8 +192,8 @@ void scanResultBuilderPublishesCollectionsByDefaultAndPreservesOptOut() {
   loose.includeMisc(table).collectionName("Still loose");
   const auto result = out.finish();
   const auto collections = dependencyCollections(AssetCatalog{sources, SharedSequence<Asset>{result.assets}});
-  expect(collections.size() == 1 && collections.front().members.sequence == song.id() &&
-             collections.front().name == "Song" && collections.front().members.soundBanks.empty(),
+  expect(collections.size() == 1 && collections.front().selection.sequence == song.id() &&
+             collections.front().name == "Song" && collections.front().members().soundBanks.empty(),
          "publishing a sequence must create a collection even without bank requests or explicit collection metadata");
   const auto& retained = std::get<SequenceProgramAsset>(result.assets.back());
   expect(retained.metadata.id == loose.id() && retained.recipe.banks.size() == 2 &&
@@ -220,7 +220,7 @@ void scanResultBuilderNamesSequenceCollections() {
   const auto collections = dependencyCollections(AssetCatalog{sources, SharedSequence<Asset>{result.assets}});
   expect(collections.size() == 1 && collections[0].name == "Tagged Song",
          "a sequence collection can use a source title independently of the sequence name");
-  expect(collections[0].members.sequence == sequence.id(),
+  expect(collections[0].selection.sequence == sequence.id(),
          "sequence collection identity should not depend on its display name");
 }
 

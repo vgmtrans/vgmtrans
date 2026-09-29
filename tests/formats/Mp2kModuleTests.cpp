@@ -185,10 +185,10 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
   const SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.collections().size() == 1, "MP2k fixture should produce one collection");
   const Collection& collection = snapshot.collections().front();
-  expect(collection.members.soundBanks.size() == 1 && collection.members.samplePools.size() == 1,
+  expect(collection.members().soundBanks.size() == 1 && collection.members().samplePools.size() == 1,
          "MP2k collection should attach its PCM-owning bank and shared PSG samples");
 
-  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
+  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members().soundBanks.front());
   expect(instruments != nullptr && instruments->instruments.size() == 3,
          "MP2k bank should retain DirectSound, wave-RAM, and square programs");
   expect(instruments->instruments[0].modulation.vibrato && instruments->instruments[0].modulation.tremolo &&
@@ -212,7 +212,7 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
   expect(std::abs(directAttackSeconds(127) - 258.0 / (255.0 * gbaFrameRate)) < 1e-12,
          "DirectSound attack conversion must retain the final partial integer step");
 
-  const auto* psg = snapshot.asset<SamplePoolAsset>(collection.members.samplePools[0]);
+  const auto* psg = snapshot.asset<SamplePoolAsset>(collection.members().samplePools[0]);
   expect(psg != nullptr && psg->pool.samples.size() == 16 && instruments->localSamples.samples.size() == 1,
          "MP2k synth should generate only the PSG samples used by the bank");
   expect(instruments->instruments[1].regions.size() == 128 && instruments->instruments[2].regions.size() == 128,
@@ -348,7 +348,7 @@ void mp2kFixedReverseDirectSoundUsesMixerRate() {
   const SourceId source = scanMp2k(session, "mp2k-fixed-reverse.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
   const Collection& collection = snapshot.collections().front();
-  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
+  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members().soundBanks.front());
   expect(instruments && instruments->instruments[0].regions.size() == 128 &&
              instruments->instruments[0].regions[60].keyRange.low == 60 &&
              instruments->instruments[0].regions[60].unityKey == 60.0,
@@ -369,14 +369,14 @@ void mp2kNoiseUsesAuditedRegisterClockAndWidth() {
   const SourceId source = scanMp2k(session, "mp2k-noise.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
   const Collection& collection = snapshot.collections().front();
-  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
+  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members().soundBanks.front());
   expect(instruments && instruments->instruments.size() == 3 && instruments->instruments[2].regions.size() == 128,
          "MP2k noise should preserve the key-clamped register table with one region per key");
   const Region& noiseA4 = instruments->instruments[2].regions[69];
   const double renderedClock = 26758.0 * std::exp2((69.0 - noiseA4.unityKey) / 12.0);
   const double hardwareClock = 524288.0 / 7.0 / 4.0;  // gNoiseTable[48] = 0x17
   expect(std::abs(renderedClock - hardwareClock) < 1e-9, "noise key 69 should use the clock selected by register 0x17");
-  const auto* psg = snapshot.asset<SamplePoolAsset>(collection.members.samplePools[0]);
+  const auto* psg = snapshot.asset<SamplePoolAsset>(collection.members().samplePools[0]);
   const Sample* noise = psg ? &psg->pool.samples[noiseA4.sample.index()] : nullptr;
   expect(noise && noise->codecParameter == 5, "short MP2k noise should reference the 7-bit GBA LFSR sample");
   const auto decoded = decodeSample(*noise, session.sources().bytes(source));
@@ -397,11 +397,11 @@ void mp2kCgbFixedToneUsesDacResolutionMask() {
   scanMp2k(session, "mp2k-cgb-fixed.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
   const Collection& collection = snapshot.collections().front();
-  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
+  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members().soundBanks.front());
   expect(instruments && instruments->instruments.size() == 3 && instruments->instruments[2].regions.size() == 128,
          "CGB FIX fixture should retain singleton hardware-pitch regions");
   const Region& key37 = instruments->instruments[2].regions[37];
-  const auto* psg = snapshot.asset<SamplePoolAsset>(collection.members.samplePools.front());
+  const auto* psg = snapshot.asset<SamplePoolAsset>(collection.members().samplePools.front());
   expect(psg != nullptr, "CGB FIX fixture should retain its PSG sample pool");
   const Sample& sample = psg->pool.samples[key37.sample.index()];
   const double renderedFrequency =
@@ -458,7 +458,7 @@ void mp2kCgbVolumeUsesCombinedHardwareQuantization() {
   const auto levels = eventsOfType<LevelPerformanceEvent>(performanceTrack);
   const auto balances = eventsOfType<StereoBalancePerformanceEvent>(performanceTrack);
   const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(performanceTrack);
-  const auto* instruments = snapshot.asset<SoundBankAsset>(snapshot.collections().front().members.soundBanks.front());
+  const auto* instruments = snapshot.asset<SoundBankAsset>(snapshot.collections().front().members().soundBanks.front());
   expect(instruments && instruments->instruments.size() > 3, "CGB rhythm fixture should produce its source program");
   const auto pannedRegion = std::ranges::find_if(instruments->instruments[3].regions,
                                                  [](const Region& region) { return region.keyRange.low == 61; });
@@ -610,7 +610,7 @@ void mp2kDirectSoundMasterVolumeAffectsOnlyPcmVoices() {
   Session session;
   scanMp2k(session, "mp2k-master-volume.gba", mp2kFixture(7));
   const SessionSnapshot snapshot = session.snapshot();
-  const auto* instruments = snapshot.asset<SoundBankAsset>(snapshot.collections().front().members.soundBanks.front());
+  const auto* instruments = snapshot.asset<SoundBankAsset>(snapshot.collections().front().members().soundBanks.front());
   expect(instruments && instruments->instruments.size() == 3 && !instruments->instruments[0].regions.empty() &&
              !instruments->instruments[1].regions.empty(),
          "MP2k master-volume fixture should retain its PCM and CGB instruments");

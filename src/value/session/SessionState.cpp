@@ -127,9 +127,9 @@ void SessionState::removeSources(std::span<const SourceId> sources) {
   removeDiscoveredData(sourceIds, removedAssets);
 }
 
-CollectionId SessionState::createUserCollection(std::string name, CollectionMembers members,
-                                                std::vector<ResolvedDependency> dependencies,
-                                                std::vector<CollectionIssue> issues) {
+CollectionId SessionState::createUserCollection(DesiredCollection collection) {
+  const auto& name = collection.name;
+  const auto& members = collection.selection;
   if (name.empty()) {
     throw std::invalid_argument("A user-created collection must have a name");
   }
@@ -161,10 +161,10 @@ CollectionId SessionState::createUserCollection(std::string name, CollectionMemb
   const CollectionId id{nextCollectionId_++};
   collections_.push_back(Collection{
       .id = id,
-      .name = std::move(name),
-      .members = std::move(members),
-      .issues = std::move(issues),
-      .dependencies = std::move(dependencies),
+      .name = std::move(collection.name),
+      .selection = std::move(collection.selection),
+      .issues = std::move(collection.issues),
+      .inputs = std::move(collection.inputs),
   });
   return id;
 }
@@ -197,18 +197,18 @@ SourceMap SessionState::sourceMapForAsset(AssetId asset) const {
 void SessionState::reconcileCollections(std::vector<DesiredCollection> desired) {
   std::unordered_set<AssetId> sequences;
   for (auto& candidate : desired) {
-    const AssetId sequence = candidate.members.sequence.value();
+    const AssetId sequence = candidate.selection.sequence.value();
     sequences.insert(sequence);
     validateMiscAssets(candidate);
     Collection collection{
         .name = std::move(candidate.name),
         .origin = CollectionOrigin::Discovered,
-        .members = std::move(candidate.members),
+        .selection = std::move(candidate.selection),
         .issues = std::move(candidate.issues),
-        .dependencies = std::move(candidate.dependencies),
+        .inputs = std::move(candidate.inputs),
     };
     const auto found = std::ranges::find_if(collections_, [&](const Collection& existing) {
-      return existing.isDiscovered() && existing.members.sequence == sequence;
+      return existing.isDiscovered() && existing.selection.sequence == sequence;
     });
     if (found != collections_.end()) {
       collection.id = found->id;
@@ -220,7 +220,7 @@ void SessionState::reconcileCollections(std::vector<DesiredCollection> desired) 
   }
 
   std::erase_if(collections_, [&](const Collection& collection) {
-    return collection.isDiscovered() && !sequences.contains(collection.members.sequence.value());
+    return collection.isDiscovered() && !sequences.contains(collection.selection.sequence.value());
   });
 }
 
@@ -293,7 +293,7 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
   std::erase_if(diagnostics_, removesDiagnostic);
 
   std::erase_if(collections_, [&](const Collection& collection) {
-    return !collection.isDiscovered() && referencesAnyAsset(collection.members, assetIds);
+    return !collection.isDiscovered() && referencesAnyAsset(collection.members(), assetIds);
   });
   rebuildViews();
   rebuildIndexes();
@@ -302,16 +302,14 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
 void SessionState::validateMiscAssets(DesiredCollection& desired) {
   // Audio inputs were checked during resolution. These extra assets are for
   // inspection only, so losing one reports a problem without blocking audio preparation.
-  if (desired.members.miscAssets.empty()) {
+  if (desired.selection.miscAssets.empty()) {
     return;
   }
-  ResolvedDependency supplemental{.owner = desired.members.sequence.value(), .role = DependencyRole::Supplemental};
-  std::erase_if(desired.members.miscAssets, [&](AssetId id) {
+  std::erase_if(desired.selection.miscAssets, [&](AssetId id) {
     if (asset<MiscAsset>(id) != nullptr) {
-      supplemental.targets.push_back({id, {}});
       return false;
     }
-    supplemental.status = ResolutionStatus::Incomplete;
+    desired.inputs.inspectionStatus = ResolutionStatus::Incomplete;
     const bool missing = !containsAsset(id);
     addError("Collection '" + desired.name + "' references misc asset id " + std::to_string(id.value) +
              (missing ? " that does not exist" : " that is not a misc asset"));
@@ -324,7 +322,6 @@ void SessionState::validateMiscAssets(DesiredCollection& desired) {
     });
     return true;
   });
-  desired.dependencies.push_back(std::move(supplemental));
 }
 
 void SessionState::rebuildViews() {

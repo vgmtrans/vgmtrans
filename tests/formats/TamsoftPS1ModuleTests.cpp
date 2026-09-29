@@ -188,9 +188,9 @@ void modulePairsPs1MusicAndSfxBanksByRole() {
     const auto collection = std::ranges::find_if(snapshot.collections(), [&](const Collection& candidate) {
       return candidate.name.starts_with(collectionName);
     });
-    return collection == snapshot.collections().end() || collection->members.soundBanks.size() != 1
+    return collection == snapshot.collections().end() || collection->members().soundBanks.size() != 1
                ? nullptr
-               : snapshot.asset<SoundBankAsset>(collection->members.soundBanks.front());
+               : snapshot.asset<SoundBankAsset>(collection->members().soundBanks.front());
   };
   const auto* music = pairedBank("C27BGM");
   const auto* sfxBank = pairedBank("C27 (");

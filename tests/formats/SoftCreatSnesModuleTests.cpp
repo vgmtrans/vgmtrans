@@ -287,9 +287,9 @@ void instrumentAnnotationsReflectTheSynthModel() {
       session.addSource(SourceFile{.name = "synthetic-softcreat.aram"}, modernScannerFixture());
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
-  const auto* bank = snapshot.collections().empty() || snapshot.collections().front().members.soundBanks.empty()
+  const auto* bank = snapshot.collections().empty() || snapshot.collections().front().members().soundBanks.empty()
                          ? nullptr
-                         : snapshot.asset<SoundBankAsset>(snapshot.collections().front().members.soundBanks.front());
+                         : snapshot.asset<SoundBankAsset>(snapshot.collections().front().members().soundBanks.front());
   expect(bank != nullptr && bank->instruments.size() == 1,
          "SoftCreatSnes scanning should publish its referenced instrument");
 

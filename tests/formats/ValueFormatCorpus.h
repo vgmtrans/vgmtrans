@@ -60,8 +60,8 @@ inline int scanValueFormatArchive(const std::filesystem::path& path, const Value
       std::filesystem::create_directories(*corpus.outputDirectory);
     }
     for (const Collection& collection : snapshot.collections()) {
-      if (!collection.members.sequence ||
-          std::ranges::find(sequences, *collection.members.sequence) == sequences.end()) {
+      if (!collection.selection.sequence ||
+          std::ranges::find(sequences, *collection.selection.sequence) == sequences.end()) {
         continue;
       }
       const auto artifacts = session.exportCollection(collection.id, *corpus.exports);
@@ -90,7 +90,7 @@ inline int scanValueFormatArchive(const std::filesystem::path& path, const Value
   const auto missingSoundBanks = std::ranges::count_if(sequences, [&](AssetId sequence) {
     return corpus.requireSoundBank &&
            std::ranges::none_of(snapshot.collections(), [&](const Collection& collection) {
-             return collection.members.sequence == sequence && !collection.members.soundBanks.empty();
+             return collection.selection.sequence == sequence && !collection.members().soundBanks.empty();
            });
   });
 

@@ -153,8 +153,8 @@ void scannerPublishesSequenceAndReferencedSynth() {
   session.addSource(SourceFile{.name = "AsciiShuichiSnes fixture.aram"}, fixture.data());
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
-  expect(snapshot.collections().size() == 1 && snapshot.collections().front().members.sequence &&
-             snapshot.collections().front().members.soundBanks.size() == 1,
+  expect(snapshot.collections().size() == 1 && snapshot.collections().front().selection.sequence &&
+             snapshot.collections().front().members().soundBanks.size() == 1,
          "format scanning should publish the sequence and its self-contained BRR instrument bank");
 }
 

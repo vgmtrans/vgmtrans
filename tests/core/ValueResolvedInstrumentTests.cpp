@@ -280,7 +280,8 @@ void collectionExportsRequireACompanionForVariants() {
           .localSamples = {.samples = {Sample{.codec = AudioCodec::PcmS16, .encodedData = range,
                                                .sampleRate = 22050}}}}};
   builder.collections = {{.id = CollectionId{0}, .name = "Song",
-                           .members = {.sequence = AssetId{0}, .soundBanks = {AssetId{1}}}}};
+                           .selection = {.sequence = AssetId{0}, .soundBanks = {AssetId{1}}},
+      .inputs = {.banks = {{.bank = AssetId{1}}}}}};
   const auto snapshot = builder.finish();
   const auto direct = exportSequenceMidi(snapshot, sources, AssetId{0}, {});
   const auto ignored = exportCollection(snapshot, sources, CollectionId{0},
@@ -346,9 +347,10 @@ void completedCollectionsRetainInputsAcrossRenderingOutcomes() {
               .pool = {.samples = {Sample{.codec = AudioCodec::PcmS8, .encodedData = {source, 0, 4},
                                           .sampleRate = 16000}}}},
       };
-      builder.collections = {{.id = CollectionId{0}, .name = "Collection", .members = {
+      builder.collections = {{.id = CollectionId{0}, .name = "Collection", .selection = {
           .sequence = scenario == Scenario::NoSequence ? std::nullopt : std::optional{AssetId{0}},
-          .soundBanks = {AssetId{1}}, .samplePools = {AssetId{2}}}}};
+          .soundBanks = {AssetId{1}}, .samplePools = {AssetId{2}}},
+      .inputs = {.banks = {{.bank = AssetId{1}}}}}};
       const auto snapshot = builder.finish();
       auto binding = bindCollection(snapshot, CollectionId{0});
       expect(binding.collection.has_value(), "the lifetime fixture should bind successfully");
@@ -474,8 +476,9 @@ void synthSelectionsPreserveBankSamplingAndSampleOwners() {
                   }},
                   .tracks = {TrackProgram{.startAddress = Address{0}, .commands = {
                       SourceCommand{.address = Address{0}, .flow = CommandFlow::end(Address{1})}}}}}});
-  builder.collections = {{.id = CollectionId{0}, .members = {
-      .sequence = AssetId{0}, .soundBanks = {AssetId{10}, AssetId{20}, AssetId{30}}, .samplePools = {AssetId{40}}}}};
+  builder.collections = {{.id = CollectionId{0}, .selection = {
+      .sequence = AssetId{0}, .soundBanks = {AssetId{10}, AssetId{20}, AssetId{30}}, .samplePools = {AssetId{40}}},
+      .inputs = {.banks = {{.bank = AssetId{10}}, {.bank = AssetId{20}}, {.bank = AssetId{30}}}}}};
   const auto snapshot = builder.finish();
   for (const auto format : {SynthExportFormat::SoundFont2, SynthExportFormat::Dls}) {
     const auto artifact = exportSoundBank(snapshot, sources, AssetId{20}, format, {.exportOnlyUsedInstruments = true});

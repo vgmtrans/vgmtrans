@@ -65,8 +65,7 @@ struct BankAssets {
         parseSegSatSequence(input.reader, sequenceDraft.id(), sequence, &result.sourceMap(), &result.diagnostics());
     const std::vector<u8> referencedBanks =
         sequence.referencedBanks.empty() ? std::vector<u8>{0} : sequence.referencedBanks;
-    sequenceDraft.assignBanks(assignSegSatBanks)
-        .prepare<SegSatSequenceBindingData>(prepareSegSatSequence)
+    sequenceDraft.prepare<SegSatSequenceBindingData>(prepareSegSatSequence)
         .data(SegSatSequenceBindingData{
             .volumeModel = volumeModel,
             .referencedBanks = referencedBanks,
@@ -99,12 +98,18 @@ struct BankAssets {
 
 }  // namespace
 
-void assignSegSatBanks(BankAssignmentContext& context) {
-  const auto& sequence = context.data<SegSatSequenceBindingData>();
-  auto banks = context.banks<SegSatBankBindingData>();
+std::optional<SequenceRuntime> prepareSegSatSequence(SequencePreparationContext& context,
+                                                    const SegSatSequenceBindingData& sequence) {
+  auto banks = context.banks<SegSatBankBindingData>(kSegSatFormatName);
   if (banks.size() != sequence.referencedBanks.size()) {
     context.warning(fmt::format("SegSat sequence refers to {} banks, but the collection contains {} SegSat banks",
                                 sequence.referencedBanks.size(), banks.size()));
+  }
+  if (banks.empty() && !sequence.referencedBanks.empty()) {
+    context.fail("SegSat collection does not contain a retained SegSat instrument bank");
+  }
+  if (banks.empty()) {
+    return std::nullopt;
   }
 
   // Keep banks whose stored numbers already match the sequence's bank commands.
@@ -118,45 +123,21 @@ void assignSegSatBanks(BankAssignmentContext& context) {
       unmatched.erase(found);
     }
   }
+  std::vector<SegSatVelocityBank> velocityBanks;
   auto fallback = unmatched.begin();
   for (size_t i = 0; i < banks.size(); ++i) {
     const u8 logical = !exact[i] && fallback != unmatched.end() ? *fallback++ : banks[i].data.sourceBank;
     // Keep the sequence's bank number for interpreting its commands, but export
     // a lone bank as bank zero. These settings apply only to this collection.
-    banks[i].placement = AssetPrivateData::make(
-        SegSatBankUse{.logicalBank = logical, .exportBank = static_cast<u8>(banks.size() == 1 ? 0 : logical)});
-  }
-}
-
-void prepareSegSatBank(BankPreparationContext& context, const SegSatBankBindingData&) {
-  const auto* use = context.placement.get<SegSatBankUse>();
-  if (use == nullptr) {
-    return;
-  }
-  for (auto& instrument : context.bank.instruments) {
-    const auto address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
-    instrument.explicitAddress = InstrumentAddress{.bank = use->exportBank, .program = address.program};
-    instrument.identity = segSatInstrumentIdentity(use->logicalBank, static_cast<u8>(address.program));
-  }
-}
-
-std::optional<SequenceRuntime> prepareSegSatSequence(SequencePreparationContext& context,
-                                                     const SegSatSequenceBindingData& sequence) {
-  std::vector<SegSatVelocityBank> velocityBanks;
-  for (const auto& bank : context.banks<SegSatBankBindingData>(kSegSatFormatName)) {
-    const auto* use = bank.placement.get<SegSatBankUse>();
-    if (use == nullptr) {
-      context.fail("SegSat bank is missing its logical bank assignment", bank.asset.metadata.range);
+    const u8 exportBank = banks.size() == 1 ? 0 : logical;
+    for (auto& instrument : banks[i].asset.instruments) {
+      const auto address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
+      instrument.explicitAddress = InstrumentAddress{.bank = exportBank, .program = address.program};
+      instrument.identity = segSatInstrumentIdentity(logical, static_cast<u8>(address.program));
     }
-    auto runtime = bank.data;
-    runtime.sourceBank = use->logicalBank;
+    auto runtime = banks[i].data;
+    runtime.sourceBank = logical;
     velocityBanks.push_back(std::move(runtime));
-  }
-  if (velocityBanks.empty() && !sequence.referencedBanks.empty()) {
-    context.fail("SegSat collection does not contain a retained SegSat instrument bank");
-  }
-  if (velocityBanks.empty()) {
-    return std::nullopt;
   }
   return segSatSequenceRuntime(SegSatRuntimeConfig{.velocityBanks = std::move(velocityBanks),
                                                    .volumeModel = sequence.volumeModel,

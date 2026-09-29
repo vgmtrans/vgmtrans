@@ -51,60 +51,6 @@ template <class Range>
 
 enum class ResolutionMode { Automatic, Manual };
 
-template <class Data>
-struct BankAssignment {
-  const SoundBankAsset& bank;
-  const Data& data;
-  AssetPrivateData& placement;
-};
-
-// Runs after banks have been chosen, whether automatically or by the user.
-// Settings belong to this sequence's use of each bank: two sequences can give
-// the same bank different bank numbers without changing the scanned bank.
-class BankAssignmentContext {
-public:
-  BankAssignmentContext(const AssetCatalog& assets, const SequenceProgramAsset& sequence,
-                        std::span<DependencyTarget> targets, std::vector<CollectionIssue>& issues)
-      : sequence(sequence), assets_(assets), targets_(targets), issues_(issues) {}
-
-  const SequenceProgramAsset& sequence;
-
-  template <class Data>
-  [[nodiscard]] const Data& data() const {
-    const auto* value = sequence.privateData.template get<Data>();
-    if (value == nullptr) {
-      throw std::logic_error("Sequence is missing its bank assignment data");
-    }
-    return *value;
-  }
-
-  template <class Data>
-  [[nodiscard]] std::vector<BankAssignment<Data>> banks() {
-    std::vector<BankAssignment<Data>> result;
-    for (auto& target : targets_) {
-      const auto* bank = assets_.asset<SoundBankAsset>(target.asset);
-      if (bank != nullptr) {
-        if (const auto* data = bank->privateData.template get<Data>()) {
-          result.push_back({*bank, *data, target.placement});
-        }
-      }
-    }
-    return result;
-  }
-
-  void warning(std::string message) {
-    issues_.push_back({.severity = Severity::Warning,
-                       .message = std::move(message),
-                       .asset = sequence.metadata.id,
-                       .range = sequence.metadata.range});
-  }
-
-private:
-  const AssetCatalog& assets_;
-  std::span<DependencyTarget> targets_;
-  std::vector<CollectionIssue>& issues_;
-};
-
 // Information available while choosing one asset's inputs. Manual collections
 // offer only the user's chosen candidates, in the user's order. The callback
 // returns its choices; the core records the collection and leaves assets unchanged.

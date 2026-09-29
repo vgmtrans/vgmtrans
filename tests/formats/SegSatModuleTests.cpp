@@ -221,8 +221,8 @@ std::vector<u8> velocityBankSource(u8 totalLevel) {
 }
 
 const SequenceProgramAsset& sequenceAsset(const SessionSnapshot& snapshot, const Collection& collection) {
-  expect(collection.members.sequence.has_value(), "SegSat fixture collection should reference a sequence");
-  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.members.sequence);
+  expect(collection.selection.sequence.has_value(), "SegSat fixture collection should reference a sequence");
+  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.selection.sequence);
   expect(sequence != nullptr, "SegSat fixture sequence asset should exist");
   return *sequence;
 }
@@ -400,9 +400,9 @@ void segSatCollectionBindingSuppliesVlTablesToSequence() {
              pitch->normalizedWheelPosition && std::abs(*pitch->normalizedWheelPosition - (-0.046875)) < 0.000001,
          "SegSat should retain its raw pitch-wheel position for collection-aware lowering");
 
-  expect(collection.members.samplePools.empty(), "SegSat samples should be local to their sound bank");
-  expect(collection.members.soundBanks.size() == 1, "SegSat fixture should attach its instrument set");
-  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
+  expect(collection.members().samplePools.empty(), "SegSat samples should be local to their sound bank");
+  expect(collection.members().soundBanks.size() == 1, "SegSat fixture should attach its instrument set");
+  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members().soundBanks.front());
   expect(instruments != nullptr && instruments->instruments.size() == 2 &&
              instruments->localSamples.samples.size() == 1 &&
              instruments->instruments.front().pitchBendRangeCents == 2400 &&
@@ -455,7 +455,7 @@ void segSatDirectOutputPreservesHardwareStereoGains() {
     session.scanPendingSources();
     const auto snapshot = session.snapshot();
     expect(snapshot.collections().size() == 1, "stereo fixture should produce one collection");
-    const auto* bank = snapshot.asset<SoundBankAsset>(snapshot.collections().front().members.soundBanks.front());
+    const auto* bank = snapshot.asset<SoundBankAsset>(snapshot.collections().front().members().soundBanks.front());
     expect(bank != nullptr && !bank->instruments.empty() && !bank->instruments.front().regions.empty(),
            "stereo fixture should retain its sampled region");
     const auto* velocityBank = bank->privateData.get<SegSatVelocityBank>();
@@ -490,9 +490,9 @@ void segSatRuntimeMapSelectsBankInsideAnotherSampleSpan() {
   const SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.collections().size() == 1, "overlapping SegSat fixture should produce one collection");
   const Collection& collection = snapshot.collections().front();
-  expect(collection.members.soundBanks.size() == 1,
+  expect(collection.members().soundBanks.size() == 1,
          "an implicit bank-zero sequence should attach only its runtime-mapped instrument bank");
-  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
+  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members().soundBanks.front());
   expect(instruments != nullptr && instruments->metadata.range.offset == 0x1200,
          "runtime bank zero should remain discoverable inside an earlier bank's sample span");
 
@@ -526,7 +526,7 @@ void segSatMultiBankPlaybackUsesTheActiveBanksVlTable() {
   session.scanPendingSources();
 
   const SessionSnapshot snapshot = session.snapshot();
-  expect(snapshot.collections().size() == 1 && snapshot.collections().front().members.soundBanks.size() == 2,
+  expect(snapshot.collections().size() == 1 && snapshot.collections().front().members().soundBanks.size() == 2,
          "a two-bank SegSat sequence should attach both runtime-mapped instrument sets");
   const CollectionPlayback playback =
       session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{.sequence = {.sequenceLoops = 0}});
@@ -563,6 +563,76 @@ void segSatMultiBankPlaybackUsesTheActiveBanksVlTable() {
       "a fallback physical bank should retain its velocity data under the sequence's logical bank alias");
 }
 
+void segSatPreparationReservesExactMatchesBeforeFallbacks() {
+  const auto bank = [](u32 id, u8 number) {
+    return SoundBankAsset{
+        .metadata = {.id = AssetId{id}, .format = "SegSat"},
+        .instruments = {Instrument{.explicitAddress = InstrumentAddress{number, 5},
+                                   .identity = segSatInstrumentIdentity(number, 5)}},
+        .privateData = AssetPrivateData::make(SegSatVelocityBank{.sourceBank = number}),
+    };
+  };
+  const struct {
+    std::vector<u8> requested;
+    std::vector<AssetId> selected;
+    std::vector<u8> logical;
+    bool warns;
+  } cases[] = {
+      {{2, 7}, {AssetId{1}, AssetId{2}}, {7, 2}, false},
+      {{4}, {AssetId{1}}, {4}, false},
+      {{7}, {AssetId{1}}, {7}, false},
+      {{2, 7}, {AssetId{1}}, {2}, true},
+      {{2}, {}, {}, true},
+  };
+  for (const auto& entry : cases) {
+    test::SessionSnapshotBuilder builder;
+    builder.assets = {
+        SequenceProgramAsset{
+            .metadata = {.id = AssetId{0}, .format = "SegSat"},
+            .program = {.runtime = segSatSequenceRuntime({})},
+            .privateData = AssetPrivateData::make(SegSatSequenceBindingData{.referencedBanks = entry.requested}),
+            .prepare = [](SequencePreparationContext& context) {
+              return prepareSegSatSequence(context, *context.sequence.privateData.get<SegSatSequenceBindingData>());
+            }},
+        bank(1, 9), bank(2, 2),
+    };
+    DesiredCollection desired{.selection = {.sequence = AssetId{0}, .soundBanks = entry.selected}};
+    resolveDependencies(AssetCatalog{std::vector<SourceFile>{}, SharedSequence<Asset>{builder.assets}}, desired,
+                        ResolutionMode::Manual);
+    expect(desired.issues.empty(), "bank mapping diagnostics belong to preparation, after companion selection");
+    builder.collections = {{.id = CollectionId{0}, .selection = desired.selection, .inputs = desired.inputs}};
+    const auto snapshot = builder.finish();
+    const auto prepared = bindCollection(snapshot, CollectionId{0});
+    if (entry.selected.empty()) {
+      expect(!prepared.collection && prepared.diagnostics.size() == 2 &&
+                 prepared.diagnostics[0].severity == Severity::Warning &&
+                 prepared.diagnostics[1].severity == Severity::Error,
+             "missing all SegSat banks must retain the earlier count warning before the preparation failure");
+      continue;
+    }
+    expect(prepared.collection && prepared.diagnostics.size() == (entry.warns ? 1u : 0u),
+           "a missing logical bank should warn during preparation while retaining the selected fallback");
+    if (entry.warns) {
+      expect(prepared.diagnostics.front().severity == Severity::Warning &&
+                 prepared.diagnostics.front().message ==
+                     "SegSat sequence refers to 2 banks, but the collection contains 1 SegSat banks",
+             "the moved bank-count diagnostic should preserve its severity and explanation");
+    }
+    for (size_t i = 0; i < entry.logical.size(); ++i) {
+      const auto& instrument = prepared.collection->soundBanks()[i].instruments.front();
+      const u32 outputBank = entry.logical.size() == 1 ? 0 : entry.logical[i];
+      expect(instrument.identity == segSatInstrumentIdentity(entry.logical[i], 5) &&
+                 instrument.explicitAddress == InstrumentAddress{outputBank, 5},
+             "exact matches must be reserved before fallbacks, and a lone bank must export at bank zero");
+    }
+    const auto standalone = bindSoundBank(snapshot, AssetId{1});
+    expect(standalone.collection && standalone.collection->soundBanks().front().instruments.front().explicitAddress ==
+                                       InstrumentAddress{9, 5} &&
+               snapshot.asset<SoundBankAsset>(AssetId{1})->instruments.front().identity == segSatInstrumentIdentity(9, 5),
+           "sequence-specific aliases must not leak into standalone preparation or the scanned bank");
+  }
+}
+
 void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
   SourceStore sources;
   const SourceId bank5Source = sources.add(SourceFile{.name = "bank-5.bin"}, velocityBankSource(0));
@@ -578,7 +648,6 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "SegSat", .name = "Sequence"},
       .program = std::move(parsedSequence.program),
   };
-  sequence.recipe.assignBanks = assignSegSatBanks;
   sequence.prepare = [](SequencePreparationContext& context) {
     return prepareSegSatSequence(context, *context.sequence.privateData.get<SegSatSequenceBindingData>());
   };
@@ -604,10 +673,6 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
       }},
       .privateData = AssetPrivateData::make(
           readSegSatVelocityBank(sources.reader(bank5Source), *bank5Layout, 5, SegSatVolumeModel::V1_33)),
-      .prepare =
-          [](BankPreparationContext& context) {
-            prepareSegSatBank(context, *context.bank.privateData.get<SegSatBankBindingData>());
-          },
   };
   const SoundBankAsset bank6{
       .metadata =
@@ -623,10 +688,6 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
       }},
       .privateData = AssetPrivateData::make(
           readSegSatVelocityBank(sources.reader(bank6Source), *bank6Layout, 6, SegSatVolumeModel::V1_33)),
-      .prepare =
-          [](BankPreparationContext& context) {
-            prepareSegSatBank(context, *context.bank.privateData.get<SegSatBankBindingData>());
-          },
   };
   const SoundBankAsset foreignBank{
       .metadata = AssetMetadata{.id = AssetId{3}, .format = "Foreign", .name = "Foreign Bank"},
@@ -639,7 +700,7 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
   const Collection collection{
       .id = CollectionId{0},
       .name = "Multi-source SegSat",
-      .members =
+      .selection =
           {
               .sequence = sequence.metadata.id,
               .soundBanks = {bank6.metadata.id, foreignBank.metadata.id, bank5.metadata.id},
@@ -648,10 +709,10 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
   test::SessionSnapshotBuilder builder;
   builder.sources = sources.sourceFiles();
   builder.assets = {sequence, bank5, foreignBank, bank6};
-  DesiredCollection desired{.members = collection.members};
+  DesiredCollection desired{.selection = collection.selection};
   resolveDependencies(AssetCatalog{sources, SharedSequence<Asset>{builder.assets}}, desired, ResolutionMode::Manual);
   builder.collections = {collection};
-  builder.collections.front().dependencies = std::move(desired.dependencies);
+  builder.collections.front().inputs = std::move(desired.inputs);
   builder.collections.front().issues = std::move(desired.issues);
   const SessionSnapshot snapshot = builder.finish();
 
@@ -769,5 +830,6 @@ void runSegSatModuleTests() {
   segSatMultiBankPlaybackUsesTheActiveBanksVlTable();
   segSatDirectOutputPreservesHardwareStereoGains();
   segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources();
+  segSatPreparationReservesExactMatchesBeforeFallbacks();
   segSatSsfExtractorUsesFourByteMiniHeader();
 }

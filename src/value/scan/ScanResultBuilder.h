@@ -44,8 +44,6 @@ public:
   ScanSequenceDraft& useBank(const ScanSoundBankDraft& bank);
   // Choose from scanned banks when collections are rebuilt, including after new files arrive.
   ScanSequenceDraft& useBanks(DependencySelector select);
-  // Assign settings such as bank numbers after automatic or manual bank selection.
-  ScanSequenceDraft& assignBanks(BankAssigner assign);
   // Configure playback from the prepared banks when binding a collection.
   ScanSequenceDraft& prepare(SequencePreparer prepare);
 

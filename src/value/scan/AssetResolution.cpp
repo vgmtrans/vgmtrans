@@ -6,6 +6,8 @@
 
 #include "value/scan/AssetResolution.h"
 
+#include <type_traits>
+
 namespace vgmtrans::core {
 
 namespace {
@@ -13,67 +15,51 @@ namespace {
 class Resolver {
 public:
   Resolver(const AssetCatalog& assets, DesiredCollection& result, ResolutionMode mode)
-      : assets_(assets), result_(result), mode_(mode), selected_(result.members) {}
+      : assets_(assets), result_(result), mode_(mode) {}
 
   void resolve() {
-    // Choose banks first, then ask those banks which sample pools they need.
-    if (result_.members.sequence) {
-      if (const auto* sequence = assets_.asset<SequenceProgramAsset>(*result_.members.sequence)) {
-        ResolvedDependency banks{.owner = sequence->metadata.id, .role = DependencyRole::SoundBank};
+    ResolvedInputs banks;
+    if (result_.selection.sequence) {
+      if (const auto* sequence = assets_.asset<SequenceProgramAsset>(*result_.selection.sequence)) {
         if (mode_ == ResolutionMode::Manual) {
-          // A manual selection replaces all sequence requests, including exact
-          // scanner-known references, with one ordered set of banks.
-          if (!sequence->recipe.banks.empty() || !selected_.soundBanks.empty()) {
-            accept(sequence->metadata, banks, selectAll(selected_.soundBanks));
+          // Manual choices replace all requests, including exact scanner links.
+          if (!sequence->recipe.banks.empty() || !selected<SoundBankAsset>().empty()) {
+            accept<SoundBankAsset>(sequence->metadata, banks, selectAll(selected<SoundBankAsset>()));
           }
         } else {
-          requests(sequence->metadata, banks, sequence->recipe.banks);
+          requests<SoundBankAsset>(sequence->metadata, banks, sequence->recipe.banks);
         }
-        assignBanks(*sequence, banks);
-        if (!sequence->recipe.banks.empty() || sequence->recipe.assignBanks || !banks.targets.empty()) {
-          result_.dependencies.push_back(std::move(banks));
-        }
+      } else {
+        banks.status = ResolutionStatus::Failed;
+        result_.issues.push_back(missingSequenceIssue(result_.selection.sequence));
       }
+    } else if (!selected<SoundBankAsset>().empty()) {
+      // Standalone bank preparation has no sequence requests.
+      accept<SoundBankAsset>({}, banks, selectAll(selected<SoundBankAsset>()));
     }
-    // Banks can request sample pools only. Requests for other asset types fail,
-    // so resolution never needs to follow a chain back to another bank or sequence.
-    for (auto id : result_.members.soundBanks) {
-      if (const auto* bank = assets_.asset<SoundBankAsset>(id)) {
-        ResolvedDependency samples{.owner = id, .role = DependencyRole::SamplePool};
-        requests(bank->metadata, samples, bank->recipe.samples);
-        concreteSamples(*bank, samples);
-        if (!bank->recipe.samples.empty() || !samples.targets.empty()) {
-          result_.dependencies.push_back(std::move(samples));
-        }
-      }
+
+    result_.inputs = {.bankStatus = banks.status, .bankAlternatives = std::move(banks.alternatives)};
+    for (const auto& target : banks.targets) {
+      const auto& bank = *assets_.asset<SoundBankAsset>(target.asset);
+      CollectionBank input{.bank = target.asset};
+      requests<SamplePoolAsset>(bank.metadata, input.samples, bank.recipe.samples);
+      concreteSamples(bank, input.samples);
+      result_.inputs.banks.push_back(std::move(input));
     }
   }
 
 private:
-  void assignBanks(const SequenceProgramAsset& sequence, ResolvedDependency& banks) {
-    if (!sequence.recipe.assignBanks) {
-      return;
-    }
-    try {
-      BankAssignmentContext context{assets_, sequence, banks.targets, result_.issues};
-      sequence.recipe.assignBanks(context);
-    } catch (const std::exception& error) {
-      accept(sequence.metadata, banks,
-             DependencySelection::failed(std::string("Bank assignment failed: ") + error.what()));
-    } catch (...) {
-      accept(sequence.metadata, banks, DependencySelection::failed("Bank assignment failed"));
+  template <class Provider>
+  const std::vector<AssetId>& selected() const {
+    if constexpr (std::is_same_v<Provider, SoundBankAsset>) {
+      return result_.selection.soundBanks;
+    } else {
+      return result_.selection.samplePools;
     }
   }
 
-  std::vector<AssetId>& members(DependencyRole role) {
-    return role == DependencyRole::SoundBank ? result_.members.soundBanks : result_.members.samplePools;
-  }
-
-  const std::vector<AssetId>& selected(DependencyRole role) const {
-    return role == DependencyRole::SoundBank ? selected_.soundBanks : selected_.samplePools;
-  }
-
-  void requests(const AssetMetadata& owner, ResolvedDependency& resolved,
+  template <class Provider>
+  void requests(const AssetMetadata& owner, ResolvedInputs& resolved,
                 const std::vector<DependencyRequest>& requests) {
     for (const auto& request : requests) {
       DependencySelection selection;
@@ -82,20 +68,20 @@ private:
           selection.add(direct->asset, direct->placement);
         } else {
           selection = std::get<DependencySelector>(request)(
-              DependencyContext{assets_, *assets_.asset(owner.id), mode_, selected(resolved.role)});
+              DependencyContext{assets_, *assets_.asset(owner.id), mode_, selected<Provider>()});
         }
       } catch (const std::exception& error) {
         selection = DependencySelection::failed(std::string("Asset dependency resolution failed: ") + error.what());
       } catch (...) {
         selection = DependencySelection::failed("Asset dependency resolution failed");
       }
-      accept(owner, resolved, selection);
+      accept<Provider>(owner, resolved, selection);
     }
   }
 
-  // Some scanners already know which pool supplies each region's sample. Include
-  // those pools automatically so formats do not need to repeat those links in a recipe.
-  void concreteSamples(const SoundBankAsset& bank, ResolvedDependency& resolved) {
+  // Scanners may already identify the pool supplying a region. Include those
+  // uses without requiring the format to repeat the same links in its recipe.
+  void concreteSamples(const SoundBankAsset& bank, ResolvedInputs& resolved) {
     DependencySelection samples;
     for (const auto& instrument : bank.instruments) {
       for (const auto& region : instrument.regions) {
@@ -110,12 +96,12 @@ private:
       }
     }
     if (!samples.targets().empty()) {
-      accept(bank.metadata, resolved, samples);
+      accept<SamplePoolAsset>(bank.metadata, resolved, samples);
     }
   }
 
-  void accept(const AssetMetadata& owner, ResolvedDependency& resolved, const DependencySelection& selection) {
-    const auto role = resolved.role;
+  template <class Provider>
+  void accept(const AssetMetadata& owner, ResolvedInputs& resolved, const DependencySelection& selection) {
     for (auto diagnostic : selection.issues()) {
       if (!diagnostic.asset) {
         diagnostic.asset = owner.id;
@@ -126,27 +112,20 @@ private:
       result_.issues.push_back(std::move(diagnostic));
     }
     if (selection.status() == ResolutionStatus::Incomplete && selection.issues().empty()) {
-      auto missing = role == DependencyRole::SoundBank ? missingSoundBankIssue() : missingSamplePoolIssue();
+      auto missing = std::is_same_v<Provider, SoundBankAsset> ? missingSoundBankIssue() : missingSamplePoolIssue();
       missing.asset = owner.id;
       missing.range = owner.range;
       result_.issues.push_back(std::move(missing));
     }
-    // Satisfying a later request must not hide an earlier missing or failed input.
+    // A later successful request cannot hide an earlier unresolved request.
     resolved.status = std::max(resolved.status, selection.status());
     resolved.alternatives.insert(resolved.alternatives.end(), selection.alternatives().begin(),
                                  selection.alternatives().end());
     for (const auto& target : selection.targets()) {
-      // A sequence uses each bank once. Sample inputs may use the same pool at
-      // several placements, so those relationships retain every target.
-      if (role == DependencyRole::SamplePool ||
-          std::ranges::find(resolved.targets, target.asset, &DependencyTarget::asset) == resolved.targets.end()) {
-        resolved.targets.push_back(target);
-      }
-      const bool correctType = role == DependencyRole::SoundBank
-                                   ? assets_.asset<SoundBankAsset>(target.asset) != nullptr
-                                   : assets_.asset<SamplePoolAsset>(target.asset) != nullptr;
-      const bool allowed =
-          mode_ != ResolutionMode::Manual || std::ranges::find(selected(role), target.asset) != selected(role).end();
+      const bool correctType = assets_.asset<Provider>(target.asset) != nullptr;
+      const auto& candidates = selected<Provider>();
+      const bool allowed = mode_ != ResolutionMode::Manual ||
+                           std::ranges::find(candidates, target.asset) != candidates.end();
       if (!correctType || !allowed) {
         resolved.status = ResolutionStatus::Failed;
         result_.issues.push_back({.severity = Severity::Error,
@@ -158,9 +137,10 @@ private:
                                   .range = owner.range});
         continue;
       }
-      auto& providers = members(role);
-      if (std::ranges::find(providers, target.asset) == providers.end()) {
-        providers.push_back(target.asset);
+      // Banks are used once. Pools can be used at several distinct placements.
+      if (std::is_same_v<Provider, SamplePoolAsset> ||
+          std::ranges::find(resolved.targets, target.asset, &DependencyTarget::asset) == resolved.targets.end()) {
+        resolved.targets.push_back(target);
       }
     }
   }
@@ -168,8 +148,6 @@ private:
   const AssetCatalog& assets_;
   DesiredCollection& result_;
   ResolutionMode mode_;
-  // Keep the user's original choices while result_ accumulates resolved inputs.
-  CollectionMembers selected_;
 };
 
 }  // namespace
@@ -189,7 +167,7 @@ std::vector<DesiredCollection> dependencyCollections(const AssetCatalog& assets)
     const auto& descriptor = sequence->collection;
     DesiredCollection collection{
         .name = descriptor.name.empty() ? sequence->metadata.name : descriptor.name,
-        .members = {.sequence = sequence->metadata.id, .miscAssets = descriptor.miscAssets}};
+        .selection = {.sequence = sequence->metadata.id, .miscAssets = descriptor.miscAssets}};
     resolveDependencies(assets, collection);
     result.push_back(std::move(collection));
   }

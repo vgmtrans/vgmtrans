@@ -162,12 +162,13 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
     builder.collections.push_back(Collection{
         .id = CollectionId{index},
         .name = "Part " + std::to_string(index),
-        .members =
+        .selection =
             {
                 .sequence = sequenceId,
                 .soundBanks = {instrumentId},
                 .samplePools = {samplesId},
             },
+      .inputs = {.banks = {{.bank = instrumentId}}},
     });
   }
 

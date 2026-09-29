@@ -6,6 +6,7 @@
 
 #include "value/model/CollectionModel.h"
 
+#include <algorithm>
 #include <string>
 #include <utility>
 
@@ -24,6 +25,30 @@ namespace {
 }
 
 }  // namespace
+
+ResolutionStatus CollectionInputs::status() const noexcept {
+  auto result = std::max(bankStatus, inspectionStatus);
+  for (const auto& bank : banks) {
+    result = std::max(result, bank.samples.status);
+  }
+  return result;
+}
+
+CollectionMembers collectionMembers(const CollectionMembers& selection, const CollectionInputs& inputs) {
+  auto result = selection;
+  const auto include = [](std::vector<AssetId>& members, AssetId id) {
+    if (std::ranges::find(members, id) == members.end()) {
+      members.push_back(id);
+    }
+  };
+  for (const auto& bank : inputs.banks) {
+    include(result.soundBanks, bank.bank);
+    for (const auto& sample : bank.samples.targets) {
+      include(result.samplePools, sample.asset);
+    }
+  }
+  return result;
+}
 
 CollectionIssue missingSequenceIssue(std::optional<AssetId> asset) {
   return missingRoleIssue("missing-sequence", "sequence", asset);

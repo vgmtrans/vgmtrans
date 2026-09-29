@@ -113,10 +113,10 @@ void relocatedLayoutUsesDriverCodeAndHeaderContracts() {
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
   const Collection* collection = snapshot.collections().empty() ? nullptr : &snapshot.collections().front();
-  expect(snapshot.diagnostics().empty() && snapshot.collections().size() == 1 && collection->members.sequence &&
-             collection->members.soundBanks.size() == 1 && collection->members.samplePools.empty(),
+  expect(snapshot.diagnostics().empty() && snapshot.collections().size() == 1 && collection->selection.sequence &&
+             collection->members().soundBanks.size() == 1 && collection->members().samplePools.empty(),
          "NeverlandSnes scanning should publish one sequence and self-contained BRR sound bank");
-  const auto* bank = snapshot.asset<SoundBankAsset>(collection->members.soundBanks.front());
+  const auto* bank = snapshot.asset<SoundBankAsset>(collection->members().soundBanks.front());
   expect(bank != nullptr && bank->instruments.size() == 1 && bank->instruments.front().regions.size() == 1,
          "the referenced program should retain its ADSR, tuning, and BRR sample region");
   const double expectedUnity = 120.0 - 12.0 * std::log2((0x217d / 4096.0) * 2.9375);

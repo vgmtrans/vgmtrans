@@ -110,7 +110,7 @@ void detectsTablesAndBuildsBank() {
   session.scanPendingSources();
   const auto snapshot = session.snapshot();
   expect(snapshot.diagnostics().empty() && snapshot.collections().size() == 1 &&
-             snapshot.collections().front().members.soundBanks.size() == 1,
+             snapshot.collections().front().members().soundBanks.size() == 1,
          "scanner must build a complete sequence and BRR bank");
   data[0x94c] = 0;
   expect(!findLayout(ByteReader(SourceId{70}, data)), "an incompatible phrase command map must be rejected");
@@ -430,7 +430,7 @@ void sampleCurvesResolveTuningAndNoise() {
   session.addSource(SourceFile{.name = "noise.aram"}, data);
   session.scanPendingSources();
   const auto snapshot = session.snapshot();
-  const auto* bank = snapshot.asset<SoundBankAsset>(snapshot.collections().front().members.soundBanks.front());
+  const auto* bank = snapshot.asset<SoundBankAsset>(snapshot.collections().front().members().soundBanks.front());
   expect(bank && bank->instruments.size() == 2 &&
              std::ranges::any_of(bank->localSamples.samples,
                                  [](const auto& sample) {

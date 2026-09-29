@@ -1028,12 +1028,12 @@ void akaoSampleSelectionUsesPlayableArticulations() {
   const AkaoArticulation unrelatedFive{.articulationId = 5, .sample = SampleRef::resolved(unrelatedSamplesId, 0)};
   const AkaoArticulation unrelatedNine{.articulationId = 9, .sample = SampleRef::resolved(unrelatedSamplesId, 0)};
   const auto local = resolve({localFive, localNine}, {unrelatedFive, unrelatedNine});
-  expect(local.size() == 1 && local.front().members.samplePools == std::vector{localSamplesId},
+  expect(local.size() == 1 && local.front().members().samplePools == std::vector{localSamplesId},
          "Akao matching should not let a newer unrelated pool outrank complete local samples");
 
   const auto supplemented = resolve({localFive, {.articulationId = 9}}, {unrelatedNine}, 29);
   expect(supplemented.size() == 1 &&
-             supplemented.front().members.samplePools == std::vector{localSamplesId, unrelatedSamplesId} &&
+             supplemented.front().members().samplePools == std::vector{localSamplesId, unrelatedSamplesId} &&
              supplemented.front().issues.empty(),
          "a different sample set should fill a preferred pool's gap when an articulation has no playable sample");
   const auto missing = resolve({localFive, {.articulationId = 9}}, {});
@@ -1118,9 +1118,9 @@ void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView() {
          "Akao structural regions should remain without samples until collection binding");
   expect(project.collections().size() == 1, "Akao synthetic scan should resolve one collection");
   const auto& collection = project.collections().front();
-  expect(collection.members.sequence == sequenceId, "Akao collection should reference the scanned sequence");
-  expect(collection.members.samplePools.size() == 1, "Akao collection should reference the scanned sample collection");
-  expect(collection.members.soundBanks == std::vector<AssetId>{soundBankId},
+  expect(collection.selection.sequence == sequenceId, "Akao collection should reference the scanned sequence");
+  expect(collection.members().samplePools.size() == 1, "Akao collection should reference the scanned sample collection");
+  expect(collection.members().soundBanks == std::vector<AssetId>{soundBankId},
          "Akao collection should reference its detected structural instrument set");
   const auto sequenceHeaders = project.sourceMap().withRole(SourceId{0}, SourceRole::Header);
   const auto header = std::ranges::find_if(sequenceHeaders, [&](SourceAnnotationId id) {
@@ -1203,7 +1203,7 @@ void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView() {
   const auto prepared = bindCollection(project, collection.id);
   expect(prepared.collection && prepared.collection->soundBanks().size() == 1 &&
              prepared.collection->soundBanks().front().instruments.front().regions.front().sample.owner() ==
-                 collection.members.samplePools.front(),
+                 collection.members().samplePools.front(),
          "Akao bank preparation should connect the structural instrument regions to its selected samples");
 
   const auto artifacts = session.exportCollection(collection.id, ExportRequest{.kinds = {ExportKind::Dls}});

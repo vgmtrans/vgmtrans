@@ -93,11 +93,11 @@ void layoutAndScannerBuildTheCompleteYsVCollection() {
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
   const Collection* collection = snapshot.collections().empty() ? nullptr : &snapshot.collections().front();
-  expect(snapshot.collections().size() == 1 && collection->members.sequence &&
-             collection->members.soundBanks.size() == 1 && collection->members.samplePools.empty(),
+  expect(snapshot.collections().size() == 1 && collection->selection.sequence &&
+             collection->members().soundBanks.size() == 1 && collection->members().samplePools.empty(),
          "FalcomSnes scanning should publish a sequence and self-contained sound bank");
 
-  const auto* set = snapshot.asset<SoundBankAsset>(collection->members.soundBanks.front());
+  const auto* set = snapshot.asset<SoundBankAsset>(collection->members().soundBanks.front());
   const Instrument* instrument = set != nullptr && set->instruments.size() == 1 ? &set->instruments.front() : nullptr;
   const Region* region =
       instrument != nullptr && instrument->regions.size() == 1 ? &instrument->regions.front() : nullptr;

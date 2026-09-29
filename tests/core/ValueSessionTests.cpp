@@ -107,7 +107,7 @@ void sessionScansValuesAndDerivedSources() {
          "source annotation children should support tree view nodes");
   expect(sourceMap.find(SourceAnnotationId{99}) == nullptr,
          "source map should return null for a missing annotation id");
-  expect(snapshot.collections()[0].members.sequence == sequence->metadata.id,
+  expect(snapshot.collections()[0].selection.sequence == sequence->metadata.id,
          "collection should reference sequence asset");
   expect(snapshot.collection(snapshot.collections()[0].id) == &snapshot.collections()[0],
          "session snapshot should find a collection by stable id");
@@ -443,7 +443,7 @@ void sessionPublishesDeclaredSequenceCollections() {
   SessionSnapshot project = session.snapshot();
   expect(project.collections().size() == 1, "declared sequence collection should be published");
   expect(project.collections()[0].isDiscovered() &&
-             project.collections()[0].members.sequence == metadata(project.assets().front()).id,
+             project.collections()[0].selection.sequence == metadata(project.assets().front()).id,
          "a discovered collection should belong to its published sequence");
 
   session.removeSource(source);
@@ -491,9 +491,9 @@ void sessionCreatesUserCollectionsFromDetectedAssets() {
          "creating a collection should publish a new immutable snapshot revision");
   expect(collection->name == "Hand-picked" && !collection->isDiscovered(),
          "manual collection should preserve its name and user-created origin");
-  expect(collection->members.sequence == members.sequence && collection->members.soundBanks == members.soundBanks,
+  expect(collection->selection.sequence == members.sequence && collection->members().soundBanks == members.soundBanks,
          "manual collection should preserve the selected asset ids");
-  expect(!collection->dependencies.empty(), "manual collection should retain its resolved asset dependencies");
+  expect(!collection->inputs.banks.empty(), "manual collection should retain its resolved asset dependencies");
 
   const auto unrelated = session.addSource(SourceFile{.name = "unrelated.seq"}, {0xcc, 9});
   session.scanPendingSources();
@@ -527,9 +527,9 @@ void sessionMatchesCollectionsAcrossSeparateSourceScans() {
   expect(project.collections().size() == 1, "typed asset data should update the existing bank collection");
   expect(project.collections()[0].resolutionStatus() == ResolutionStatus::Resolved,
          "bank collection should become complete when sequence and instruments are both present");
-  expect(project.collections()[0].members.sequence.has_value(),
+  expect(project.collections()[0].selection.sequence.has_value(),
          "completed bank collection should reference the sequence");
-  expect(project.collections()[0].members.soundBanks.size() == 1,
+  expect(project.collections()[0].members().soundBanks.size() == 1,
          "completed bank collection should retain the instrument reference");
 }
 
@@ -669,8 +669,8 @@ void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
   expect(project.collections()[0].id == collectionId, "collection id should be preserved for the same key");
   expect(project.collections()[0].resolutionStatus() == ResolutionStatus::Incomplete,
          "remaining sequence-only collection should become incomplete");
-  expect(project.collections()[0].members.sequence.has_value(), "remaining collection should keep the sequence asset");
-  expect(project.collections()[0].members.soundBanks.empty(),
+  expect(project.collections()[0].selection.sequence.has_value(), "remaining collection should keep the sequence asset");
+  expect(project.collections()[0].members().soundBanks.empty(),
          "removed instrument source should be removed from the collection");
   expect(!project.collections()[0].issues.empty(), "incomplete collection should explain what is missing");
 
@@ -1074,7 +1074,7 @@ void sessionReportsDesiredCollectionMissingAssetReferences() {
     session.scanPendingSources();
     const auto snapshot = session.snapshot();
     const auto& collection = snapshot.collections().front();
-    expect(collection.members.soundBanks.empty() && collection.issues.front().code == "invalid-dependency" &&
+    expect(collection.members().soundBanks.empty() && collection.issues.front().code == "invalid-dependency" &&
                collection.resolutionStatus() == ResolutionStatus::Failed,
            "missing and wrong-type dependency targets must not enter collection membership");
     expect(!bindCollection(snapshot, collection.id).collection,
@@ -1102,42 +1102,40 @@ void sessionKeepsSequenceCollectionsWhenSupplementalAssetsDisappear() {
     session.scanPendingSources();
     const auto before = session.snapshot();
     const auto& collection = before.collections().front();
-    expect(collection.members.miscAssets.size() == 1 &&
-               collection.dependencies.back().role == DependencyRole::Supplemental &&
-               collection.dependencies.back().targets.front().asset == collection.members.miscAssets.front() &&
+    expect(collection.selection.miscAssets.size() == 1 &&
                collection.resolutionStatus() == (wrongType ? ResolutionStatus::Incomplete : ResolutionStatus::Resolved),
            "supplemental references must retain valid targets and report their own typed outcome");
     expect(wrongType ? collection.issues.front().code == "wrong-type-misc" : collection.issues.empty(),
            "supplemental references must diagnose an asset of the wrong type");
     expect(bindCollection(before, collection.id).collection.has_value(),
            "supplemental errors must not prevent audio preparation");
-    session.removeAssets(collection.members.miscAssets);
+    session.removeAssets(collection.selection.miscAssets);
     const auto after = session.snapshot();
     const auto* updated = after.collection(collection.id);
-    expect(updated != nullptr && updated->members.sequence == collection.members.sequence &&
-               updated->members.miscAssets.empty() && updated->issues.front().code == "missing-misc" &&
+    expect(updated != nullptr && updated->selection.sequence == collection.selection.sequence &&
+               updated->selection.miscAssets.empty() && updated->issues.front().code == "missing-misc" &&
                updated->resolutionStatus() == ResolutionStatus::Incomplete &&
                bindCollection(after, updated->id).collection.has_value(),
            "removing an inspection asset must retain the sequence's identity and report the missing reference");
-    expect(collection.members.miscAssets.size() == 1, "earlier snapshots must retain their supplemental membership");
+    expect(collection.selection.miscAssets.size() == 1, "earlier snapshots must retain their supplemental membership");
   }
 }
 
 void sessionReconcilesCollectionsBySequenceIdentity() {
   SessionState state;
-  state.reconcileCollections({{.name = "Same name", .members = {.sequence = AssetId{1}}},
-                              {.name = "Same name", .members = {.sequence = AssetId{2}}}});
+  state.reconcileCollections({{.name = "Same name", .selection = {.sequence = AssetId{1}}},
+                              {.name = "Same name", .selection = {.sequence = AssetId{2}}}});
   const auto first = state.collections()[0].id;
   const auto second = state.collections()[1].id;
   expect(first != second, "distinct sequences must retain distinct collections even with the same name");
 
-  state.reconcileCollections({{.name = "Renamed", .members = {.sequence = AssetId{2}}},
-                              {.name = "Same name", .members = {.sequence = AssetId{1}}}});
+  state.reconcileCollections({{.name = "Renamed", .selection = {.sequence = AssetId{2}}},
+                              {.name = "Same name", .selection = {.sequence = AssetId{1}}}});
   expect(state.collections().size() == 2 && state.collections()[0].id == first &&
-             state.collections()[0].members.sequence == AssetId{1} && state.collections()[1].id == second &&
-             state.collections()[1].name == "Renamed" && state.collections()[1].members.sequence == AssetId{2},
+             state.collections()[0].selection.sequence == AssetId{1} && state.collections()[1].id == second &&
+             state.collections()[1].name == "Renamed" && state.collections()[1].selection.sequence == AssetId{2},
          "renaming or reordering discovery results must preserve each sequence's collection identity");
-  state.reconcileCollections({{.name = "Renamed", .members = {.sequence = AssetId{2}}}});
+  state.reconcileCollections({{.name = "Renamed", .selection = {.sequence = AssetId{2}}}});
   expect(state.collections().size() == 1 && state.collections().front().id == second,
          "removing one sequence must remove only its discovered collection");
 }
@@ -1411,7 +1409,7 @@ void sessionExportsASequenceWithoutACollection() {
   session.removeSource(unrelated);
   const auto after = session.snapshot();
   expect(after.collections().size() == 1 && after.collections().front().id == manual &&
-             !after.collections().front().isDiscovered() && after.collections().front().members.sequence == sequence,
+             !after.collections().front().isDiscovered() && after.collections().front().selection.sequence == sequence,
          "an opted-out sequence must support manual collections that survive an empty discovery rebuild");
 }
 
@@ -1419,8 +1417,8 @@ void snapshotFindsTheFirstCollectionContainingAnAsset() {
   test::SessionSnapshotBuilder builder;
   builder.assets.emplace_back(MiscAsset{.metadata = AssetMetadata{.id = AssetId{4}, .name = "Shared"}});
   builder.collections = {
-      Collection{.id = CollectionId{8}, .name = "First", .members = {.miscAssets = {AssetId{4}}}},
-      Collection{.id = CollectionId{9}, .name = "Second", .members = {.miscAssets = {AssetId{4}}}},
+      Collection{.id = CollectionId{8}, .name = "First", .selection = {.miscAssets = {AssetId{4}}}},
+      Collection{.id = CollectionId{9}, .name = "Second", .selection = {.miscAssets = {AssetId{4}}}},
   };
   const SessionSnapshot snapshot = builder.finish();
 

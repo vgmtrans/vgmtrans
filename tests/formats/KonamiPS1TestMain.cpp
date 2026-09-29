@@ -44,7 +44,7 @@ int main(int argc, char** argv) {
       const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program);
       renderFailures += performance.tracks.empty() || !performance.diagnostics.empty();
       const auto collection = std::ranges::find_if(snapshot.collections(), [&](const Collection& candidate) {
-        return candidate.members.sequence == sequence->metadata.id;
+        return candidate.selection.sequence == sequence->metadata.id;
       });
       CollectionBindingResult binding;
       std::vector<const SoundBankAsset*> soundBanks;

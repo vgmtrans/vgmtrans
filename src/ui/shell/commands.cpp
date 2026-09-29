@@ -237,16 +237,17 @@ void collections(Context& context, Args args) {
       const auto& found = require(snapshot.asset(id), "asset", id.value);
       context.out << fmt::format("  {} {} | {}\n", kind, id.value, metadata(found).name);
     };
-    if (value.members.sequence) {
-      member("sequence", *value.members.sequence);
+    if (value.selection.sequence) {
+      member("sequence", *value.selection.sequence);
     }
-    for (const auto id : value.members.soundBanks) {
+    const auto members = value.members();
+    for (const auto id : members.soundBanks) {
       member("sound-bank", id);
     }
-    for (const auto id : value.members.samplePools) {
+    for (const auto id : members.samplePools) {
       member("sample-pool", id);
     }
-    for (const auto id : value.members.miscAssets) {
+    for (const auto id : value.selection.miscAssets) {
       member("misc", id);
     }
     for (const auto& issue : value.issues) {

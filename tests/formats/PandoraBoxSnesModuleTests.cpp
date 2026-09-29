@@ -110,9 +110,9 @@ void layoutAndSynthUseAuditedDriverTables() {
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
   const Collection* collection = snapshot.collections().empty() ? nullptr : &snapshot.collections().front();
-  const SoundBankAsset* bank = collection == nullptr || collection->members.soundBanks.empty()
+  const SoundBankAsset* bank = collection == nullptr || collection->members().soundBanks.empty()
                                    ? nullptr
-                                   : snapshot.asset<SoundBankAsset>(collection->members.soundBanks.front());
+                                   : snapshot.asset<SoundBankAsset>(collection->members().soundBanks.front());
   const auto found = bank == nullptr ? std::vector<Instrument>::const_iterator{}
                                      : std::ranges::find(bank->instruments, u64{1}, [](const Instrument& instrument) {
                                          return instrument.identity ? instrument.identity->key : ~u64{0};

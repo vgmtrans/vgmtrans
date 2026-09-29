@@ -313,8 +313,8 @@ const Event* findEvent(const PerformanceSequence& performance) {
 
 const Collection* firstCollection(const SessionSnapshot& snapshot) {
   const auto found = std::ranges::find_if(snapshot.collections(), [](const Collection& collection) {
-    return collection.members.sequence && !collection.members.soundBanks.empty() &&
-           !collection.members.samplePools.empty();
+    return collection.selection.sequence && !collection.members().soundBanks.empty() &&
+           !collection.members().samplePools.empty();
   });
   return found == snapshot.collections().end() ? nullptr : &*found;
 }
@@ -377,14 +377,14 @@ void psf2ArchivesRemainSeparate() {
   const SessionSnapshot first = session.snapshot();
   expect(first.collections().size() == 1, "the first PSF2 should publish one collection");
   const CollectionId initial = first.collections().front().id;
-  const CollectionMembers initialMembers = first.collections().front().members;
+  const CollectionMembers initialMembers = first.collections().front().members();
 
   load("second.psf2");
   const SessionSnapshot second = session.snapshot();
   const Collection* retained = second.collection(initial);
-  expect(second.collections().size() == 2 && retained && retained->members.sequence == initialMembers.sequence &&
-             retained->members.soundBanks == initialMembers.soundBanks &&
-             retained->members.samplePools == initialMembers.samplePools,
+  expect(second.collections().size() == 2 && retained && retained->selection.sequence == initialMembers.sequence &&
+             retained->members().soundBanks == initialMembers.soundBanks &&
+             retained->members().samplePools == initialMembers.samplePools,
          "loading another PSF2 should add an independent collection without replacing the first");
 }
 
@@ -409,7 +409,7 @@ void syntheticFeatures() {
   expect(collection != nullptr, "same-stem SQ/HD/BD should resolve into a collection");
   const auto bound = bindCollection(snapshot, collection->id);
   expect(bound.collection.has_value(), "SonyPS2 collection should bind");
-  const CollectionId manual = session.createUserCollection("Manual SonyPS2 collection", collection->members);
+  const CollectionId manual = session.createUserCollection("Manual SonyPS2 collection", collection->members());
   expect(bindCollection(session.snapshot(), manual).collection.has_value(),
          "a user-created SonyPS2 collection should infer its unique HD/BD binding");
   const auto& bank = bound.collection->soundBanks().front();
@@ -551,7 +551,7 @@ void trivialSongCollapsesToSelectedMidi() {
   const auto snapshot = scanFixture(sqFixture(true, false, 0, 240, 480));
   expect(snapshot.collections().size() == 1 && snapshot.collections().front().name == "music MIDI 2",
          "a Song should select its sparse MIDI block number instead of publishing a duplicate sequence");
-  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*snapshot.collections().front().members.sequence);
+  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*snapshot.collections().front().selection.sequence);
   expect(sequence != nullptr && sequence->program.timebase.ppqn == 480,
          "a Song should inherit the division of the MIDI block it selects");
   const auto bound = bindCollection(snapshot, snapshot.collections().front().id);
@@ -678,10 +678,10 @@ void realArchive(const std::filesystem::path& path) {
   const auto snapshot = session.snapshot();
   std::vector<const Collection*> sonyCollections;
   for (const auto& collection : snapshot.collections()) {
-    if (!collection.members.sequence) {
+    if (!collection.selection.sequence) {
       continue;
     }
-    const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.members.sequence);
+    const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.selection.sequence);
     if (sequence != nullptr && sequence->metadata.format == kFormatName) {
       sonyCollections.push_back(&collection);
     }

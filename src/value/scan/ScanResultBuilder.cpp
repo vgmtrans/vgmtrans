@@ -102,11 +102,6 @@ ScanSequenceDraft& ScanSequenceDraft::prepare(SequencePreparer prepare) {
   return *this;
 }
 
-ScanSequenceDraft& ScanSequenceDraft::assignBanks(BankAssigner assign) {
-  out_->drafts_.at(slot_)->sequenceRecipe.assignBanks = std::move(assign);
-  return *this;
-}
-
 ScanSoundBankDraft& ScanSoundBankDraft::useSamples(AssetId samples) {
   out_->drafts_.at(slot_)->bankRecipe.samples.emplace_back(DependencyTarget{samples, {}});
   return *this;

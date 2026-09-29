@@ -67,7 +67,7 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
   snapshotBuilder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Looping",
-      .members = {.sequence = AssetId{0}},
+      .selection = {.sequence = AssetId{0}},
   });
   const SessionSnapshot project = snapshotBuilder.finish();
 
@@ -118,8 +118,8 @@ void standaloneSequenceExportDoesNotRequireACollection() {
   });
   auto ambiguousBuilder = snapshotBuilder;
   ambiguousBuilder.collections = {
-      Collection{.id = CollectionId{0}, .name = "First", .members = {.sequence = AssetId{7}}},
-      Collection{.id = CollectionId{1}, .name = "Second", .members = {.sequence = AssetId{7}}},
+      Collection{.id = CollectionId{0}, .name = "First", .selection = {.sequence = AssetId{7}}},
+      Collection{.id = CollectionId{1}, .name = "Second", .selection = {.sequence = AssetId{7}}},
   };
   const SessionSnapshot snapshot = snapshotBuilder.finish();
   expect(snapshot.collections().empty(), "standalone MIDI fixture should not contain a collection");

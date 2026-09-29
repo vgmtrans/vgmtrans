@@ -225,10 +225,9 @@ void Session::removeAssets(std::span<const AssetId> assets) {
 
 CollectionId Session::createUserCollection(std::string name, CollectionMembers members) {
   sealFormats();
-  DesiredCollection selection{.members = std::move(members)};
+  DesiredCollection selection{.name = std::move(name), .selection = std::move(members)};
   resolveDependencies(AssetCatalog{sources_, state_->assets()}, selection, ResolutionMode::Manual);
-  const CollectionId id = state_->createUserCollection(std::move(name), std::move(selection.members),
-                                                       std::move(selection.dependencies), std::move(selection.issues));
+  const CollectionId id = state_->createUserCollection(std::move(selection));
   invalidateSnapshot();
   return id;
 }

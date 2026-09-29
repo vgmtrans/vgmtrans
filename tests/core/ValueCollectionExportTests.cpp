@@ -207,12 +207,13 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   builder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Usage",
-      .members =
+      .selection =
           {
               .sequence = sequence.metadata.id,
               .soundBanks = {instruments.metadata.id},
               .samplePools = {samples.metadata.id},
           },
+      .inputs = {.banks = {{.bank = instruments.metadata.id}}},
   });
   const SessionSnapshot snapshot = builder.finish();
 
@@ -256,7 +257,7 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   test::SessionSnapshotBuilder multiBankBuilder;
   multiBankBuilder.assets = {sequence, instruments, samples, otherBank};
   auto multiBankCollection = snapshot.collections().front();
-  multiBankCollection.members.soundBanks.push_back(otherBank.metadata.id);
+  multiBankCollection.inputs.banks.push_back({.bank = otherBank.metadata.id});
   multiBankBuilder.collections.push_back(std::move(multiBankCollection));
   const auto multiBankSnapshot = multiBankBuilder.finish();
   const auto firstBank = exportSoundBank(multiBankSnapshot, sources, instruments.metadata.id,
@@ -278,12 +279,13 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
       Collection{
           .id = CollectionId{1},
           .name = "Other Usage",
-          .members =
+          .selection =
               {
                   .sequence = sequence.metadata.id,
                   .soundBanks = {instruments.metadata.id},
                   .samplePools = {otherSamples.metadata.id},
               },
+      .inputs = {.banks = {{.bank = instruments.metadata.id}}},
       },
   };
   const SessionSnapshot ambiguousSnapshot = ambiguousBuilder.finish();
@@ -506,12 +508,13 @@ void collectionBindingAppliesToWholeExport() {
   builder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Performance Finalizer",
-      .members =
+      .selection =
           {
               .sequence = sequence.metadata.id,
               .soundBanks = {instruments.metadata.id},
               .samplePools = {samples.metadata.id},
           },
+      .inputs = {.banks = {{.bank = instruments.metadata.id}}},
   });
   auto failingSequence = sequence;
   failingSequence.metadata.id = AssetId{3};
@@ -519,7 +522,7 @@ void collectionBindingAppliesToWholeExport() {
   builder.assets.emplace_back(failingSequence);
   auto failingCollection = builder.collections.front();
   failingCollection.id = CollectionId{1};
-  failingCollection.members.sequence = failingSequence.metadata.id;
+  failingCollection.selection.sequence = failingSequence.metadata.id;
   builder.collections.push_back(std::move(failingCollection));
 
   const SessionSnapshot snapshot = builder.finish();
@@ -578,7 +581,7 @@ void sequencePreparationValidatesRuntimeReplacement() {
     builder.assets = {SequenceProgramAsset{.metadata = {.id = AssetId{1}, .range = sequenceRange},
                                            .program = {.runtime = std::move(runtime)},
                                            .prepare = std::move(prepare)}};
-    builder.collections = {{.id = CollectionId{1}, .members = {.sequence = AssetId{1}}}};
+    builder.collections = {{.id = CollectionId{1}, .selection = {.sequence = AssetId{1}}}};
     return bindCollection(builder.finish(), CollectionId{1});
   };
   const auto unchanged = [](SequencePreparationContext&) { return std::nullopt; };
@@ -645,15 +648,13 @@ void collectionBindingProducesAnImmutableInstrumentView() {
   builder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Prepared Probe",
-      .members =
+      .selection =
           {
               .soundBanks = {durable.metadata.id},
               .samplePools = {samples.metadata.id},
               .miscAssets = {manifest.metadata.id},
           },
-      .dependencies = {{.owner = durable.metadata.id,
-                        .role = DependencyRole::SamplePool,
-                        .targets = {{samples.metadata.id, {}}}}},
+      .inputs = {.banks = {{.bank = durable.metadata.id, .samples = {.targets = {{samples.metadata.id, {}}}}}}},
   });
 
   const auto snapshotWithBinder = [&](BankPreparer binder) {
@@ -669,11 +670,11 @@ void collectionBindingProducesAnImmutableInstrumentView() {
              snapshot.asset<SoundBankAsset>(durable.metadata.id)->instruments.front().name == "Durable Instrument",
          "collection binding should preserve selected asset identity without mutating durable assets");
 
-  expect(snapshot.collection(CollectionId{0})->members.miscAssets == std::vector{manifest.metadata.id} &&
+  expect(snapshot.collection(CollectionId{0})->selection.miscAssets == std::vector{manifest.metadata.id} &&
              *snapshot.asset<MiscAsset>(manifest.metadata.id)->privateData.get<u32>() == 42,
          "supplemental assets should remain available for collection inspection");
   auto missingMiscBuilder = builder;
-  missingMiscBuilder.collections.front().members.miscAssets = {AssetId{99}};
+  missingMiscBuilder.collections.front().selection.miscAssets = {AssetId{99}};
   const auto missingMisc = bindCollection(missingMiscBuilder.finish(), CollectionId{0});
   expect(!missingMisc.collection, "binding should still validate supplemental asset membership");
   diagnosticWithMessage(missingMisc.diagnostics, "Collection miscellaneous asset was not found");
@@ -711,11 +712,17 @@ void collectionBindingProducesAnImmutableInstrumentView() {
          "collection binding should reject changes to selected instrument identity or order");
   diagnosticWithMessage(changedIdentity.diagnostics, "Asset preparation changed sound bank identity, format, or order");
 
+  auto implicitPoolBuilder = builder;
+  implicitPoolBuilder.collections.front().selection.samplePools.clear();
+  const auto implicitPool = bindCollection(implicitPoolBuilder.finish(), CollectionId{0});
+  expect(implicitPool.collection && implicitPool.collection->samplePools().size() == 1,
+         "a resolved bank's sample use must supply its pool without a duplicate membership entry");
+
   auto missingPoolBuilder = builder;
-  missingPoolBuilder.collections.front().members.samplePools.clear();
+  std::erase_if(missingPoolBuilder.assets, [&](const Asset& asset) { return metadata(asset).id == samples.metadata.id; });
   const auto missingPool = bindCollection(missingPoolBuilder.finish(), CollectionId{0});
-  expect(!missingPool.collection, "collection binding should reject an external pool outside its membership");
-  diagnosticWithMessage(missingPool.diagnostics, "Dependency provider is not a selected collection member");
+  expect(!missingPool.collection, "collection binding must still reject a resolved pool absent from its snapshot");
+  diagnosticWithMessage(missingPool.diagnostics, "Collection sample pool asset was not found");
 
   const auto unresolved = bindCollection(snapshotWithBinder([](BankPreparationContext& context) {
                                            context.bank.instruments.front().regions.front().sample =
@@ -788,12 +795,13 @@ void synthOnlyExportRendersSequencesWithoutOriginalModulation() {
   builder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "No Modulation",
-      .members =
+      .selection =
           {
               .sequence = sequence.metadata.id,
               .soundBanks = {instruments.metadata.id},
               .samplePools = {samples.metadata.id},
           },
+      .inputs = {.banks = {{.bank = instruments.metadata.id}}},
   });
   synthOnlySequenceExecutions = 0;
   const auto artifacts = exportCollection(builder.finish(), sources, CollectionId{0},
@@ -835,7 +843,7 @@ void exportDiagnosticsPreserveSourceRanges() {
   builder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Probe",
-      .members = {.samplePools = {missingSamplePool.metadata.id}},
+      .selection = {.samplePools = {missingSamplePool.metadata.id}},
   });
   const SessionSnapshot project = builder.finish();
 
@@ -993,12 +1001,13 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
   builder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Playback",
-      .members =
+      .selection =
           {
               .sequence = sequence.metadata.id,
               .soundBanks = {instruments.metadata.id},
               .samplePools = {samples.metadata.id},
           },
+      .inputs = {.banks = {{.bank = instruments.metadata.id}}},
   });
   const auto playback = prepareCollectionPlayback(builder.finish(), sources, CollectionId{0}, PlaybackRequest{});
   expect(playback.playable() && playback.diagnostics.empty(),
@@ -1026,7 +1035,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
   sequenceOnlyBuilder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Missing Synth",
-      .members = {.sequence = sequence.metadata.id},
+      .selection = {.sequence = sequence.metadata.id},
   });
   const auto missingSynth =
       prepareCollectionPlayback(sequenceOnlyBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{});
@@ -1047,12 +1056,13 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
   sampleOnlySynthBuilder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Sample-only Synth",
-      .members =
+      .selection =
           {
               .sequence = sequence.metadata.id,
               .soundBanks = {emptyInstruments.metadata.id},
               .samplePools = {samples.metadata.id},
           },
+      .inputs = {.banks = {{.bank = emptyInstruments.metadata.id}}},
   });
   const auto sampleOnlySynth =
       prepareCollectionPlayback(sampleOnlySynthBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{});
@@ -1070,11 +1080,12 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
   synthOnlyBuilder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Missing Sequence",
-      .members =
+      .selection =
           {
               .soundBanks = {instruments.metadata.id},
               .samplePools = {samples.metadata.id},
           },
+      .inputs = {.banks = {{.bank = instruments.metadata.id}}},
   });
   const auto missingSequence =
       prepareCollectionPlayback(synthOnlyBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{});

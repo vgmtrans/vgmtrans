@@ -352,7 +352,7 @@ void konamiTmnt2AliasesMiscSamplesAndTrackLabels() {
          "the complete pointer/track-table span should be published once as a shared Sequence Table misc asset");
   expect(std::ranges::all_of(
              resolvedScanCollections(result),
-             [](const DesiredCollection& collection) { return collection.members.miscAssets.size() == 1; }),
+             [](const DesiredCollection& collection) { return collection.selection.miscAssets.size() == 1; }),
          "every aliased sequence collection should attach the shared Sequence Table misc asset");
   const auto* sequence = firstAsset<SequenceProgramAsset>(result);
   expect(sequence && sequence->program.tracks.size() == 1 && sequence->program.tracks[0].name == "FM Track 0",

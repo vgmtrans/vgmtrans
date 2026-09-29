@@ -15,7 +15,7 @@ namespace vgmtrans::core {
 namespace {
 
 [[nodiscard]] bool collectionContains(const Collection& collection, AssetId asset) {
-  const auto& members = collection.members;
+  const auto& members = collection.members();
   return members.sequence == asset || std::ranges::find(members.soundBanks, asset) != members.soundBanks.end() ||
          std::ranges::find(members.samplePools, asset) != members.samplePools.end() ||
          std::ranges::find(members.miscAssets, asset) != members.miscAssets.end();
@@ -29,14 +29,6 @@ AssetMetadata& metadata(Asset& asset) {
 
 const AssetMetadata& metadata(const Asset& asset) {
   return std::visit([](const auto& typedAsset) -> const AssetMetadata& { return typedAsset.metadata; }, asset);
-}
-
-ResolutionStatus Collection::resolutionStatus() const noexcept {
-  ResolutionStatus status = ResolutionStatus::Resolved;
-  for (const auto& dependency : dependencies) {
-    status = std::max(status, dependency.status);
-  }
-  return status;
 }
 
 SessionSnapshot::Storage::Storage(std::vector<SourceFile> sourcesValue, SharedSequence<Asset> assetsValue,

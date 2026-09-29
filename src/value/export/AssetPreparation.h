@@ -26,28 +26,28 @@ struct PreparationFailure {
 
 template <class Data>
 struct BankInput {
-  const SoundBankAsset& asset;
+  SoundBankAsset& asset;
   const Data& data;
-  const AssetPrivateData placement;
 };
 
 // Used by the sequence's prepare callback after all banks have been prepared.
-// Banks are read-only here; the callback configures how this sequence plays them.
+// It may configure the private bank contents and the sequence runtime together.
+// Scanned assets remain immutable; identity and format must be retained.
 struct SequencePreparationContext {
 public:
-  SequencePreparationContext(const SequenceProgramAsset& sequence, std::span<const SoundBankAsset> soundBanks,
-                             std::vector<Diagnostic>& diagnostics, std::span<const DependencyTarget> bankUses = {})
-      : sequence(sequence), diagnostics(diagnostics), soundBanks_(soundBanks), bankUses_(bankUses) {}
+  SequencePreparationContext(const SequenceProgramAsset& sequence, std::span<SoundBankAsset> soundBanks,
+                             std::vector<Diagnostic>& diagnostics)
+      : sequence(sequence), diagnostics(diagnostics), soundBanks_(soundBanks) {}
 
   const SequenceProgramAsset& sequence;
   std::vector<Diagnostic>& diagnostics;
 
   // Return this format's banks in selected order. Missing format data stops
-  // preparation. Each placement describes how the sequence uses that bank.
+  // preparation. Changes apply only to this collection's prepared copies.
   template <class Data>
   [[nodiscard]] std::vector<BankInput<Data>> banks(std::string_view format) {
     std::vector<BankInput<Data>> result;
-    for (const auto& bank : soundBanks_) {
+    for (auto& bank : soundBanks_) {
       if (bank.metadata.format != format) {
         continue;
       }
@@ -55,8 +55,7 @@ public:
       if (data == nullptr) {
         fail("Sequence bank input is missing its retained format data", bank.metadata.range);
       }
-      const auto use = std::ranges::find(bankUses_, bank.metadata.id, &DependencyTarget::asset);
-      result.push_back({bank, *data, use == bankUses_.end() ? AssetPrivateData{} : use->placement});
+      result.push_back({bank, *data});
     }
     return result;
   }
@@ -77,8 +76,7 @@ public:
   }
 
 private:
-  std::span<const SoundBankAsset> soundBanks_;
-  std::span<const DependencyTarget> bankUses_;
+  std::span<SoundBankAsset> soundBanks_;
 };
 
 template <class Data>
@@ -92,18 +90,14 @@ struct SampleInput {
 // inputs were chosen during resolution; the shared sample pools remain read-only.
 struct BankPreparationContext {
   BankPreparationContext(SoundBankAsset& bank, u32 bankIndex, std::span<const DependencyTarget> inputs,
-                         std::span<const SamplePoolAsset* const> samplePools, std::vector<Diagnostic>& diagnostics,
-                         AssetPrivateData placement = {})
-      : bank(bank), bankIndex(bankIndex), inputs(inputs), diagnostics(diagnostics), placement(std::move(placement)),
-        samplePools_(samplePools) {}
+                         const SessionSnapshot& snapshot, std::vector<Diagnostic>& diagnostics)
+      : bank(bank), bankIndex(bankIndex), inputs(inputs), diagnostics(diagnostics), snapshot_(snapshot) {}
 
   SoundBankAsset& bank;
   // Zero-based index among banks of this format, in the selected order.
   u32 bankIndex;
   std::span<const DependencyTarget> inputs;
   std::vector<Diagnostic>& diagnostics;
-  // Settings assigned by the sequence, if any; empty for standalone banks.
-  const AssetPrivateData placement;
 
   // Only this bank's chosen inputs, in order. A pool can appear more than once
   // with different placements, such as different starting sample positions.
@@ -111,16 +105,15 @@ struct BankPreparationContext {
   [[nodiscard]] std::vector<SampleInput<Data>> samples() {
     std::vector<SampleInput<Data>> result;
     for (const auto& input : inputs) {
-      const auto found =
-          std::ranges::find(samplePools_, input.asset, [](const SamplePoolAsset* value) { return value->metadata.id; });
-      if (found == samplePools_.end()) {
+      const auto* pool = snapshot_.asset<SamplePoolAsset>(input.asset);
+      if (pool == nullptr) {
         fail("Bank input refers to a missing sample pool");
       }
-      const auto* data = (*found)->privateData.template get<Data>();
+      const auto* data = pool->privateData.template get<Data>();
       if (data == nullptr) {
         fail("Bank sample input is missing its retained format data");
       }
-      result.push_back({**found, *data, input.placement});
+      result.push_back({*pool, *data, input.placement});
     }
     return result;
   }
@@ -148,7 +141,7 @@ struct BankPreparationContext {
   }
 
 private:
-  std::span<const SamplePoolAsset* const> samplePools_;
+  const SessionSnapshot& snapshot_;
 };
 
 }  // namespace vgmtrans::core

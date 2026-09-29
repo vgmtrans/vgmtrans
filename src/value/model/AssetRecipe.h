@@ -18,7 +18,6 @@
 namespace vgmtrans::core {
 
 class DependencyContext;
-class BankAssignmentContext;
 struct BankPreparationContext;
 struct SequencePreparationContext;
 struct SequenceRuntime;
@@ -79,7 +78,6 @@ private:
 
 using DependencySelector = std::function<DependencySelection(const DependencyContext&)>;
 using BankPreparer = std::function<void(BankPreparationContext&)>;
-using BankAssigner = std::function<void(BankAssignmentContext&)>;
 
 // Use an asset ID when scanning already found the input. Otherwise, a callback
 // chooses from the available assets when collections are rebuilt.
@@ -89,9 +87,6 @@ using DependencyRequest = std::variant<DependencyTarget, DependencySelector>;
 // those inputs to make the sequence or bank ready for playback and export.
 struct SequenceRecipe {
   std::vector<DependencyRequest> banks;
-  // Give the chosen banks settings for this sequence, such as bank numbers.
-  // This cannot change which banks were chosen or edit the banks themselves.
-  BankAssigner assignBanks;
 };
 
 struct BankRecipe {

@@ -422,10 +422,10 @@ void modulePairsKdtWithSonyVab() {
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
   const auto collection = std::ranges::find_if(
-      snapshot.collections(), [](const Collection& candidate) { return candidate.members.sequence.has_value(); });
-  expect(collection != snapshot.collections().end() && collection->members.soundBanks.size() == 1,
+      snapshot.collections(), [](const Collection& candidate) { return candidate.selection.sequence.has_value(); });
+  expect(collection != snapshot.collections().end() && collection->members().soundBanks.size() == 1,
          "Konami KDT collections should bind to Sony VAB banks from the same source");
-  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection->members.sequence);
+  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection->selection.sequence);
   expect(sequence && sequence->metadata.format == kKonamiPs1FormatName,
          "the resolved sequence should remain owned by the KonamiPS1 module");
 }
@@ -447,7 +447,7 @@ void moduleFollowsAuditedRuntimeVabLinks() {
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
   const auto collection = std::ranges::find_if(
-      snapshot.collections(), [](const Collection& candidate) { return candidate.members.sequence.has_value(); });
+      snapshot.collections(), [](const Collection& candidate) { return candidate.selection.sequence.has_value(); });
   expect(collection != snapshot.collections().end(), "a runtime-linked VAB fixture should resolve a KDT collection");
   const auto bound = bindCollection(snapshot, collection->id);
   expect(bound.collection && bound.collection->soundBanks().size() == 1 &&

@@ -221,10 +221,10 @@ size_t countEvents(const PerformanceSequence& performance) {
 
 const Collection* squareCollection(const SessionSnapshot& snapshot) {
   for (const auto& collection : snapshot.collections()) {
-    if (!collection.members.sequence) {
+    if (!collection.selection.sequence) {
       continue;
     }
-    const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.members.sequence);
+    const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.selection.sequence);
     if (sequence != nullptr && sequence->metadata.format == kSquarePs2FormatName) {
       return &collection;
     }
@@ -265,7 +265,7 @@ void syntheticArchiveCoversDriverFeatures() {
     }
   }
   const Collection* collection = squareCollection(snapshot);
-  expect(collection != nullptr && collection->members.soundBanks.size() == 1,
+  expect(collection != nullptr && collection->members().soundBanks.size() == 1,
          "BGM and WD members should resolve through their driver bank ID");
 
   const auto binding = bindCollection(snapshot, collection->id);
@@ -410,7 +410,7 @@ void scanRealArchive(const std::filesystem::path& path) {
                               [](const Diagnostic& diagnostic) { return diagnostic.severity == Severity::Error; }),
          "real SquarePS2 scan should not produce validation errors");
   const Collection* collection = squareCollection(snapshot);
-  if (collection == nullptr || collection->members.soundBanks.empty()) {
+  if (collection == nullptr || collection->members().soundBanks.empty()) {
     std::cerr << "real archive diagnostic: " << snapshot.sources().size() << " sources, " << snapshot.assets().size()
               << " assets, " << snapshot.collections().size() << " collections\n";
     for (const auto& source : snapshot.sources()) {
@@ -435,7 +435,7 @@ void scanRealArchive(const std::filesystem::path& path) {
       std::cerr << "diagnostic: " << diagnostic.message << '\n';
     }
   }
-  expect(collection != nullptr && !collection->members.soundBanks.empty(),
+  expect(collection != nullptr && !collection->members().soundBanks.empty(),
          "real SquarePS2 archive should resolve a BGM with its WD bank");
   const auto binding = bindCollection(snapshot, collection->id);
   expect(binding.collection.has_value(), "real SquarePS2 collection should bind");
@@ -443,7 +443,7 @@ void scanRealArchive(const std::filesystem::path& path) {
       collection->id, PlaybackRequest{.sequence = {.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = 0}});
   expect(playback.playable() && countEvents<NotePerformanceEvent>(playback.performance) != 0,
          "real SquarePS2 BGM should prepare playable MIDI and SoundFont data");
-  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection->members.sequence);
+  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection->selection.sequence);
   size_t commands = 0;
   if (sequence != nullptr) {
     for (const auto& track : sequence->program.tracks) {

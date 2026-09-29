@@ -161,8 +161,8 @@ Session sonyPs1CollectionSession(std::initializer_list<std::string_view> banks,
 
 const Collection& sonyPs1Collection(const SessionSnapshot& snapshot, size_t banks, size_t pools) {
   const auto found = std::ranges::find_if(snapshot.collections(), [&](const Collection& collection) {
-    return collection.members.sequence && collection.members.soundBanks.size() == banks &&
-           collection.members.samplePools.size() == pools;
+    return collection.selection.sequence && collection.members().soundBanks.size() == banks &&
+           collection.members().samplePools.size() == pools;
   });
   expect(found != snapshot.collections().end(), "the expected SonyPS1 collection should be discovered");
   return *found;
@@ -468,14 +468,14 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
   const Collection* latestCollection = nullptr;
   const auto bankForSequence = [&](u32 sequenceOffset) {
     for (const auto& collection : pairedSnapshot.collections()) {
-      const auto* sequence = pairedSnapshot.asset<SequenceProgramAsset>(*collection.members.sequence);
+      const auto* sequence = pairedSnapshot.asset<SequenceProgramAsset>(*collection.selection.sequence);
       if (sequence->metadata.range.offset == sequenceOffset) {
         if (sequenceOffset == secondSequence) {
           latestCollection = &collection;
         }
-        expect(collection.members.soundBanks.size() == 1 && collection.members.samplePools.empty(),
+        expect(collection.members().soundBanks.size() == 1 && collection.members().samplePools.empty(),
                "each same-source SonyPS1 sequence should resolve to one combined VAB");
-        return pairedSnapshot.asset<SoundBankAsset>(collection.members.soundBanks.front())->metadata.range.offset;
+        return pairedSnapshot.asset<SoundBankAsset>(collection.members().soundBanks.front())->metadata.range.offset;
       }
     }
     return std::numeric_limits<u64>::max();
@@ -492,7 +492,7 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
   }
   builder.assets.push_back(foreignBank);
   auto collection = *latestCollection;
-  collection.members.soundBanks.insert(collection.members.soundBanks.begin(), foreignBank.metadata.id);
+  collection.inputs.banks.insert(collection.inputs.banks.begin(), {.bank = foreignBank.metadata.id});
   builder.collections.push_back(collection);
   const auto binding = bindCollection(builder.finish(), collection.id);
   expect(binding.collection.has_value(), "SonyPS1 banks should prepare with foreign collection members");
@@ -540,8 +540,8 @@ void sonyPs1RawSamplesSupportManualCollections() {
            "raw detection should retain every sample without decoding gaps or terminal padding");
     for (u32 bank = 0; bank < 2; ++bank) {
       const auto id =
-          session.createUserCollection("Manual", CollectionMembers{.sequence = discovered.members.sequence,
-                                                                   .soundBanks = {discovered.members.soundBanks[bank]},
+          session.createUserCollection("Manual", CollectionMembers{.sequence = discovered.selection.sequence,
+                                                                   .soundBanks = {discovered.members().soundBanks[bank]},
                                                                    .samplePools = {samples.metadata.id}});
       const auto bound = bindCollection(session.snapshot(), id);
       if (duplicate && bank == 0) {
@@ -566,7 +566,7 @@ void runSonyPs1CollectionBindingTests() {
     Session session = sonyPs1CollectionSession({"A.VH", "B.VH"}, {"COMMON.VB"});
     const SessionSnapshot snapshot = session.snapshot();
     const Collection& collection = sonyPs1Collection(snapshot, 2, 1);
-    const AssetId poolId = collection.members.samplePools.front();
+    const AssetId poolId = collection.members().samplePools.front();
     const auto resolved = bindCollection(snapshot, collection.id);
     const auto usesPool = [poolId](const BoundCollection& bound) {
       return std::ranges::all_of(bound.soundBanks(), [poolId](const SoundBankAsset& bank) {
@@ -578,9 +578,9 @@ void runSonyPs1CollectionBindingTests() {
 
     const CollectionId manualId =
         session.createUserCollection("Manual Sony Collection", CollectionMembers{
-                                                                   .sequence = collection.members.sequence,
-                                                                   .soundBanks = collection.members.soundBanks,
-                                                                   .samplePools = collection.members.samplePools,
+                                                                   .sequence = collection.selection.sequence,
+                                                                   .soundBanks = collection.members().soundBanks,
+                                                                   .samplePools = collection.members().samplePools,
                                                                });
     const auto manual = bindCollection(session.snapshot(), manualId);
     expect(manual.collection && usesPool(*manual.collection),
@@ -593,9 +593,9 @@ void runSonyPs1CollectionBindingTests() {
       }
       auto broken = collection;
       if (removePool) {
-        broken.members.samplePools.clear();
+        std::erase_if(builder.assets, [poolId](const Asset& asset) { return metadata(asset).id == poolId; });
       } else if (!invalidIndex) {
-        broken.members.soundBanks.erase(broken.members.soundBanks.begin());
+        broken.inputs.banks.front().bank = AssetId{999};
       }
       if (invalidIndex) {
         for (auto& asset : builder.assets) {
@@ -606,7 +606,7 @@ void runSonyPs1CollectionBindingTests() {
       }
       builder.collections.push_back(broken);
       expect(!bindCollection(builder.finish(), broken.id).collection,
-             "invalid membership or sample placement must prevent preparation");
+             "missing resolved assets or invalid sample placement must prevent preparation");
     };
     rejects(false, false);
     rejects(true, false);
@@ -617,7 +617,8 @@ void runSonyPs1CollectionBindingTests() {
     Session session = sonyPs1CollectionSession({"A.VH", "B.VH"}, {"A.VB", "B.VB"});
     const SessionSnapshot snapshot = session.snapshot();
     auto collection = sonyPs1Collection(snapshot, 2, 2);
-    std::ranges::reverse(collection.members.samplePools);
+    collection.selection.samplePools = collection.members().samplePools;
+    std::ranges::reverse(collection.selection.samplePools);
     test::SessionSnapshotBuilder builder;
     for (const auto& asset : snapshot.assets()) {
       builder.assets.push_back(asset);
@@ -626,8 +627,8 @@ void runSonyPs1CollectionBindingTests() {
     const auto binding = bindCollection(builder.finish(), collection.id);
     expect(binding.collection.has_value(), "SonyPS1 preparation should not depend on pool member order");
     const auto& banks = binding.collection->soundBanks();
-    expect(banks[0].instruments.front().regions.front().sample.owner() == collection.members.samplePools[1] &&
-               banks[1].instruments.front().regions.front().sample.owner() == collection.members.samplePools[0],
+    expect(banks[0].instruments.front().regions.front().sample.owner() == collection.members().samplePools[1] &&
+               banks[1].instruments.front().regions.front().sample.owner() == collection.members().samplePools[0],
            "each SonyPS1 bank should use its recorded dependency after member reordering");
   }
 
@@ -637,7 +638,7 @@ void runSonyPs1CollectionBindingTests() {
     const Collection& discovered = sonyPs1Collection(snapshot, 1, 0);
     expect(discovered.resolutionStatus() == ResolutionStatus::Ambiguous,
            "equally compatible SonyPS1 pools should be reported as ambiguous");
-    CollectionMembers members = discovered.members;
+    CollectionMembers members = discovered.members();
     for (const auto& asset : snapshot.assets()) {
       if (const auto* pool = std::get_if<SamplePoolAsset>(&asset)) {
         members.samplePools.push_back(pool->metadata.id);
@@ -655,7 +656,7 @@ void runSonyPs1CollectionBindingTests() {
     Session session = sonyPs1CollectionSession({"BANK.VH"}, {"BANK.VB", "BANK.raw"});
     const SessionSnapshot snapshot = session.snapshot();
     const Collection& collection = sonyPs1Collection(snapshot, 1, 0);
-    expect(collection.resolutionStatus() == ResolutionStatus::Ambiguous && collection.members.samplePools.empty(),
+    expect(collection.resolutionStatus() == ResolutionStatus::Ambiguous && collection.members().samplePools.empty(),
            "multiple same-stem SonyPS1 pools should not produce an arbitrary captured relationship");
   }
 }

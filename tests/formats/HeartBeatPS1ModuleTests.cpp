@@ -225,9 +225,9 @@ void moduleBuildsEmbeddedWaveBank() {
   const SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.collections().size() == 1, "HeartBeatPS1 fixture should produce one collection");
   const Collection& collection = snapshot.collections().front();
-  expect(collection.members.sequence && collection.members.soundBanks.size() == 1,
+  expect(collection.selection.sequence && collection.members().soundBanks.size() == 1,
          "the collection should connect qQES playback to its embedded wave bank");
-  const auto* bank = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
+  const auto* bank = snapshot.asset<SoundBankAsset>(collection.members().soundBanks.front());
   expect(bank && bank->instruments.size() == 1 && bank->localSamples.samples.size() == 1,
          "the embedded attribute and ADPCM sections should become one playable sound bank");
   const Instrument& instrument = bank->instruments.front();
@@ -235,7 +235,7 @@ void moduleBuildsEmbeddedWaveBank() {
          "program identity and its tone region should retain the source wave-bank ID");
   expect(std::abs(instrument.regions.front().unityKey - 59.5) < 0.000001 && instrument.reverb == 1.0,
          "fine tuning should use the driver's low seven bits and preserve tone-default reverb routing");
-  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.members.sequence);
+  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.selection.sequence);
   const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program);
   const auto bends = eventsOfType<PitchBendPerformanceEvent>(performance.tracks.front());
   expect(bends.size() == 2 && std::abs(bends.front()->semitones + 6.0) < 0.001 &&

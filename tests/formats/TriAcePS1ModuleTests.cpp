@@ -323,10 +323,10 @@ void triAcePs1ExtractorAndModuleBuildSelfContainedCollection() {
   expect(snapshot.collections().size() == 1,
          "SLZ stream with an omitted alignment tail should produce one TriAcePS1 collection");
   const Collection& collection = snapshot.collections().front();
-  expect(collection.members.sequence.has_value() && collection.members.soundBanks.size() == 1,
+  expect(collection.selection.sequence.has_value() && collection.members().soundBanks.size() == 1,
          "the extracted sequence and RAM bank should remain in one collection (banks=" +
-             std::to_string(collection.members.soundBanks.size()) + ")");
-  const auto* bank = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
+             std::to_string(collection.members().soundBanks.size()) + ")");
+  const auto* bank = snapshot.asset<SoundBankAsset>(collection.members().soundBanks.front());
   expect(bank != nullptr && bank->instruments.size() == 1 && bank->localSamples.samples.size() == 1,
          "TriAcePS1 bank should retain its local SPU sample pool");
   const Instrument& instrument = bank->instruments.front();

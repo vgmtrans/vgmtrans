@@ -286,10 +286,10 @@ bool CollectionFilterProxyModel::filterAcceptsRow(int sourceRow, const QModelInd
   const QModelIndex index = sourceModel()->index(sourceRow, 0, sourceParent);
   const auto collectionId = core::CollectionId{index.data(IdRole).toUInt()};
   const auto* collection = workspace_.snapshot().collection(collectionId);
-  if (collection == nullptr || !collection->members.sequence) {
+  if (collection == nullptr || !collection->selection.sequence) {
     return false;
   }
-  const auto* sequence = workspace_.snapshot().asset(*collection->members.sequence);
+  const auto* sequence = workspace_.snapshot().asset(*collection->selection.sequence);
   return sequence != nullptr &&
          filterRegularExpression().match(QString::fromStdString(core::metadata(*sequence).name)).hasMatch();
 }
@@ -401,17 +401,18 @@ void CollectionContentsModel::rebuild() {
     collection_.reset();
     return;
   }
-  for (const auto id : collection->members.miscAssets) {
+  const auto members = collection->members();
+  for (const auto id : members.miscAssets) {
     entries_.push_back({id});
   }
-  for (const auto id : collection->members.soundBanks) {
+  for (const auto id : members.soundBanks) {
     entries_.push_back({id});
   }
-  for (const auto id : collection->members.samplePools) {
+  for (const auto id : members.samplePools) {
     entries_.push_back({id});
   }
-  if (collection->members.sequence) {
-    entries_.push_back({*collection->members.sequence});
+  if (collection->selection.sequence) {
+    entries_.push_back({*collection->selection.sequence});
   }
 }
 

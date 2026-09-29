@@ -98,7 +98,7 @@ Selection examines immutable assets. It must not mutate format state, construct
 collections, or capture borrowed pointers in its result. Asset IDs and owned
 `AssetPrivateData` placements survive the temporary catalog.
 
-## Bank assignments and preparation
+## Preparation
 
 A bank's preparation hook receives its selected sample inputs and a private bank
 copy:
@@ -122,39 +122,31 @@ input directly. It fails if the selection is empty, has multiple inputs, or lack
 the requested data. An optional message describes the format's single-input
 requirement.
 
-Some sequences also assign logical meanings to their selected banks. Register
-`sequence.assignBanks(assignBanks)` for that case. It runs after automatic or
-manual selection and can attach native placement values to the sequence-to-bank
-relationships. It cannot change membership or mutate bank assets:
+Sequence preparation runs after the selected banks have prepared their samples.
+It receives private, mutable bank contents and their retained format data, and
+can configure those contents together with the sequence runtime:
 
 ```cpp
-void assignBanks(BankAssignmentContext& context) {
-  const auto& sequence = context.data<SequenceData>();
-  for (auto& bank : context.banks<BankData>()) {
-    bank.placement = AssetPrivateData::make(logicalUse(sequence, bank.data));
-  }
-}
-```
-
-SegSat uses this step to reserve exact physical bank matches before assigning
-fallback logical roles. Each bank applies its assignment through
-`BankPreparationContext::placement`. Sequence preparation runs afterward with
-read-only prepared banks. Like `samples<Data>()`, `banks<Data>(format)` presents
-each input's `asset`, retained `data`, and `placement` together:
-
-```cpp
-SequenceRuntime prepareSequence(SequencePreparationContext& context) {
+std::optional<SequenceRuntime> prepareSequence(SequencePreparationContext& context) {
   RuntimeConfig config;
   for (const auto& bank : context.banks<BankData>(kFormatName)) {
     appendPrograms(config, bank.data);
+    // bank.asset is this collection's prepared copy. Configure its instrument
+    // identities or preferred output addresses here when the sequence requires it.
   }
   return sequenceRuntime(std::move(config));
 }
 ```
 
+SegSat reserves exact physical bank matches before assigning fallback logical
+numbers in selected order. One callback applies those numbers to instrument
+identities and playback velocity data, and gives a lone bank output bank zero.
+No assignment callback or stored sequence-to-bank placement is involved. A bank
+count mismatch is reported during preparation; collection discovery reports
+companion-selection problems only.
+
 Bank views preserve selected order and skip other formats. A matching bank with
-missing retained data fails preparation; it is not silently skipped. A placement
-is empty when no sequence assignment exists. `context.sequence` is always a
+missing retained data fails preparation; it is not silently skipped. `context.sequence` is always a
 reference to the sequence being prepared. Both preparation contexts default
 diagnostics to their owner's source range. Supplemental assets remain available
 through collection inspection, outside the audio preparation interface.
@@ -172,7 +164,25 @@ path. Formats do not need to propagate failure flags or write `return` after
 earlier warnings, reports the error once, and discards partial changes.
 
 Different sequences can assign different logical addresses to the same durable
-bank. Standalone bank preparation has no sequence assignment.
+bank. Standalone bank preparation runs only the bank hook and keeps its native instrument mapping.
+
+## Stored collection inputs
+
+`Collection::selection` retains the original choices. For an automatic collection,
+these are the sequence and supplemental inspection assets. Manual collections also
+retain the user's ordered bank and sample choices, including unused sample pools.
+
+`Collection::inputs.banks` holds the resolved banks in order. Each `CollectionBank`
+contains its bank ID and `samples`: chosen pool uses, their placements, status,
+and alternatives. Bank-selection status and alternatives belong to `CollectionInputs`.
+IDs refer to assets in the same immutable session snapshot as the collection.
+
+For example, a user can select pools A and B while one bank uses A twice at
+different offsets. The selection retains `[A, B]`; the bank's sample targets retain
+`[A at offset 4, A at offset 12]`. Preparation visits those targets directly.
+`members()` derives the flat inspection/export view, retaining the user's order
+and adding automatic uses once each. There is no stored owner/role list or second
+resolved member list to reconcile.
 
 ## Core policy
 
@@ -186,30 +196,33 @@ bank. Standalone bank preparation has no sequence assignment.
 - Supplemental inspection references have their own recorded outcome. Missing or
   wrong-type references are omitted from membership and make the collection
   incomplete, preserving audio preparation despite their error diagnostics.
-- Each owner has one ordered input list for its dependency role. Multiple requests
-  combine into that list, preserving unresolved outcomes and alternatives. Bank
-  inputs deduplicate assets; sample inputs preserve distinct placements within
-  the same pool. Flattened collection membership deduplicates both.
-- Bank assignment writes directly to the recorded inputs. Preparation borrows
-  those same lists from the collection; it does not reconstruct relationships.
+- Multiple requests combine into one ordered selection, preserving unresolved
+  outcomes and alternatives. Bank inputs deduplicate assets; a bank's sample uses
+  retain distinct placements within the same pool. `members()` deduplicates uses
+  for display, without changing the stored relationships.
+- Preparation reads each bank's sample inputs directly. It does not join owner IDs
+  or roles to a separate member list. Resolved provider IDs and manual restrictions
+  are validated during resolution; snapshot lookups still reject missing or
+  wrong-type assets before callbacks run.
 - Automatic candidates cannot cross independent container roots. Standalone
   files remain available to native ID, path, and compatibility rules. Exact
   references supplied by a scanner are authoritative.
 - Manual collections replace the sequence's bank requests with the chosen banks.
   Bank sample requests run within the selected pools in user order. Manual
   selections may cross container boundaries but cannot add unselected providers.
-  Bank assignments apply after this override.
-- Wrong-type providers, selector exceptions, and assignment exceptions produce
-  failed dependencies and block preparation. Missing or ambiguous requests remain
+- Wrong-type providers and selector exceptions produce failed selections and
+  block preparation. Missing or ambiguous requests remain
   inspectable; preparation and sample validation determine whether the selected
   assets can be used. MIDI can still be useful without a bank.
-- Preparation validates recorded relationships, bank identity, sample references,
+- Preparation validates bank identity, sample references,
   and resulting synth data. Failures publish no partially prepared collection.
   Durable assets and previous snapshots remain unchanged.
 
-The resolver rebuilds decisions from the current immutable catalog after session
-changes. It retains no mutable matching database and does not search globally for
-a combination of providers. Driver-specific choices stay in format requests.
+The resolver rebuilds automatic collections from the current immutable catalog
+after session changes. User collections retain their manual resolution; they are
+not automatically rematched when new files arrive. The resolver retains no mutable
+matching database and does not search globally for a combination of providers.
+Driver-specific choices stay in format requests.
 
 Standalone full-bank export uses the bank's own recipe. Exporting only instruments
 used by a sequence requires one unambiguous collection; exporting a particular
@@ -223,17 +236,20 @@ of diagnostic codes, ambiguous positions within one pool, manual ordering and
 confinement, container scope, provider type validation, standalone preparation,
 and copy isolation. Preparation tests cover immediate failure across nested
 helpers, single-input validation, and returned-runtime validation and retention.
-Shared-bank tests cover different logical assignments across
-sequences, overlapping requests, assignment failures, and assignments to a manually
-substituted bank. Format tests cover
+Shared-bank tests cover sequence-specific configuration, overlapping requests,
+failure after editing private bank contents, and manually substituted banks.
+They also cover unused manual sample choices and repeated placements without
+duplicating automatic membership. Format tests cover
 native matching, sample positions, Akao coverage, PSF2 manifests, and SegSat shared
 sequence entries, logical addressing, and velocity behavior.
 
-The refined implementation passes all 43 headless CTest targets. Corpus
-verification covers 56 files across 17 groups, including the original six formats
+The collection-input revision passes all 43 headless CTest targets. Current
+verification is recorded in [the implementation notes](../../../docs/value-core-review/resolved-instrument-prototype.html#verification).
+
+Historical corpus verification of the earlier dependency implementation covered 56 files across 17 groups, including the original six formats
 and additional SegSat, NDS, MP2k, and Namco SNES archives. All 430 collections
-retain the same banks, pools, and resolved sample references; manual selections
-agree with automatic resolution. All 464 generated artifacts are byte-identical:
+retained the same banks, pools, and resolved sample references; manual selections
+agreed with automatic resolution. All 464 generated artifacts were byte-identical:
 430 MIDI files and 17 each of SoundFont and DLS. The sampled MP2k group reports
 pre-existing sample-reference errors in both builds, with matching artifacts and
 exit status; the other 16 groups export without a nonzero exit status.

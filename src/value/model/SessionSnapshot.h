@@ -39,17 +39,20 @@ enum class CollectionOrigin { Discovered, User };
 struct Collection {
   CollectionId id;
   std::string name;
-  // A discovered collection is identified by members.sequence during rebuilds.
+  // A discovered collection is identified by selection.sequence during rebuilds.
   // User collections have independent identities, even for the same sequence.
   CollectionOrigin origin = CollectionOrigin::User;
   // Collections are the export units. A sequence may be paired with instrument
   // banks and sample pools loaded from the same or separate sources.
-  CollectionMembers members;
+  // Original choices: automatic collections retain only their root and inspection assets.
+  CollectionMembers selection;
   std::vector<CollectionIssue> issues;
-  std::vector<ResolvedDependency> dependencies;
+  CollectionInputs inputs;
+
+  [[nodiscard]] CollectionMembers members() const { return collectionMembers(selection, inputs); }
 
   [[nodiscard]] bool isDiscovered() const noexcept { return origin == CollectionOrigin::Discovered; }
-  [[nodiscard]] ResolutionStatus resolutionStatus() const noexcept;
+  [[nodiscard]] ResolutionStatus resolutionStatus() const noexcept { return inputs.status(); }
 };
 
 // Copyable read-only view of one Session revision. Copies share immutable

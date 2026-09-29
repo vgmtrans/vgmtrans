@@ -147,10 +147,10 @@ void scannerBuildsACompleteV2Collection() {
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
   const Collection* collection = snapshot.collections().empty() ? nullptr : &snapshot.collections().front();
-  expect(snapshot.collections().size() == 1 && collection->members.sequence &&
-             collection->members.soundBanks.size() == 1 && collection->members.samplePools.empty(),
+  expect(snapshot.collections().size() == 1 && collection->selection.sequence &&
+             collection->members().soundBanks.size() == 1 && collection->members().samplePools.empty(),
          "HudsonSnes scanning should publish a connected sequence and self-contained sound bank");
-  const auto* instruments = snapshot.asset<SoundBankAsset>(collection->members.soundBanks.front());
+  const auto* instruments = snapshot.asset<SoundBankAsset>(collection->members().soundBanks.front());
   const Envelope* envelope =
       instruments != nullptr && !instruments->instruments.empty() && !instruments->instruments.front().regions.empty()
           ? &instruments->instruments.front().regions.front().envelope
@@ -474,7 +474,7 @@ void optionalRealCorpusSmokeTest() {
       session.scanPendingSources();
       const SessionSnapshot snapshot = session.snapshot();
       if (!snapshot.collections().empty()) {
-        const CollectionMembers& members = snapshot.collections().front().members;
+        const CollectionMembers& members = snapshot.collections().front().members();
         const auto* bank = members.soundBanks.empty() ? nullptr : snapshot.asset<SoundBankAsset>(members.soundBanks[0]);
         const bool connected = members.sequence && bank != nullptr && !bank->localSamples.samples.empty();
         synthConnected += connected;

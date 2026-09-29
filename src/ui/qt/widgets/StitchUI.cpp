@@ -153,7 +153,7 @@ bool exportStitchedCollections(vgmtrans::ui::WorkspaceController& workspace,
 
   for (const auto id : orderedCollections) {
     const auto* collection = workspace.snapshot().collection(id);
-    if (collection == nullptr || !collection->members.sequence) {
+    if (collection == nullptr || !collection->selection.sequence) {
       showToast(QStringLiteral("Each selected collection must contain a sequence for stitched export."),
                 ToastType::Error, 15000);
       return false;
@@ -224,8 +224,8 @@ QString collectionLabel(const vgmtrans::ui::WorkspaceController& workspace,
   const auto* collection = workspace.snapshot().collection(collectionId);
   QString label = collection != nullptr ? QString::fromStdString(collection->name)
                                         : QStringLiteral("(unknown collection)");
-  if (collection != nullptr && collection->members.sequence) {
-    const auto* sequence = workspace.snapshot().asset(*collection->members.sequence);
+  if (collection != nullptr && collection->selection.sequence) {
+    const auto* sequence = workspace.snapshot().asset(*collection->selection.sequence);
     label += QStringLiteral(" - ");
     label += sequence != nullptr ? QString::fromStdString(vgmtrans::core::metadata(*sequence).name)
                                  : QStringLiteral("(missing sequence)");

@@ -246,8 +246,8 @@ void commandValidationAndCollections() {
   const auto snapshot = fixture.session.snapshot();
   expect(snapshot.collections().size() == 2 && snapshot.collections().back().name == "C:\\Music\\mix tape",
          "quoted fragments should combine and preserve literal backslashes");
-  expect(snapshot.collections().back().members.sequence == AssetId{0} &&
-             snapshot.collections().back().members.soundBanks == std::vector{AssetId{1}},
+  expect(snapshot.collections().back().selection.sequence == AssetId{0} &&
+             snapshot.collections().back().members().soundBanks == std::vector{AssetId{1}},
          "manual collections should use the core's typed members");
   expect(fixture.run("quit") == CommandResult::Exit, "quit should return an exit result");
   fixture.ok(" \t");

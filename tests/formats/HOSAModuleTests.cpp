@@ -308,9 +308,9 @@ void hosaModuleBuildsDriverAccurateRegions() {
   const SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.collections().size() == 1, "HOSA fixture should produce one collection");
   const Collection& collection = snapshot.collections().front();
-  expect(collection.members.soundBanks.size() == 1 && collection.members.sequence,
+  expect(collection.members().soundBanks.size() == 1 && collection.selection.sequence,
          "HOSA collection should bind its HOSAV sequence and local bank");
-  const auto* bank = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
+  const auto* bank = snapshot.asset<SoundBankAsset>(collection.members().soundBanks.front());
   expect(bank != nullptr && bank->instruments.size() == 1 && bank->instruments[0].regions.size() == 2 &&
              bank->localSamples.samples.size() == 2 && bank->instruments[0].reverb == 0.0,
          "bank pointers, driver region thresholds, and sample offsets should resolve the complete local synth");

@@ -121,7 +121,7 @@ void layoutAndModuleBuildASequenceAndSynth() {
   expect(snapshot.diagnostics().empty() && snapshot.collections().size() == 1,
          "GraphResSnes scanning should publish one explicit collection without diagnostics");
   const Collection& collection = snapshot.collections().front();
-  const auto* bank = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
+  const auto* bank = snapshot.asset<SoundBankAsset>(collection.members().soundBanks.front());
   expect(bank && bank->instruments.size() == 1 && bank->instruments.front().identity &&
              bank->instruments.front().identity->key == 2 &&
              std::abs(bank->instruments.front().regions.front().unityKey - 57.0) < 0.000001,

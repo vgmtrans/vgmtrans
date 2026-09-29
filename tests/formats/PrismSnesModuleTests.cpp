@@ -350,10 +350,10 @@ void moduleBuildsTunedSnesSynth() {
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
   const Collection* collection = snapshot.collections().empty() ? nullptr : &snapshot.collections().front();
-  expect(snapshot.collections().size() == 1 && collection->members.sequence &&
-             collection->members.soundBanks.size() == 1 && collection->members.samplePools.empty(),
+  expect(snapshot.collections().size() == 1 && collection->selection.sequence &&
+             collection->members().soundBanks.size() == 1 && collection->members().samplePools.empty(),
          "PrismSnes scanning should publish one sequence, sound bank, and explicit collection");
-  const auto* set = snapshot.asset<SoundBankAsset>(collection->members.soundBanks.front());
+  const auto* set = snapshot.asset<SoundBankAsset>(collection->members().soundBanks.front());
   expect(set != nullptr && set->instruments.size() == 3 && set->localSamples.samples.size() == 3 &&
              set->instruments[0].identity == InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 2} &&
              set->instruments[1].identity == InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 3} &&

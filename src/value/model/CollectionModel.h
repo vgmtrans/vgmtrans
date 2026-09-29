@@ -33,17 +33,13 @@ struct CollectionIssue {
   SourceRange range;
 };
 
-// Audio dependencies form sequence -> sound bank -> sample pool. Supplemental
-// references connect a sequence to inspection assets outside that audio chain.
-enum class DependencyRole { SoundBank, SamplePool, Supplemental };
-
 // Listed from least to most serious; a collection reports the most serious
 // outcome among its dependencies. Incomplete or ambiguous selections may still
 // be usable, but Failed blocks preparation, regardless of diagnostic severity.
 enum class ResolutionStatus { Resolved, Incomplete, Ambiguous, Failed };
 
 // A chosen input asset, plus settings for this particular use. For example,
-// placement can hold a bank number or the first sample to use in a pool.
+// placement can hold the first sample to use in a pool.
 // Settings must own their data because the catalog used for matching is temporary.
 // Another sequence or bank can use the same asset with different settings.
 struct DependencyTarget {
@@ -51,17 +47,33 @@ struct DependencyTarget {
   AssetPrivateData placement;
 };
 
-// owner is the sequence or bank requesting inputs; targets are its chosen inputs
-// in order. All requests for the same role share this list and status. Alternatives
-// record unresolved choices. Banks appear once, but a sample pool may appear at
-// several starting positions.
-struct ResolvedDependency {
-  AssetId owner;
-  DependencyRole role = DependencyRole::SoundBank;
+// The outcome of choosing an asset's inputs. The containing field determines
+// their type. Sample uses retain repeated pools at different placements.
+struct ResolvedInputs {
   ResolutionStatus status = ResolutionStatus::Resolved;
   std::vector<DependencyTarget> targets;
   std::vector<DependencyTarget> alternatives;
 };
+
+struct CollectionBank {
+  AssetId bank;
+  ResolvedInputs samples;
+};
+
+// Resolution stores the actual audio relationships once. Manual choices remain
+// in CollectionMembers; they can include pools that no bank needs.
+struct CollectionInputs {
+  std::vector<CollectionBank> banks;
+  ResolutionStatus bankStatus = ResolutionStatus::Resolved;
+  std::vector<DependencyTarget> bankAlternatives;
+  ResolutionStatus inspectionStatus = ResolutionStatus::Resolved;
+
+  [[nodiscard]] ResolutionStatus status() const noexcept;
+};
+
+// Flat inspection/export membership is a view, not a second list to synchronize.
+// Explicit choices keep their order; automatically used assets follow once each.
+[[nodiscard]] CollectionMembers collectionMembers(const CollectionMembers& selection, const CollectionInputs& inputs);
 
 // Published sequences produce collections by default. Identity is always the
 // sequence's AssetId; an empty name uses the sequence's display name.
@@ -75,9 +87,11 @@ struct SequenceCollectionOptions {
 // A collection description before the session assigns or reuses its CollectionId.
 struct DesiredCollection {
   std::string name;
-  CollectionMembers members;
+  CollectionMembers selection;
   std::vector<CollectionIssue> issues;
-  std::vector<ResolvedDependency> dependencies;
+  CollectionInputs inputs;
+
+  [[nodiscard]] CollectionMembers members() const { return collectionMembers(selection, inputs); }
 };
 
 [[nodiscard]] CollectionIssue missingSequenceIssue(std::optional<AssetId> asset = std::nullopt);

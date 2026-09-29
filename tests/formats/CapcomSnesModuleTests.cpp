@@ -725,10 +725,10 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(sampleAnnotation->range.offset == 0x6000 && sampleAnnotation->range.size == 9,
          "sample payload node should preserve the encoded BRR source range");
 
-  expect(project.collections()[0].members.sequence == sequence->metadata.id, "collection should reference sequence");
-  expect(project.collections()[0].members.soundBanks == std::vector<AssetId>{instruments->metadata.id},
+  expect(project.collections()[0].selection.sequence == sequence->metadata.id, "collection should reference sequence");
+  expect(project.collections()[0].members().soundBanks == std::vector<AssetId>{instruments->metadata.id},
          "collection should reference instrument set");
-  expect(project.collections()[0].members.samplePools.empty(),
+  expect(project.collections()[0].members().samplePools.empty(),
          "local samples should not require a separate collection member");
 }
 

@@ -196,9 +196,9 @@ const Collection* firstCollection(const SessionSnapshot& snapshot) {
 
 const SoundBankAsset* firstSoundBank(const SessionSnapshot& snapshot) {
   const Collection* collection = firstCollection(snapshot);
-  return collection == nullptr || collection->members.soundBanks.empty()
+  return collection == nullptr || collection->members().soundBanks.empty()
              ? nullptr
-             : snapshot.asset<SoundBankAsset>(collection->members.soundBanks.front());
+             : snapshot.asset<SoundBankAsset>(collection->members().soundBanks.front());
 }
 
 const Region* firstRegion(const SoundBankAsset* bank) {
@@ -371,7 +371,7 @@ void scannerBuildsScriptedSynthModulation() {
   const Instrument* instrument = bank == nullptr || bank->instruments.empty() ? nullptr : &bank->instruments.front();
   const Region* region = firstRegion(bank);
 
-  expect(snapshot.diagnostics().empty() && collection != nullptr && collection->members.sequence && bank != nullptr &&
+  expect(snapshot.diagnostics().empty() && collection != nullptr && collection->selection.sequence && bank != nullptr &&
              instrument != nullptr && instrument->identity && instrument->identity->key == 0x1500 && region != nullptr,
          "scanner output should bind the descriptor-address identity to a BRR-backed instrument");
   expect(region->modulation.vibrato && region->modulation.tremolo &&
@@ -403,9 +403,9 @@ void shienDialectUsesItsDriverTimingAndPointers() {
   const Collection* collection = firstCollection(snapshot);
   const SoundBankAsset* bank = firstSoundBank(snapshot);
   const Region* region = firstRegion(bank);
-  const auto* sequence = collection == nullptr || !collection->members.sequence
+  const auto* sequence = collection == nullptr || !collection->selection.sequence
                              ? nullptr
-                             : snapshot.asset<SequenceProgramAsset>(*collection->members.sequence);
+                             : snapshot.asset<SequenceProgramAsset>(*collection->selection.sequence);
   expect(snapshot.diagnostics().empty() && sequence != nullptr && bank != nullptr &&
              !bank->instruments.empty() && bank->instruments.front().identity &&
              bank->instruments.front().identity->key == 0x1500 && region != nullptr &&
@@ -500,9 +500,9 @@ void loopingVoicePreludeRemainsSeparateFromItsVibratoCycle() {
   const SessionSnapshot snapshot = scan(std::move(bytes));
   const Collection* collection = firstCollection(snapshot);
   const auto* bank = firstSoundBank(snapshot);
-  const auto* sequence = collection == nullptr || !collection->members.sequence
+  const auto* sequence = collection == nullptr || !collection->selection.sequence
                              ? nullptr
-                             : snapshot.asset<SequenceProgramAsset>(*collection->members.sequence);
+                             : snapshot.asset<SequenceProgramAsset>(*collection->selection.sequence);
   const Region* region = firstRegion(bank);
   expect(snapshot.diagnostics().empty() && sequence != nullptr && region != nullptr &&
              region->modulation.vibrato && region->modulation.vibrato->delaySeconds &&
