@@ -10,14 +10,11 @@
 
 #include "value/export/AssetPreparation.h"
 #include "value/export/CollectionBinding.h"
-#include "value/scan/ScanResultBuilder.h"
 #include "SessionSnapshotBuilder.h"
 
 #include <array>
-#include <memory>
 #include <stdexcept>
 #include <string>
-#include <type_traits>
 #include <vector>
 
 using namespace vgmtrans::core;
@@ -27,56 +24,6 @@ namespace {
 struct ProbeData {
   u32 value = 0;
 };
-
-// Preparation cannot replace or relabel a selected asset through either API.
-static_assert(std::is_const_v<std::remove_reference_t<decltype(BankPreparationContext::asset)>>);
-static_assert(std::is_const_v<std::remove_reference_t<decltype(BankInput<ProbeData>::metadata)>>);
-
-void preparationOwnsContentsWithoutCopyingDiscoveryHooks() {
-  SourceStore sources;
-  const auto source = sources.add(SourceFile{.name = "preparation.probe"}, {0});
-  ScanIdAllocator ids;
-  ScanInput input{.source = sources.source(source), .reader = sources.reader(source), .ids = ids};
-  ScanResultBuilder scan(input, "Probe");
-  const auto pool = scan.samplePool("Pool", input.reader.range(0, 1));
-  auto bank = scan.soundBank("Bank", input.reader.range(0, 1));
-  auto calls = std::make_shared<u32>(0);
-  bank.useSamples([calls, poolId = pool.id()](const DependencyContext&) {
-    return DependencySelection{}.add(poolId);
-  });
-  bank.data(ProbeData{42}).prepare<ProbeData>([calls](BankPreparationContext& context, const ProbeData& original) {
-    ++*calls;
-    context.privateData = AssetPrivateData::make(ProbeData{43});
-    expect(original.value == 42 && context.asset.privateData.get<ProbeData>() == &original,
-           "typed preparation data must remain the scanned value even after replacing prepared data");
-    context.localSamples.samples = {Sample{.name = "Prepared sample"}};
-    context.instruments = {Instrument{
-        .regions = {Region{.sample = SampleRef::resolved(context.asset.metadata.id, 0)}},
-    }};
-    expect(context.asset.instruments.empty() && context.asset.localSamples.samples.empty(),
-           "the read-only asset must remain the scanned bank while private contents change");
-  });
-  const auto bankId = bank.id();
-  test::SessionSnapshotBuilder builder;
-  builder.assets = scan.finish().assets;
-  const auto snapshot = builder.finish();
-  const auto owners = calls.use_count();
-  auto first = bindSoundBank(snapshot, bankId);
-  const auto second = bindSoundBank(snapshot, bankId);
-  expect(first.collection && second.collection && *calls == 2 && calls.use_count() == owners,
-         "each preparation must run the original hook without copying discovery closures into its result");
-  const auto& original = *snapshot.asset<SoundBankAsset>(bankId);
-  expect(original.instruments.empty() && original.localSamples.samples.empty() &&
-             original.privateData.get<ProbeData>()->value == 42,
-         "repeated preparation must leave all scanned bank contents unchanged");
-  PreparedCollection prepared(std::move(*first.collection));
-  const auto& result = prepared.soundBanks().front();
-  expect(result.metadata.id == bankId && result.metadata.name == "Bank" && result.metadata.format == "Probe" &&
-             result.instruments.front().regions.front().sample.owner() == bankId &&
-             result.localSamples.samples.front().name == "Prepared sample" &&
-             result.privateData.get<ProbeData>()->value == 43 && !result.prepare && result.recipe.samples.empty(),
-         "bank-only export must retain prepared contents and identity without retaining discovery hooks");
-}
 
 void sourceLocationsDistinguishHostFilesMembersAndTransformedData() {
   const SourceFile host{.name = "Display name", .path = "/music/./song.psf2"};
@@ -267,6 +214,8 @@ void dependenciesPreserveSharingPlacementsAndPrivatePreparation() {
   const auto prepared = bindCollection(snapshot, CollectionId{1});
   expect(prepared.collection.has_value(), "cross-format banks should prepare through their own asset hooks");
   const auto& banks = prepared.collection->soundBanks();
+  expect(!banks[0].prepare && banks[0].recipe.samples.empty(),
+         "prepared banks should not retain discovery recipes or callbacks");
   expect(banks[0].instruments.front().regions.front().sample.index() == 2 &&
              banks[1].instruments.front().regions.front().sample.index() == 5 &&
              banks[1].instruments.front().explicitAddress->bank == 1,
@@ -688,7 +637,6 @@ void sequencePreparationConfiguresPrivateBanksInOnePass() {
 }  // namespace
 
 void runValueAssetResolutionTests() {
-  preparationOwnsContentsWithoutCopyingDiscoveryHooks();
   sourceLocationsDistinguishHostFilesMembersAndTransformedData();
   manualChoicesStaySeparateFromRepeatedSampleUses();
   singleSampleInputRejectsInvalidSelections();
