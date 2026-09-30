@@ -1386,26 +1386,74 @@ void performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes() {
 }
 
 void performanceMidiLoweringOrdersDelayedPitchWithSourceWrites() {
-  PerformanceTrack track{.id = TrackId{0}, .endTick = 8};
-  u64 order = 0;
-  u32 noteId = 0, automationId = 0;
-  PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{1}, 0, order, noteId, automationId};
-  const auto note = out.note(64, 1.0, 8);
-  out.at(1).pitchBend(1.0);
-  out.at(4).pitchSlide(note, 60, 64, 2);
-  const auto prepared = preparePerformance(PerformanceSequence{
-      .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend, .tracks = {track}});
-  std::vector<Diagnostic> diagnostics;
-  const auto events =
-      detail::lowerMidiTrackEvents(prepared, 0, {}, PerformanceTempoMap{prepared.performance()}, diagnostics);
-  std::vector<std::pair<u64, double>> bends;
-  for (const auto& event : events) {
-    if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event)) {
-      bends.emplace_back(bend->header.tick, bend->semitones);
+  struct Case {
+    double noteKey;
+    double sourceBend;
+    std::vector<std::pair<u64, double>> expected;
+  };
+  const std::array cases{
+      Case{64, 1, {{0, -4}, {1, 1}, {4, -4}, {5, -2}, {6, 0}}},
+      Case{64, -4, {{1, -4}, {4, -4}, {5, -2}, {6, 0}}},
+      Case{60, 1, {{1, 1}, {4, 0}, {5, 2}, {6, 4}}},
+  };
+  for (const auto& test : cases) {
+    PerformanceTrack track{.id = TrackId{0}, .endTick = 8};
+    u64 order = 0;
+    u32 noteId = 0, automationId = 0;
+    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{1}, 0, order, noteId, automationId};
+    const auto note = out.note(test.noteKey, 1.0, 8);
+    out.at(1).pitchBend(test.sourceBend);
+    out.at(4).pitchSlide(note, 60, 64, 2);
+    const auto prepared = preparePerformance(PerformanceSequence{
+        .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend, .tracks = {track}});
+    std::vector<Diagnostic> diagnostics;
+    const auto events =
+        detail::lowerMidiTrackEvents(prepared, 0, {}, PerformanceTempoMap{prepared.performance()}, diagnostics);
+    std::vector<std::pair<u64, double>> bends;
+    for (const auto& event : events) {
+      if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event)) {
+        bends.emplace_back(bend->header.tick, bend->semitones);
+      }
     }
+    expect(bends == test.expected,
+           "a delayed slide must establish an earlier start only when needed, retaining intervening source writes");
   }
-  expect(bends == std::vector<std::pair<u64, double>>{{0, -4.0}, {1, 1.0}, {4, -4.0}, {5, -2.0}, {6, 0.0}},
-         "a delayed slide's initial pitch must precede later source writes, which retain their chronological effect");
+}
+
+void performanceMidiPortamentoReadsTheSourceWheelAtTheTransition() {
+  for (bool instrumentRange : {false, true}) {
+    PerformanceTrack track{.id = TrackId{0}, .endTick = 8};
+    u64 order = 0;
+    u32 noteId = 0, automationId = 0;
+    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{1}, 0, order, noteId, automationId};
+    const auto note = out.note(64, 1.0, 8);
+    out.at(1).pitchBend(PitchBendPerformanceEvent{.normalizedWheelPosition = 0.5});
+    if (instrumentRange) {
+      out.at(2).instrument(0, 1);
+    } else {
+      out.at(2).pitchBendRange(4);
+    }
+    out.at(4).pitchSlide(note, 66, 68, 2).preferPortamento();
+    const SoundBankAsset bank{.instruments = {
+        Instrument{.explicitAddress = InstrumentAddress{0, 0}},
+        Instrument{.explicitAddress = InstrumentAddress{0, 1}, .pitchBendRangeCents = 400},
+    }};
+    const auto prepared = preparePerformance({.tracks = {track}}, {bank});
+    std::vector<Diagnostic> diagnostics;
+    const auto events =
+        detail::lowerMidiTrackEvents(prepared, 0, {}, PerformanceTempoMap{prepared.performance()}, diagnostics);
+    bool keepsOriginalKey = false, resetsWheel = false;
+    for (const auto& event : events) {
+      if (const auto* attack = std::get_if<detail::MidiNoteEvent>(&event); attack && attack->header.tick == 0) {
+        keepsOriginalKey = attack->key == 64;
+      }
+      if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event); bend && bend->header.tick == 4) {
+        resetsWheel = bend->semitones == 0 && !bend->normalizedWheelPosition;
+      }
+    }
+    expect(keepsOriginalKey && resetsWheel,
+           "portamento must interpret a persistent source wheel using the range at the transition, then reset it");
+  }
 }
 
 void performanceMidiRendererResolvesSourceInstrumentIdentityAtExport() {
@@ -1612,6 +1660,7 @@ void runValueMidiPitchTests() {
   performanceMidiRendererResolvesNormalizedWheelBeforeLoweringTransitions();
   performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes();
   performanceMidiLoweringOrdersDelayedPitchWithSourceWrites();
+  performanceMidiPortamentoReadsTheSourceWheelAtTheTransition();
   performanceMidiRendererResolvesSourceInstrumentIdentityAtExport();
   performanceMidiRendererQuantizesPitchBendAndPortamento();
   performanceMidiRendererSkipsRedundantPitchBends();

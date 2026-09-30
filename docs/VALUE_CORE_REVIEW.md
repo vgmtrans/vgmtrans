@@ -336,6 +336,8 @@ Current staged work:
 
 7. **Implemented: physical MIDI note planning.** Ordinary notes and portamento fragments share one MIDI note record. Complete gate ends and attack/continuation/expired actions before scheduling bend resets or choosing attack ranges. Remove duration backpatching from the renderer.
 
+8. **Implemented: targeted pitch-history queries.** Ordinary curve placement skips replay. Held and earlier-start decisions still query it. Native portamento reads the source wheel and its range from one timeline.
+
 Complete and validate each stage before implementing the next. The completed stages remove a stateful protocol, instrument-membership reconstruction, caller-managed pairing of performances and address plans, and repeated voice/deadline reconstruction; the remaining stages still need to demonstrate their own reductions in logic and conceptual overhead.
 
 ### Review of the implemented changes
@@ -435,6 +437,22 @@ Two behavioral corrections accompany that agreement. An expired boundary no long
 Verification: all 43 headless CTest entries, the three MIDI suites against the fully instrumented ASan/UBSan core, and the Qt build/model test pass. Twelve saved MIDI fixtures and diagnostics remain identical. Of 3,072 generated exports, 2,768 are byte-identical and 304 change only in pitch-wheel or sensitivity messages; notes, other controls, and diagnostics are unchanged. Removing hardware caps from the same cases restores exact agreement for all 3,072 exports. The deadline regression explicitly checks that release pitch survives an expired portamento boundary until the next real attack. The long-duration regression checks saturation. No new real-file corpus or listening comparison was performed.
 
 This does not complete pitch-conversion simplification. Source spans are still needed to attach and sample curves, native portamento still replaces a span’s source boundaries with generated segments, and delayed slides still require earlier pitch writes. MIDI notes retain source fields rather than defining an entirely independent note vocabulary. Those remaining distinctions need their own justification and tests before another refactor.
+
+### Pitch placement: inspect history only when it changes a decision
+
+The previous implementation queried and replayed the bend history before sampling every slide on every affected note. For an ordinary slide, the answer did not affect the generated samples: the curve already states the desired pitch, and the MIDI note provides its reference key. The query was doing work that the decision did not need.
+
+The code now makes the two exceptions explicit. A held transition needs to decide whether to inherit live pitch or establish its declared start. A delayed slide starting away from the note’s key needs to decide whether to insert an earlier starting-pitch write. Other curve placement skips the history query. The earlier write is always an absolute transition; a held transition begins on a note boundary and cannot enter that branch.
+
+Native-portamento lookup also previously scanned raw events to find the primary source wheel, then searched a separate range timeline to interpret it. `SourcePitchTimeline` records those source facts together. It retains a reference to the immutable normalized wheel and snapshots the changing range context, so a later range or instrument change still affects the queried pitch. This removes `primaryPitchBendAt` and `establishedPitchBend` as separate helpers. Reset scheduling now takes the first eligible attack from the already-ordered note plan instead of scanning for a minimum tick.
+
+This stage removes **14 physical production lines and 13 nonblank, noncomment lines** relative to `be95b26cd`. Against `core-rewrite`, production C++ is **394 physical lines and 348 nonblank, noncomment lines smaller** (395 fewer physical lines including CMake). No source emission or format-authoring API changes.
+
+All 43 headless CTest entries and the three MIDI suites under ASan/UBSan pass. All 3,072 generated exports and twelve saved MIDI fixtures, with diagnostics, are byte-identical to `be95b26cd`. The added cases distinguish delayed starts that require an earlier write from those already established by a source bend, and check persistent normalized wheels after both source-range and instrument-range changes.
+
+A small synthetic timing check compiled both lowering versions at `-O2` and alternated three before/after runs, each measuring ten conversions per case. Median times for 256 ordinary 64-tick slides fell from about 231 ms to 103 ms; 256 two-tick slides fell from 17 ms to 7 ms. A single long curve measured about 164/159 ms, held slides 228/239 ms, and delayed slides 227/244 ms. The improvement is concentrated in repeated ordinary slides; this is not a general speedup claim or real-file performance study.
+
+I have not replaced the remaining replay with a forward-only cursor. Delayed slides can insert an earlier pitch write, and a continuing curve can visit later notes before another transition is lowered. A cursor would therefore need invalidation and replay rules. This cleanup removes unnecessary queries without adding that protocol. The remaining queries and delayed placement are still candidates for a larger redesign, but that redesign must reduce total machinery rather than conceal it in a cache.
 
 The original implementation rationale follows:
 
