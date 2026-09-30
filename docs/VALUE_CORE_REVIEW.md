@@ -460,6 +460,16 @@ A small synthetic timing check compiled both lowering versions at `-O2` and alte
 
 I have not replaced the remaining replay with a forward-only cursor. Delayed slides can insert an earlier pitch write, and a continuing curve can visit later notes before another transition is lowered. A cursor would therefore need invalidation and replay rules. This cleanup removes unnecessary queries without adding that protocol. The remaining queries and delayed placement are still candidates for a larger redesign, but that redesign must reduce total machinery rather than conceal it in a cache.
 
+### Investigation: resolve placement before expanding curves
+
+**Recommendation revised: do not land this refactor in its tested form.** The prototype kept placed curves compact and merged their samples only when needed. It avoided an expanded intermediate history, but held transitions still needed historical pitch ownership, and delayed slides could still insert earlier writes. Queries could skip consecutive samples from one curve, but had to preserve interleaving with other curves and source writes.
+
+That required a priority queue and sample-skipping rules while retaining the existing ownership resolver and prefix replay. The final prototype added 46 physical production lines and 42 nonblank, noncomment lines against `4dccd4d82`. The clearer phase boundary did not remove enough conceptual or logical work to justify those additions. No format-authoring API became simpler.
+
+The existing core suite and 3,072 generated comparisons passed: ordered bends, MIDI bytes, and diagnostics matched exactly. Synthetic planner timings improved for dense curves, particularly held slides, but sparse held slides took roughly twice as long (about 35 ms versus 16 ms for ten conversions). This supports a possible workload-specific optimization, not a general simplification or speedup. The [HTML investigation](value-core-review/resolved-instrument-prototype.html#pitch-placement-investigation) records the design, measurements, and limits.
+
+The prototype was removed from production and retained locally in `/tmp/vgmtrans-pitch-placement/`. Production and permanent tests are unchanged. The next design attempt needs to simplify how source bends and transitions own pitch, including inheritance and earlier-start placement; changing the timing of sample expansion alone does not do that.
+
 The original implementation rationale follows:
 
 Start with a vertical slice of **instrument resolution and address assignment**. Use existing performances and banks as inputs initially; a new voice model is not a prerequisite. Make variants, used-instrument filtering, pitch conversion, and MIDI consume the same resolved selections. Include one paired export and one stitched export so that late address assignment actually replaces the remapping path.
