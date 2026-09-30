@@ -193,11 +193,10 @@ void semitoneAttacksKeepOneTuningBend() {
         const auto isBend = [](const auto& event) {
           return isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend);
         };
-        expect(std::ranges::count_if(track.events, isBend) == 1,
-               "semitone changes must retain one tuning bend across octave boundaries in both revisions");
-        const auto bend = std::ranges::find_if(track.events, isBend);
+        expect(std::ranges::count_if(track.events, isBend) == (tuning == 0 ? 0 : 1),
+               "semitone changes must retain a nonzero tuning bend without writing a redundant centered wheel");
         const double cents = midiPitchBendRanges(track.events).front().second;
-        const double offset = midiChannelMessage(*bend, MidiChannelMessageKind::PitchBend)->value * cents / 819200.0;
+        const double offset = midiPitchSemitonesAt(track.events, 0);
         for (size_t i = 0; i < notes.size(); ++i) {
           const double expected = (basePitch == 8192 ? 60 : 48) + i + tuning / 20.0;
           expect(notes[i].tick == i && std::abs(notes[i].key + offset - expected) < cents / 819200.0,

@@ -87,7 +87,7 @@ void performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape() {
 
   expect(!hasPreDelayNonzero, "sequence-event vibrato simulation should stay silent before the delay expires");
   const std::vector<std::pair<u64, s16>> expectedPitchBends{
-      {2, 0}, {3, 2048}, {4, 4096}, {5, 2048}, {6, 0}, {7, -2048}, {8, -4096},
+      {3, 2048}, {4, 4096}, {5, 2048}, {6, 0}, {7, -2048}, {8, -4096},
   };
   expect(pitchBends == expectedPitchBends,
          "sequence-event vibrato simulation should emit a delayed triangle LFO bend shape");
@@ -290,7 +290,7 @@ void performanceMidiRendererDoesNotDoubleDelayVibrato() {
   }
 
   const std::vector<std::pair<u64, s16>> expectedPitchBends{
-      {0, 0}, {4, 2048}, {5, 4096}, {6, 2048}, {7, 0}, {8, -2048},
+      {4, 2048}, {5, 4096}, {6, 2048}, {7, 0}, {8, -2048},
   };
   expect(pitchBends == expectedPitchBends,
          "sequence-event vibrato simulation should not apply a second delay to source-delayed depth envelopes");
@@ -351,7 +351,7 @@ void performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes() {
   }
 
   const std::vector<std::pair<u64, s16>> expectedPitchBends{
-      {2, 0}, {3, 2048}, {4, 4096}, {5, 0}, {8, 2048}, {9, 4096}, {10, 2048},
+      {3, 2048}, {4, 4096}, {5, 0}, {8, 2048}, {9, 4096}, {10, 2048},
   };
   expect(pitchBends == expectedPitchBends,
          "sequence-event vibrato simulation should restart the delay and phase for each new note");

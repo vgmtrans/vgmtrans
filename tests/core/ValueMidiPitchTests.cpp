@@ -15,27 +15,34 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <tuple>
 
 using namespace vgmtrans::core;
 
 namespace {
 
-void midiTrackPlanningPreservesConsumedCommandTiming() {
+void midiModulationIgnoresConsumedCommands() {
   PerformanceTrack track{.id = TrackId{0}, .endTick = 4};
   u64 order = 0;
   u32 noteId = 0, automationId = 0;
   PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
   out.vibratoRateCyclesPerTick(0.25, {.shape = LfoShape{.samples = {0, 1, 0, -1}}});
   out.vibratoDepth(1.0);
+  out.tremoloRateCyclesPerTick(0.25);
+  out.tremoloDepth(6.0);
+  out.modulation(ModulationPerformanceEvent{
+      .target = ModulationPerformanceTarget::PanDepth, .panDepth = 0.5,
+      .context = {.cyclesPerTick = 0.25}});
   out.note(60, 1.0, 2);
   out.at(2).updateEnvelope(Envelope{.attackSeconds = 0.1}, EnvelopeFields::Attack);
   out.at(2).note(64, 1.0, 2);
-  // Caller-created timelines can give coincident commands the same sequence.
-  // Their stable order still determines whether a controller sample precedes a reset.
+  // An unrelated command must not change sampling, even when all commands
+  // at the reset tick have the same sequence number.
   for (auto& event : track.events) {
     std::visit([](auto& value) { value.header.sequence = 0; }, event);
   }
   std::array<std::vector<std::pair<u64, s32>>, 3> pitches;
+  std::array<std::vector<std::tuple<u64, u8, s32>>, 3> controllers;
   for (size_t variant = 0; variant < pitches.size(); ++variant) {
     auto input = track;
     if (variant == 1) {
@@ -54,10 +61,95 @@ void midiTrackPlanningPreservesConsumedCommandTiming() {
       if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend)) {
         pitches[variant].emplace_back(event.tick, bend->value);
       }
+      if (const auto* control = midiChannelMessage(event, MidiChannelMessageKind::ControlChange);
+          control && (control->parameter == 10 || control->parameter == 11)) {
+        controllers[variant].emplace_back(event.tick, control->parameter, control->value);
+      }
     }
   }
-  expect(pitches[0] == pitches[1] && pitches[0] != pitches[2],
-         "a consumed envelope command must retain the preceding LFO sample before a coincident note resets its phase");
+  expect(controllers[0] == controllers[1] && controllers[0] == controllers[2],
+         "consumed commands and markers must not change tremolo or pan sampling");
+  expect(pitches[0] == pitches[1] && pitches[0] == pitches[2],
+         "consumed commands and markers must not change pitch sampling at a coincident note reset");
+}
+
+void midiModulationRetainsTheSourceTimelineExtent() {
+  std::array<std::vector<std::pair<u64, s32>>, 3> pitches;
+  for (size_t variant = 0; variant < pitches.size(); ++variant) {
+    PerformanceTrack track{.id = TrackId{0}, .endTick = variant == 0 ? 8u : 4u};
+    u64 order = 0;
+    u32 noteId = 0, automationId = 0;
+    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+    out.vibratoRateCyclesPerTick(0.25, {.shape = LfoShape{.samples = {0, 1, 0, -1}}});
+    out.vibratoDepth(1.0);
+    out.note(60, 1.0, 4);
+    if (variant == 1) out.at(8).timeSignature(3, 4, 24);
+    if (variant == 2) out.at(8).updateEnvelope(Envelope{.attackSeconds = 0.1}, EnvelopeFields::Attack);
+    const auto prepared = preparePerformance({.tracks = {track}}, {}, {.dynamicEnvelopes = false});
+    const auto midi = renderMidiSequence(prepared, {}, ModulationConversionPolicy::SequenceEventSimulation);
+    for (const auto& event : midi.tracks[0].events) {
+      if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend)) {
+        pitches[variant].emplace_back(event.tick, bend->value);
+      }
+    }
+    expect(std::abs(midiPitchSemitonesAt(midi.tracks[0].events, 8) + 1.0) < 0.001,
+           "modulation must continue through the last source command, including the release tail");
+  }
+  expect(pitches[0] == pitches[1] && pitches[0] == pitches[2],
+         "a consumed trailing command must preserve the source timeline extent without needing a timing event");
+}
+
+void midiPitchUsesCompletedSamplesForStableSensitivity() {
+  PerformanceTrack track{.id = TrackId{0}, .endTick = 10};
+  u64 order = 0;
+  u32 noteId = 0, automationId = 0;
+  PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+  out.pitchBend(1.0);
+  out.tuning(50.0);
+  out.vibratoRateCyclesPerTick(0.25, {.shape = LfoShape{.samples = {0, 1, 0, -1}}});
+  out.vibratoDepth(3.0);
+  const auto note = out.note(60, 1.0, 4);
+  out.at(4).continueVoice(note, NotePerformanceEvent{.key = 60, .durationTicks = 2});
+  out.at(5).vibratoDepth(1.0);
+  out.at(6).vibratoDepth(0.0);
+  out.at(6).note(64, 1.0, 4);
+  const auto midi = renderTestMidi({.tracks = {track}}, {}, ModulationConversionPolicy::SequenceEventSimulation);
+  const auto& events = midi.tracks[0].events;
+  expect(midiPitchBendRanges(events) == std::vector<std::pair<u64, u16>>{{0, 500}, {6, 200}},
+         "sensitivity must cover future combined pitch at the attack, stay fixed through ties, and shrink at the next attack");
+  const std::array<double, 7> expected{1.5, 1.5, 4.5, 1.5, -1.5, 1.5, 1.5};
+  for (u64 tick = 0; tick < expected.size(); ++tick) {
+    expect(std::abs(midiPitchSemitonesAt(events, tick) - expected[tick]) < 0.001,
+           "source bend, tuning and vibrato must add in semitones, including when sensitivity changes");
+  }
+}
+
+void midiPitchMeasuresCombinedAndAsymmetricLfoSamples() {
+  for (bool cancel : {false, true}) {
+    PerformanceTrack track{.id = TrackId{0}, .endTick = 4};
+    u64 order = 0;
+    u32 noteId = 0, automationId = 0;
+    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+    out.pitchBend(1.5);
+    out.vibratoDepth(0.5, {.cyclesPerTick = 0.25,
+                          .shape = LfoShape{.samples = {0, 1, 0, -1}},
+                          .pitchRangeSemitones = ModulationRange{.minimum = -2.0, .maximum = 6.0}},
+                     PitchBendLayerId{1});
+    if (cancel) {
+      out.vibratoDepth(0.5, {.cyclesPerTick = 0.25,
+                            .shape = LfoShape{.samples = {0, -1, 0, 1}},
+                            .pitchRangeSemitones = ModulationRange{.minimum = -6.0, .maximum = 2.0}},
+                       PitchBendLayerId{2});
+    }
+    out.note(60, 1.0, 4);
+    const auto midi = renderTestMidi({.tracks = {track}}, {}, ModulationConversionPolicy::SynthModulators);
+    const auto& events = midi.tracks[0].events;
+    expect(midiPitchBendRanges(events) == std::vector<std::pair<u64, u16>>{{0, static_cast<u16>(cancel ? 200 : 800)}},
+           "sensitivity must measure the actual sum of asymmetric LFOs, including cancellation");
+    expect(std::abs(midiPitchSemitonesAt(events, 2) - (cancel ? 1.5 : 7.5)) < 0.001 &&
+               std::abs(midiPitchSemitonesAt(events, 4) - (cancel ? 1.5 : -0.5)) < 0.001,
+           "asymmetric LFO peaks must survive MIDI quantization without clipping");
+  }
 }
 
 void midiNotePlanningResolvesAttacksBeforeRendering() {
@@ -166,7 +258,7 @@ void midiNotePlanningKeepsReleasePitchPastExpiredContinuations() {
   const auto attacks = midiNotes(midi.tracks[0].events);
   expect(attacks.size() == 2 && attacks[0].duration == 2 && attacks[1].tick == 10,
          "a continuation after the hardware deadline must have no physical attack");
-  expect(midiPitchBendRanges(midi.tracks[0].events) == std::vector<std::pair<u64, u16>>{{0, 200}, {0, 400}, {10, 200}},
+  expect(midiPitchBendRanges(midi.tracks[0].events) == std::vector<std::pair<u64, u16>>{{0, 400}, {10, 200}},
          "an expired boundary must not start a new pitch-range interval");
 }
 
@@ -755,14 +847,14 @@ void performanceMidiRendererSimulatesDeterministicSampleAndHoldNoise() {
   });
   const auto ranges = midiPitchBendRanges(midi.tracks.front().events);
   expect(nonzero != midi.tracks.front().events.end() && nonzero->tick == 3 &&
-             ranges == std::vector<std::pair<u64, u16>>{{0, 200}, {0, 300}},
-         "noise modulation should reserve its range, hold zero through the first cycle, then hold a reproducible sample"
+             ranges == std::vector<std::pair<u64, u16>>{{0, 200}},
+         "noise modulation should size sensitivity from rendered samples, hold zero through the first cycle, then hold a reproducible sample"
          " (ranges=" +
              std::to_string(ranges.size()) +
              ", first=" + (ranges.empty() ? std::string("none") : std::to_string(ranges.front().second)) + ")");
 }
 
-void performanceMidiRendererUsesOnlyFrozenVibratoOffsetForPitchRange() {
+void performanceMidiRendererSizesRangeFromActualVibratoSamples() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 100},
       .tracks = {PerformanceTrack{
@@ -802,9 +894,9 @@ void performanceMidiRendererUsesOnlyFrozenVibratoOffsetForPitchRange() {
       renderTestMidi(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
   const auto pitchBendRanges = midiPitchBendRanges(midi.tracks[0].events);
 
-  const std::vector<std::pair<u64, u16>> expectedPitchBendRanges{{0, 200}, {2, 300}};
+  const std::vector<std::pair<u64, u16>> expectedPitchBendRanges{{0, 200}};
   expect(pitchBendRanges == expectedPitchBendRanges,
-         "frozen vibrato should reserve only its current offset and restore full-depth headroom when resumed");
+         "frozen vibrato and an oscillator whose first sample is zero should not reserve unrendered depth");
 }
 
 void performanceMidiRendererUsesWholeSemitonePitchBendRanges() {
@@ -861,9 +953,7 @@ void performanceMidiRendererPlansRangesAtPhysicalAttacks() {
     }
     const auto midi = renderTestMidi(PerformanceSequence{.tracks = {track}});
     const auto& events = midi.tracks.front().events;
-    const std::vector<std::pair<u64, u16>> expectedRanges =
-        sharedOrder ? std::vector<std::pair<u64, u16>>{{0, 600}, {6, 200}, {6, 500}}
-                    : std::vector<std::pair<u64, u16>>{{0, 600}, {6, 500}};
+    const std::vector<std::pair<u64, u16>> expectedRanges{{0, 600}, {6, 500}};
     expect(midiPitchBendRanges(events) == expectedRanges,
            "ties must reserve range at the original attack and a new attack must restore current source sensitivity");
     expect(std::ranges::any_of(events,
@@ -1180,15 +1270,11 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
   const auto hasRange = [&](u64 tick, u16 cents) {
     return std::ranges::find(ranges, std::pair{tick, cents}) != ranges.end();
   };
-  const auto hasBend = [&](u64 tick, s16 value) {
-    return std::ranges::any_of(midi.tracks[0].events, [&](const MidiEvent& event) {
-      const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
-      return bend != nullptr && event.tick == tick && bend->value == value;
-    });
-  };
-  expect(hasBend(4, 6963) && hasBend(6, 6144) && hasBend(8, -341) && hasRange(0, 500) && !hasRange(6, 800) &&
-             hasRange(8, 600),
-         "a held transition should mask source range changes until the next physical attack");
+  expect(hasRange(0, 1200) && !hasRange(6, 800) && hasRange(8, 600) &&
+             std::abs(midiPitchSemitonesAt(midi.tracks[0].events, 4) - 4.25) < 0.002 &&
+             std::abs(midiPitchSemitonesAt(midi.tracks[0].events, 6) - 3.75) < 0.002 &&
+             std::abs(midiPitchSemitonesAt(midi.tracks[0].events, 8) + 0.25) < 0.002,
+         "a held transition must keep stable sensitivity and combine with source bends until the next attack");
 
   PerformanceTrack delayedTransitionTrack{
       .id = TrackId{1},
@@ -1646,7 +1732,6 @@ void performanceMidiRendererSkipsRedundantPitchBends() {
     }
     const std::vector<std::pair<u64, u16>> expectedPitchBendRanges{{0, 200}};
     const std::vector<std::pair<u64, s16>> expectedPitchBends{
-        {0, 0},
         {24, 4096},
         {48, 0},
     };
@@ -1664,7 +1749,10 @@ void performanceMidiRendererSkipsRedundantPitchBends() {
 }  // namespace
 
 void runValueMidiPitchTests() {
-  midiTrackPlanningPreservesConsumedCommandTiming();
+  midiModulationIgnoresConsumedCommands();
+  midiModulationRetainsTheSourceTimelineExtent();
+  midiPitchUsesCompletedSamplesForStableSensitivity();
+  midiPitchMeasuresCombinedAndAsymmetricLfoSamples();
   midiNotePlanningResolvesAttacksBeforeRendering();
   midiNotePlanningKeepsZeroDurationAttacksAndOrphanTies();
   midiNotePlanningDoesNotWrapLongExtensions();
@@ -1680,7 +1768,7 @@ void runValueMidiPitchTests() {
   performanceMidiRendererCombinesPitchSlidesWithSimulatedVibrato();
   performanceMidiRendererAddsIndependentPitchLfosWithoutRestartingChannelPhase();
   performanceMidiRendererSimulatesDeterministicSampleAndHoldNoise();
-  performanceMidiRendererUsesOnlyFrozenVibratoOffsetForPitchRange();
+  performanceMidiRendererSizesRangeFromActualVibratoSamples();
   performanceMidiRendererUsesWholeSemitonePitchBendRanges();
   performanceMidiRendererPlansRangesAtPhysicalAttacks();
   performanceMidiRendererDoesNotRestartVibratoAtAHeldPitchSlideBoundary();

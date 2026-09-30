@@ -8,6 +8,7 @@
 
 #include "value/export/midi/MidiModel.h"
 
+#include <algorithm>
 #include <optional>
 #include <span>
 #include <vector>
@@ -138,6 +139,35 @@ inline std::vector<std::pair<u64, u16>> midiPitchBendRanges(std::span<const vgmt
     }
   }
   return result;
+}
+
+// Decode the effective wheel pitch in playback order, including sensitivity
+// changes. Assertions about musical pitch should not depend on a chosen range.
+inline double midiPitchSemitonesAt(std::span<const vgmtrans::core::MidiEvent> events, u64 tick) {
+  using namespace vgmtrans::core;
+  std::vector<const MidiEvent*> ordered;
+  for (const auto& event : events) {
+    if (event.tick <= tick) ordered.push_back(&event);
+  }
+  std::ranges::stable_sort(ordered, [](const auto* left, const auto* right) {
+    return std::pair{left->tick, left->priority} < std::pair{right->tick, right->priority};
+  });
+  u8 parameterMsb = 127, parameterLsb = 127;
+  u16 rangeCents = 200;
+  s32 wheel = 0;
+  for (const auto* event : ordered) {
+    if (const auto* bend = midiChannelMessage(*event, MidiChannelMessageKind::PitchBend)) {
+      wheel = bend->value;
+    } else if (const auto* control = midiChannelMessage(*event, MidiChannelMessageKind::ControlChange)) {
+      if (control->parameter == 101) parameterMsb = static_cast<u8>(control->value);
+      if (control->parameter == 100) parameterLsb = static_cast<u8>(control->value);
+      if (parameterMsb == 0 && parameterLsb == 0) {
+        if (control->parameter == 6) rangeCents = static_cast<u16>(control->value * 100 + rangeCents % 100);
+        if (control->parameter == 38) rangeCents = static_cast<u16>((rangeCents / 100) * 100 + control->value);
+      }
+    }
+  }
+  return wheel * static_cast<double>(rangeCents) / (8192.0 * 100.0);
 }
 
 inline std::optional<u16> firstMidiController14(std::span<const vgmtrans::core::MidiEvent> events,

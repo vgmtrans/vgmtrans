@@ -1045,9 +1045,11 @@ void cps3HeldNotesRetargetOneVoiceWithoutLosingPitch() {
         midiBends.emplace_back(event.tick, bend->value);
       }
     }
-    expect(midiRanges == std::vector<std::pair<u64, u16>>{{0, 1200}, {12, 400}},
-           "the sfiii2 held voices should switch at their physical attack to one compatible four-semitone range");
-    expect(midiBends == std::vector<std::pair<u64, s16>>{{24, 8191}, {30, 0}, {36, 4096}, {48, 8191}},
+    expect(midiRanges == std::vector<std::pair<u64, u16>>{{0, 1200}},
+           "the sfiii2 held voices should retain the declared sensitivity when it covers their complete pitch paths");
+    expect(midiBends == std::vector<std::pair<u64, s16>>{{24, 2731}, {30, 0}, {36, 1365}, {48, 2731}} &&
+               std::abs(midiPitchSemitonesAt(rendered->tracks[0].events, 24) - 4.0) < 0.002 &&
+               std::abs(midiPitchSemitonesAt(rendered->tracks[0].events, 36) - 2.0) < 0.002,
            "the sfiii2 pitch commands should produce actual bend-value changes in export and preview MIDI");
   }
 

@@ -20,9 +20,9 @@ struct MidiAttack {
   bool silencePreviousVoice;
 };
 
-// Boundaries carry controller timing even when they emit no Note On. Independent
-// LFO requests are resolved from source defaults during planning. An expired
-// boundary still ends the preceding controller interval, but applies no effects.
+// Live boundaries can change controllers without a Note On. Independent LFO
+// requests are resolved from source defaults during planning. Expired boundaries
+// apply no effects.
 struct MidiNoteBoundary {
   PerformanceEventHeader header;
   std::optional<MidiAttack> attack;
@@ -39,17 +39,11 @@ struct MidiInstrumentEvent {
   bool forceBankSelect = false;
 };
 
-// A source command whose effects were consumed elsewhere still delimits the
-// preceding controller interval, including commands coincident with an attack.
-struct MidiTimingEvent {
-  PerformanceEventHeader header;
-};
-
 // Controls retain their musical values until encoding. Source-only envelope
 // updates and pitch-transition settings have already been consumed by preparation
 // and lowering, respectively. Notes and instrument changes use completed decisions.
 using MidiTrackEvent = std::variant<
-    MidiNoteBoundary, MidiInstrumentEvent, MidiTimingEvent, LevelPerformanceEvent, ExpressionPerformanceEvent,
+    MidiNoteBoundary, MidiInstrumentEvent, LevelPerformanceEvent, ExpressionPerformanceEvent,
     PanPerformanceEvent, ChannelPanPerformanceEvent,
     StereoBalancePerformanceEvent, MasterLevelPerformanceEvent, ReverbPerformanceEvent, MonoModePerformanceEvent,
     TuningPerformanceEvent, PortamentoPerformanceEvent, PortamentoEnablePerformanceEvent, PitchBendPerformanceEvent,

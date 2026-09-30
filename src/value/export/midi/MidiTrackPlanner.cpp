@@ -629,7 +629,7 @@ std::vector<NoteDraft*> appendSourceEvents(
                            std::is_same_v<Event, TempoPerformanceEvent> ||
                            std::is_same_v<Event, TimeSignaturePerformanceEvent> ||
                            std::is_same_v<Event, GlobalTransposePerformanceEvent>) {
-        events.emplace_back(detail::MidiTimingEvent{source.header});
+        // These commands have already been applied by preparation or global timing.
       } else if constexpr (std::is_same_v<Event, PitchTransitionSettingsPerformanceEvent>) {
         if (renderPortamentoSettings) {
           events.emplace_back(PortamentoPerformanceEvent{
