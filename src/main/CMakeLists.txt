@@ -120,8 +120,8 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/model/AssetRecipe.h
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.h
-    ${PROJECT_SOURCE_DIR}/src/value/export/midi/PitchTransitionMidiLowering.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/export/midi/PitchTransitionMidiLowering.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiTrackPlanner.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiTrackPlanner.h
     ${PROJECT_SOURCE_DIR}/src/value/export/BinaryWriter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/BinaryWriter.h
     ${PROJECT_SOURCE_DIR}/src/value/export/CollectionBinding.cpp

@@ -9,7 +9,7 @@
 #include "ValueFormatTestSupport.h"
 
 #include "../PerformanceTestSupport.h"
-#include "value/export/midi/PitchTransitionMidiLowering.h"
+#include "value/export/midi/MidiTrackPlanner.h"
 #include "value/export/synth/SynthExportData.h"
 #include "value/extractors/MameRomSetExtractor.h"
 #include "value/formats/CPS/Cps.h"
@@ -1014,7 +1014,7 @@ void cps3HeldNotesRetargetOneVoiceWithoutLosingPitch() {
   const MidiExportOptions bendOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend};
   const auto loweredInput = preparePerformance(performance);
   std::vector<Diagnostic> loweredDiagnostics;
-  const auto lowered = detail::lowerMidiTrackEvents(
+  const auto lowered = detail::planMidiTrack(
       loweredInput, 0, bendOptions,
       PerformanceTempoMap{loweredInput.performance()}, loweredDiagnostics);
   const MidiSequence midi = renderTestMidi(performance, bendOptions);

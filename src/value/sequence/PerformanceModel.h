@@ -71,15 +71,14 @@ struct NotePerformanceEvent {
   double linearVelocity = 1.0;
   u32 durationTicks = 0;
   // Some hardware stops a voice after a fixed real-time counter even when the
-  // sequence gate remains open. Renderers clamp durationTicks to this limit.
+  // sequence gate remains open. Preparation combines these into the voice's
+  // deadline; output planning applies it without changing this source gate.
   std::optional<double> maximumDurationMilliseconds;
-  // Extend the current physical note instead of emitting another Note On.
-  // Source ties set this; MIDI pitch lowering also sets it for held bends.
-  // Voice identity is independent: native portamento emits new physical notes
-  // while retaining the same voice.
+  // Tie to the preceding source note anchor, retaining its pitch motion.
+  // A changed-key continuation can share the voice without sharing this anchor.
   bool extendsPrevious = false;
-  // Native portamento may need another MIDI note to continue a source voice.
-  // This distinguishes that synthetic note from a genuine envelope restart.
+  // Whether the source retriggers its envelope, independently of pitch motion
+  // and the LFO reset decisions below.
   bool restartsEnvelope = true;
   // Source override for a fresh attack. Preparation consumes this into the
   // sounding voice's resolved instrument; continuations keep that instrument.
@@ -424,10 +423,8 @@ struct MarkerPerformanceEvent {
   std::string text;
 };
 
-// Source and MIDI timelines share control events, but give notes different responsibilities.
-template <class NoteEvent>
-using PerformanceEventWithNote =
-    std::variant<NoteEvent, TempoPerformanceEvent, TimeSignaturePerformanceEvent, InstrumentPerformanceEvent,
+using PerformanceEvent =
+    std::variant<NotePerformanceEvent, TempoPerformanceEvent, TimeSignaturePerformanceEvent, InstrumentPerformanceEvent,
                  EnvelopePerformanceEvent, LevelPerformanceEvent, ExpressionPerformanceEvent, PanPerformanceEvent,
                  ChannelPanPerformanceEvent, StereoBalancePerformanceEvent, MasterLevelPerformanceEvent,
                  ReverbPerformanceEvent, MonoModePerformanceEvent, TuningPerformanceEvent,
@@ -435,7 +432,6 @@ using PerformanceEventWithNote =
                  PitchBendPerformanceEvent, PitchBendRangePerformanceEvent, PitchTransitionSettingsPerformanceEvent,
                  LegatoPedalPerformanceEvent, ModulationPerformanceEvent, MarkerPerformanceEvent>;
 
-using PerformanceEvent = PerformanceEventWithNote<NotePerformanceEvent>;
 
 enum class PerformanceAutomationTarget {
   Tempo,
@@ -652,8 +648,8 @@ private:
   std::vector<Point> points_;
 };
 
-template <class NoteEvent>
-[[nodiscard]] const PerformanceEventHeader& performanceEventHeader(const PerformanceEventWithNote<NoteEvent>& event) {
+template <class... Events>
+[[nodiscard]] const PerformanceEventHeader& performanceEventHeader(const std::variant<Events...>& event) {
   return std::visit([](const auto& value) -> const PerformanceEventHeader& { return value.header; }, event);
 }
 [[nodiscard]] const PitchTransitionIntent* pitchTransitionIntent(const PerformanceAutomation& automation);

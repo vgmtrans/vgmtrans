@@ -8,7 +8,7 @@
 #include "../TestSupport.h"
 
 #include "../PerformanceTestSupport.h"
-#include "value/export/midi/PitchTransitionMidiLowering.h"
+#include "value/export/midi/MidiTrackPlanner.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
@@ -19,6 +19,46 @@
 using namespace vgmtrans::core;
 
 namespace {
+
+void midiTrackPlanningPreservesConsumedCommandTiming() {
+  PerformanceTrack track{.id = TrackId{0}, .endTick = 4};
+  u64 order = 0;
+  u32 noteId = 0, automationId = 0;
+  PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+  out.vibratoRateCyclesPerTick(0.25, {.shape = LfoShape{.samples = {0, 1, 0, -1}}});
+  out.vibratoDepth(1.0);
+  out.note(60, 1.0, 2);
+  out.at(2).updateEnvelope(Envelope{.attackSeconds = 0.1}, EnvelopeFields::Attack);
+  out.at(2).note(64, 1.0, 2);
+  // Caller-created timelines can give coincident commands the same sequence.
+  // Their stable order still determines whether a controller sample precedes a reset.
+  for (auto& event : track.events) {
+    std::visit([](auto& value) { value.header.sequence = 0; }, event);
+  }
+  std::array<std::vector<std::pair<u64, s32>>, 3> pitches;
+  for (size_t variant = 0; variant < pitches.size(); ++variant) {
+    auto input = track;
+    if (variant == 1) {
+      for (auto& event : input.events) {
+        if (const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event)) {
+          event = MarkerPerformanceEvent{.header = envelope->header, .text = "Timing reference"};
+        }
+      }
+    }
+    if (variant == 2) {
+      std::erase_if(input.events, [](const auto& event) { return std::holds_alternative<EnvelopePerformanceEvent>(event); });
+    }
+    const auto prepared = preparePerformance({.tracks = {input}}, {}, {.dynamicEnvelopes = false});
+    const auto midi = renderMidiSequence(prepared, {}, ModulationConversionPolicy::SequenceEventSimulation);
+    for (const auto& event : midi.tracks[0].events) {
+      if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend)) {
+        pitches[variant].emplace_back(event.tick, bend->value);
+      }
+    }
+  }
+  expect(pitches[0] == pitches[1] && pitches[0] != pitches[2],
+         "a consumed envelope command must retain the preceding LFO sample before a coincident note resets its phase");
+}
 
 void midiNotePlanningResolvesAttacksBeforeRendering() {
   PerformanceTrack track{.id = TrackId{0}, .endTick = 28};
@@ -39,25 +79,22 @@ void midiNotePlanningResolvesAttacksBeforeRendering() {
                                              .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
                                              .tracks = {track}});
   std::vector<Diagnostic> diagnostics;
-  const auto lowered = detail::lowerMidiTrackEvents(prepared, 0, {}, PerformanceTempoMap{prepared.performance()}, diagnostics);
-  std::vector<const detail::MidiNoteEvent*> notes;
+  const auto lowered = detail::planMidiTrack(prepared, 0, {}, PerformanceTempoMap{prepared.performance()}, diagnostics);
+  std::vector<const detail::MidiNoteBoundary*> notes;
   for (const auto& event : lowered) {
-    if (const auto* note = std::get_if<detail::MidiNoteEvent>(&event)) notes.push_back(note);
+    if (const auto* note = std::get_if<detail::MidiNoteBoundary>(&event)) notes.push_back(note);
   }
-  using Action = detail::MidiNoteAction;
-  expect(notes.size() == 7, "note planning must retain ordinary tie boundaries and native-portamento attacks");
-  const std::array actions{Action::Attack, Action::Continue, Action::Attack, Action::Continue,
-                           Action::Attack, Action::Continue, Action::Expired};
+  const std::array<bool, 7> hasAttack{true, false, true, false, true, false, false};
   const std::array<u64, 7> ticks{0, 4, 5, 8, 12, 16, 20};
-  const std::array<double, 7> bases{60, 60, 72, 60, 67, 67, 67};
   for (size_t index = 0; index < notes.size(); ++index) {
-    expect(notes[index]->action == actions[index] && notes[index]->header.tick == ticks[index] &&
-               notes[index]->bendBaseKey == bases[index],
-           "planned actions and bend references must follow their own voice through mixed pitch representations");
+    expect(notes[index]->attack.has_value() == hasAttack[index] && notes[index]->header.tick == ticks[index] &&
+               notes[index]->expired == (index == 6),
+           "completed boundaries must distinguish physical attacks, continuations and expired controller intervals");
   }
-  expect(notes[0]->endTick == 14 && notes[2]->endTick == 25 && notes[4]->endTick == 19,
-         "the completed plan must include overlap and all extensions, clamp the voice deadline, and leave other voices alone");
-  expect(notes[1]->restartsVibratoLfoPhase == false && notes[1]->restartsTremoloLfoPhase == true &&
+  expect(notes[0]->attack->durationTicks == 14 && notes[2]->attack->durationTicks == 20 &&
+             notes[4]->attack->durationTicks == 7,
+         "completed attacks must include overlap and extensions, clamp the voice deadline, and leave other voices alone");
+  expect(!notes[1]->restartVibrato && notes[1]->restartTremolo &&
              notes[1]->header.sourceAnnotation == SourceAnnotationId{2},
          "planning a tie must retain independent LFO reset decisions and source association");
   expect(std::get<NotePerformanceEvent>(prepared.performance().tracks[0].events.front()).durationTicks == 4,
@@ -77,11 +114,11 @@ void midiNotePlanningKeepsZeroDurationAttacksAndOrphanTies() {
   }}}};
   const auto prepared = preparePerformance(source);
   std::vector<Diagnostic> diagnostics;
-  const auto lowered = detail::lowerMidiTrackEvents(prepared, 0, {}, PerformanceTempoMap{prepared.performance()}, diagnostics);
-  const auto& zero = std::get<detail::MidiNoteEvent>(lowered[0]);
-  const auto& orphan = std::get<detail::MidiNoteEvent>(lowered[1]);
-  expect(zero.action == detail::MidiNoteAction::Attack && zero.endTick == 0 &&
-             orphan.action == detail::MidiNoteAction::Attack && orphan.endTick == 6 && orphan.extendsPrevious,
+  const auto lowered = detail::planMidiTrack(prepared, 0, {}, PerformanceTempoMap{prepared.performance()}, diagnostics);
+  const auto& zero = std::get<detail::MidiNoteBoundary>(lowered[0]);
+  const auto& orphan = std::get<detail::MidiNoteBoundary>(lowered[1]);
+  expect(zero.attack && zero.attack->durationTicks == 0 &&
+             orphan.attack && orphan.attack->durationTicks == 4 && !orphan.instrument,
          "a zero-duration fresh attack and a tie with no preceding physical note must each retain their Note On");
   const auto midi = renderMidiSequence(prepared);
   const auto attacks = midiNotes(midi.tracks[0].events);
@@ -116,7 +153,7 @@ void midiNotePlanningKeepsReleasePitchPastExpiredContinuations() {
   out.at(10).note(72, 1.0, 4);
   const auto prepared = preparePerformance({.timebase = {.ppqn = 10}, .tracks = {track}});
   std::vector<Diagnostic> diagnostics;
-  const auto lowered = detail::lowerMidiTrackEvents(prepared, 0, {}, PerformanceTempoMap{prepared.performance()}, diagnostics);
+  const auto lowered = detail::planMidiTrack(prepared, 0, {}, PerformanceTempoMap{prepared.performance()}, diagnostics);
   std::vector<std::pair<u64, double>> bends;
   for (const auto& event : lowered) {
     if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event)) {
@@ -215,28 +252,25 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
       renderTestMidi(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   const auto bendLoweringInput = preparePerformance(performance);
   std::vector<Diagnostic> bendLoweringDiagnostics;
-  const auto bendLowering = detail::lowerMidiTrackEvents(
+  const auto bendLowering = detail::planMidiTrack(
       bendLoweringInput, 0, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend},
       PerformanceTempoMap{bendLoweringInput.performance()}, bendLoweringDiagnostics);
   const auto sourceNote = std::ranges::find_if(bendLoweringInput.performance().tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<NotePerformanceEvent>(event);
   });
   const auto loweredNote = std::ranges::find_if(bendLowering, [](const auto& event) {
-    return std::holds_alternative<detail::MidiNoteEvent>(event);
+    return std::holds_alternative<detail::MidiNoteBoundary>(event);
   });
-  const auto notesMatch = [](const NotePerformanceEvent& lhs, const NotePerformanceEvent& rhs) {
-    return lhs.header.sourceCommand == rhs.header.sourceCommand &&
-           lhs.header.sourceAnnotation == rhs.header.sourceAnnotation && lhs.header.track == rhs.header.track &&
-           lhs.header.tick == rhs.header.tick && lhs.header.sequence == rhs.header.sequence &&
-           lhs.header.automation == rhs.header.automation && lhs.key == rhs.key &&
-           lhs.linearVelocity == rhs.linearVelocity && lhs.durationTicks == rhs.durationTicks &&
-           lhs.extendsPrevious == rhs.extendsPrevious && lhs.voice == rhs.voice && lhs.instrument == rhs.instrument &&
-           lhs.restartsLfoPhase == rhs.restartsLfoPhase && lhs.restartsVibratoLfoPhase == rhs.restartsVibratoLfoPhase &&
-           lhs.restartsTremoloLfoPhase == rhs.restartsTremoloLfoPhase && lhs.note == rhs.note && lhs.lane == rhs.lane;
-  };
-  expect(sourceNote != bendLoweringInput.performance().tracks[0].events.end() && loweredNote != bendLowering.end() &&
-             notesMatch(std::get<NotePerformanceEvent>(*sourceNote), std::get<detail::MidiNoteEvent>(*loweredNote)),
-         "pitch-bend lowering should preserve the prepared note segment verbatim");
+  expect(sourceNote != bendLoweringInput.performance().tracks[0].events.end() && loweredNote != bendLowering.end(),
+         "both the prepared source and completed MIDI boundary must remain available");
+  const auto& sourceBoundary = std::get<NotePerformanceEvent>(*sourceNote);
+  const auto& midiBoundary = std::get<detail::MidiNoteBoundary>(*loweredNote);
+  expect(midiBoundary.header.sourceCommand == sourceBoundary.header.sourceCommand &&
+             midiBoundary.header.sourceAnnotation == sourceBoundary.header.sourceAnnotation &&
+             midiBoundary.attack && midiBoundary.attack->key == sourceBoundary.key &&
+             midiBoundary.attack->durationTicks == sourceBoundary.durationTicks &&
+             midiBoundary.attack->linearVelocity == sourceBoundary.linearVelocity,
+         "a completed attack must preserve its source association and musical values");
   const auto noteEvent = std::ranges::find_if(bent.tracks[0].events, [](const MidiEvent& event) {
     return std::holds_alternative<NoteDuration>(event.payload);
   });
@@ -278,7 +312,7 @@ void sourceVoiceKeyChangesNeedNoPitchBinding() {
     const auto prepared = preparePerformance({.preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
                                                .tracks = {track}});
     std::vector<Diagnostic> diagnostics;
-    const auto lowered = detail::lowerMidiTrackEvents(prepared, 0, {},
+    const auto lowered = detail::planMidiTrack(prepared, 0, {},
                                                        PerformanceTempoMap{prepared.performance()}, diagnostics);
     const auto heldBend = [&](u64 tick, double semitones) {
       return std::ranges::any_of(lowered, [&](const auto& event) {
@@ -313,7 +347,7 @@ void sourceKeyChangeUsesRealizedPitchWithPortamento() {
   out.at(4).continueVoice(first, NotePerformanceEvent{.key = 67, .durationTicks = 4});
   const auto prepared = preparePerformance({.tracks = {track}});
   std::vector<Diagnostic> diagnostics;
-  const auto lowered = detail::lowerMidiTrackEvents(prepared, 0, {},
+  const auto lowered = detail::planMidiTrack(prepared, 0, {},
                                                      PerformanceTempoMap{prepared.performance()}, diagnostics);
   expect(std::ranges::any_of(lowered, [](const auto& event) {
            const auto* glide = std::get_if<PortamentoPerformanceEvent>(&event);
@@ -1025,7 +1059,7 @@ void performanceMidiRendererDefersPitchResetUntilTheNextAttack() {
           .tracks = {track},
       });
   std::vector<Diagnostic> loweredDiagnostics;
-  const auto lowered = detail::lowerMidiTrackEvents(
+  const auto lowered = detail::planMidiTrack(
       loweredInput, 0, {},
       PerformanceTempoMap{loweredInput.performance()}, loweredDiagnostics);
   std::vector<std::pair<u64, double>> bends;
@@ -1065,7 +1099,7 @@ void performanceMidiLoweringAppliesPitchResetsBeforeLaterTransitions() {
           .tracks = {track},
       });
   std::vector<Diagnostic> loweredDiagnostics;
-  const auto lowered = detail::lowerMidiTrackEvents(
+  const auto lowered = detail::planMidiTrack(
       loweredInput, 0, {},
       PerformanceTempoMap{loweredInput.performance()}, loweredDiagnostics);
   const auto bendAt = [&](u64 tick) -> std::optional<double> {
@@ -1103,7 +1137,7 @@ void performanceMidiRendererLeavesTerminalPitchBentWithoutAnotherAttack() {
           .tracks = {track},
       });
   std::vector<Diagnostic> loweredDiagnostics;
-  const auto lowered = detail::lowerMidiTrackEvents(
+  const auto lowered = detail::planMidiTrack(
       loweredInput, 0, {},
       PerformanceTempoMap{loweredInput.performance()}, loweredDiagnostics);
   const auto& events = lowered;
@@ -1218,7 +1252,7 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
           .tracks = {sameVoiceTrack},
       });
   std::vector<Diagnostic> sameVoiceLoweredDiagnostics;
-  const auto sameVoiceLowered = detail::lowerMidiTrackEvents(
+  const auto sameVoiceLowered = detail::planMidiTrack(
       sameVoiceLoweredInput, 0, {},
       PerformanceTempoMap{sameVoiceLoweredInput.performance()}, sameVoiceLoweredDiagnostics);
   const auto sameVoiceStart =
@@ -1316,7 +1350,7 @@ void performanceMidiRendererResolvesNormalizedWheelBeforeLoweringTransitions() {
 
   const auto pitchBendInput = prepareTestPerformance(performance, soundBanks);
   std::vector<Diagnostic> pitchBendDiagnostics;
-  const auto pitchBend = detail::lowerMidiTrackEvents(
+  const auto pitchBend = detail::planMidiTrack(
       pitchBendInput, 0, {},
       tempos, pitchBendDiagnostics);
   const auto heldStart = std::ranges::find_if(pitchBend, [](const auto& event) {
@@ -1325,7 +1359,7 @@ void performanceMidiRendererResolvesNormalizedWheelBeforeLoweringTransitions() {
   });
   const auto portamentoInput = prepareTestPerformance(performance, soundBanks);
   std::vector<Diagnostic> portamentoDiagnostics;
-  const auto portamento = detail::lowerMidiTrackEvents(
+  const auto portamento = detail::planMidiTrack(
       portamentoInput, 0, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento},
       tempos, portamentoDiagnostics);
   const auto sourceReset = std::ranges::find_if(portamento, [](const auto& event) {
@@ -1367,7 +1401,7 @@ void performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes() {
   };
   const auto loweredInput = preparePerformance(performance);
   std::vector<Diagnostic> loweredDiagnostics;
-  const auto lowered = detail::lowerMidiTrackEvents(
+  const auto lowered = detail::planMidiTrack(
       loweredInput, 0, {},
       PerformanceTempoMap{loweredInput.performance()}, loweredDiagnostics);
   const auto lastBendAt = [&](u64 tick) -> std::optional<double> {
@@ -1408,7 +1442,7 @@ void performanceMidiLoweringOrdersDelayedPitchWithSourceWrites() {
         .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend, .tracks = {track}});
     std::vector<Diagnostic> diagnostics;
     const auto events =
-        detail::lowerMidiTrackEvents(prepared, 0, {}, PerformanceTempoMap{prepared.performance()}, diagnostics);
+        detail::planMidiTrack(prepared, 0, {}, PerformanceTempoMap{prepared.performance()}, diagnostics);
     std::vector<std::pair<u64, double>> bends;
     for (const auto& event : events) {
       if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event)) {
@@ -1441,11 +1475,11 @@ void performanceMidiPortamentoReadsTheSourceWheelAtTheTransition() {
     const auto prepared = preparePerformance({.tracks = {track}}, {bank});
     std::vector<Diagnostic> diagnostics;
     const auto events =
-        detail::lowerMidiTrackEvents(prepared, 0, {}, PerformanceTempoMap{prepared.performance()}, diagnostics);
+        detail::planMidiTrack(prepared, 0, {}, PerformanceTempoMap{prepared.performance()}, diagnostics);
     bool keepsOriginalKey = false, resetsWheel = false;
     for (const auto& event : events) {
-      if (const auto* attack = std::get_if<detail::MidiNoteEvent>(&event); attack && attack->header.tick == 0) {
-        keepsOriginalKey = attack->key == 64;
+      if (const auto* attack = std::get_if<detail::MidiNoteBoundary>(&event); attack && attack->header.tick == 0) {
+        keepsOriginalKey = attack->attack && attack->attack->key == 64;
       }
       if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event); bend && bend->header.tick == 4) {
         resetsWheel = bend->semitones == 0 && !bend->normalizedWheelPosition;
@@ -1630,6 +1664,7 @@ void performanceMidiRendererSkipsRedundantPitchBends() {
 }  // namespace
 
 void runValueMidiPitchTests() {
+  midiTrackPlanningPreservesConsumedCommandTiming();
   midiNotePlanningResolvesAttacksBeforeRendering();
   midiNotePlanningKeepsZeroDurationAttacksAndOrphanTies();
   midiNotePlanningDoesNotWrapLongExtensions();

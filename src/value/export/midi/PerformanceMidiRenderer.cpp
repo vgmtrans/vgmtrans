@@ -9,7 +9,7 @@
 #include "value/base/LevelScale.h"
 #include "value/export/PerformancePitchBendContext.h"
 #include "value/export/SequenceModulationProfile.h"
-#include "value/export/midi/PitchTransitionMidiLowering.h"
+#include "value/export/midi/MidiTrackPlanner.h"
 
 #include <algorithm>
 #include <cmath>
@@ -281,8 +281,8 @@ class PitchBendLayers {
   std::map<u32, PitchBendPerformanceEvent> layers;
 };
 
-using detail::MidiNoteAction;
-using detail::MidiNoteEvent;
+using detail::MidiNoteBoundary;
+using detail::MidiInstrumentEvent;
 using detail::MidiTrackEvent;
 using MidiTimeline = std::vector<const MidiTrackEvent*>;
 
@@ -367,8 +367,8 @@ using MidiTimeline = std::vector<const MidiTrackEvent*>;
     const MidiTimeline& timeline, MidiTuningRendering tuningRendering, const ResolvedPerformance& resolved) {
   const auto nextAttack = [&](auto from, std::optional<u64> previousTick = std::nullopt) {
     return std::find_if(from, timeline.end(), [&](const MidiTrackEvent* event) {
-      const auto* note = std::get_if<MidiNoteEvent>(event);
-      return note && note->action == MidiNoteAction::Attack && (!previousTick || note->header.tick != *previousTick);
+      const auto* note = std::get_if<MidiNoteBoundary>(event);
+      return note && note->attack.has_value() && (!previousTick || note->header.tick != *previousTick);
     });
   };
   // Controls with an equal tick/sequence see the attack's range too, even if
@@ -384,10 +384,22 @@ using MidiTimeline = std::vector<const MidiTrackEvent*>;
   PitchBendLayers activeBendLayers;
   double activeTuningBend = 0.0;
   const auto applyPitch = [&](const MidiTrackEvent* event) {
-    if (const auto* note = std::get_if<MidiNoteEvent>(event); note && note->action == MidiNoteAction::Expired) {
+    if (const auto* note = std::get_if<MidiNoteBoundary>(event); note && note->expired) {
       return;
     }
-    (void)pitchContext.apply(*event, resolved);
+    if (const auto* range = std::get_if<PitchBendRangePerformanceEvent>(event)) {
+      pitchContext.setSourceRangeCents(range->cents);
+    }
+    const ResolvedInstrument* selection = nullptr;
+    if (const auto* change = std::get_if<MidiInstrumentEvent>(event)) {
+      selection = &change->selection;
+    } else if (const auto* boundary = std::get_if<MidiNoteBoundary>(event); boundary && boundary->instrument) {
+      selection = &*boundary->instrument;
+    }
+    if (selection) {
+      pitchContext.setInstrumentRangeCents(selection->instrument ? selection->instrument->pitchBendRangeCents
+                                                                : std::nullopt);
+    }
     if (const auto* tuning = std::get_if<TuningPerformanceEvent>(event)) {
       activeTuningBend = tuningBendSemitones(tuning->cents, tuningRendering);
     } else if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(event)) {
@@ -723,7 +735,7 @@ public:
         refreshPitchBendRange(header.tick, effectivePitchBendRangeCents(modulationConversion));
       }
 
-      const auto* note = std::get_if<MidiNoteEvent>(event);
+      const auto* note = std::get_if<MidiNoteBoundary>(event);
       flushSimulatedVibrato(header.tick, note);
       u64 otherFlushTick = header.tick;
       if (note != nullptr &&
@@ -737,8 +749,7 @@ public:
         flushSimulatedTremolo(otherFlushTick, modulationConversion);
       }
       flushSimulatedPan(otherFlushTick);
-      addMidiEvent(*event, source.sourceTrackNumber, globalTransposes, modulationConversion, resolved,
-                   modulationProfile);
+      addMidiEvent(*event, source.sourceTrackNumber, globalTransposes, modulationConversion, modulationProfile);
     }
     flushSimulatedVibrato(source.endTick);
     if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
@@ -962,9 +973,9 @@ private:
     addPitchBend(tick, value, force);
   }
 
-  void flushSimulatedVibrato(u64 upToTick, const NotePerformanceEvent* note = nullptr) {
+  void flushSimulatedVibrato(u64 upToTick, const MidiNoteBoundary* note = nullptr) {
     const bool restartsPitch =
-        note != nullptr && note->restartsVibratoLfoPhase.value_or(!note->extendsPrevious && note->restartsLfoPhase);
+        note != nullptr && note->restartVibrato;
     const auto layerEnd = [&](const SimulatedPitchLfoState& pitch) {
       return restartsPitch && pitch.oscillator.restartsOnNote && upToTick != 0 ? upToTick - 1 : upToTick;
     };
@@ -1045,8 +1056,8 @@ private:
     }
   }
 
-  bool shouldRestartSimulatedVibratoForNote(const NotePerformanceEvent& note) const {
-    if (!note.restartsVibratoLfoPhase.value_or(!note.extendsPrevious && note.restartsLfoPhase)) {
+  bool shouldRestartSimulatedVibratoForNote(const MidiNoteBoundary& note) const {
+    if (!note.restartVibrato) {
       return false;
     }
     return std::ranges::any_of(pitchLfos, [](const auto& entry) {
@@ -1155,8 +1166,8 @@ private:
     }
   }
 
-  bool shouldRestartSimulatedTremoloForNote(const NotePerformanceEvent& note) const {
-    return note.restartsTremoloLfoPhase.value_or(!note.extendsPrevious && note.restartsLfoPhase) && tremolo.started;
+  bool shouldRestartSimulatedTremoloForNote(const MidiNoteBoundary& note) const {
+    return note.restartTremolo && tremolo.started;
   }
 
   void addCombinedPan(u64 tick, bool force = false) {
@@ -1202,24 +1213,23 @@ private:
     }
   }
 
-  bool shouldRestartSimulatedPanForNote(const NotePerformanceEvent& note) const {
-    return !note.extendsPrevious && note.restartsLfoPhase && panLfo.started;
+  bool shouldRestartSimulatedPanForNote(const MidiNoteBoundary& note) const {
+    return note.restartPan && panLfo.started;
   }
 
   void addMidiEvent(const MidiTrackEvent& event, u32 sourceTrackNumber,
                     std::span<const GlobalTransposePerformanceEvent* const> globalTransposes,
-                    ModulationConversionPolicy modulationConversion, const ResolvedPerformance& resolved,
-                    const SequenceModulationProfile* modulationProfile) {
+                    ModulationConversionPolicy modulationConversion, const SequenceModulationProfile* modulationProfile) {
     const bool forceControllers = !performanceEventHeader(event).automation;
     std::visit(
         [&](const auto& typedEvent) {
           using TypedEvent = std::decay_t<decltype(typedEvent)>;
-          if constexpr (std::is_same_v<TypedEvent, MidiNoteEvent>) {
-            if (typedEvent.action == MidiNoteAction::Expired) {
+          if constexpr (std::is_same_v<TypedEvent, MidiNoteBoundary>) {
+            if (typedEvent.expired) {
               return;
             }
-            if (!typedEvent.extendsPrevious) {
-              auto selection = instrumentSelection(resolved.selectionFor(typedEvent));
+            if (typedEvent.instrument) {
+              auto selection = instrumentSelection(*typedEvent.instrument);
               applyInstrumentSelection(typedEvent.header.tick, selection, modulationConversion, false);
             }
             if (shouldRestartSimulatedVibratoForNote(typedEvent)) {
@@ -1238,10 +1248,11 @@ private:
             if (shouldRestartSimulatedPanForNote(typedEvent)) {
               restartSimulatedPanForNote(typedEvent.header.tick);
             }
-            if (typedEvent.action == MidiNoteAction::Continue) {
+            if (!typedEvent.attack) {
               return;
             }
-            if (options.terminatePreviousVoice && typedEvent.restartsEnvelope && hasNote) {
+            const auto& attack = *typedEvent.attack;
+            if (attack.silencePreviousVoice && hasNote) {
               // Silence the old voice before bank, range, controller, or bend
               // state for this attack can affect it.
               addController(typedEvent.header.tick, MidiController::AllSoundOff, 0, kVoiceTerminationPriority);
@@ -1250,20 +1261,11 @@ private:
               addCombinedLevel(typedEvent.header.tick);
             }
             hasNote = true;
-            const u8 key = midiKey(typedEvent.key + globalTransposeAt(globalTransposes, typedEvent.header.tick));
+            const u8 key = midiKey(attack.key + globalTransposeAt(globalTransposes, typedEvent.header.tick));
             track.events.push_back(
-                midi::note(typedEvent.header.tick, channel, key, midiVelocity(typedEvent.linearVelocity),
-                           static_cast<u32>(std::min<u64>(typedEvent.endTick - typedEvent.header.tick,
-                                                         std::numeric_limits<u32>::max()))));
-          } else if constexpr (std::is_same_v<TypedEvent, TempoPerformanceEvent>) {
-            // Tempo is song-wide. Effective changes are written once on the
-            // first MIDI track after all source tracks have been lowered.
-          } else if constexpr (std::is_same_v<TypedEvent, TimeSignaturePerformanceEvent>) {
-            // Standard MIDI treats time signatures as global metadata. They are collected
-            // once and written to the first MIDI track by renderMidiSequence.
-          } else if constexpr (std::is_same_v<TypedEvent, InstrumentPerformanceEvent>) {
-            const auto selection = instrumentSelection(resolved.selectionFor(typedEvent),
-                                                       typedEvent.forceBankSelect);
+                midi::note(typedEvent.header.tick, channel, key, midiVelocity(attack.linearVelocity), attack.durationTicks));
+          } else if constexpr (std::is_same_v<TypedEvent, MidiInstrumentEvent>) {
+            const auto selection = instrumentSelection(typedEvent.selection, typedEvent.forceBankSelect);
             applyInstrumentSelection(typedEvent.header.tick, selection, modulationConversion, true);
           } else if constexpr (std::is_same_v<TypedEvent, LevelPerformanceEvent>) {
             sourceLevelGain = typedEvent.linearGain;
@@ -1330,9 +1332,6 @@ private:
               tuningSemitones = bend;
               addCurrentPitchBend(typedEvent.header.tick, modulationConversion, false);
             }
-          } else if constexpr (std::is_same_v<TypedEvent, GlobalTransposePerformanceEvent>) {
-            // Global transpose changes how later notes and portamento controls are written. It does not
-            // become a MIDI event itself.
           } else if constexpr (std::is_same_v<TypedEvent, PitchBendPerformanceEvent>) {
             pitchBendLayers.apply(typedEvent);
             addCurrentPitchBend(typedEvent.header.tick, modulationConversion, false);
@@ -1481,7 +1480,7 @@ MidiSequence renderMidiSequence(const ResolvedPerformance& resolved,
 
   for (size_t trackIndex = 0; trackIndex < performance.tracks.size(); ++trackIndex) {
     const auto& performanceTrack = performance.tracks[trackIndex];
-    const auto events = detail::lowerMidiTrackEvents(resolved, trackIndex, options, globalTempos, sequence.diagnostics);
+    const auto events = detail::planMidiTrack(resolved, trackIndex, options, globalTempos, sequence.diagnostics);
     const auto timeline = midiTimeline(events, globalReverb);
     MidiTrack midiTrack{
         .name = performanceTrack.name.empty() ? "Track " + std::to_string(performanceTrack.sourceTrackNumber)

@@ -4,12 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/export/midi/PitchTransitionMidiLowering.h"
+#include "value/export/midi/MidiTrackPlanner.h"
 
 #include "value/export/PerformancePitchBendContext.h"
 
 #include <algorithm>
 #include <cmath>
+#include <deque>
 #include <iterator>
 #include <limits>
 #include <optional>
@@ -25,17 +26,38 @@ namespace vgmtrans::core {
 
 namespace {
 
-using detail::MidiNoteAction;
-using detail::MidiNoteEvent;
+using detail::MidiNoteBoundary;
+using detail::MidiInstrumentEvent;
 using detail::MidiTrackEvent;
+
+// Private planning state. Source properties remain borrowed; key, gate and
+// continuation decisions are completed here before creating output events.
+enum class NoteAction { Attack, Continue, Expired };
+
+struct NoteDraft {
+  const NotePerformanceEvent* source;
+  PerformanceEventHeader header;
+  u64 endTick;
+  double key;
+  double bendBaseKey;
+  bool extendsPrevious;
+  bool restartsEnvelope;
+  NoteAction action = NoteAction::Attack;
+  size_t outputIndex = 0;  // Preserve the boundary's position among coincident source controls.
+
+  explicit NoteDraft(const NotePerformanceEvent& note)
+      : source(&note), header(note.header), endTick(addTicks(note.header.tick, note.durationTicks)),
+        key(note.key), bendBaseKey(note.key), extendsPrevious(note.extendsPrevious),
+        restartsEnvelope(note.restartsEnvelope) {}
+};
 
 struct NoteSpan {
   const NotePerformanceEvent& source;
-  u64 endTick = 0;
+  u64 endTick = 0;  // Source gate including ties, independent of MIDI overlap and hardware deadlines.
   // Native portamento replaces the source boundaries with these segments.
   // Otherwise the source boundaries retain their individual LFO decisions.
   bool usesPortamento = false;
-  std::vector<MidiNoteEvent> segments;
+  std::vector<NoteDraft> segments;
 };
 
 // Source pitch at a given command: the persistent primary wheel and the
@@ -118,11 +140,6 @@ using PitchBendWrites = std::vector<PitchBendWrite>;
   return found == notes.end() ? nullptr : &*found;
 }
 
-[[nodiscard]] const NoteSpan* findNote(const std::vector<NoteSpan>& notes, PerformanceNoteId id) {
-  const auto found = std::ranges::find_if(notes, [id](const NoteSpan& note) { return note.source.note == id; });
-  return found == notes.end() ? nullptr : &*found;
-}
-
 // Source voices are explicit. Only the preceding physical MIDI note needs to
 // be recovered here, because portamento can change its bend reference key.
 [[nodiscard]] NoteSpan* previousVoiceNote(std::vector<NoteSpan>& notes, const NoteSpan& note) {
@@ -151,7 +168,7 @@ using PitchBendWrites = std::vector<PitchBendWrite>;
     } else {
       auto& span = notes.emplace_back(NoteSpan{
           .source = *source, .endTick = addTicks(source->header.tick, source->durationTicks),
-          .segments = {MidiNoteEvent{*source}}});
+          .segments = {NoteDraft{*source}}});
       span.segments.front().extendsPrevious = previousVoiceNote(notes, span) != nullptr;
     }
   }
@@ -368,7 +385,7 @@ PitchBendState resolvePitchBends(PitchBendWrites& writes, PitchBendLayerId heldT
         sampleTicks.push_back(tick);
       }
     }
-    for (const MidiNoteEvent& segment : note.segments) {
+    for (const NoteDraft& segment : note.segments) {
       if (segment.header.tick >= startTick && segment.header.tick <= endTick) {
         sampleTicks.push_back(segment.header.tick);
       }
@@ -392,20 +409,19 @@ PitchBendState resolvePitchBends(PitchBendWrites& writes, PitchBendLayerId heldT
 }
 
 [[nodiscard]] std::optional<u64> nextIndependentAttack(
-    const std::vector<MidiTrackEvent>& events, const PerformanceAutomation& automation,
+    const std::vector<NoteDraft*>& physicalNotes, const PerformanceAutomation& automation,
     std::span<const NoteSpan* const> affectedNotes) {
   const bool continuesAtEnd = automation.realization.endReason == PerformanceAutomationEndReason::Completed &&
                               pitchTransitionIntent(automation)->continuesAcrossNotes;
   // Physical-note planning has already ordered this timeline.
-  for (const auto& event : events) {
-    const auto* note = std::get_if<MidiNoteEvent>(&event);
-    if (note == nullptr || note->action != MidiNoteAction::Attack || note->header.tick < automation.realization.endTick) {
+  for (const auto* note : physicalNotes) {
+    if (note->action != NoteAction::Attack || note->header.tick < automation.realization.endTick) {
       continue;
     }
     // A curve can finish on a new note that still belongs to that curve.
     // Reuse the affected-note set rather than reconstructing that relationship.
     if (continuesAtEnd && note->header.tick == automation.realization.endTick &&
-        std::ranges::any_of(affectedNotes, [&](const auto* affected) { return affected->source.note == note->note; })) {
+        std::ranges::any_of(affectedNotes, [&](const auto* affected) { return affected->source.note == note->source->note; })) {
       continue;
     }
     return note->header.tick;
@@ -442,7 +458,7 @@ PitchBendState resolvePitchBends(PitchBendWrites& writes, PitchBendLayerId heldT
 }
 
 void lowerPitchBends(std::vector<Diagnostic>& diagnostics, std::vector<MidiTrackEvent>& events,
-                     std::vector<NoteSpan>& notes, const std::vector<const PerformanceAutomation*>& transitions,
+                     const std::vector<NoteDraft*>& physicalNotes, std::vector<NoteSpan>& notes, const std::vector<const PerformanceAutomation*>& transitions,
                      const SourcePitchTimeline& sourcePitch) {
   auto bends = takeSourcePitchBends(events);
   const PitchBendLayerId heldTransitionLayer = unusedPitchBendLayer(bends);
@@ -471,7 +487,7 @@ void lowerPitchBends(std::vector<Diagnostic>& diagnostics, std::vector<MidiTrack
       // Retain the terminal bend through note-off and the synth's release
       // phase. Make its next-attack reset visible while lowering later
       // transitions so they inherit the chronological pitch state.
-      if (const auto resetTick = nextIndependentAttack(events, *automation, affectedNotes)) {
+      if (const auto resetTick = nextIndependentAttack(physicalNotes, *automation, affectedNotes)) {
         bends.push_back(transitionPitchBend(*automation, held, *resetTick, 0.0, true));
       }
     }
@@ -495,7 +511,7 @@ void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
   }
 
   const u64 clampedStart = std::min(startTick, note.endTick);
-  std::erase_if(note.segments, [=](const MidiNoteEvent& segment) {
+  std::erase_if(note.segments, [=](const NoteDraft& segment) {
     return segment.header.tick >= clampedStart || segment.endTick <= segment.header.tick;
   });
   for (auto& segment : note.segments) {
@@ -509,23 +525,13 @@ void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
     }
   }
   if (clampedStart < note.endTick) {
-    auto& segment = note.segments.emplace_back(MidiNoteEvent{note.source});
+    auto& segment = note.segments.emplace_back(NoteDraft{note.source});
     segment.header = automation.header;
     segment.header.tick = clampedStart;
     segment.endTick = note.endTick;
     segment.key = segment.bendBaseKey = transition.targetKey;
     segment.extendsPrevious = false;
     segment.restartsEnvelope = false;
-  }
-}
-
-void inheritMidiBendBases(std::vector<NoteSpan>& notes) {
-  for (auto& note : notes) {
-    auto* previous = previousVoiceNote(notes, note);
-    auto& first = note.segments.front();
-    if (previous != nullptr && first.extendsPrevious) {
-      first.bendBaseKey = bendBaseKeyAt(*previous, note.source.header.tick);
-    }
   }
 }
 
@@ -590,22 +596,40 @@ void lowerPortamento(std::vector<Diagnostic>& diagnostics, std::vector<MidiTrack
   }
 }
 
-void appendSourceEvents(std::vector<MidiTrackEvent>& events, const std::vector<PerformanceEvent>& sourceEvents,
-                        const std::vector<NoteSpan>& notes, bool renderPortamentoSettings, u64& nextSequence) {
+std::vector<NoteDraft*> appendSourceEvents(
+    std::vector<MidiTrackEvent>& events, const std::vector<PerformanceEvent>& sourceEvents,
+    std::vector<NoteSpan>& notes, bool renderPortamentoSettings, u64& nextSequence,
+    const ResolvedPerformance& resolved, std::deque<NoteDraft>& ties) {
+  std::vector<NoteDraft*> boundaries;
+  const auto append = [&](NoteDraft& note) {
+    note.outputIndex = events.size();
+    events.emplace_back(MidiNoteBoundary{.header = note.header});
+    boundaries.push_back(&note);
+  };
   for (const auto& event : sourceEvents) {
     std::visit([&](const auto& source) {
       using Event = std::decay_t<decltype(source)>;
       if constexpr (std::is_same_v<Event, NotePerformanceEvent>) {
-        const auto* span = source.note.valid() ? findNote(notes, source.note) : nullptr;
+        auto* span = source.note.valid() ? findNote(notes, source.note) : nullptr;
         if (span && span->usesPortamento) {
           return;
         }
-        MidiNoteEvent note{source};
+        auto& note = span && &source == &span->source ? span->segments.front() : ties.emplace_back(source);
+        // The span's logical end includes ties; this boundary starts with its
+        // own gate. Physical planning extends the attack actually sounding then.
+        note.endTick = addTicks(source.header.tick, source.durationTicks);
         if (span) {
           note.extendsPrevious |= span->segments.front().extendsPrevious;
           note.bendBaseKey = span->segments.front().bendBaseKey;
         }
-        events.emplace_back(std::move(note));
+        append(note);
+      } else if constexpr (std::is_same_v<Event, InstrumentPerformanceEvent>) {
+        events.emplace_back(MidiInstrumentEvent{source.header, resolved.selectionFor(source), source.forceBankSelect});
+      } else if constexpr (std::is_same_v<Event, EnvelopePerformanceEvent> ||
+                           std::is_same_v<Event, TempoPerformanceEvent> ||
+                           std::is_same_v<Event, TimeSignaturePerformanceEvent> ||
+                           std::is_same_v<Event, GlobalTransposePerformanceEvent>) {
+        events.emplace_back(detail::MidiTimingEvent{source.header});
       } else if constexpr (std::is_same_v<Event, PitchTransitionSettingsPerformanceEvent>) {
         if (renderPortamentoSettings) {
           events.emplace_back(PortamentoPerformanceEvent{
@@ -622,47 +646,68 @@ void appendSourceEvents(std::vector<MidiTrackEvent>& events, const std::vector<P
     }, event);
   }
 
-  for (const auto& note : notes) {
+  for (auto& note : notes) {
     if (!note.usesPortamento) {
       continue;
     }
-    for (const auto& segment : note.segments) {
+    for (auto& segment : note.segments) {
       if (segment.endTick <= segment.header.tick) {
         continue;
       }
-      auto event = segment;
-      event.header.sequence = nextSequence++;
-      events.emplace_back(std::move(event));
+      segment.header.sequence = nextSequence++;
+      append(segment);
     }
   }
+  std::ranges::stable_sort(boundaries, {}, [](const NoteDraft* note) { return note->header.order(); });
+  return boundaries;
 }
 
 // Resolve physical attacks before encoding. Later boundaries can extend an
 // earlier attack, but retain their own LFO decisions and source annotations.
-void planPhysicalNotes(std::vector<MidiTrackEvent>& events, const ResolvedPerformance& resolved) {
-  std::unordered_map<PerformanceVoiceId, MidiNoteEvent*> previous;
-  for (auto& event : events) {
-    auto* note = std::get_if<MidiNoteEvent>(&event);
-    if (note == nullptr) {
-      continue;
+void planPhysicalNotes(const std::vector<NoteDraft*>& notes, const ResolvedPerformance& resolved) {
+  std::unordered_map<PerformanceVoiceId, NoteDraft*> previous;
+  for (auto* note : notes) {
+    auto& attack = previous[note->source->voice];
+    if (note->extendsPrevious && attack != nullptr) {
+      note->bendBaseKey = attack->bendBaseKey;
     }
-    if (const auto limit = resolved.voiceFor(*note).endLimit) {
+    if (const auto limit = resolved.voiceFor(*note->source).endLimit) {
       if ((note->extendsPrevious || !note->restartsEnvelope) && note->header.tick >= *limit) {
-        note->action = MidiNoteAction::Expired;
+        note->action = NoteAction::Expired;
         continue;
       }
       note->endTick = std::max(note->header.tick, std::min(note->endTick, *limit));
     }
-    auto& attack = previous[note->voice];
     if (note->extendsPrevious && attack != nullptr) {
       attack->endTick = std::max(attack->endTick, note->endTick);
-      note->bendBaseKey = attack->bendBaseKey;
-      note->action = MidiNoteAction::Continue;
+      note->action = NoteAction::Continue;
     } else {
       note->bendBaseKey = note->key;
       attack = note;
     }
   }
+}
+
+[[nodiscard]] MidiNoteBoundary finishNote(const NoteDraft& note, const ResolvedPerformance& resolved,
+                                         const MidiExportOptions& options) {
+  const bool restart = !note.extendsPrevious && note.source->restartsLfoPhase;
+  MidiNoteBoundary boundary{
+      .header = note.header,
+      .restartVibrato = note.source->restartsVibratoLfoPhase.value_or(restart),
+      .restartTremolo = note.source->restartsTremoloLfoPhase.value_or(restart),
+      .restartPan = restart,
+      .expired = note.action == NoteAction::Expired,
+  };
+  if (!boundary.expired && !note.extendsPrevious) {
+    boundary.instrument = resolved.selectionFor(*note.source);
+  }
+  if (note.action == NoteAction::Attack) {
+    boundary.attack = detail::MidiAttack{
+        note.key, note.source->linearVelocity,
+        static_cast<u32>(std::min<u64>(note.endTick - note.header.tick, std::numeric_limits<u32>::max())),
+        options.terminatePreviousVoice && note.restartsEnvelope};
+  }
+  return boundary;
 }
 
 [[nodiscard]] PitchTransitionRenderingHint effectiveRendering(const PerformanceSequence& performance,
@@ -682,7 +727,7 @@ void planPhysicalNotes(std::vector<MidiTrackEvent>& events, const ResolvedPerfor
 
 }  // namespace
 
-std::vector<detail::MidiTrackEvent> detail::lowerMidiTrackEvents(
+std::vector<detail::MidiTrackEvent> detail::planMidiTrack(
     const ResolvedPerformance& resolved, size_t trackIndex, const MidiExportOptions& options,
     const PerformanceTempoMap& tempos, std::vector<Diagnostic>& diagnostics) {
   const auto& performance = resolved.performance();
@@ -766,20 +811,24 @@ std::vector<detail::MidiTrackEvent> detail::lowerMidiTrackEvents(
   if (!portamentoTransitions.empty()) {
     lowerPortamento(diagnostics, events, notes, portamentoTransitions, tempos, nextSequence, *sourcePitch);
   }
-  inheritMidiBendBases(notes);
   const bool renderPortamentoSettings =
       !portamentoTransitions.empty() || options.pitchTransitions == MidiPitchTransitionRendering::Portamento ||
       (options.pitchTransitions == MidiPitchTransitionRendering::PreserveFormat &&
        performance.preferredPitchTransitionRendering == PitchTransitionRenderingHint::Portamento);
-  appendSourceEvents(events, track.events, notes, renderPortamentoSettings, nextSequence);
+  // Tie boundaries have stable addresses; span segments are no longer split
+  // after this point. Gate planning and pitch sampling share those same records.
+  std::deque<NoteDraft> ties;
+  const auto physicalNotes = appendSourceEvents(events, track.events, notes, renderPortamentoSettings,
+                                                nextSequence, resolved, ties);
+  planPhysicalNotes(physicalNotes, resolved);
+  for (const auto* note : physicalNotes) {
+    events[note->outputIndex] = finishNote(*note, resolved, options);
+  }
+  if (!pitchBendTransitions.empty()) {
+    lowerPitchBends(diagnostics, events, physicalNotes, notes, pitchBendTransitions, *sourcePitch);
+  }
   std::ranges::stable_sort(events, {},
                            [](const MidiTrackEvent& event) { return performanceEventHeader(event).order(); });
-  planPhysicalNotes(events, resolved);
-  if (!pitchBendTransitions.empty()) {
-    lowerPitchBends(diagnostics, events, notes, pitchBendTransitions, *sourcePitch);
-    std::ranges::stable_sort(events, {},
-                             [](const MidiTrackEvent& event) { return performanceEventHeader(event).order(); });
-  }
   return events;
 }
 

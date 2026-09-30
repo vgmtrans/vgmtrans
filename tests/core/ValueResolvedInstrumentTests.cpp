@@ -10,7 +10,7 @@
 #include "value/export/CollectionBinding.h"
 #include "value/export/Export.h"
 #include "value/export/ResolvedPerformance.h"
-#include "value/export/midi/PitchTransitionMidiLowering.h"
+#include "value/export/midi/MidiTrackPlanner.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/export/synth/SynthExportData.h"
 #include "value/sequence/SequenceVm.h"
@@ -519,13 +519,14 @@ void soundingVoicesOwnSelectionsAndDeadlines() {
          "track-local source note IDs must become distinct prepared voices across tracks");
   for (const auto mode : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
     std::vector<Diagnostic> diagnostics;
-    const auto events = detail::lowerMidiTrackEvents(prepared, 0, {.pitchTransitions = mode},
+    const auto events = detail::planMidiTrack(prepared, 0, {.pitchTransitions = mode},
                                                      PerformanceTempoMap{prepared.performance()}, diagnostics);
     expect(diagnostics.empty(), "lowering valid voice continuations should not add diagnostics");
     for (const auto& event : events) {
-      if (const auto* note = std::get_if<detail::MidiNoteEvent>(&event); note && note->voice == first.voice) {
-        expect(prepared.voiceFor(*note).endLimit == 14 && prepared.selectionFor(*note).address.program == 5,
-               "every lowered physical fragment must retain the source voice's selection and absolute deadline");
+      if (const auto* note = std::get_if<detail::MidiNoteBoundary>(&event); note && note->attack && note->attack->key != 72) {
+        expect(note->header.tick + note->attack->durationTicks <= 14 &&
+                   (!note->instrument || note->instrument->address.program == 5),
+               "completed attacks must already carry their voice's instrument and respect its absolute deadline");
       }
     }
     const auto midi = renderMidiSequence(prepared, {.pitchTransitions = mode});
