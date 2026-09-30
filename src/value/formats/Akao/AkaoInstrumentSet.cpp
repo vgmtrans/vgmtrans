@@ -459,13 +459,13 @@ AkaoInstrumentSetBuild buildAkaoInstrumentSet(const ScanInput& input, const Akao
   };
 }
 
-bool applyAkaoArticulations(SoundBankAsset& instruments, const AkaoInstrumentSetBindingData& recipe,
+bool applyAkaoArticulations(std::vector<Instrument>& instruments, const AkaoInstrumentSetBindingData& recipe,
                             const AkaoArticulationMap& articulations) {
-  if (instruments.instruments.size() != recipe.regions.size()) {
+  if (instruments.size() != recipe.regions.size()) {
     return false;
   }
-  for (size_t instrumentIndex = 0; instrumentIndex < instruments.instruments.size(); ++instrumentIndex) {
-    auto& instrument = instruments.instruments[instrumentIndex];
+  for (size_t instrumentIndex = 0; instrumentIndex < instruments.size(); ++instrumentIndex) {
+    auto& instrument = instruments[instrumentIndex];
     const auto& regionRecipes = recipe.regions[instrumentIndex];
     if (instrument.regions.size() != regionRecipes.size()) {
       return false;
@@ -480,7 +480,7 @@ bool applyAkaoArticulations(SoundBankAsset& instruments, const AkaoInstrumentSet
     }
   }
   if (recipe.usesIndividualArticulations) {
-    addSyntheticArticulationInstruments(instruments.instruments, articulations, recipe.noAttackArticulationIds);
+    addSyntheticArticulationInstruments(instruments, articulations, recipe.noAttackArticulationIds);
   }
   return true;
 }

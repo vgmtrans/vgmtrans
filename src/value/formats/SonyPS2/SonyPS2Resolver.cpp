@@ -114,9 +114,9 @@ struct BoundSample {
 
 class BodyBinder {
 public:
-  BodyBinder(BankPreparationContext& context, SoundBankAsset& bank, const SamplePoolAsset& body,
+  BodyBinder(BankPreparationContext& context, const SamplePoolAsset& body,
              const SoundBankData& bankData, const SampleBodyData& bodyData, BodyAddressing addressing)
-      : context_(context), bank_(bank), body_(body), bankData_(bankData), bodyData_(bodyData), addressing_(addressing) {
+      : context_(context), body_(body), bankData_(bankData), bodyData_(bodyData), addressing_(addressing) {
   }
 
   void bind(Region& region) {
@@ -152,9 +152,9 @@ private:
     if (inserted) {
       sample->second = addLocalSample(bodyOffset, logicalOffset, range);
     }
-    const auto& local = bank_.localSamples.samples[sample->second];
+    const auto& local = context_.localSamples.samples[sample->second];
     return BoundSample{
-        .reference = SampleRef::resolved(bank_.metadata.id, sample->second),
+        .reference = SampleRef::resolved(context_.asset.metadata.id, sample->second),
         .loops = local.loop.enabled,
     };
   }
@@ -180,8 +180,8 @@ private:
       context_.warning("SonyPS2 BD ends inside its final ADPCM block; the incomplete block was omitted",
                        stream->encodedData);
     }
-    const u32 index = static_cast<u32>(bank_.localSamples.samples.size());
-    bank_.localSamples.samples.push_back(Sample{
+    const u32 index = static_cast<u32>(context_.localSamples.samples.size());
+    context_.localSamples.samples.push_back(Sample{
         .name = fmt::format("VAG at {:#x}", bodyOffset),
         .codec = AudioCodec::PsxAdpcm,
         .encodedData = stream->encodedData,
@@ -193,7 +193,6 @@ private:
   }
 
   BankPreparationContext& context_;
-  SoundBankAsset& bank_;
   const SamplePoolAsset& body_;
   const SoundBankData& bankData_;
   const SampleBodyData& bodyData_;
@@ -202,30 +201,28 @@ private:
 };
 
 void bindBody(BankPreparationContext& context, const SoundBankData& data, const SampleInput<SampleBodyData>& input) {
-  auto* bank = &context.bank;
-  const auto* body = &input.asset;
-  const auto* bankData = &data;
-  const auto* bodyData = &input.data;
-  const BodyAddressing addressing = bodyAddressing(*bankData, *bodyData);
+  const auto& body = input.asset;
+  const auto& bodyData = input.data;
+  const BodyAddressing addressing = bodyAddressing(data, bodyData);
   if (addressing.omittedLeadingBlock) {
     // Some PSF2 rips discarded the bank's initial silent block but kept the
     // original Vagi addresses. Translate those logical addresses rather than
     // manufacturing a padded source.
     context.warning("SonyPS2 BD omits its initial silent ADPCM block; Vagi offsets were shifted by 16 bytes",
-                    body->metadata.range);
+                    body.metadata.range);
   }
-  const u32 sizeDifference = bankData->expectedBodyBytes > bodyData->bytes
-                                 ? bankData->expectedBodyBytes - bodyData->bytes
-                                 : bodyData->bytes - bankData->expectedBodyBytes;
+  const u32 sizeDifference = data.expectedBodyBytes > bodyData.bytes
+                                 ? data.expectedBodyBytes - bodyData.bytes
+                                 : bodyData.bytes - data.expectedBodyBytes;
   if (sizeDifference > 32) {
     // Shipped banks can retain an unrelated allocation size. sceHSyn_Load
     // receives the uploaded body base and resolves samples through Vagi offsets.
     context.warning("SonyPS2 HD bodySize differs from the selected BD; VAG offsets were used for binding",
-                    bank->metadata.range);
+                    context.asset.metadata.range);
   }
 
-  BodyBinder binder(context, *bank, *body, *bankData, *bodyData, addressing);
-  for (auto& instrument : bank->instruments) {
+  BodyBinder binder(context, body, data, bodyData, addressing);
+  for (auto& instrument : context.instruments) {
     for (auto& region : instrument.regions) {
       binder.bind(region);
     }
@@ -278,7 +275,7 @@ DependencySelection selectSonyPs2Samples(const DependencyContext& context) {
 }
 
 void prepareSonyPs2Bank(BankPreparationContext& context, const SoundBankData& data) {
-  for (auto& instrument : context.bank.instruments) {
+  for (auto& instrument : context.instruments) {
     if (!instrument.identity || instrument.identity->domain != kInstrumentDomain) {
       continue;
     }

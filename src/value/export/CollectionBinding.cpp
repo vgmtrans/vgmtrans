@@ -100,13 +100,16 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
     }
   }
 
-  // Callbacks change private bank copies so preparing one collection cannot
-  // change another. Sample pools stay read-only and are kept alive by the snapshot.
+  // Copy contents for this collection, leaving discovery recipes and callbacks
+  // on the scanned asset. External sample pools stay shared and read-only.
   std::vector<SoundBankAsset> soundBanks;
   soundBanks.reserve(inputs.size());
   for (const auto& input : inputs) {
     if (const auto* bank = snapshot.asset<SoundBankAsset>(input.bank)) {
-      soundBanks.push_back(*bank);
+      soundBanks.push_back({.metadata = bank->metadata,
+                            .instruments = bank->instruments,
+                            .localSamples = bank->localSamples,
+                            .privateData = bank->privateData});
     } else {
       diagnostics.push_back(exportError("Collection sound bank asset was not found"));
       failed = true;
@@ -133,10 +136,8 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
     try {
       for (size_t i = 0; i < soundBanks.size(); ++i) {
         auto& bank = soundBanks[i];
-        // Keep the callback on the original asset so it stays alive even if it
-        // replaces the bank copy. Each bank uses its own format's preparation.
-        const auto& prepare = snapshot.asset<SoundBankAsset>(inputs[i].bank)->prepare;
-        if (!prepare) {
+        const auto& asset = *snapshot.asset<SoundBankAsset>(inputs[i].bank);
+        if (!asset.prepare) {
           continue;
         }
         // Banks of other formats must not shift this format's bank numbers.
@@ -144,8 +145,8 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
             static_cast<u32>(std::count_if(soundBanks.begin(), soundBanks.begin() + i, [&](const auto& previous) {
               return previous.metadata.format == bank.metadata.format;
             }));
-        BankPreparationContext context{bank, index, inputs[i].samples.targets, snapshot, diagnostics};
-        prepare(context);
+        BankPreparationContext context{asset, bank, index, inputs[i].samples.targets, snapshot, diagnostics};
+        asset.prepare(context);
       }
       // Sequence settings may depend on the banks' prepared instruments and samples.
       if (sequence != nullptr && sequence->prepare) {
@@ -177,19 +178,6 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
     }
   }
 
-  if (!failed) {
-    // Preparation may change a bank's contents, but its ID, format, and place
-    // in the selected order must still agree with the resolved inputs.
-    for (size_t index = 0; index < soundBanks.size(); ++index) {
-      const auto& metadata = soundBanks[index].metadata;
-      const auto* original = snapshot.asset<SoundBankAsset>(inputs[index].bank);
-      if (original == nullptr || metadata.id != original->metadata.id || metadata.format != original->metadata.format) {
-        diagnostics.push_back(exportError("Asset preparation changed sound bank identity, format, or order"));
-        failed = true;
-        break;
-      }
-    }
-  }
   if (!failed) {
     // Check sample references after preparation has connected each instrument
     // to its samples; scanned banks are allowed to leave those links unfinished.

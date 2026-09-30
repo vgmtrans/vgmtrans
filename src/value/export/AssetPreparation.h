@@ -26,13 +26,15 @@ struct PreparationFailure {
 
 template <class Data>
 struct BankInput {
-  SoundBankAsset& asset;
+  const AssetMetadata& metadata;
+  std::vector<Instrument>& instruments;
+  SamplePool& localSamples;
   const Data& data;
 };
 
 // Used by the sequence's prepare callback after all banks have been prepared.
 // It may configure the private bank contents and the sequence runtime together.
-// Scanned assets remain immutable; identity and format must be retained.
+// Identity stays read-only; only instruments and local samples can change.
 struct SequencePreparationContext {
 public:
   SequencePreparationContext(const SequenceProgramAsset& sequence, std::span<SoundBankAsset> soundBanks,
@@ -55,7 +57,7 @@ public:
       if (data == nullptr) {
         fail("Sequence bank input is missing its retained format data", bank.metadata.range);
       }
-      result.push_back({bank, *data});
+      result.push_back({bank.metadata, bank.instruments, bank.localSamples, *data});
     }
     return result;
   }
@@ -86,14 +88,20 @@ struct SampleInput {
   const AssetPrivateData& placement;
 };
 
-// Used by a bank's prepare callback to update its private copy. Its sample
-// inputs were chosen during resolution; the shared sample pools remain read-only.
+// The scanned asset stays read-only. A callback edits only this collection's
+// instruments, local samples, and retained format data. External pools are shared.
 struct BankPreparationContext {
-  BankPreparationContext(SoundBankAsset& bank, u32 bankIndex, std::span<const DependencyTarget> inputs,
+  BankPreparationContext(const SoundBankAsset& asset, SoundBankAsset& prepared, u32 bankIndex,
+                         std::span<const DependencyTarget> inputs,
                          const SessionSnapshot& snapshot, std::vector<Diagnostic>& diagnostics)
-      : bank(bank), bankIndex(bankIndex), inputs(inputs), diagnostics(diagnostics), snapshot_(snapshot) {}
+      : asset(asset), instruments(prepared.instruments), localSamples(prepared.localSamples),
+        privateData(prepared.privateData), bankIndex(bankIndex), inputs(inputs), diagnostics(diagnostics),
+        snapshot_(snapshot) {}
 
-  SoundBankAsset& bank;
+  const SoundBankAsset& asset;
+  std::vector<Instrument>& instruments;
+  SamplePool& localSamples;
+  AssetPrivateData& privateData;
   // Zero-based index among banks of this format, in the selected order.
   u32 bankIndex;
   std::span<const DependencyTarget> inputs;
@@ -131,13 +139,13 @@ struct BankPreparationContext {
   void warning(std::string message, SourceRange range = {}) {
     diagnostics.push_back({.severity = Severity::Warning,
                            .message = std::move(message),
-                           .range = range.valid() ? range : bank.metadata.range});
+                           .range = range.valid() ? range : asset.metadata.range});
   }
   // Report an error and stop the entire collection's preparation immediately.
   [[noreturn]] void fail(std::string message, SourceRange range = {}) {
     throw detail::PreparationFailure{{.severity = Severity::Error,
                                       .message = std::move(message),
-                                      .range = range.valid() ? range : bank.metadata.range}};
+                                      .range = range.valid() ? range : asset.metadata.range}};
   }
 
 private:

@@ -199,7 +199,8 @@ ScanSequenceDraft& ScanSequenceDraft::prepare(Prepare callback) {
 template <class Data, class Prepare>
 ScanSoundBankDraft& ScanSoundBankDraft::prepare(Prepare callback) {
   return prepare([callback = std::move(callback)](BankPreparationContext& context) {
-    const auto* data = context.bank.privateData.template get<Data>();
+    // Replacing prepared data must not invalidate the callback's source data.
+    const auto* data = context.asset.privateData.template get<Data>();
     if (data == nullptr) {
       context.fail("Bank is missing its preparation data");
     }

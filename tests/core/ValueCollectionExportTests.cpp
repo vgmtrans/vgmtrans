@@ -419,8 +419,7 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
 
 void bindInstrumentSet(BankPreparationContext& context) {
   const AssetId samples = context.inputs.front().asset;
-  auto& instruments = context.bank;
-  instruments.instruments = {Instrument{
+  context.instruments = {Instrument{
       .name = "Prepared Instrument",
       .regions = {Region{.sample = SampleRef::resolved(samples, 0)}},
   }};
@@ -695,22 +694,13 @@ void collectionBindingProducesAnImmutableInstrumentView() {
   diagnosticWithMessage(usedOnly.front().diagnostics, "Collection does not reference a sequence asset");
 
   const auto threw = bindCollection(snapshotWithBinder([](BankPreparationContext& context) {
-                                      context.bank.instruments.front().name = "Partially Bound";
+                                      context.instruments.front().name = "Partially Bound";
                                       throw std::runtime_error("expected binding exception");
                                     }),
                                     CollectionId{0});
   expect(!threw.collection,
          "an exception should abort collection binding instead of publishing the callback's partial changes");
   diagnosticWithMessage(threw.diagnostics, "Asset preparation failed: expected binding exception");
-
-  const auto changedIdentity = bindCollection(snapshotWithBinder([](BankPreparationContext& context) {
-                                                context.bank.metadata.id = AssetId{99};
-                                                context.bank.metadata.format = "Changed";
-                                              }),
-                                              CollectionId{0});
-  expect(!changedIdentity.collection,
-         "collection binding should reject changes to selected instrument identity or order");
-  diagnosticWithMessage(changedIdentity.diagnostics, "Asset preparation changed sound bank identity, format, or order");
 
   auto implicitPoolBuilder = builder;
   implicitPoolBuilder.collections.front().selection.samplePools.clear();
@@ -725,7 +715,7 @@ void collectionBindingProducesAnImmutableInstrumentView() {
   diagnosticWithMessage(missingPool.diagnostics, "Collection sample pool asset was not found");
 
   const auto unresolved = bindCollection(snapshotWithBinder([](BankPreparationContext& context) {
-                                           context.bank.instruments.front().regions.front().sample =
+                                           context.instruments.front().regions.front().sample =
                                                SampleRef::unbound(0);
                                          }),
                                          CollectionId{0});
@@ -733,7 +723,7 @@ void collectionBindingProducesAnImmutableInstrumentView() {
   diagnosticWithMessage(unresolved.diagnostics, "Synth region has an unresolved sample reference");
 
   const auto malformed = bindCollection(snapshotWithBinder([](BankPreparationContext& context) {
-                                          context.bank.instruments.front().regions.front().pan =
+                                          context.instruments.front().regions.front().pan =
                                               std::numeric_limits<double>::quiet_NaN();
                                         }),
                                         CollectionId{0});

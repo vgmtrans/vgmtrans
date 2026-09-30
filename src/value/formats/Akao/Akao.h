@@ -225,7 +225,8 @@ struct AkaoInstrumentSetBuild {
 [[nodiscard]] AkaoInstrumentSetBuild buildAkaoInstrumentSet(const core::ScanInput& input,
                                                             const AkaoSequenceAnalysis& sequence,
                                                             core::InstrumentSetBuilder& instruments);
-[[nodiscard]] bool applyAkaoArticulations(core::SoundBankAsset& instruments, const AkaoInstrumentSetBindingData& recipe,
+[[nodiscard]] bool applyAkaoArticulations(std::vector<core::Instrument>& instruments,
+                                          const AkaoInstrumentSetBindingData& recipe,
                                           const AkaoArticulationMap& articulations);
 
 void prepareAkaoBank(core::BankPreparationContext& context, const AkaoSoundBankData& data);

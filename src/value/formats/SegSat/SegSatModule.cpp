@@ -130,7 +130,7 @@ std::optional<SequenceRuntime> prepareSegSatSequence(SequencePreparationContext&
     // Keep the sequence's bank number for interpreting its commands, but export
     // a lone bank as bank zero. These settings apply only to this collection.
     const u8 exportBank = banks.size() == 1 ? 0 : logical;
-    for (auto& instrument : banks[i].asset.instruments) {
+    for (auto& instrument : banks[i].instruments) {
       const auto address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
       instrument.explicitAddress = InstrumentAddress{.bank = exportBank, .program = address.program};
       instrument.identity = segSatInstrumentIdentity(logical, static_cast<u8>(address.program));

@@ -223,7 +223,8 @@ void akaoSequenceAnalysisUsesSemanticOperands() {
   SoundBankAsset bank;
   const AkaoInstrumentSetBindingData recipe{.usesIndividualArticulations = true,
                                             .noAttackArticulationIds = analysis.references.noAttackArticulationIds};
-  expect(applyAkaoArticulations(bank, recipe, {{9, {.loopPoint = 32, .sample = SampleRef::resolved(AssetId{1}, 0)}}}) &&
+  expect(applyAkaoArticulations(bank.instruments, recipe,
+                              {{9, {.loopPoint = 32, .sample = SampleRef::resolved(AssetId{1}, 0)}}}) &&
              bank.instruments.size() == 2 && bank.instruments[0].regions[0].sampleStartFrame == 0 &&
              bank.instruments[1].regions[0].sampleStartFrame == 56 && bank.instruments[1].explicitAddress->bank == 2,
          "F2 should select a sustain variant while retaining the full-sample instrument");

@@ -143,13 +143,13 @@ void prepareAkaoBank(BankPreparationContext& context, const AkaoSoundBankData& d
       }
     }
   }
-  if (!applyAkaoArticulations(context.bank, data.binding, articulations)) {
+  if (!applyAkaoArticulations(context.instruments, data.binding, articulations)) {
     context.fail("Akao retained instrument recipe does not match its structural bank");
   }
   if (data.version == AkaoPs1Version::Version1_0) {
     // FF7 controls reverb per track. A fixed SoundFont send would remain audible
     // even after C3 (Reverb Off) sets the MIDI reverb controller to zero.
-    for (auto& instrument : context.bank.instruments) instrument.reverb = 0.0;
+    for (auto& instrument : context.instruments) instrument.reverb = 0.0;
   }
 
   std::set<u32> missing;
@@ -173,7 +173,7 @@ void prepareAkaoBank(BankPreparationContext& context, const AkaoSoundBankData& d
   for (const auto& [id, articulation] : articulations) {
     preparedData.runtime.articulationEnvelopes.emplace(id, AkaoAdsr{articulation.adsr1, articulation.adsr2});
   }
-  context.bank.privateData = AssetPrivateData::make(std::move(preparedData));
+  context.privateData = AssetPrivateData::make(std::move(preparedData));
 }
 
 // Configure SequenceVm with articulation ADSR defaults from the prepared banks.

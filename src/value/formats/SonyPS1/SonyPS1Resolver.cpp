@@ -26,8 +26,8 @@ struct SamplePosition {
   u32 firstSample = 0;
 };
 
-[[nodiscard]] bool needsExternalSamples(const SoundBankAsset& bank) {
-  return std::ranges::any_of(bank.instruments, [](const Instrument& instrument) {
+[[nodiscard]] bool needsExternalSamples(std::span<const Instrument> instruments) {
+  return std::ranges::any_of(instruments, [](const Instrument& instrument) {
     return std::ranges::any_of(instrument.regions, [](const Region& region) { return region.sample.needsBinding(); });
   });
 }
@@ -68,7 +68,7 @@ struct SamplePosition {
 void applySampleBinding(BankPreparationContext& context, const SonyPs1BankLayout& layout, const SamplePoolAsset& pool,
                         u32 firstSample) {
   const auto& sizes = layout.sampleSizes;
-  for (auto& instrument : context.bank.instruments) {
+  for (auto& instrument : context.instruments) {
     for (auto& region : instrument.regions) {
       if (!region.sample.needsBinding()) {
         continue;
@@ -123,14 +123,14 @@ DependencySelection selectSonyPs1Samples(const DependencyContext& context) {
 }
 
 void prepareSonyPs1Bank(BankPreparationContext& context, const SonyPs1BankLayout& layout) {
-  for (auto& instrument : context.bank.instruments) {
+  for (auto& instrument : context.instruments) {
     const u32 program = instrument.explicitAddress ? instrument.explicitAddress->program
                         : instrument.identity      ? instrument.identity->key & 0xff
                                                    : 0;
     instrument.explicitAddress = InstrumentAddress{.bank = context.bankIndex, .program = program};
     instrument.identity = sonyPs1InstrumentIdentity(static_cast<u16>(context.bankIndex), static_cast<u8>(program));
   }
-  if (!needsExternalSamples(context.bank)) {
+  if (!needsExternalSamples(context.instruments)) {
     return;
   }
   const auto sample =

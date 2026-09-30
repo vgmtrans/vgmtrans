@@ -100,14 +100,15 @@ collections, or capture borrowed pointers in its result. Asset IDs and owned
 
 ## Preparation
 
-A bank's preparation hook receives its selected sample inputs and a private bank
-copy:
+A bank's preparation hook receives its selected sample inputs and direct access
+to this collection's `instruments`, `localSamples`, and `privateData`. `asset`
+refers to the read-only scanned bank, including its identity and original data:
 
 ```cpp
 void prepareBank(BankPreparationContext& context, const BankData& layout) {
   for (const auto& input : context.samples<SampleData>()) {
     // Resolve native sample indexes using input.asset, input.data,
-    // and input.placement, updating context.bank's regions.
+    // and input.placement, updating regions in context.instruments.
   }
 }
 ```
@@ -116,6 +117,11 @@ The hook belongs to the bank, so a Konami sequence can use a Sony bank without
 knowing how Sony prepares samples. `bankIndex` gives the bank's ordinal among
 selected banks of the same format. A shared sample pool can have different
 placements in each bank's inputs.
+
+The typed `layout` argument comes from the scanned bank. It remains valid if the
+callback replaces `context.privateData` with prepared information for sequence
+preparation. Recipes and preparation callbacks remain on the scanned asset;
+collection-local bank storage copies only metadata and contents.
 
 When a bank needs exactly one pool, `context.sample<SampleData>()` returns that
 input directly. It fails if the selection is empty, has multiple inputs, or lacks
@@ -131,8 +137,8 @@ std::optional<SequenceRuntime> prepareSequence(SequencePreparationContext& conte
   RuntimeConfig config;
   for (const auto& bank : context.banks<BankData>(kFormatName)) {
     appendPrograms(config, bank.data);
-    // bank.asset is this collection's prepared copy. Configure its instrument
-    // identities or preferred output addresses here when the sequence requires it.
+    // Configure bank.instruments and bank.localSamples for this sequence.
+    // bank.metadata and bank.data are read-only.
   }
   return sequenceRuntime(std::move(config));
 }
@@ -214,7 +220,7 @@ resolved member list to reconcile.
   block preparation. Missing or ambiguous requests remain
   inspectable; preparation and sample validation determine whether the selected
   assets can be used. MIDI can still be useful without a bank.
-- Preparation validates bank identity, sample references,
+- Preparation exposes bank identity read-only and validates sample references
   and resulting synth data. Failures publish no partially prepared collection.
   Durable assets and previous snapshots remain unchanged.
 
