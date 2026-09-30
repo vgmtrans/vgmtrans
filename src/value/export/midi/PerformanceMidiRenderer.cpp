@@ -247,13 +247,6 @@ struct SimulatedPitchLfoState {
   double semitones = 0.0;
 };
 
-[[nodiscard]] u16 wholeSemitonePitchBendRangeCents(u16 cents) {
-  constexpr u32 kMinimumRangeCents = 200;
-  constexpr u32 kMaximumWholeSemitoneRangeCents = 12'700;
-  const u32 clamped = std::clamp<u32>(cents, kMinimumRangeCents, kMaximumWholeSemitoneRangeCents);
-  return static_cast<u16>(((clamped + 99) / 100) * 100);
-}
-
 // Pitch layers are persistent and additive. Source wheels retain their
 // normalized values so a source range change can reinterpret them.
 class PitchBendLayers {
@@ -358,31 +351,39 @@ using MidiTimeline = std::vector<const MidiTrackEvent*>;
   return 1.0 / maximumGain;
 }
 
-// Pitch is resolved once, in musical units. Attacks delimit the intervals in
-// which MIDI sensitivity must stay fixed; ties do not start a new interval.
+// Pitch is resolved once, in musical units. Source sensitivity follows its own
+// timeline; attacks delimit lookahead for temporary MIDI range overrides.
 struct PitchSample {
   u64 tick;
   double semitones;
-  u16 minimumRangeCents;  // Source and instrument sensitivity remain lower bounds.
+  u16 sourceRangeCents;
   bool attack = false;
 };
 
 void encodePitch(std::span<const PitchSample> samples, MidiTrack& track, u8 channel) {
+  constexpr double roundoff = 1e-9;  // Adding pitch layers must not spuriously exceed an exact range boundary.
   std::optional<u16> previousRange;
   s16 previousBend = 0;
+  u16 overrideRange = 0;
   for (auto begin = samples.begin(); begin != samples.end();) {
     const auto end = std::find_if(std::next(begin), samples.end(), [](const auto& sample) { return sample.attack; });
-    double cents = 200.0;
+    double requiredSemitones = 0.0;
     for (auto sample = begin; sample != end; ++sample) {
-      cents = std::max({cents, static_cast<double>(sample->minimumRangeCents), std::abs(sample->semitones) * 100.0});
+      if (std::abs(sample->semitones) > sample->sourceRangeCents / 100.0 + roundoff) {
+        requiredSemitones = std::max(requiredSemitones, std::abs(sample->semitones));
+      }
     }
-    const u16 range =
-        wholeSemitonePitchBendRangeCents(static_cast<u16>(std::clamp(std::ceil(cents), 0.0, 12'700.0)));
-    if (previousRange != range) {
-      midi::appendRpn(track, begin->tick, channel, 0, 0, static_cast<u16>((range / 100) << 7));
-      previousRange = range;
-    }
+    // Expand only when the rendered pitch exceeds the source scale. Keep the
+    // override while it is needed; restore the source at an attack whose entire
+    // interval fits. Ties and release tails do not end an override.
+    overrideRange = requiredSemitones == 0.0 ? 0 : std::max(
+        overrideRange, static_cast<u16>(std::ceil(std::min(requiredSemitones, 127.0) - roundoff) * 100.0));
     for (auto sample = begin; sample != end; ++sample) {
+      const u16 range = std::max(sample->sourceRangeCents, overrideRange);
+      if (previousRange != range) {
+        midi::appendRpn(track, sample->tick, channel, 0, 0, static_cast<u16>(((range / 100) << 7) | (range % 100)));
+        previousRange = range;
+      }
       const s16 bend = midiPitchBend(sample->semitones, range);
       if (previousBend != bend) {
         track.events.push_back(midi::pitchBend(sample->tick, channel, bend));
@@ -802,16 +803,16 @@ private:
 
   void recordPitch(u64 tick, bool attack = false) {
     const double semitones = tuningSemitones + layeredPitchBendSemitones() + simulatedPitchLfoSemitones();
-    const u16 minimumRange = pitchBendContext.availableRangeCents();
-    pitchRequested |= semitones != 0.0 || minimumRange > 200;
+    const u16 sourceRange = std::min<u16>(pitchBendContext.rangeCents(), 12'700);
+    pitchRequested |= semitones != 0.0 || sourceRange != 200;
     // A tick has one final pitch, including any note reset or later source write.
     if (!pitchSamples.empty() && pitchSamples.back().tick == tick) {
       attack |= pitchSamples.back().attack;
       pitchSamples.pop_back();
     }
     if (attack || pitchSamples.empty() || pitchSamples.back().semitones != semitones ||
-        pitchSamples.back().minimumRangeCents != minimumRange) {
-      pitchSamples.push_back({tick, semitones, minimumRange, attack});
+        pitchSamples.back().sourceRangeCents != sourceRange) {
+      pitchSamples.push_back({tick, semitones, sourceRange, attack});
     }
   }
 

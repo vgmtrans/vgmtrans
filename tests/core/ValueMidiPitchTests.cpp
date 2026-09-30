@@ -21,6 +21,129 @@ using namespace vgmtrans::core;
 
 namespace {
 
+void midiPitchFollowsSourceSensitivityCommands() {
+  for (bool normalized : {false, true}) {
+    PerformanceTrack track{.id = TrackId{0}, .endTick = 12};
+    u64 order = 0;
+    u32 noteId = 0, automationId = 0;
+    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+    out.pitchBendRange(12);
+    out.pitchBend(PitchBendPerformanceEvent{
+        .semitones = 1.0, .normalizedWheelPosition = normalized ? std::optional{0.5} : std::nullopt});
+    const auto first = out.note(60, 1.0, 4);
+    out.at(2).pitchBendRange(1);
+    out.at(4).continueVoice(first, NotePerformanceEvent{.key = 60, .durationTicks = 4});
+    out.at(5).pitchBendRange(4);
+    out.at(8).note(64, 1.0, 4);
+    out.at(9).pitchBendRange(4);
+    out.at(10).pitchBendRange(2);
+    const auto midi = renderTestMidi({.tracks = {track}});
+    const auto& events = midi.tracks[0].events;
+    const std::vector<std::pair<u64, u16>> expected{{0, 1200}, {2, 100}, {5, 400}, {10, 200}};
+    expect(midiPitchBendRanges(events) == expected,
+           "source sensitivity changes must keep their ticks; notes, ties, and unused range must not change sensitivity");
+    for (const auto& [tick, range] : expected) {
+      expect(std::abs(midiPitchSemitonesAt(events, tick) - (normalized ? range / 200.0 : 1.0)) < 0.001,
+             "a source range change must reinterpret a normalized wheel and preserve an absolute semitone bend");
+    }
+    if (normalized) {
+      expect(std::ranges::count_if(events, [](const MidiEvent& event) {
+        return isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+      }) == 1, "following source sensitivity must preserve a persistent normalized wheel without rewriting it");
+    }
+  }
+}
+
+void midiPitchDoesNotAnticipateSourceSensitivity() {
+  for (bool hasAttack : {false, true}) {
+    PerformanceTrack track{.id = TrackId{0}, .endTick = 12};
+    u64 order = 0;
+    u32 noteId = 0, automationId = 0;
+    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+    out.pitchBend(PitchBendPerformanceEvent{.normalizedWheelPosition = 0.5});
+    out.at(4).pitchBendRange(12);
+    if (hasAttack) out.at(8).note(60, 1.0, 4);
+    const auto midi = renderTestMidi({.tracks = {track}});
+    expect(midiPitchBendRanges(midi.tracks[0].events) == std::vector<std::pair<u64, u16>>{{0, 200}, {4, 1200}},
+           "lookahead must not move source sensitivity earlier, including before the first attack or without notes");
+  }
+}
+
+void midiPitchFollowsInstrumentSensitivityAndSourceFallback() {
+  PerformanceTrack track{.id = TrackId{0}, .endTick = 10};
+  u64 order = 0;
+  u32 noteId = 0, automationId = 0;
+  PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+  out.pitchBendRange(12);
+  out.instrument(0, 0);
+  out.pitchBend(PitchBendPerformanceEvent{.normalizedWheelPosition = 0.5});
+  out.note(60, 1.0, 4);
+  out.at(2).instrument(0, 1);
+  out.at(3).pitchBendRange(6);
+  out.at(4).note(64, 1.0, 4);
+  out.at(6).instrument(0, 2);
+  const SoundBankAsset bank{.instruments = {
+      Instrument{.explicitAddress = InstrumentAddress{0, 0}, .pitchBendRangeCents = 400},
+      Instrument{.explicitAddress = InstrumentAddress{0, 1}, .pitchBendRangeCents = 100},
+      Instrument{.explicitAddress = InstrumentAddress{0, 2}}}};
+  const std::array<const SoundBankAsset*, 1> banks{&bank};
+  const auto midi = renderTestMidi({.tracks = {track}}, {}, ModulationConversionPolicy::SynthModulators, banks);
+  const auto& events = midi.tracks[0].events;
+  expect(midiPitchBendRanges(events) == std::vector<std::pair<u64, u16>>{{0, 400}, {2, 100}, {6, 600}},
+         "instrument sensitivity must take precedence, with the current source setting as fallback");
+  expect(std::abs(midiPitchSemitonesAt(events, 3) - 0.5) < 0.001 &&
+             std::abs(midiPitchSemitonesAt(events, 6) - 3.0) < 0.001,
+         "source changes beneath instrument sensitivity must take effect when the instrument stops overriding it");
+}
+
+void midiPitchPreservesSmallAndZeroSourceRanges() {
+  for (u16 cents : {0, 1, 30, 100, 235, 12700}) {
+    PerformanceTrack track{.id = TrackId{0}, .endTick = 4};
+    u64 order = 0;
+    u32 noteId = 0, automationId = 0;
+    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+    out.pitchBendRange(PitchBendRangePerformanceEvent{.cents = cents});
+    out.pitchBend(PitchBendPerformanceEvent{.normalizedWheelPosition = -1.0});
+    if (cents == 30) {
+      // Independent layers add to the exact source limit despite floating-point roundoff.
+      out.pitchBend(-0.1);
+      out.pitchBend(-0.2, PitchBendLayerId{1});
+    }
+    out.note(60, 1.0, 4);
+    const auto midi = renderTestMidi({.tracks = {track}});
+    expect(midiPitchBendRanges(midi.tracks[0].events) == std::vector<std::pair<u64, u16>>{{0, cents}},
+           "source sensitivities, including zero and fractions of a semitone, must not be rounded or raised");
+    expect(std::abs(midiPitchSemitonesAt(midi.tracks[0].events, 0) + cents / 100.0) < 1e-9,
+           "the negative wheel endpoint must retain its source pitch scale");
+  }
+}
+
+void midiPitchKeepsAnOverrideUntilTheSourceRangeSuffices() {
+  PerformanceTrack track{.id = TrackId{0}, .endTick = 12};
+  u64 order = 0;
+  u32 noteId = 0, automationId = 0;
+  PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+  out.pitchBendRange(2);
+  const auto first = out.note(60, 1.0, 4);
+  out.at(1).pitchSlide(first, 60, 72, 2);
+  out.at(4).note(67, 1.0, 4);
+  out.at(4).pitchBend(5.0, PitchBendLayerId{1});
+  out.at(5).pitchBend(PitchBendPerformanceEvent{.normalizedWheelPosition = 0.5});
+  out.at(6).pitchBendRange(1);
+  out.at(7).pitchBendRange(4);
+  out.at(8).pitchBend(0.0, PitchBendLayerId{1});
+  out.at(8).note(69, 1.0, 4);
+  const auto midi = renderTestMidi({.tracks = {track}}, {.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  const auto& events = midi.tracks[0].events;
+  expect(midiPitchBendRanges(events) == std::vector<std::pair<u64, u16>>{{0, 1200}, {8, 400}},
+         "a necessary override must not shrink while still needed, and must restore the current source range");
+  for (const auto& [tick, pitch] : std::vector<std::pair<u64, double>>{
+           {3, 12.0}, {4, 5.0}, {5, 6.0}, {6, 5.5}, {7, 7.0}, {8, 2.0}}) {
+    expect(std::abs(midiPitchSemitonesAt(events, tick) - pitch) < 0.002,
+           "an override must cover the held slide destination and preserve source interpretation beneath it");
+  }
+}
+
 void midiModulationIgnoresConsumedCommands() {
   PerformanceTrack track{.id = TrackId{0}, .endTick = 4};
   u64 order = 0;
@@ -899,7 +1022,7 @@ void performanceMidiRendererSizesRangeFromActualVibratoSamples() {
          "frozen vibrato and an oscillator whose first sample is zero should not reserve unrendered depth");
 }
 
-void performanceMidiRendererUsesWholeSemitonePitchBendRanges() {
+void performanceMidiRendererPreservesFractionalPitchBendRanges() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {PerformanceTrack{
@@ -922,14 +1045,14 @@ void performanceMidiRendererUsesWholeSemitonePitchBendRanges() {
 
   const MidiSequence midi = renderTestMidi(performance);
   const auto& events = midi.tracks[0].events;
-  expect(midiPitchBendRanges(events) == std::vector<std::pair<u64, u16>>{{0, 300}},
-         "MIDI renderer should round pitch-bend ranges upward to whole semitones");
+  expect(midiPitchBendRanges(events) == std::vector<std::pair<u64, u16>>{{0, 235}},
+         "MIDI renderer should preserve source sensitivity in both the semitone and cents data bytes");
   expect(std::ranges::any_of(events,
                              [](const MidiEvent& event) {
                                const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
-                               return bend != nullptr && bend->value == 4369;
+                               return bend != nullptr && bend->value == 5578;
                              }),
-         "MIDI renderer should quantize pitch bends using the emitted whole-semitone range");
+         "MIDI renderer should quantize pitch bends using the emitted fractional range");
 }
 
 void performanceMidiRendererPlansRangesAtPhysicalAttacks() {
@@ -1270,11 +1393,11 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
   const auto hasRange = [&](u64 tick, u16 cents) {
     return std::ranges::find(ranges, std::pair{tick, cents}) != ranges.end();
   };
-  expect(hasRange(0, 1200) && !hasRange(6, 800) && hasRange(8, 600) &&
+  expect(hasRange(0, 1200) && hasRange(6, 800) && hasRange(8, 600) &&
              std::abs(midiPitchSemitonesAt(midi.tracks[0].events, 4) - 4.25) < 0.002 &&
              std::abs(midiPitchSemitonesAt(midi.tracks[0].events, 6) - 3.75) < 0.002 &&
              std::abs(midiPitchSemitonesAt(midi.tracks[0].events, 8) + 0.25) < 0.002,
-         "a held transition must keep stable sensitivity and combine with source bends until the next attack");
+         "a slide within the source range must follow source sensitivity changes without an override");
 
   PerformanceTrack delayedTransitionTrack{
       .id = TrackId{1},
@@ -1749,6 +1872,11 @@ void performanceMidiRendererSkipsRedundantPitchBends() {
 }  // namespace
 
 void runValueMidiPitchTests() {
+  midiPitchFollowsSourceSensitivityCommands();
+  midiPitchDoesNotAnticipateSourceSensitivity();
+  midiPitchFollowsInstrumentSensitivityAndSourceFallback();
+  midiPitchPreservesSmallAndZeroSourceRanges();
+  midiPitchKeepsAnOverrideUntilTheSourceRangeSuffices();
   midiModulationIgnoresConsumedCommands();
   midiModulationRetainsTheSourceTimelineExtent();
   midiPitchUsesCompletedSamplesForStableSensitivity();
@@ -1769,7 +1897,7 @@ void runValueMidiPitchTests() {
   performanceMidiRendererAddsIndependentPitchLfosWithoutRestartingChannelPhase();
   performanceMidiRendererSimulatesDeterministicSampleAndHoldNoise();
   performanceMidiRendererSizesRangeFromActualVibratoSamples();
-  performanceMidiRendererUsesWholeSemitonePitchBendRanges();
+  performanceMidiRendererPreservesFractionalPitchBendRanges();
   performanceMidiRendererPlansRangesAtPhysicalAttacks();
   performanceMidiRendererDoesNotRestartVibratoAtAHeldPitchSlideBoundary();
   performanceMidiRendererPreservesExactSamplesAndChainedPitchContinuity();

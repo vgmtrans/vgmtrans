@@ -8,7 +8,6 @@
 
 #include "value/export/ResolvedPerformance.h"
 
-#include <algorithm>
 #include <optional>
 
 namespace vgmtrans::core {
@@ -39,10 +38,8 @@ class PerformancePitchBendContext {
   void setSourceRangeCents(u16 cents) noexcept { sourceRangeCents_ = cents; }
   void setInstrumentRangeCents(std::optional<u16> cents) noexcept { instrumentRangeCents_ = cents; }
 
-  [[nodiscard]] u16 sourceRangeCents() const noexcept { return sourceRangeCents_; }
-  [[nodiscard]] std::optional<u16> instrumentRangeCents() const noexcept { return instrumentRangeCents_; }
-  [[nodiscard]] u16 availableRangeCents() const noexcept {
-    return std::max(sourceRangeCents_, instrumentRangeCents_.value_or(static_cast<u16>(0)));
+  [[nodiscard]] u16 rangeCents() const noexcept {
+    return instrumentRangeCents_.value_or(sourceRangeCents_);
   }
   [[nodiscard]] double semitones(const PitchBendPerformanceEvent& bend) const noexcept {
     return effectivePitchBendSemitones(bend, sourceRangeCents_, instrumentRangeCents_);
