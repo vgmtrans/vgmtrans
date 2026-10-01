@@ -23,10 +23,9 @@ namespace {
 
 void midiPitchFollowsSourceSensitivityCommands() {
   for (bool normalized : {false, true}) {
-    PerformanceTrack track{.id = TrackId{0}, .endTick = 12};
-    u64 order = 0;
-    u32 noteId = 0, automationId = 0;
-    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+    PerformanceTrackFixture fixture{12};
+    auto& track = fixture.track;
+    auto& out = fixture.out;
     out.pitchBendRange(12);
     out.pitchBend(PitchBendPerformanceEvent{
         .semitones = 1.0, .normalizedWheelPosition = normalized ? std::optional{0.5} : std::nullopt});
@@ -56,10 +55,9 @@ void midiPitchFollowsSourceSensitivityCommands() {
 
 void midiPitchDoesNotAnticipateSourceSensitivity() {
   for (bool hasAttack : {false, true}) {
-    PerformanceTrack track{.id = TrackId{0}, .endTick = 12};
-    u64 order = 0;
-    u32 noteId = 0, automationId = 0;
-    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+    PerformanceTrackFixture fixture{12};
+    auto& track = fixture.track;
+    auto& out = fixture.out;
     out.pitchBend(PitchBendPerformanceEvent{.normalizedWheelPosition = 0.5});
     out.at(4).pitchBendRange(12);
     if (hasAttack) out.at(8).note(60, 1.0, 4);
@@ -70,10 +68,9 @@ void midiPitchDoesNotAnticipateSourceSensitivity() {
 }
 
 void midiPitchFollowsInstrumentSensitivityAndSourceFallback() {
-  PerformanceTrack track{.id = TrackId{0}, .endTick = 10};
-  u64 order = 0;
-  u32 noteId = 0, automationId = 0;
-  PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+  PerformanceTrackFixture fixture{10};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   out.pitchBendRange(12);
   out.instrument(0, 0);
   out.pitchBend(PitchBendPerformanceEvent{.normalizedWheelPosition = 0.5});
@@ -98,10 +95,9 @@ void midiPitchFollowsInstrumentSensitivityAndSourceFallback() {
 
 void midiPitchPreservesSmallAndZeroSourceRanges() {
   for (u16 cents : {0, 1, 30, 100, 235, 12700}) {
-    PerformanceTrack track{.id = TrackId{0}, .endTick = 4};
-    u64 order = 0;
-    u32 noteId = 0, automationId = 0;
-    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+    PerformanceTrackFixture fixture{4};
+    auto& track = fixture.track;
+    auto& out = fixture.out;
     out.pitchBendRange(PitchBendRangePerformanceEvent{.cents = cents});
     out.pitchBend(PitchBendPerformanceEvent{.normalizedWheelPosition = -1.0});
     if (cents == 30) {
@@ -119,10 +115,9 @@ void midiPitchPreservesSmallAndZeroSourceRanges() {
 }
 
 void midiPitchKeepsAnOverrideUntilTheSourceRangeSuffices() {
-  PerformanceTrack track{.id = TrackId{0}, .endTick = 12};
-  u64 order = 0;
-  u32 noteId = 0, automationId = 0;
-  PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+  PerformanceTrackFixture fixture{12};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   out.pitchBendRange(2);
   const auto first = out.note(60, 1.0, 4);
   out.at(1).pitchSlide(first, 60, 72, 2);
@@ -145,10 +140,9 @@ void midiPitchKeepsAnOverrideUntilTheSourceRangeSuffices() {
 }
 
 void midiModulationIgnoresConsumedCommands() {
-  PerformanceTrack track{.id = TrackId{0}, .endTick = 4};
-  u64 order = 0;
-  u32 noteId = 0, automationId = 0;
-  PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+  PerformanceTrackFixture fixture{4};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   out.vibratoRateCyclesPerTick(0.25, {.shape = LfoShape{.samples = {0, 1, 0, -1}}});
   out.vibratoDepth(1.0);
   out.tremoloRateCyclesPerTick(0.25);
@@ -180,10 +174,8 @@ void midiModulationIgnoresConsumedCommands() {
     }
     const auto prepared = preparePerformance({.tracks = {input}}, {}, {.dynamicEnvelopes = false});
     const auto midi = renderMidiSequence(prepared, {}, ModulationConversionPolicy::SequenceEventSimulation);
+    pitches[variant] = midiPitchBends(midi.tracks[0].events);
     for (const auto& event : midi.tracks[0].events) {
-      if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend)) {
-        pitches[variant].emplace_back(event.tick, bend->value);
-      }
       if (const auto* control = midiChannelMessage(event, MidiChannelMessageKind::ControlChange);
           control && (control->parameter == 10 || control->parameter == 11)) {
         controllers[variant].emplace_back(event.tick, control->parameter, control->value);
@@ -199,10 +191,9 @@ void midiModulationIgnoresConsumedCommands() {
 void midiModulationRetainsTheSourceTimelineExtent() {
   std::array<std::vector<std::pair<u64, s32>>, 3> pitches;
   for (size_t variant = 0; variant < pitches.size(); ++variant) {
-    PerformanceTrack track{.id = TrackId{0}, .endTick = variant == 0 ? 8u : 4u};
-    u64 order = 0;
-    u32 noteId = 0, automationId = 0;
-    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+    PerformanceTrackFixture fixture{variant == 0 ? 8u : 4u};
+    auto& track = fixture.track;
+    auto& out = fixture.out;
     out.vibratoRateCyclesPerTick(0.25, {.shape = LfoShape{.samples = {0, 1, 0, -1}}});
     out.vibratoDepth(1.0);
     out.note(60, 1.0, 4);
@@ -210,11 +201,7 @@ void midiModulationRetainsTheSourceTimelineExtent() {
     if (variant == 2) out.at(8).updateEnvelope(Envelope{.attackSeconds = 0.1}, EnvelopeFields::Attack);
     const auto prepared = preparePerformance({.tracks = {track}}, {}, {.dynamicEnvelopes = false});
     const auto midi = renderMidiSequence(prepared, {}, ModulationConversionPolicy::SequenceEventSimulation);
-    for (const auto& event : midi.tracks[0].events) {
-      if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend)) {
-        pitches[variant].emplace_back(event.tick, bend->value);
-      }
-    }
+    pitches[variant] = midiPitchBends(midi.tracks[0].events);
     expect(std::abs(midiPitchSemitonesAt(midi.tracks[0].events, 8) + 1.0) < 0.001,
            "modulation must continue through the last source command, including the release tail");
   }
@@ -223,10 +210,9 @@ void midiModulationRetainsTheSourceTimelineExtent() {
 }
 
 void midiPitchUsesCompletedSamplesForStableSensitivity() {
-  PerformanceTrack track{.id = TrackId{0}, .endTick = 10};
-  u64 order = 0;
-  u32 noteId = 0, automationId = 0;
-  PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+  PerformanceTrackFixture fixture{10};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   out.pitchBend(1.0);
   out.tuning(50.0);
   out.vibratoRateCyclesPerTick(0.25, {.shape = LfoShape{.samples = {0, 1, 0, -1}}});
@@ -249,10 +235,9 @@ void midiPitchUsesCompletedSamplesForStableSensitivity() {
 
 void midiPitchMeasuresCombinedAndAsymmetricLfoSamples() {
   for (bool cancel : {false, true}) {
-    PerformanceTrack track{.id = TrackId{0}, .endTick = 4};
-    u64 order = 0;
-    u32 noteId = 0, automationId = 0;
-    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+    PerformanceTrackFixture fixture{4};
+    auto& track = fixture.track;
+    auto& out = fixture.out;
     out.pitchBend(1.5);
     out.vibratoDepth(0.5, {.cyclesPerTick = 0.25,
                           .shape = LfoShape{.samples = {0, 1, 0, -1}},
@@ -276,10 +261,9 @@ void midiPitchMeasuresCombinedAndAsymmetricLfoSamples() {
 }
 
 void midiNotePlanningResolvesAttacksBeforeRendering() {
-  PerformanceTrack track{.id = TrackId{0}, .endTick = 28};
-  u64 order = 0;
-  u32 noteId = 0, automationId = 0;
-  PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+  PerformanceTrackFixture fixture{28};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   const auto first = out.note(NotePerformanceEvent{
       .key = 60, .durationTicks = 4, .maximumDurationMilliseconds = 950.0});
   out.at(4).continueVoice(first, NotePerformanceEvent{
@@ -301,6 +285,7 @@ void midiNotePlanningResolvesAttacksBeforeRendering() {
   }
   const std::array<bool, 7> hasAttack{true, false, true, false, true, false, false};
   const std::array<u64, 7> ticks{0, 4, 5, 8, 12, 16, 20};
+  expect(notes.size() == ticks.size(), "planning must retain every source note boundary");
   for (size_t index = 0; index < notes.size(); ++index) {
     expect(notes[index]->attack.has_value() == hasAttack[index] && notes[index]->header.tick == ticks[index] &&
                notes[index]->expired == (index == 6),
@@ -356,10 +341,9 @@ void midiNotePlanningDoesNotWrapLongExtensions() {
 }
 
 void midiNotePlanningKeepsReleasePitchPastExpiredContinuations() {
-  PerformanceTrack track{.id = TrackId{0}, .endTick = 14};
-  u64 order = 0;
-  u32 noteId = 0, automationId = 0;
-  PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+  PerformanceTrackFixture fixture{14};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   const auto first = out.note(NotePerformanceEvent{
       .key = 60, .durationTicks = 4, .maximumDurationMilliseconds = 100.0});
   out.pitchSlide(first, 60, 64, 4).preferPitchBend();
@@ -386,16 +370,9 @@ void midiNotePlanningKeepsReleasePitchPastExpiredContinuations() {
 }
 
 void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
-  PerformanceTrack track{
-      .id = TrackId{0},
-      .sourceTrackNumber = 0,
-      .endTick = 8,
-  };
-  u64 nextSequence = 0;
-  u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,         {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence, nextNote,
-                         nextAutomation};
+  PerformanceTrackFixture fixture{8};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   out.tempo(1'000'000);
   const PerformanceNoteId note = out.note(NotePerformanceEvent{
       .key = 64,
@@ -510,10 +487,9 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
 
 void sourceVoiceKeyChangesNeedNoPitchBinding() {
   for (bool nativeGlide : {false, true}) {
-    PerformanceTrack track{.id = TrackId{0}, .endTick = 16};
-    u64 order = 0;
-    u32 noteId = 0, automationId = 0;
-    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{1}, 0, order, noteId, automationId};
+    PerformanceTrackFixture fixture{16};
+    auto& track = fixture.track;
+    auto& out = fixture.out;
     const auto first = out.note(60, 1.0, 4);
     const auto second = out.at(4).continueVoice(first, NotePerformanceEvent{.key = 64, .durationTicks = 4});
     if (nativeGlide) {
@@ -553,10 +529,9 @@ void sourceVoiceKeyChangesNeedNoPitchBinding() {
 }
 
 void sourceKeyChangeUsesRealizedPitchWithPortamento() {
-  PerformanceTrack track{.id = TrackId{0}, .endTick = 8};
-  u64 order = 0;
-  u32 noteId = 0, automationId = 0;
-  PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{1}, 0, order, noteId, automationId};
+  PerformanceTrackFixture fixture{8};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   const auto first = out.note(60, 1.0, 4);
   out.pitchSlide(first, 60, 64, 8).preferPitchBend();
   out.at(4).continueVoice(first, NotePerformanceEvent{.key = 67, .durationTicks = 4});
@@ -572,16 +547,9 @@ void sourceKeyChangeUsesRealizedPitchWithPortamento() {
 }
 
 void performanceMidiRendererAllowsMixedPitchTransitionRendering() {
-  PerformanceTrack track{
-      .id = TrackId{0},
-      .sourceTrackNumber = 0,
-      .endTick = 12,
-  };
-  u64 nextSequence = 0;
-  u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,         {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence, nextNote,
-                         nextAutomation};
+  PerformanceTrackFixture fixture{12};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   const PerformanceNoteId first = out.note(60, 1.0, 4);
   const PerformanceNoteId second = out.at(4).continueVoice(first, NotePerformanceEvent{.key = 64, .durationTicks = 4});
   out.at(4).pitchSlide(second, 60, 64, 4).preferPortamento();
@@ -642,16 +610,9 @@ void performanceMidiRendererAllowsMixedPitchTransitionRendering() {
 }
 
 void performanceMidiRendererRetainsHeldVoiceAcrossChainedPitchBends() {
-  PerformanceTrack track{
-      .id = TrackId{0},
-      .sourceTrackNumber = 0,
-      .endTick = 16,
-  };
-  u64 nextSequence = 0;
-  u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,         {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence, nextNote,
-                         nextAutomation};
+  PerformanceTrackFixture fixture{16};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   const PerformanceNoteId first = out.note(60, 1.0, 4);
   out.pitchSlide(first, 56, 60, 8);
   const PerformanceNoteId second = out.at(4).continueVoice(first, NotePerformanceEvent{.key = 62, .durationTicks = 4});
@@ -675,27 +636,16 @@ void performanceMidiRendererRetainsHeldVoiceAcrossChainedPitchBends() {
   const auto ranges = midiPitchBendRanges(midi.tracks[0].events);
   expect(ranges == std::vector<std::pair<u64, u16>>{{0, 700}},
          "one linked MIDI voice should keep a stable range large enough for its entire pitch path");
-  const auto hasMidiBend = [&](u64 tick, s16 value) {
-    return std::ranges::any_of(midi.tracks[0].events, [&](const MidiEvent& event) {
-      const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
-      return bend != nullptr && event.tick == tick && bend->value == value;
-    });
-  };
-  expect(hasMidiBend(8, 2341) && hasMidiBend(12, 4681) && hasMidiBend(16, 8191),
+  expect(midiPitchBendAt(midi.tracks[0].events, 8) == 2341 &&
+             midiPitchBendAt(midi.tracks[0].events, 12) == 4681 &&
+             midiPitchBendAt(midi.tracks[0].events, 16) == 8191,
          "chained transitions should honor each absolute start key without retuning the held voice's bend range");
 }
 
 void performanceMidiRendererHonorsRequiredPortamento() {
-  PerformanceTrack track{
-      .id = TrackId{0},
-      .sourceTrackNumber = 0,
-      .endTick = 8,
-  };
-  u64 nextSequence = 0;
-  u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,         {track.id, CommandId{3}}, SourceAnnotationId{4}, 0, nextSequence, nextNote,
-                         nextAutomation};
+  PerformanceTrackFixture fixture{8};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   out.portamentoEnable(true);
   out.note(60, 1.0, 8);
   const PerformanceNoteId destination = out.at(4).note(64, 1.0, 4);
@@ -729,16 +679,9 @@ void performanceMidiRendererHonorsRequiredPortamento() {
 }
 
 void performanceMidiRendererStartsANewVoiceAfterPitchBendContinuationWhenMidiPortamentoTakesOver() {
-  PerformanceTrack track{
-      .id = TrackId{0},
-      .sourceTrackNumber = 0,
-      .endTick = 12,
-  };
-  u64 nextSequence = 0;
-  u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,         {track.id, CommandId{5}}, SourceAnnotationId{6}, 0, nextSequence, nextNote,
-                         nextAutomation};
+  PerformanceTrackFixture fixture{12};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   const PerformanceNoteId first = out.note(60, 1.0, 4);
   const PerformanceNoteId second = out.at(4).continueVoice(first, NotePerformanceEvent{.key = 64, .durationTicks = 4});
   out.at(4).pitchSlide(second, 60, 64, 3).preferPitchBend();
@@ -763,16 +706,9 @@ void performanceMidiRendererStartsANewVoiceAfterPitchBendContinuationWhenMidiPor
 }
 
 void performanceMidiRendererResetsHeldPitchBeforeMidiPortamentoTakesOver() {
-  PerformanceTrack track{
-      .id = TrackId{0},
-      .sourceTrackNumber = 0,
-      .endTick = 12,
-  };
-  u64 nextSequence = 0;
-  u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,         {track.id, CommandId{7}}, SourceAnnotationId{8}, 0, nextSequence, nextNote,
-                         nextAutomation};
+  PerformanceTrackFixture fixture{12};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   const PerformanceNoteId first = out.note(60, 1.0, 4);
   const PerformanceNoteId second = out.at(4).continueVoice(first, NotePerformanceEvent{.key = 64, .durationTicks = 8});
   out.at(4).pitchSlide(second, 60, 64, 4).preferPitchBend();
@@ -784,28 +720,14 @@ void performanceMidiRendererResetsHeldPitchBeforeMidiPortamentoTakesOver() {
           .tracks = {track},
       },
       MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PreserveFormat});
-  std::optional<s16> finalBendAtTakeover;
-  for (const auto& event : midi.tracks[0].events) {
-    const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
-    if (bend != nullptr && event.tick == 8) {
-      finalBendAtTakeover = bend->value;
-    }
-  }
-  expect(finalBendAtTakeover == 0,
+  expect(midiPitchBendAt(midi.tracks[0].events, 8) == 0,
          "MIDI portamento replacing a held pitch bend should receive an untransposed destination note");
 }
 
 void performanceMidiRendererCombinesPitchSlidesWithSimulatedVibrato() {
-  PerformanceTrack track{
-      .id = TrackId{0},
-      .sourceTrackNumber = 0,
-      .endTick = 8,
-  };
-  u64 nextSequence = 0;
-  u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,         {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence, nextNote,
-                         nextAutomation};
+  PerformanceTrackFixture fixture{8};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   out.tempo(1'000'000);
   out.modulation(ModulationPerformanceEvent{
       .target = ModulationPerformanceTarget::VibratoRate,
@@ -828,239 +750,75 @@ void performanceMidiRendererCombinesPitchSlidesWithSimulatedVibrato() {
   const MidiSequence simulated =
       renderTestMidi(performance, {}, ModulationConversionPolicy::SequenceEventSimulation);
 
-  const auto lastPitchBendAt = [](const MidiSequence& midi, u64 tick) -> std::optional<s16> {
-    std::optional<s16> result;
-    for (const auto& event : midi.tracks[0].events) {
-      const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
-      if (bend != nullptr && event.tick == tick) {
-        result = bend->value;
-      }
-    }
-    return result;
-  };
 
-  expect(lastPitchBendAt(synthModulators, 2) == -4096,
+  expect(midiPitchBendAt(synthModulators.tracks[0].events, 2) == -4096,
          "synth-modulator export should retain the slide's unmodulated pitch bend");
-  expect(lastPitchBendAt(simulated, 2) == -3072,
+  expect(midiPitchBendAt(simulated.tracks[0].events, 2) == -3072,
          "sequence-event export should add simulated vibrato around the active pitch slide");
 }
 
 void performanceMidiRendererAddsIndependentPitchLfosWithoutRestartingChannelPhase() {
-  constexpr PitchBendLayerId channelLayer{1};
-  constexpr PitchBendLayerId voiceLayer{2};
-  const auto context = [](double phase, bool restartsOnNote) {
-    return LfoPerformanceContext{
-        .cyclesPerTick = 0.25,
-        .shape = LfoShape{.waveform = LfoWaveform::Triangle},
-        .initialPhaseCycles = phase,
-        .noteRestartInitialPhaseCycles = phase,
-        .restartMode = LfoRestartMode::None,
-        .restartsOnNote = restartsOnNote,
-    };
-  };
-  const PerformanceSequence performance{
-      .timebase = Timebase{.ppqn = 100},
-      .tracks = {PerformanceTrack{
-          .id = TrackId{0},
-          .sourceTrackNumber = 0,
-          .endTick = 6,
-          .events =
-              {
-                  ModulationPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 0, .sequence = 0},
-                      .target = ModulationPerformanceTarget::VibratoRate,
-                      .pitchLayer = channelLayer,
-                      .context = context(0.5, false),
-                  },
-                  ModulationPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 0, .sequence = 1},
-                      .target = ModulationPerformanceTarget::VibratoDepth,
-                      .pitchLayer = channelLayer,
-                      .pitchDepthSemitones = 1.0,
-                      .context = context(0.5, false),
-                  },
-                  ModulationPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 0, .sequence = 2},
-                      .target = ModulationPerformanceTarget::VibratoRate,
-                      .pitchLayer = voiceLayer,
-                      .context = context(0.0, true),
-                  },
-                  ModulationPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 0, .sequence = 3},
-                      .target = ModulationPerformanceTarget::VibratoDepth,
-                      .pitchLayer = voiceLayer,
-                      .pitchDepthSemitones = 0.5,
-                      .context = context(0.0, true),
-                  },
-                  NotePerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 0, .sequence = 4},
-                      .key = 60,
-                      .durationTicks = 2,
-                  },
-                  NotePerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 2, .sequence = 5},
-                      .key = 62,
-                      .durationTicks = 4,
-                  },
-              },
-      }},
-  };
-  const MidiSequence midi = renderTestMidi(performance, {}, ModulationConversionPolicy::SynthModulators);
-  const auto lastPitchBendAt = [&](u64 tick) -> std::optional<s16> {
-    std::optional<s16> result;
-    for (const auto& event : midi.tracks.front().events) {
-      if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
-          bend != nullptr && event.tick == tick) {
-        result = bend->value;
-      }
-    }
-    return result;
-  };
-  expect(lastPitchBendAt(2) == -4096,
+  PerformanceTrackFixture fixture{6};
+  auto& out = fixture.out;
+  out.vibratoDepth(1.0, {.cyclesPerTick = 0.25, .shape = LfoShape{.waveform = LfoWaveform::Triangle},
+                         .initialPhaseCycles = 0.5, .noteRestartInitialPhaseCycles = 0.5,
+                         .restartMode = LfoRestartMode::None, .restartsOnNote = false}, PitchBendLayerId{1});
+  out.vibratoDepth(0.5, {.cyclesPerTick = 0.25, .shape = LfoShape{.waveform = LfoWaveform::Triangle},
+                         .initialPhaseCycles = 0.0, .noteRestartInitialPhaseCycles = 0.0,
+                         .restartMode = LfoRestartMode::None, .restartsOnNote = true}, PitchBendLayerId{2});
+  out.note(60, 1.0, 2);
+  out.at(2).note(62, 1.0, 4);
+  const auto midi = renderTestMidi({.timebase = {.ppqn = 100}, .tracks = {fixture.track}});
+  const auto& events = midi.tracks[0].events;
+  expect(midiPitchBendAt(events, 2) == -4096,
          "a fresh note should restart only the voice LFO while preserving the additive channel LFO phase");
-  const auto combined = lastPitchBendAt(4);
-  expect(combined == 6144,
-         "independent pitch LFO layers should add before conversion to the shared MIDI pitch wheel (observed " +
-             (combined ? std::to_string(*combined) : std::string("none")) + ")");
+  expect(midiPitchBendAt(events, 4) == 6144,
+         "independent pitch LFO layers should add before conversion to the shared MIDI pitch wheel");
 }
 
 void performanceMidiRendererSimulatesDeterministicSampleAndHoldNoise() {
-  constexpr PitchBendLayerId noiseLayer{2};
-  const auto context = LfoPerformanceContext{
-      .cyclesPerTick = 0.5,
-      .shape = LfoShape{.waveform = LfoWaveform::Noise},
-      .initialPhaseCycles = 0.0,
-      .restartMode = LfoRestartMode::None,
-      .restartsOnNote = true,
-      .phaseRunsAtZeroDepth = true,
-  };
-  const PerformanceSequence performance{
-      .timebase = Timebase{.ppqn = 100},
-      .tracks = {PerformanceTrack{
-          .id = TrackId{0},
-          .sourceTrackNumber = 0,
-          .endTick = 4,
-          .events =
-              {
-                  ModulationPerformanceEvent{
-                      .header = PerformanceEventHeader{.sequence = 0},
-                      .target = ModulationPerformanceTarget::VibratoRate,
-                      .pitchLayer = noiseLayer,
-                      .context = context,
-                  },
-                  ModulationPerformanceEvent{
-                      .header = PerformanceEventHeader{.sequence = 1},
-                      .target = ModulationPerformanceTarget::VibratoDepth,
-                      .pitchLayer = noiseLayer,
-                      .pitchDepthSemitones = 3.0,
-                      .context = context,
-                  },
-                  NotePerformanceEvent{
-                      .header = PerformanceEventHeader{.sequence = 2},
-                      .key = 60,
-                      .durationTicks = 4,
-                  },
-              },
-      }},
-  };
-  const MidiSequence midi = renderTestMidi(performance, {}, ModulationConversionPolicy::SynthModulators);
-  const auto nonzero = std::ranges::find_if(midi.tracks.front().events, [](const MidiEvent& event) {
-    const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
-    return bend != nullptr && bend->value != 0;
-  });
-  const auto ranges = midiPitchBendRanges(midi.tracks.front().events);
-  expect(nonzero != midi.tracks.front().events.end() && nonzero->tick == 3 &&
-             ranges == std::vector<std::pair<u64, u16>>{{0, 200}},
-         "noise modulation should size sensitivity from rendered samples, hold zero through the first cycle, then hold a reproducible sample"
-         " (ranges=" +
-             std::to_string(ranges.size()) +
-             ", first=" + (ranges.empty() ? std::string("none") : std::to_string(ranges.front().second)) + ")");
+  PerformanceTrackFixture fixture{4};
+  fixture.out.vibratoDepth(3.0, {.cyclesPerTick = 0.5, .shape = LfoShape{.waveform = LfoWaveform::Noise},
+                                .initialPhaseCycles = 0.0, .restartMode = LfoRestartMode::None,
+                                .restartsOnNote = true, .phaseRunsAtZeroDepth = true}, PitchBendLayerId{2});
+  fixture.out.note(60, 1.0, 4);
+  const auto midi = renderTestMidi({.timebase = {.ppqn = 100}, .tracks = {fixture.track}});
+  const auto bends = midiPitchBends(midi.tracks[0].events);
+  const auto nonzero = std::ranges::find_if(bends, [](const auto& bend) { return bend.second != 0; });
+  expect(nonzero != bends.end() && nonzero->first == 3 &&
+             midiPitchBendRanges(midi.tracks[0].events) == std::vector<std::pair<u64, u16>>{{0, 200}},
+         "noise should hold zero through its first cycle and size sensitivity from actual samples");
 }
 
 void performanceMidiRendererSizesRangeFromActualVibratoSamples() {
-  const PerformanceSequence performance{
-      .timebase = Timebase{.ppqn = 100},
-      .tracks = {PerformanceTrack{
-          .id = TrackId{0},
-          .sourceTrackNumber = 0,
-          .endTick = 3,
-          .events =
-              {
-                  PitchBendRangePerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 0},
-                      .cents = 200,
-                  },
-                  ModulationPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 0},
-                      .target = ModulationPerformanceTarget::VibratoRate,
-                      .context = LfoPerformanceContext{.frequencyHz = 0.0},
-                  },
-                  ModulationPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 0},
-                      .target = ModulationPerformanceTarget::VibratoDepth,
-                      .pitchDepthSemitones = 0.75,
-                  },
-                  PitchBendPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 1},
-                      .semitones = 2.0,
-                  },
-                  ModulationPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 2},
-                      .target = ModulationPerformanceTarget::VibratoRate,
-                      .context = LfoPerformanceContext{.frequencyHz = 1.0},
-                  },
-              },
-      }},
-  };
-
-  const MidiSequence midi =
-      renderTestMidi(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
-  const auto pitchBendRanges = midiPitchBendRanges(midi.tracks[0].events);
-
-  const std::vector<std::pair<u64, u16>> expectedPitchBendRanges{{0, 200}};
-  expect(pitchBendRanges == expectedPitchBendRanges,
+  PerformanceTrackFixture fixture{3};
+  auto& out = fixture.out;
+  out.pitchBendRange(2);
+  out.vibratoRate(0.0);
+  out.vibratoDepth(0.75);
+  out.at(1).pitchBend(2.0);
+  out.at(2).vibratoRate(1.0);
+  const auto midi = renderTestMidi({.timebase = {.ppqn = 100}, .tracks = {fixture.track}}, {},
+                                  ModulationConversionPolicy::SequenceEventSimulation);
+  expect(midiPitchBendRanges(midi.tracks[0].events) == std::vector<std::pair<u64, u16>>{{0, 200}},
          "frozen vibrato and an oscillator whose first sample is zero should not reserve unrendered depth");
 }
 
 void performanceMidiRendererPreservesFractionalPitchBendRanges() {
-  const PerformanceSequence performance{
-      .timebase = Timebase{.ppqn = 48},
-      .tracks = {PerformanceTrack{
-          .id = TrackId{0},
-          .sourceTrackNumber = 0,
-          .endTick = 1,
-          .events =
-              {
-                  PitchBendRangePerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 0},
-                      .cents = 235,
-                  },
-                  PitchBendPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 0},
-                      .semitones = 1.6,
-                  },
-              },
-      }},
-  };
-
-  const MidiSequence midi = renderTestMidi(performance);
-  const auto& events = midi.tracks[0].events;
-  expect(midiPitchBendRanges(events) == std::vector<std::pair<u64, u16>>{{0, 235}},
-         "MIDI renderer should preserve source sensitivity in both the semitone and cents data bytes");
-  expect(std::ranges::any_of(events,
-                             [](const MidiEvent& event) {
-                               const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
-                               return bend != nullptr && bend->value == 5578;
-                             }),
-         "MIDI renderer should quantize pitch bends using the emitted fractional range");
+  PerformanceTrackFixture fixture{1};
+  fixture.out.pitchBendRange(PitchBendRangePerformanceEvent{.cents = 235});
+  fixture.out.pitchBend(1.6);
+  const auto midi = renderTestMidi({.tracks = {fixture.track}});
+  expect(midiPitchBendRanges(midi.tracks[0].events) == std::vector<std::pair<u64, u16>>{{0, 235}} &&
+             midiPitchBendAt(midi.tracks[0].events, 0) == 5578,
+         "fractional sensitivity must retain its cents byte and scale an absolute semitone bend correctly");
 }
 
 void performanceMidiRendererPlansRangesAtPhysicalAttacks() {
   for (bool sharedOrder : {false, true}) {
-    PerformanceTrack track{.id = TrackId{0}, .endTick = 10};
-    u64 order = 0;
-    u32 noteId = 0, automationId = 0;
-    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{1}, 0, order, noteId, automationId};
+    PerformanceTrackFixture fixture{10};
+    auto& track = fixture.track;
+    auto& out = fixture.out;
     const auto first = out.note(60, 1.0, 2);
     out.at(2).continueVoice(first, NotePerformanceEvent{.key = 60, .durationTicks = 4});
     out.at(3).pitchBend(6.0);
@@ -1101,16 +859,9 @@ void performanceMidiRendererPlansRangesAtPhysicalAttacks() {
 }
 
 void performanceMidiRendererDoesNotRestartVibratoAtAHeldPitchSlideBoundary() {
-  PerformanceTrack track{
-      .id = TrackId{0},
-      .sourceTrackNumber = 0,
-      .endTick = 8,
-  };
-  u64 nextSequence = 0;
-  u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,         {track.id, CommandId{9}}, SourceAnnotationId{10}, 0, nextSequence, nextNote,
-                         nextAutomation};
+  PerformanceTrackFixture fixture{8};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   out.tempo(1'000'000);
   out.modulation(ModulationPerformanceEvent{
       .target = ModulationPerformanceTarget::VibratoRate,
@@ -1135,32 +886,15 @@ void performanceMidiRendererDoesNotRestartVibratoAtAHeldPitchSlideBoundary() {
   const MidiSequence plain = renderTestMidi(performance, bendOptions, ModulationConversionPolicy::SynthModulators);
   const MidiSequence simulated =
       renderTestMidi(performance, bendOptions, ModulationConversionPolicy::SequenceEventSimulation);
-  const auto lastPitchBendAt = [](const MidiSequence& midi, u64 tick) -> std::optional<s16> {
-    std::optional<s16> result;
-    for (const auto& event : midi.tracks[0].events) {
-      if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
-          bend != nullptr && event.tick == tick) {
-        result = bend->value;
-      }
-    }
-    return result;
-  };
 
-  expect(lastPitchBendAt(plain, 7) != lastPitchBendAt(simulated, 7),
+  expect(midiPitchBendAt(plain.tracks[0].events, 7) != midiPitchBendAt(simulated.tracks[0].events, 7),
          "a suppressed destination attack should not restart the held voice's vibrato delay");
 }
 
 void performanceMidiRendererPreservesExactSamplesAndChainedPitchContinuity() {
-  PerformanceTrack track{
-      .id = TrackId{0},
-      .sourceTrackNumber = 0,
-      .endTick = 8,
-  };
-  u64 nextSequence = 0;
-  u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,         {track.id, CommandId{3}}, SourceAnnotationId{4}, 0, nextSequence, nextNote,
-                         nextAutomation};
+  PerformanceTrackFixture fixture{8};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   const PerformanceNoteId note = out.note(64, 1.0, 8);
   auto first = out.pitchSlide(note, 60, 62, 2);
   first.sample(out.at(1), 61.5);
@@ -1175,33 +909,21 @@ void performanceMidiRendererPreservesExactSamplesAndChainedPitchContinuity() {
   const MidiSequence midi = renderTestMidi(performance);
 
   const auto ranges = midiPitchBendRanges(midi.tracks[0].events);
-  std::vector<std::pair<u64, s16>> bends;
-  for (const auto& event : midi.tracks[0].events) {
-    if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend)) {
-      bends.emplace_back(event.tick, bend->value);
-    }
-  }
+  const auto bends = midiPitchBends(midi.tracks[0].events);
 
   expect(ranges == std::vector<std::pair<u64, u16>>{{0, 400}},
          "chained pitch bends should choose one range large enough for the complete note");
-  expect(std::ranges::find(bends, std::pair<u64, s16>{1, -5120}) != bends.end() &&
-             std::ranges::find(bends, std::pair<u64, s16>{3, -1024}) != bends.end(),
+  expect(std::ranges::find(bends, std::pair<u64, s32>{1, -5120}) != bends.end() &&
+             std::ranges::find(bends, std::pair<u64, s32>{3, -1024}) != bends.end(),
          "pitch-bend lowering should reproduce exact source samples rather than replacing them with a linear ramp");
   expect(std::ranges::none_of(bends, [](const auto& bend) { return bend.first == 2 && bend.second == 0; }),
          "queued pitch transitions should remain continuous at their shared boundary");
 }
 
 void performanceMidiRendererKeepsSampledPitchCurvesSparse() {
-  PerformanceTrack track{
-      .id = TrackId{0},
-      .sourceTrackNumber = 0,
-      .endTick = 8,
-  };
-  u64 nextSequence = 0;
-  u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,         {track.id, CommandId{4}}, SourceAnnotationId{5}, 0, nextSequence, nextNote,
-                         nextAutomation};
+  PerformanceTrackFixture fixture{8};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   const PerformanceNoteId note = out.note(60, 1.0, 8);
   out.pitchSlide(note, 60, 62, 6).sample(out.at(4), 61);
 
@@ -1221,84 +943,40 @@ void performanceMidiRendererKeepsSampledPitchCurvesSparse() {
          "sampled pitch curves should emit their actual changes without redundant per-tick bend writes");
 }
 
-void performanceMidiRendererResetsInterruptedPitchBeforeTheNewNote() {
-  PerformanceTrack track{
-      .id = TrackId{0},
-      .sourceTrackNumber = 0,
-      .endTick = 8,
+void pitchResetsOnlyAtTheNextAttack() {
+  const struct {
+    const char* name;
+    double noteKey;
+    u32 gate, slideTicks;
+    std::optional<u64> nextAttack;
+    std::vector<std::pair<u64, double>> expected;
+  } cases[] = {
+      {"interrupted slide", 64, 8, 6, 3, {{0, -4}, {1, -10.0 / 3}, {2, -8.0 / 3}, {3, 0}}},
+      {"slide through release", 60, 2, 4, 12, {{1, 1}, {2, 2}, {3, 3}, {4, 4}, {12, 0}}},
+      {"terminal release", 60, 8, 4, {}, {{1, 1}, {2, 2}, {3, 3}, {4, 4}}},
   };
-  u64 nextSequence = 0;
-  u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,         {track.id, CommandId{5}}, SourceAnnotationId{6}, 0, nextSequence, nextNote,
-                         nextAutomation};
-  const PerformanceNoteId firstNote = out.note(64, 1.0, 8);
-  out.pitchSlide(firstNote, 60, 64, 6);
-  out.at(3).note(67, 1.0, 3);
-
-  const MidiSequence midi = renderTestMidi(PerformanceSequence{
-      .timebase = Timebase{.ppqn = 48},
-      .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
-      .tracks = {track},
-  });
-  std::vector<std::pair<u64, s16>> bends;
-  for (const auto& event : midi.tracks[0].events) {
-    if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend)) {
-      bends.emplace_back(event.tick, bend->value);
+  for (const auto& test : cases) {
+    PerformanceTrackFixture fixture{16};
+    auto& out = fixture.out;
+    const auto note = out.note(test.noteKey, 1.0, test.gate);
+    out.pitchSlide(note, 60, 64, test.slideTicks).preferPitchBend();
+    if (test.nextAttack) out.at(*test.nextAttack).note(67, 1.0, 3);
+    const auto midi = renderTestMidi({.tracks = {fixture.track}});
+    const auto& events = midi.tracks[0].events;
+    const auto bends = midiPitchBends(events);
+    expect(bends.size() == test.expected.size(), std::string(test.name) + ": unexpected bend writes");
+    for (size_t i = 0; i < bends.size(); ++i) {
+      const auto [tick, pitch] = test.expected[i];
+      expect(bends[i].first == tick && std::abs(midiPitchSemitonesAt(events, tick) - pitch) < 0.001,
+             std::string(test.name) + ": wrong pitch or reset timing at tick " + std::to_string(tick));
     }
   }
-  expect(!bends.empty() && bends.back() == std::pair<u64, s16>{3, 0},
-         "a new-note interruption should reset the channel bend at the interruption tick");
-}
-
-void performanceMidiRendererDefersPitchResetUntilTheNextAttack() {
-  PerformanceTrack track{
-      .id = TrackId{0},
-      .sourceTrackNumber = 0,
-      .endTick = 16,
-  };
-  u64 nextSequence = 0;
-  u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,         {track.id, CommandId{7}}, SourceAnnotationId{8}, 0, nextSequence, nextNote,
-                         nextAutomation};
-  const PerformanceNoteId slidingNote = out.note(60, 1.0, 2);
-  out.pitchSlide(slidingNote, 60, 64, 4);
-  out.at(12).note(67, 1.0, 4);
-
-  const auto loweredInput = preparePerformance(PerformanceSequence{
-          .timebase = Timebase{.ppqn = 48},
-          .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
-          .tracks = {track},
-      });
-  std::vector<Diagnostic> loweredDiagnostics;
-  const auto lowered = detail::planMidiTrack(
-      loweredInput, 0, {},
-      PerformanceTempoMap{loweredInput.performance()}, loweredDiagnostics);
-  std::vector<std::pair<u64, double>> bends;
-  for (const auto& event : lowered) {
-    if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event)) {
-      bends.emplace_back(bend->header.tick, bend->semitones);
-    }
-  }
-
-  expect(std::ranges::find(bends, std::pair<u64, double>{4, 4.0}) != bends.end() &&
-             std::ranges::none_of(bends, [](const auto& bend) { return bend.first == 8; }) &&
-             bends.back() == std::pair<u64, double>{12, 0.0},
-         "a terminal bend should survive note-off and reset only when the next note attacks");
 }
 
 void performanceMidiLoweringAppliesPitchResetsBeforeLaterTransitions() {
-  PerformanceTrack track{
-      .id = TrackId{0},
-      .sourceTrackNumber = 0,
-      .endTick = 30,
-  };
-  u64 nextSequence = 0;
-  u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,         {track.id, CommandId{8}}, SourceAnnotationId{9}, 0, nextSequence, nextNote,
-                         nextAutomation};
+  PerformanceTrackFixture fixture{30};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   const PerformanceNoteId oldVoice = out.note(60, 1.0, 4);
   out.pitchSlide(oldVoice, 60, 56, 4);
   const PerformanceNoteId heldStart = out.at(8).note(68, 1.0, 2);
@@ -1328,38 +1006,6 @@ void performanceMidiLoweringAppliesPitchResetsBeforeLaterTransitions() {
 
   expect(bendAt(10) == 0.0 && bendAt(15) == 2.0 && bendAt(16) == 2.0,
          "a delayed transition should observe earlier next-attack resets without doubling a held transition");
-}
-
-void performanceMidiRendererLeavesTerminalPitchBentWithoutAnotherAttack() {
-  PerformanceTrack track{
-      .id = TrackId{0},
-      .sourceTrackNumber = 0,
-      .endTick = 12,
-  };
-  u64 nextSequence = 0;
-  u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,         {track.id, CommandId{9}}, SourceAnnotationId{10}, 0, nextSequence, nextNote,
-                         nextAutomation};
-  const PerformanceNoteId note = out.note(60, 1.0, 8);
-  out.pitchSlide(note, 60, 64, 4);
-
-  const auto loweredInput = preparePerformance(PerformanceSequence{
-          .timebase = Timebase{.ppqn = 48},
-          .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
-          .tracks = {track},
-      });
-  std::vector<Diagnostic> loweredDiagnostics;
-  const auto lowered = detail::planMidiTrack(
-      loweredInput, 0, {},
-      PerformanceTempoMap{loweredInput.performance()}, loweredDiagnostics);
-  const auto& events = lowered;
-  const auto lastBend = std::find_if(events.rbegin(), events.rend(), [](const auto& event) {
-    return std::holds_alternative<PitchBendPerformanceEvent>(event);
-  });
-  expect(lastBend != events.rend() && std::get<PitchBendPerformanceEvent>(*lastBend).header.tick == 4 &&
-             std::get<PitchBendPerformanceEvent>(*lastBend).semitones == 4.0,
-         "pitch-bend lowering should not reset a release tail merely because the track has no later attack");
 }
 
 void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
@@ -1487,12 +1133,9 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
 }
 
 void performanceMidiRendererExpandsRangeForComposedPitchLayers() {
-  PerformanceTrack track{.id = TrackId{0}, .endTick = 16};
-  u64 nextSequence = 0;
-  u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,         {track.id, CommandId{15}}, SourceAnnotationId{16}, 0, nextSequence, nextNote,
-                         nextAutomation};
+  PerformanceTrackFixture fixture{16};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   constexpr PitchBendLayerId secondLayer{1};
 
   out.note(60, 1.0, 8);
@@ -1528,12 +1171,9 @@ void performanceMidiRendererExpandsRangeForComposedPitchLayers() {
 }
 
 void performanceMidiRendererResolvesNormalizedWheelBeforeLoweringTransitions() {
-  PerformanceTrack track{.id = TrackId{0}, .endTick = 8};
-  u64 nextSequence = 0;
-  u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,         {track.id, CommandId{17}}, SourceAnnotationId{18}, 0, nextSequence, nextNote,
-                         nextAutomation};
+  PerformanceTrackFixture fixture{8};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
 
   const PerformanceNoteId first = out.note(NotePerformanceEvent{
       .key = 60,
@@ -1587,16 +1227,9 @@ void performanceMidiRendererResolvesNormalizedWheelBeforeLoweringTransitions() {
 }
 
 void performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes() {
-  PerformanceTrack track{
-      .id = TrackId{0},
-      .sourceTrackNumber = 0,
-      .endTick = 16,
-  };
-  u64 nextSequence = 0;
-  u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,         {track.id, CommandId{7}}, SourceAnnotationId{8}, 0, nextSequence, nextNote,
-                         nextAutomation};
+  PerformanceTrackFixture fixture{16};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   const PerformanceNoteId firstNote = out.note(64, 1.0, 4);
   out.pitchSlide(firstNote, 60, 68, 8).continueAcrossNotes();
   out.at(4).note(67, 1.0, 4);
@@ -1640,10 +1273,9 @@ void performanceMidiLoweringOrdersDelayedPitchWithSourceWrites() {
       Case{60, 1, {{1, 1}, {4, 0}, {5, 2}, {6, 4}}},
   };
   for (const auto& test : cases) {
-    PerformanceTrack track{.id = TrackId{0}, .endTick = 8};
-    u64 order = 0;
-    u32 noteId = 0, automationId = 0;
-    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{1}, 0, order, noteId, automationId};
+    PerformanceTrackFixture fixture{8};
+    auto& track = fixture.track;
+    auto& out = fixture.out;
     const auto note = out.note(test.noteKey, 1.0, 8);
     out.at(1).pitchBend(test.sourceBend);
     out.at(4).pitchSlide(note, 60, 64, 2);
@@ -1665,10 +1297,9 @@ void performanceMidiLoweringOrdersDelayedPitchWithSourceWrites() {
 
 void performanceMidiPortamentoReadsTheSourceWheelAtTheTransition() {
   for (bool instrumentRange : {false, true}) {
-    PerformanceTrack track{.id = TrackId{0}, .endTick = 8};
-    u64 order = 0;
-    u32 noteId = 0, automationId = 0;
-    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{1}, 0, order, noteId, automationId};
+    PerformanceTrackFixture fixture{8};
+    auto& track = fixture.track;
+    auto& out = fixture.out;
     const auto note = out.note(64, 1.0, 8);
     out.at(1).pitchBend(PitchBendPerformanceEvent{.normalizedWheelPosition = 0.5});
     if (instrumentRange) {
@@ -1760,113 +1391,39 @@ void performanceMidiRendererResolvesSourceInstrumentIdentityAtExport() {
 }
 
 void performanceMidiRendererQuantizesPitchBendAndPortamento() {
-  const PerformanceSequence performance{
-      .timebase = Timebase{.ppqn = 48},
-      .tracks = {PerformanceTrack{
-          .id = TrackId{0},
-          .sourceTrackNumber = 0,
-          .endTick = 24,
-          .events =
-              {
-                  PitchBendRangePerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 0},
-                      .cents = 400,
-                  },
-                  PitchBendPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 0},
-                      .semitones = 1.0,
-                  },
-                  PitchTransitionSettingsPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 12},
-                      .timeMilliseconds = 83.0,
-                  },
-              },
-      }},
-  };
-
-  const MidiSequence midiSequence = renderTestMidi(performance);
-  const auto& events = midiSequence.tracks[0].events;
-  expect(midiPitchBendRanges(events) == std::vector<std::pair<u64, u16>>{{0, 400}},
-         "MIDI renderer should emit the performance pitch-bend range");
-  expect(std::ranges::any_of(events,
-                             [](const MidiEvent& event) {
-                               const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
-                               return bend != nullptr && event.tick == 0 && bend->value == 2048;
-                             }),
+  PerformanceTrackFixture fixture{24};
+  fixture.out.pitchBendRange(4);
+  fixture.out.pitchBend(1.0);
+  fixture.out.at(12).pitchTransitionSettings(83.0);
+  const auto midi = renderTestMidi({.tracks = {fixture.track}});
+  const auto& events = midi.tracks[0].events;
+  expect(midiPitchBendRanges(events) == std::vector<std::pair<u64, u16>>{{0, 400}} &&
+             midiPitchBendAt(events, 0) == 2048,
          "MIDI renderer should quantize semitone pitch bend through the active range");
-  expect(std::ranges::any_of(events,
-                             [](const MidiEvent& event) {
-                               const auto* time = midiController(event, MidiController::PortamentoTime);
-                               return time != nullptr && event.tick == 12 && time->value == 0;
-                             }),
-         "MIDI renderer should write the high seven bits of the physical portamento time");
-  expect(firstMidiController14(events, MidiController::PortamentoTime) == 83,
-         "MIDI renderer should retain the full physical portamento time");
+  expect(firstMidiController14(events, MidiController::PortamentoTime) == 83 &&
+             std::ranges::any_of(events, [](const MidiEvent& event) {
+               return event.tick == 12 && isMidiController(event, MidiController::PortamentoTime);
+             }),
+         "MIDI renderer should retain both bytes of the physical portamento time at the source tick");
 }
 
 void performanceMidiRendererSkipsRedundantPitchBends() {
-  const PerformanceSequence performance{
-      .timebase = Timebase{.ppqn = 48},
-      .tracks = {PerformanceTrack{
-          .id = TrackId{0},
-          .sourceTrackNumber = 0,
-          .endTick = 48,
-          .events =
-              {
-                  PitchBendRangePerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 0},
-                      .cents = 200,
-                  },
-                  PitchBendRangePerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 6},
-                      .cents = 200,
-                  },
-                  PitchBendPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 0},
-                      .semitones = 0.0,
-                  },
-                  PitchBendPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 12},
-                      .semitones = 0.0,
-                  },
-                  PitchBendPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 24},
-                      .semitones = 1.0,
-                  },
-                  PitchBendPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 36},
-                      .semitones = 1.0,
-                  },
-                  PitchBendPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 48},
-                      .semitones = 0.0,
-                  },
-              },
-      }},
-  };
-
-  const auto assertPitchBends = [](const MidiSequence& midiSequence, std::string_view label) {
-    const auto pitchBendRanges = midiPitchBendRanges(midiSequence.tracks[0].events);
-    std::vector<std::pair<u64, s16>> pitchBends;
-    for (const MidiEvent& event : midiSequence.tracks[0].events) {
-      if (const auto* pitchBend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend)) {
-        pitchBends.emplace_back(event.tick, pitchBend->value);
-      }
-    }
-    const std::vector<std::pair<u64, u16>> expectedPitchBendRanges{{0, 200}};
-    const std::vector<std::pair<u64, s16>> expectedPitchBends{
-        {24, 4096},
-        {48, 0},
-    };
-    expect(pitchBendRanges == expectedPitchBendRanges,
-           std::string(label) + " should skip repeated pitch bend range values");
-    expect(pitchBends == expectedPitchBends, std::string(label) + " should skip repeated pitch bend values");
-  };
-
-  assertPitchBends(renderTestMidi(performance), "synth-modulator MIDI lowering");
-  assertPitchBends(
-      renderTestMidi(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation),
-      "sequence-event MIDI lowering");
+  PerformanceTrackFixture fixture{48};
+  auto& out = fixture.out;
+  out.pitchBendRange(2);
+  out.pitchBend(0.0);
+  out.at(6).pitchBendRange(2);
+  out.at(12).pitchBend(0.0);
+  out.at(24).pitchBend(1.0);
+  out.at(36).pitchBend(1.0);
+  out.at(48).pitchBend(0.0);
+  for (const auto policy :
+       {ModulationConversionPolicy::SynthModulators, ModulationConversionPolicy::SequenceEventSimulation}) {
+    const auto midi = renderTestMidi({.tracks = {fixture.track}}, {}, policy);
+    expect(midiPitchBendRanges(midi.tracks[0].events) == std::vector<std::pair<u64, u16>>{{0, 200}} &&
+               midiPitchBends(midi.tracks[0].events) == std::vector<std::pair<u64, s32>>{{24, 4096}, {48, 0}},
+           "both modulation policies should skip repeated pitch bend ranges and values");
+  }
 }
 
 }  // namespace
@@ -1902,10 +1459,8 @@ void runValueMidiPitchTests() {
   performanceMidiRendererDoesNotRestartVibratoAtAHeldPitchSlideBoundary();
   performanceMidiRendererPreservesExactSamplesAndChainedPitchContinuity();
   performanceMidiRendererKeepsSampledPitchCurvesSparse();
-  performanceMidiRendererResetsInterruptedPitchBeforeTheNewNote();
-  performanceMidiRendererDefersPitchResetUntilTheNextAttack();
+  pitchResetsOnlyAtTheNextAttack();
   performanceMidiLoweringAppliesPitchResetsBeforeLaterTransitions();
-  performanceMidiRendererLeavesTerminalPitchBentWithoutAnotherAttack();
   performanceMidiRendererCombinesSourceBendWithPitchTransitions();
   performanceMidiRendererExpandsRangeForComposedPitchLayers();
   performanceMidiRendererResolvesNormalizedWheelBeforeLoweringTransitions();

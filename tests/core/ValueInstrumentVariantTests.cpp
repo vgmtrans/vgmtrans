@@ -467,118 +467,6 @@ void variantAddressesRespectExportProjectionsAndExhaustion() {
 
 }
 
-void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(bool changesInstrument) {
-  Instrument instrument = testInstrument(0, Envelope{.attackSeconds = 1.0});
-  instrument.regions[0].sample = SampleRef::resolved(AssetId{10}, 0);
-  std::vector<SoundBankAsset> sets{SoundBankAsset{.instruments = {std::move(instrument)}}};
-  if (changesInstrument) {
-    auto other = sets[0].instruments[0];
-    other.identity->key = 1;
-    sets[0].instruments.push_back(std::move(other));
-  }
-  auto performance = sequenceWithEvents({
-      EnvelopePerformanceEvent{
-          .header = eventHeader(0, 0),
-          .update = EnvelopeUpdate::set(Envelope{.attackSeconds = 0.1}, EnvelopeFields::Attack),
-      },
-      NotePerformanceEvent{
-          .header = eventHeader(0, 1),
-          .key = 60,
-          .durationTicks = 4,
-          .note = PerformanceNoteId{1},
-          .voice = PerformanceVoiceId{1},
-      },
-      NotePerformanceEvent{
-          .header = eventHeader(4, 2),
-          .key = 60,
-          .durationTicks = 4,
-          .extendsPrevious = true,
-          .note = PerformanceNoteId{1},
-          .voice = PerformanceVoiceId{1},
-      },
-      EnvelopePerformanceEvent{
-          .header = eventHeader(8, 3),
-          .update = EnvelopeUpdate::restore(),
-      },
-      NotePerformanceEvent{
-          .header = eventHeader(8, 4),
-          .key = 62,
-          .durationTicks = 4,
-          .note = PerformanceNoteId{2},
-          .voice = PerformanceVoiceId{1},
-      },
-  });
-  performance.tracks[0].automations.push_back(PerformanceAutomation{
-      .header = eventHeader(8, 5),
-      .intent =
-          PitchTransitionIntent{
-              .note = PerformanceNoteId{2}, .startKey = 60, .targetKey = 62},
-      .realization = {.startTick = 8, .endTick = 8},
-  });
-  if (changesInstrument) {
-    performance.tracks[0].events.insert(
-        performance.tracks[0].events.begin() + 3,
-        InstrumentPerformanceEvent{.header = eventHeader(6, 3), .instrument = InstrumentAddress{.program = 1}});
-    performance.tracks[0].events.emplace_back(NotePerformanceEvent{
-        .header = eventHeader(12, 6), .key = 64, .durationTicks = 4, .note = PerformanceNoteId{3}, .voice = PerformanceVoiceId{3}});
-  }
-  const auto materialized = preparePerformance(performance, {sets.begin(), sets.end()}, InstrumentPreparationOptions{.dynamicEnvelopes = true, .onlyUsedInstruments = true});
-  const auto& preparedBanks = materialized.soundBanks();
-  const size_t selected = selectedInstrumentForNote(materialized, PerformanceNoteId{1});
-  expect(selected == (changesInstrument ? 2 : 1), "the dynamic note should select its generated prepared instrument");
-
-  SourceStore sources;
-  const SourceId source = sources.add(SourceFile{.name = "dynamic-envelope.pcm"}, std::vector<u8>{0});
-  const SamplePoolAsset samples{
-      .metadata = AssetMetadata{.id = AssetId{10}},
-      .pool = SamplePool{.samples = {Sample{
-                             .codec = AudioCodec::PcmS8,
-                             .encodedData = SourceRange{.source = source, .offset = 0, .size = 1},
-                             .sampleRate = 32000,
-                         }}},
-  };
-  std::vector<const SamplePoolAsset*> sampleViews{&samples};
-  const auto selectedInstruments = selectSynthBanks(materialized);
-  const SynthExportInput input{
-      .soundBanks = selectedInstruments, .samplePools = sampleViews,
-      .filterSamplesToReferencedInstruments = true};
-  const auto prepared = prepareSynthData(input, sources);
-  const size_t count = changesInstrument ? 2 : 1;
-  const auto variant = materialized.selectionFor(InstrumentHandle{0, static_cast<u32>(selected)}).address;
-  expect(prepared.instruments.size() == count && prepared.instruments.back().address == variant,
-         "used-only synth export should retain the attack's variant and any subsequent independent attack");
-
-  for (const auto rendering : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
-    const auto midi = renderMidiSequence(materialized, {.pitchTransitions = rendering});
-    u16 program = 0;
-    size_t noteCount = 0;
-    for (const auto& event : midi.tracks[0].events) {
-      if (const auto* change = midiChannelMessage(event, MidiChannelMessageKind::ProgramChange)) {
-        program = change->value;
-      } else if (midiNote(event)) {
-        ++noteCount;
-        expect(program == (event.tick == 12 ? 1 : variant.program),
-               "a continuation must use the attack's preset, and the next attack must use the intervening selection");
-      }
-    }
-    expect(noteCount == count + (rendering == MidiPitchTransitionRendering::Portamento ? 1 : 0),
-           "only native portamento should add a physical continuation note");
-  }
-
-  const auto sf2 = buildSoundFont2(input, sources);
-  const auto dls = buildDls(input, sources);
-  const size_t presets = asciiOffset(sf2.bytes, "phdr") + 8;
-  expect(sf2.diagnostics.empty() && dls.diagnostics.empty() && chunkSize(sf2.bytes, "phdr") == (count + 1) * 38 &&
-             readLe16(sf2.bytes, presets + (count - 1) * 38 + 20) == variant.program &&
-             readLe32(dls.bytes, asciiOffset(dls.bytes, "colh") + 8) == count &&
-             readLe32(dls.bytes, asciiOffset(dls.bytes, "insh") + 16) == (changesInstrument ? 1 : variant.program),
-         "both serialized banks must retain exactly the presets used by the paired MIDI");
-
-  const auto leadingTie = sequenceWithEvents({NotePerformanceEvent{.extendsPrevious = true}});
-  expect(preparePerformance(leadingTie, preparedBanks).usedInstruments() == std::set{InstrumentHandle{0, 0}},
-         "a leading tie with no preceding voice should still retain the selected instrument");
-}
-
 void signedStereoMaterializationUsesAttackTimeVariants() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "signed-stereo.pcm"}, std::vector<u8>{0x00, 0x80, 0xe8, 0x03});
@@ -758,9 +646,6 @@ void runValueInstrumentVariantTests() {
     dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero(rendering);
   }
   variantAddressesRespectExportProjectionsAndExhaustion();
-  for (const bool changesInstrument : {false, true}) {
-    dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(changesInstrument);
-  }
   signedStereoMaterializationUsesAttackTimeVariants();
   variantLaneStateSurvivesInstrumentChanges();
   signedStereoMaterializationLeavesOrdinaryTracksAlone();

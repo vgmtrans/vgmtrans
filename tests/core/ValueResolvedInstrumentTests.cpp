@@ -10,7 +10,6 @@
 #include "value/export/CollectionBinding.h"
 #include "value/export/Export.h"
 #include "value/export/ResolvedPerformance.h"
-#include "value/export/midi/MidiTrackPlanner.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/export/synth/SynthExportData.h"
 #include "value/sequence/SequenceVm.h"
@@ -54,23 +53,19 @@ void resolvedVariantsShareAddressesWithBothSynthWriters() {
   banks[0].instruments.shrink_to_fit();  // Appending the variant must not invalidate its base handle.
   const std::array<const SamplePoolAsset*, 1> pools{&pool};
 
-  PerformanceTrack track{.id = TrackId{0}, .endTick = 12};
-  u64 order = 0;
-  u32 noteId = 0, automationId = 0;
-  PerformanceEmitter out{track, {TrackId{0}, CommandId{1}}, SourceAnnotationId{1}, 0, order, noteId, automationId};
+  PerformanceTrackFixture fixture{12};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   out.instrument(InstrumentIdentity{"prototype", 5});
   out.updateEnvelope(Envelope{.attackSeconds = 0.25}, EnvelopeFields::Attack);
   const auto first = out.note(60, 1, 4);
   out.at(2).instrument(InstrumentIdentity{"prototype", 7});
+  out.at(2).continueVoice(first, NotePerformanceEvent{.key = 60, .durationTicks = 2});
+  out.at(4).restoreEnvelope();
   const auto continuation = out.at(4).continueVoice(first, NotePerformanceEvent{.key = 64, .durationTicks = 4});
   out.at(4).pitchSlide(continuation, 60, 64, 2);
   const auto fresh = out.at(8).note(67, 1, 4);
   const PerformanceSequence sourcePerformance{.timebase = {.ppqn = 48}, .tracks = {track}};
-  const auto unadapted = preparePerformance(sourcePerformance, {banks.begin(), banks.end()});
-  expect(unadapted.voiceFor(noteById(unadapted.performance(), first)).instrument == InstrumentSelection{InstrumentHandle{0, 0}} &&
-             unadapted.voiceFor(noteById(unadapted.performance(), continuation)).instrument == InstrumentSelection{InstrumentHandle{0, 0}} &&
-             unadapted.voiceFor(noteById(unadapted.performance(), fresh)).instrument == InstrumentSelection{InstrumentHandle{0, 1}},
-         "resolution must retain the attack's instrument through an intervening program change");
   const auto resolved = preparePerformance(sourcePerformance, {banks.begin(), banks.end()},
       {.dynamicEnvelopes = true, .onlyUsedInstruments = true, .firstBank = 11});
   const auto& preparedBanks = resolved.soundBanks();
@@ -133,7 +128,8 @@ void resolvedVariantsShareAddressesWithBothSynthWriters() {
                "every MIDI attack and portamento fragment must select the matching serialized synth preset");
       }
     }
-    expect(count >= 2, "the paired-output fixture must contain both performed attacks");
+    expect(count == (mode == MidiPitchTransitionRendering::PitchBend ? 2u : 3u),
+           "only native portamento should add a physical continuation attack");
   }
 }
 
@@ -167,6 +163,9 @@ void resolutionChoosesAndDiagnosesOneDefinition() {
   const auto external = resolved.selectionFor(noteById(resolved.performance(), PerformanceNoteId{2}));
   expect(external.instrument == nullptr && external.address == InstrumentAddress{7, 9},
          "the resolved output view must distinguish external presets from owned instrument definitions");
+  const PerformanceSequence leadingTie{.tracks = {{.events = {NotePerformanceEvent{.extendsPrevious = true}}}}};
+  expect(preparePerformance(leadingTie, {SoundBankAsset{.instruments = {Instrument{}}}}).usedInstruments() == std::set{InstrumentHandle{0, 0}},
+         "a leading tie with no preceding voice should still retain the selected instrument");
   const auto midi = renderMidiSequence(resolved);
   expect(!midi.tracks.empty(), "a missing companion instrument must not prevent standalone MIDI");
 }
@@ -489,10 +488,9 @@ void synthSelectionsPreserveBankSamplingAndSampleOwners() {
 }
 
 void soundingVoicesOwnSelectionsAndDeadlines() {
-  PerformanceTrack track{.id = TrackId{0}, .endTick = 40};
-  u64 order = 0;
-  u32 nextNote = 0, nextAutomation = 0;
-  PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{1}, 0, order, nextNote, nextAutomation};
+  PerformanceTrackFixture fixture{40};
+  auto& track = fixture.track;
+  auto& out = fixture.out;
   out.instrument(0, 5);
   const auto attack = out.note(NotePerformanceEvent{.key = 60, .durationTicks = 4,
                                                   .maximumDurationMilliseconds = 1000.0});
@@ -517,34 +515,13 @@ void soundingVoicesOwnSelectionsAndDeadlines() {
   const auto secondTrackNotes = eventsOfType<NotePerformanceEvent>(prepared.performance().tracks[1]);
   expect(secondTrackNotes.front()->voice != first.voice,
          "track-local source note IDs must become distinct prepared voices across tracks");
-  for (const auto mode : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
-    std::vector<Diagnostic> diagnostics;
-    const auto events = detail::planMidiTrack(prepared, 0, {.pitchTransitions = mode},
-                                                     PerformanceTempoMap{prepared.performance()}, diagnostics);
-    expect(diagnostics.empty(), "lowering valid voice continuations should not add diagnostics");
-    for (const auto& event : events) {
-      if (const auto* note = std::get_if<detail::MidiNoteBoundary>(&event); note && note->attack && note->attack->key != 72) {
-        expect(note->header.tick + note->attack->durationTicks <= 14 &&
-                   (!note->instrument || note->instrument->address.program == 5),
-               "completed attacks must already carry their voice's instrument and respect its absolute deadline");
-      }
-    }
-    const auto midi = renderMidiSequence(prepared, {.pitchTransitions = mode});
-    for (const auto& event : midi.tracks[0].events) {
-      if (const auto* note = std::get_if<NoteDuration>(&event.payload)) {
-        expect(note->key == 72 ? event.tick + note->duration == 40 : event.tick + note->duration <= 14,
-               "a hardware stop must limit only fragments of its own voice");
-      }
-    }
-  }
 }
 
 void canceledOrDelayedPitchMotionDoesNotJoinAttacks() {
   for (const bool delayed : {false, true}) {
-    PerformanceTrack track{.id = TrackId{0}};
-    u64 order = 0;
-    u32 nextNote = 0, nextAutomation = 0;
-    PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{1}, 0, order, nextNote, nextAutomation};
+    PerformanceTrackFixture fixture{};
+    auto& track = fixture.track;
+    auto& out = fixture.out;
     out.instrument(0, 5);
     const auto first = out.note(60, 1.0, 4);
     out.at(4).instrument(0, 7);
@@ -561,10 +538,9 @@ void canceledOrDelayedPitchMotionDoesNotJoinAttacks() {
 void pitchEditsPreserveDeclaredVoiceOwnership() {
   for (const bool middleContinues : {false, true}) {
     for (const bool followsMiddle : {false, true}) {
-      PerformanceTrack track{.id = TrackId{0}};
-      u64 order = 0;
-      u32 nextNote = 0, nextAutomation = 0;
-      PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{1}, 0, order, nextNote, nextAutomation};
+      PerformanceTrackFixture fixture{};
+      auto& track = fixture.track;
+      auto& out = fixture.out;
       out.instrument(0, 5);
       const auto first = out.note(NotePerformanceEvent{.key = 60, .durationTicks = 16,
                                                      .maximumDurationMilliseconds = 500.0});

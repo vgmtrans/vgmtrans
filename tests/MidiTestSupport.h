@@ -48,6 +48,25 @@ inline bool isMidiChannelMessage(const vgmtrans::core::MidiEvent& event, vgmtran
   return midiChannelMessage(event, kind) != nullptr;
 }
 
+inline std::vector<std::pair<u64, s32>> midiPitchBends(std::span<const vgmtrans::core::MidiEvent> events) {
+  std::vector<std::pair<u64, s32>> result;
+  for (const auto& event : events) {
+    if (const auto* bend = midiChannelMessage(event, vgmtrans::core::MidiChannelMessageKind::PitchBend)) {
+      result.emplace_back(event.tick, bend->value);
+    }
+  }
+  return result;
+}
+
+// The last emitted wheel write at this exact tick, not the pitch held from an earlier tick.
+inline std::optional<s32> midiPitchBendAt(std::span<const vgmtrans::core::MidiEvent> events, u64 tick) {
+  std::optional<s32> result;
+  for (const auto& [at, value] : midiPitchBends(events)) {
+    if (at == tick) result = value;
+  }
+  return result;
+}
+
 inline const vgmtrans::core::MidiMetaMessage* midiMeta(const vgmtrans::core::MidiEvent& event, u8 type) {
   const auto* message = std::get_if<vgmtrans::core::MidiMetaMessage>(&event.payload);
   return message != nullptr && message->type == type ? message : nullptr;

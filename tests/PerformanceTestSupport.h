@@ -8,9 +8,26 @@
 
 #include "value/sequence/PerformanceModel.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/sequence/SequenceVm.h"
 
 #include <variant>
 #include <vector>
+
+// Own the emitter's counters and track together. Tests still use the production
+// emitter directly; copying this fixture would leave it referring to the old track.
+struct PerformanceTrackFixture {
+  vgmtrans::core::PerformanceTrack track;
+  u64 nextSequence = 0;
+  u32 nextNote = 0, nextAutomation = 0;
+  vgmtrans::core::PerformanceEmitter out;
+
+  explicit PerformanceTrackFixture(u64 endTick = 0)
+      : track{.id = vgmtrans::core::TrackId{0}, .endTick = endTick},
+        out{track, {track.id, vgmtrans::core::CommandId{1}}, vgmtrans::core::SourceAnnotationId{2},
+            0, nextSequence, nextNote, nextAutomation} {}
+  PerformanceTrackFixture(const PerformanceTrackFixture&) = delete;
+  PerformanceTrackFixture& operator=(const PerformanceTrackFixture&) = delete;
+};
 
 // Views borrow events from the track; keep the rendered performance alive.
 template <class Event>

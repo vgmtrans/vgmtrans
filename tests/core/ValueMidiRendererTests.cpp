@@ -93,12 +93,9 @@ void performanceMidiRendererKeepsPhysicalLimitsAcrossPortamentoFragments() {
   for (const auto mode : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
     for (const u64 slideTick : {4, 20}) {
       for (const double limitMilliseconds : {0.0, 1000.0}) {
-        PerformanceTrack track{.id = TrackId{0}, .endTick = 44};
-        u64 nextSequence = 0;
-        u32 nextNote = 0;
-        u32 nextAutomation = 0;
-        PerformanceEmitter out{
-            track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
+        PerformanceTrackFixture fixture{44};
+        auto& track = fixture.track;
+        auto& out = fixture.out;
         const auto held = out.note(
             NotePerformanceEvent{.key = 60, .durationTicks = 40, .maximumDurationMilliseconds = limitMilliseconds});
         out.at(8).tempo(1000000);
@@ -131,12 +128,9 @@ void performanceMidiRendererKeepsPhysicalLimitsAcrossVoiceContinuations() {
   for (const auto mode : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
     for (const bool changesKey : {false, true}) {
       for (const bool laterLimit : {false, true}) {
-        PerformanceTrack track{.id = TrackId{0}, .endTick = 40};
-        u64 nextSequence = 0;
-        u32 nextNote = 0;
-        u32 nextAutomation = 0;
-        PerformanceEmitter out{
-            track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
+        PerformanceTrackFixture fixture{40};
+        auto& track = fixture.track;
+        auto& out = fixture.out;
         const auto held = out.note(
             NotePerformanceEvent{.key = 60,
                                  .durationTicks = laterLimit ? 40u : 4u,
@@ -175,12 +169,9 @@ void performanceMidiRendererLimitsOnlyTheOwningVoice() {
   for (const auto mode : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
     for (const bool linkedNote : {false, true}) {
       for (const u32 lane : {0, 1}) {
-        PerformanceTrack track{.id = TrackId{0}, .endTick = 105};
-        u64 nextSequence = 0;
-        u32 nextNote = 0;
-        u32 nextAutomation = 0;
-        PerformanceEmitter out{
-            track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
+        PerformanceTrackFixture fixture{105};
+        auto& track = fixture.track;
+        auto& out = fixture.out;
         const auto held = out.note(NotePerformanceEvent{
             .key = 60, .durationTicks = linkedNote ? 10u : 100u, .maximumDurationMilliseconds = 100.0});
         out.at(5).note(NotePerformanceEvent{.key = 72, .durationTicks = 100, .lane = PerformanceLaneId{lane}});
