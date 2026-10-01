@@ -816,7 +816,8 @@ private:
     }
   }
 
-  void applyInstrumentSelection(u64 tick, const MidiInstrumentSelection& selection, bool forceProgramChange) {
+  void applyInstrumentSelection(u64 tick, const MidiInstrumentSelection& selection, bool forceProgramChange,
+                                bool selectsSourceInstrument = true) {
     const u16 bank = static_cast<u16>(selection.address.bank & 0x3fff);
     const u16 emittedBank =
         options.bankSelectStyle == MidiBankSelectStyle::MsbOnly ? static_cast<u16>(bank & 0x7f) : bank;
@@ -825,12 +826,14 @@ private:
       track.events.push_back(midi::bankSelect(tick, channel, bank, writeBankSelectLsb(options)));
       midiBank = emittedBank;
     }
-    const u8 program = data7(selection.address.program);
+    const u8 program = static_cast<u8>(std::min<u32>(selection.address.program, 127));
     if (forceProgramChange || bankChanged || program != midiProgram) {
       midiProgram = program;
       track.events.push_back(midi::programChange(tick, channel, program));
     }
-    pitchBendContext.setInstrumentRangeCents(selection.pitchBendRangeCents);
+    if (selectsSourceInstrument) {
+      pitchBendContext.setInstrumentRangeCents(selection.pitchBendRangeCents);
+    }
   }
 
   void flushModulation(u64 tick, ModulationConversionPolicy conversion) {
@@ -1077,7 +1080,7 @@ private:
             }
             if (typedEvent.instrument) {
               auto selection = instrumentSelection(*typedEvent.instrument);
-              applyInstrumentSelection(typedEvent.header.tick, selection, false);
+              applyInstrumentSelection(typedEvent.header.tick, selection, false, typedEvent.selectsSourceInstrument);
             }
             if (shouldRestartSimulatedVibratoForNote(typedEvent)) {
               restartSimulatedVibratoForNote(typedEvent.header.tick);
@@ -1196,6 +1199,16 @@ private:
           } else if constexpr (std::is_same_v<TypedEvent, LegatoPedalPerformanceEvent>) {
             addController(typedEvent.header.tick, MidiController::Legato, typedEvent.enabled ? 127 : 0);
           } else if constexpr (std::is_same_v<TypedEvent, ModulationPerformanceEvent>) {
+            if (typedEvent.tempoDerived &&
+                (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation ||
+                 typedEvent.target == ModulationPerformanceTarget::PanRate ||
+                 (typedEvent.pitchLayer != kPrimaryPitchBendLayer &&
+                  (typedEvent.target == ModulationPerformanceTarget::VibratoRate ||
+                   typedEvent.target == ModulationPerformanceTarget::VibratoDelay)))) {
+              // These oscillators already retain source cycles/ticks. A tempo
+              // conversion updates synth controls only, not live source state.
+              return;
+            }
             const double normalizedAmount = modulationControllerAmount(typedEvent, modulationProfile);
             const u8 value = midiNormalized7(normalizedAmount);
             if (typedEvent.target == ModulationPerformanceTarget::VibratoDelay ||

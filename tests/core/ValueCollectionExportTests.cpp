@@ -1137,6 +1137,21 @@ void synthPreparationKeepsSampleIdentityAndPhaseOrdering() {
   expect(trimmed.diagnostics.empty() && sustain.pcm == std::vector<s16>{-1000} &&
              sustain.loop == Loop{.enabled = true, .start = 0, .length = 1},
          "sample-start trimming must preserve phase and rebase the loop");
+  auto second = bank;
+  second.localSamples.samples[0].encodedData = {sources.add(SourceFile{}, {0, 1, 0, 2}), 0, 4};
+  const std::array copies{&bank, &second};
+  for (bool filter : {false, true}) {
+    const auto separate = prepareSynthData({.soundBanks = selectSynthBanks(copies), .samplePools = pools,
+                                            .filterSamplesToReferencedInstruments = filter}, sources);
+    const auto local = [&](size_t copy) -> const auto& {
+      return separate.samples[separate.instruments[copy].regions[1].sampleIndex].decoded;
+    };
+    expect(local(0).pcm == std::vector<s16>{-1000} && local(1).pcm == std::vector<s16>{-512} &&
+               local(0).loop == local(1).loop &&
+               separate.instruments[0].regions[0].sampleIndex == separate.instruments[1].regions[0].sampleIndex,
+           "prepared copies of one asset must keep local PCM, trimming and phase separate while sharing external samples");
+  }
+
 }
 
 }  // namespace

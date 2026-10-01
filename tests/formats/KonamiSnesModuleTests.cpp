@@ -1405,6 +1405,28 @@ void konamiSnesHeldNoteRestartsPitchEnvelopeWithoutRetrigger() {
          "restarting a held pitch envelope should not retrigger its MIDI note");
 }
 
+void konamiSnesDelayedHeldEnvelopeStartsAtTheSourceBoundary() {
+  for (bool repeat : {false, true}) {
+    std::vector<u8> bytes{0x3c, 4, 0x7f, 0x7f, 0xf1, 2, 4, 4, 0x40, 8, 0x7f, 0x7f};
+    if (repeat) bytes.insert(bytes.end(), {0x40, 8, 0x7f, 0x7f});
+    bytes.push_back(0xff);
+    const auto performance = renderKonamiSnesProgram(KONAMISNES_V2, {bytes});
+    for (auto mode : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
+      const auto midi = renderTestMidi(performance, {.pitchTransitions = mode});
+      const auto& events = midi.tracks[0].events;
+      const auto notes = midiNotes(events);
+      for (u64 boundary : (repeat ? std::vector<u64>{4, 12} : std::vector<u64>{4})) {
+        for (u64 tick = boundary; tick < boundary + 2; ++tick) {
+          const auto note = std::find_if(notes.rbegin(), notes.rend(), [=](const auto& n) { return n.tick <= tick; });
+          expect(note != notes.rend() &&
+                     std::abs(note->key + midiPitchSemitonesAt(events, tick) - 60) < 0.002,
+                 "V2 delayed envelopes must hold their starting key during the delay, including repeated tied keys");
+        }
+      }
+    }
+  }
+}
+
 void konamiSnesCompiledAutomationTicksFades() {
   const PerformanceSequence performance =
       renderKonamiSnesProgram(KONAMISNES_V6, {{0xea, 0x80,              // tempo
@@ -1498,6 +1520,7 @@ void runKonamiSnesModuleTests() {
   konamiSnesCompiledPlaybackHandlesCallsLoopsTiesAndSlides();
   konamiSnesHeldNoteUsesRealizedInlineSlidePitch();
   konamiSnesHeldNoteRestartsPitchEnvelopeWithoutRetrigger();
+  konamiSnesDelayedHeldEnvelopeStartsAtTheSourceBoundary();
   konamiSnesCompiledAutomationTicksFades();
   konamiSnesPlayOnceCoordinatesGlobalLoopCompletion();
 }

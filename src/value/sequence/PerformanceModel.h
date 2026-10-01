@@ -399,6 +399,10 @@ struct LfoPerformanceContext {
 
 struct ModulationPerformanceEvent {
   PerformanceEventHeader header;
+  // A tempo-derived update exposes physical Hz/ms to synth consumers without
+  // replaying a source command. Exact simulation retains the original clocked
+  // rate/delay and must not reapply this copy's oscillator configuration.
+  bool tempoDerived = false;
   ModulationPerformanceTarget target = ModulationPerformanceTarget::VibratoDepth;
   // Pitch modulation layers are persistent and additive, like ordinary pitch
   // bend layers. Non-pitch modulation targets ignore this field.

@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 #include "../TestSupport.h"
+#include "../MidiTestSupport.h"
 #include "../PerformanceTestSupport.h"
 #include "SessionSnapshotBuilder.h"
 #include "SynthExportTestSupport.h"
@@ -16,6 +17,7 @@
 
 #include <array>
 #include <set>
+#include <limits>
 #include <type_traits>
 
 using namespace vgmtrans::core;
@@ -188,6 +190,26 @@ void layoutSeparatesCollisionsAndRejectsOverflow() {
              selectSynthBanks(failed).empty() && failedMidi.tracks.empty() && failedMidi.diagnostics.size() == 2 &&
              failedMidi.diagnostics.front().code == "source-warning",
          "bank exhaustion must reject a partial plan while preserving earlier preparation diagnostics");
+  for (u32 program : {127u, 128u, 255u, std::numeric_limits<u32>::max()}) {
+    PerformanceTrackFixture fixture{1};
+    fixture.out.instrument(0, program);
+    fixture.out.note(60, 1, 1);
+    const auto prepared = preparePerformance({.tracks = {fixture.track}});
+    const auto midi = renderMidiSequence(prepared);
+    expect(std::ranges::any_of(midi.tracks[0].events, [](const auto& event) {
+      const auto* message = midiChannelMessage(event, MidiChannelMessageKind::ProgramChange);
+      return message && message->value == 127;
+    }), "unsigned programs beyond MIDI range must clamp to 127, not wrap through signed zero");
+    if (program == 127) continue; // This exact source address would resolve to the owned instrument.
+    for (auto firstBank : {std::optional<u32>{}, std::optional<u32>{0}}) {
+      const auto reserved = preparePerformance({.tracks = {fixture.track}},
+          {SoundBankAsset{.instruments = {Instrument{.explicitAddress = InstrumentAddress{0, 127}}}}},
+          {.firstBank = firstBank});
+      expect(reserved.selectionFor(InstrumentHandle{0, 0}).address != InstrumentAddress{0, 127},
+             "owned presets must not occupy an external program's clamped address, including after stitching");
+    }
+  }
+
 }
 
 void preparedOwnershipSurvivesCopiesAndMoves() {
@@ -310,6 +332,25 @@ void collectionExportsRequireACompanionForVariants() {
          "both companion formats must carry the original preset and its generated variant");
   expect(snapshot.asset<SoundBankAsset>(AssetId{1})->instruments.size() == 1,
          "repeated exports must not add variants to the snapshot's source bank");
+  for (u32 bank : {1u, 129u}) {
+    for (auto style : {MidiBankSelectStyle::MsbOnly, MidiBankSelectStyle::MsbAndLsb}) {
+      test::SessionSnapshotBuilder bankBuilder;
+      bankBuilder.assets.assign(snapshot.assets().begin(), snapshot.assets().end());
+      bankBuilder.collections = snapshot.collections();
+      std::get<SoundBankAsset>(bankBuilder.assets[1]).instruments[0].explicitAddress = InstrumentAddress{bank, 5};
+      const auto bankSnapshot = bankBuilder.finish();
+      const ExportRequest request{.kinds = {ExportKind::Dls}, .sequence = {.midi = {.bankSelectStyle = style}},
+                                   .dynamicEnvelopes = DynamicEnvelopePolicy::Ignore};
+      const auto collection = exportCollection(bankSnapshot, sources, CollectionId{0}, request);
+      const auto standalone = exportSoundBank(bankSnapshot, sources, AssetId{1}, SynthExportFormat::Dls, request);
+      const u32 expected = style == MidiBankSelectStyle::MsbOnly ? 256 : (bank == 1 ? 1 : 257);
+      for (const auto* artifact : {&collection[0], &standalone}) {
+        expect(readLe32(artifact->bytes, asciiOffset(artifact->bytes, "insh") + 12) == expected,
+               "collection and standalone DLS headers must encode the requested CC0/CC32 bank mode");
+      }
+    }
+  }
+
 }
 
 void completedCollectionsRetainInputsAcrossRenderingOutcomes() {

@@ -297,7 +297,8 @@ void tempoRelativeModulationFollowsTheGlobalTempoTimeline() {
                             ModulationPerformanceEvent{
                                 .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 0, .sequence = 0},
                                 .target = ModulationPerformanceTarget::VibratoRate,
-                                .context = LfoPerformanceContext{.cyclesPerTick = 0.125},
+                                .context = LfoPerformanceContext{.cyclesPerTick = 0.125,
+                                    .restartMode = LfoRestartMode::PhaseAndDelay},
                             },
                             ModulationPerformanceEvent{
                                 .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 0, .sequence = 1},

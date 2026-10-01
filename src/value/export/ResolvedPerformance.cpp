@@ -494,12 +494,28 @@ void ResolvedPerformance::assignAddresses(const InstrumentPreparationOptions& op
     }
   }
 
+  const auto aliases = [&](InstrumentAddress address) {
+    const u32 program = std::min<u32>(address.program, 127);
+    if (options.firstBank) return std::array{InstrumentAddress{address.bank, program},
+                                            InstrumentAddress{address.bank, program}};
+    return std::array{InstrumentAddress{address.bank & 127, program},
+                      InstrumentAddress{address.bank > 128 ? (address.bank >> 8) & 127 : address.bank, program}};
+  };
+  std::set<InstrumentAddress> externalAliases;
+  for (const auto& [bank, program] : external) {
+    for (const auto alias : aliases({bank, program})) externalAliases.insert(alias);
+  }
+  // Preserve legacy nonportable banks (notably SF2 percussion bank 128).
+  // Moving them requires channel-role/bank-mode policy, not numeric compaction.
+  const auto canRetain = [&](InstrumentAddress address) {
+    return (!options.firstBank && address.bank >= 128) ||
+           (address.program < 128 && !externalAliases.contains(address));
+  };
   std::bitset<128 * 128> reserved;
   const auto reserve = [&](InstrumentAddress address) {
-    const u32 program = std::min<u32>(address.program, 127);
-    reserved.set((address.bank & 127) * 128 + program);
-    const u32 sfBank = address.bank > 128 ? (address.bank >> 8) & 127 : address.bank;
-    if (sfBank < 128) reserved.set(sfBank * 128 + program);
+    for (const auto alias : aliases(address)) {
+      if (alias.bank < 128) reserved.set(alias.bank * 128 + alias.program);
+    }
   };
   std::map<InstrumentHandle, std::optional<InstrumentAddress>> preferred;
   for (u32 bank = 0; bank < soundBanks().size(); ++bank) {
@@ -510,7 +526,7 @@ void ResolvedPerformance::assignAddresses(const InstrumentPreparationOptions& op
       const auto& instrument = instruments[index];
       const auto address = instrument.explicitAddress;
       preferred.emplace(handle, address);
-      if (address) reserve(*address);
+      if (address && canRetain(*address)) reserve(*address);
     }
   }
   for (const auto& [bank, program] : external) reserve({bank, program});
@@ -518,7 +534,8 @@ void ResolvedPerformance::assignAddresses(const InstrumentPreparationOptions& op
   u32 next = 0;
   std::set<std::pair<u32, u32>> assigned;
   for (const auto& [handle, preferredAddress] : preferred) {
-    if (preferredAddress && assigned.emplace(preferredAddress->bank, preferredAddress->program).second) {
+    if (preferredAddress && canRetain(*preferredAddress) &&
+        assigned.emplace(preferredAddress->bank, preferredAddress->program).second) {
       addresses_.emplace(handle, *preferredAddress);
       continue;
     }

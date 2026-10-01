@@ -93,6 +93,36 @@ void midiPitchFollowsInstrumentSensitivityAndSourceFallback() {
          "source changes beneath instrument sensitivity must take effect when the instrument stops overriding it");
 }
 
+void continuingVoiceKeepsTheCurrentSourceSensitivity() {
+  const std::vector<SoundBankAsset> banks{{.instruments = {
+      Instrument{.explicitAddress = InstrumentAddress{0, 0}, .pitchBendRangeCents = 1200},
+      Instrument{.explicitAddress = InstrumentAddress{0, 1}, .pitchBendRangeCents = 200}}}};
+  for (auto mode : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
+    for (u64 selectionTick : {2u, 4u}) {
+      PerformanceTrackFixture f{16};
+      const auto first = f.out.note({.key = 60, .durationTicks = 4, .instrument = InstrumentAddress{0, 0}});
+      f.out.pitchBend({.normalizedWheelPosition = 0.5});
+      f.out.at(selectionTick).instrument(0, 1);
+      const auto next = f.out.at(4).continueVoice(first, {.key = 63, .durationTicks = 8});
+      f.out.at(4).pitchSlide(next, 61, 63, 4);
+      f.out.at(9).pitchBend({.normalizedWheelPosition = 0.25});
+      f.out.at(12).note({.key = 67, .durationTicks = 4, .instrument = InstrumentAddress{0, 0}});
+      const auto midi = renderMidiSequence(preparePerformance({.tracks = {f.track}}, banks), {.pitchTransitions = mode});
+      const auto& events = midi.tracks[0].events;
+      const bool bend = mode == MidiPitchTransitionRendering::PitchBend;
+      expect(std::abs(midiPitchSemitonesAt(events, 0) - 6) < 0.002 &&
+                 std::abs(midiPitchSemitonesAt(events, 4) - (bend ? 1 : 0)) < 0.002 &&
+                 std::abs(midiPitchSemitonesAt(events, 9) - (bend ? 2.5 : 0.5)) < 0.002 &&
+                 std::abs(midiPitchSemitonesAt(events, 12) - 3) < 0.002,
+             "continuing A's voice after selecting B must retain B's wheel sensitivity until a fresh source selection");
+      expect(std::ranges::any_of(events, [](const auto& event) {
+        const auto* program = midiChannelMessage(event, MidiChannelMessageKind::ProgramChange);
+        return event.tick == 4 && program && program->value == 0;
+      }) == !bend, "only a physical native reattack must restore the held voice's preset");
+    }
+  }
+}
+
 void midiPitchPreservesSmallAndZeroSourceRanges() {
   for (u16 cents : {0, 1, 30, 100, 235, 12700}) {
     PerformanceTrackFixture fixture{4};
@@ -367,6 +397,17 @@ void midiNotePlanningKeepsReleasePitchPastExpiredContinuations() {
          "a continuation after the hardware deadline must have no physical attack");
   expect(midiPitchBendRanges(midi.tracks[0].events) == std::vector<std::pair<u64, u16>>{{0, 400}, {10, 200}},
          "an expired boundary must not start a new pitch-range interval");
+  expect(std::ranges::none_of(midi.tracks[0].events, [](const auto& event) {
+    return event.tick == 4 && isMidiController(event, MidiController::PortamentoControl);
+  }), "an expired native continuation must not emit portamento controls");
+  PerformanceTrackFixture delayed{8};
+  const auto capped = delayed.out.note({.key = 64, .durationTicks = 8, .maximumDurationMilliseconds = 100.0});
+  delayed.out.at(4).pitchSlide(capped, 61, 63, 4).preferPortamento();
+  const auto prefix = renderTestMidi({.timebase = {.ppqn = 10}, .tracks = {delayed.track}});
+  const auto prefixNotes = midiNotes(prefix.tracks[0].events);
+  expect(prefixNotes.size() == 1 && prefixNotes[0].key == 61 && prefixNotes[0].duration == 2,
+         "a hardware deadline must suppress the future attack while preserving valid earlier envelope placement");
+
 }
 
 void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
@@ -679,10 +720,10 @@ void performanceMidiRendererHonorsRequiredPortamento() {
 }
 
 void performanceMidiRendererStartsANewVoiceAfterPitchBendContinuationWhenMidiPortamentoTakesOver() {
-  PerformanceTrackFixture fixture{12};
+  PerformanceTrackFixture fixture{16};
   auto& track = fixture.track;
   auto& out = fixture.out;
-  const PerformanceNoteId first = out.note(60, 1.0, 4);
+  const PerformanceNoteId first = out.note(60, 1.0, 16);
   const PerformanceNoteId second = out.at(4).continueVoice(first, NotePerformanceEvent{.key = 64, .durationTicks = 4});
   out.at(4).pitchSlide(second, 60, 64, 3).preferPitchBend();
   const PerformanceNoteId third = out.at(8).continueVoice(second, NotePerformanceEvent{.key = 67, .durationTicks = 4});
@@ -696,7 +737,7 @@ void performanceMidiRendererStartsANewVoiceAfterPitchBendContinuationWhenMidiPor
       MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PreserveFormat});
   const auto notes = midiNotes(midi.tracks[0].events);
   expect(notes.size() == 2 && notes[0].tick == 0 && notes[0].key == 60 && notes[0].duration == 9 &&
-             notes[1].tick == 8 && notes[1].key == 67 &&
+             notes[1].tick == 8 && notes[1].key == 67 && notes[1].duration == 8 &&
              std::ranges::none_of(midi.tracks[0].events,
                                   [](const MidiEvent& event) {
                                     const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
@@ -1295,6 +1336,27 @@ void performanceMidiLoweringOrdersDelayedPitchWithSourceWrites() {
   }
 }
 
+void replacementSlidesPreserveEarlierExplicitPitch() {
+  for (bool firstNative : {false, true}) {
+    for (bool laterNative : {false, true}) {
+      PerformanceTrackFixture f{12};
+      const auto note = f.out.note(60, 1, 12);
+      auto first = f.out.at(2).pitchSlide(note, 60, 64, 2);
+      auto later = f.out.at(6).pitchSlide(note, 62, 66, 2);
+      if (firstNative) first.preferPortamento(); else first.preferPitchBend();
+      if (laterNative) later.preferPortamento(); else later.preferPitchBend();
+      std::ranges::reverse(f.track.automations); // Rendering stages must not decide placement ownership.
+      const auto midi = renderTestMidi({.tracks = {f.track}});
+      const auto& events = midi.tracks[0].events;
+      const auto notes = midiNotes(events);
+      expect(notes.size() == 1u + firstNative + laterNative && notes[0].key == 60 &&
+                 std::abs(midiPitchSemitonesAt(events, 0)) < 0.002 &&
+                 (firstNative ? notes[1].key == 64 : std::abs(midiPitchSemitonesAt(events, 4) - 4) < 0.002),
+             "a later explicit slide must not retune an earlier attack, destination key, or bend trajectory");
+    }
+  }
+}
+
 void performanceMidiPortamentoReadsTheSourceWheelAtTheTransition() {
   for (bool instrumentRange : {false, true}) {
     PerformanceTrackFixture fixture{8};
@@ -1432,6 +1494,7 @@ void runValueMidiPitchTests() {
   midiPitchFollowsSourceSensitivityCommands();
   midiPitchDoesNotAnticipateSourceSensitivity();
   midiPitchFollowsInstrumentSensitivityAndSourceFallback();
+  continuingVoiceKeepsTheCurrentSourceSensitivity();
   midiPitchPreservesSmallAndZeroSourceRanges();
   midiPitchKeepsAnOverrideUntilTheSourceRangeSuffices();
   midiModulationIgnoresConsumedCommands();
@@ -1466,6 +1529,7 @@ void runValueMidiPitchTests() {
   performanceMidiRendererResolvesNormalizedWheelBeforeLoweringTransitions();
   performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes();
   performanceMidiLoweringOrdersDelayedPitchWithSourceWrites();
+  replacementSlidesPreserveEarlierExplicitPitch();
   performanceMidiPortamentoReadsTheSourceWheelAtTheTransition();
   performanceMidiRendererResolvesSourceInstrumentIdentityAtExport();
   performanceMidiRendererQuantizesPitchBendAndPortamento();

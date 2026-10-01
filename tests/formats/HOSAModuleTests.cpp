@@ -17,6 +17,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <variant>
 #include <vector>
 
@@ -327,9 +328,34 @@ void hosaModuleBuildsDriverAccurateRegions() {
          "the Serene Town drum-region volume should remain a linear 110/127 amplitude factor");
 }
 
+void hosaTempoChangesPreserveSourceClockedModulation() {
+  const auto controls = [](u8 tempo) {
+    std::vector<u8> bytes(0x54);
+    initializeHeader(bytes, 0, 2);
+    le16(bytes, 0x50, 0x54);
+    bytes.insert(bytes.end(), {0x87, 32, 4, 0x88, 32, 2, 15, 3, 0x20, 0xbc, 100, 0x80});
+    le16(bytes, 0x52, static_cast<u16>(bytes.size()));
+    bytes.insert(bytes.end(), {0xc1, 0x72, 5, 0x81, tempo, 0x80}); // change global tempo after five ticks
+    const ByteReader reader(SourceId{85}, bytes);
+    const auto layout = readSequenceLayout(reader, 0);
+    expect(layout.has_value(), "two-track HOSA timing fixture must parse");
+    const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(parseSequence(reader, AssetId{85}, *layout));
+    const auto midi = renderTestMidi(performance, {}, ModulationConversionPolicy::SequenceEventSimulation);
+    std::vector<std::tuple<u64, MidiChannelMessageKind, u8, s32>> values;
+    for (const auto& event : midi.tracks[0].events) {
+      if (const auto* message = std::get_if<MidiChannelMessage>(&event.payload))
+        values.emplace_back(event.tick, message->kind, message->parameter, message->value);
+    }
+    return values;
+  };
+  expect(controls(0x72) == controls(0xc8),
+         "a global tempo change must not restart HOSA's source-clocked vibrato or pan oscillator");
+}
+
 void runHOSAModuleTests() {
   hosaSequencePreservesAuditedGrammarAndMixer();
   hosaVibratoUsesExactDriverTables();
+  hosaTempoChangesPreserveSourceClockedModulation();
   hosaUnterminatedFinalTrackStopsAtZeroPadding();
   hosaTracksMayShareSequenceData();
   hosaSequenceLoopRestoresEveryTrack();

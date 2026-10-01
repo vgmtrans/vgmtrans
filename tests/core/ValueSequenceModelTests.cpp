@@ -463,16 +463,17 @@ void previousNoteEndRetainsContinuationChainBehavior() {
   expect(!out.setPreviousNoteEnd(4), "revising the previous note should still report failure when none exists");
   const PerformanceNoteId unrelated = out.note(55, 1.0, 6);
   const PerformanceNoteId base = out.at(10).note(60, 1.0, 20);
-  out.at(12).level(0.5);
-  const PerformanceNoteId extension = out.at(18).note(60, 0.75, 4, true);
+  out.at(12).note({.key = 48, .durationTicks = 20, .lane = PerformanceLaneId{1}});
+  const PerformanceNoteId extension = out.at(18).continueVoice(base, {.key = 60, .durationTicks = 4});
 
   expect(unrelated != base && extension == base && out.at(20).setPreviousNoteEnd(25),
          "the previous-note convenience API should resolve the latest continuation's stable identity");
   const auto& unrelatedEvent = std::get<NotePerformanceEvent>(track.events[0]);
   const auto& baseEvent = std::get<NotePerformanceEvent>(track.events[1]);
   const auto& extensionEvent = std::get<NotePerformanceEvent>(track.events[3]);
-  expect(unrelatedEvent.durationTicks == 6 && baseEvent.durationTicks == 15 && extensionEvent.durationTicks == 7,
-         "revising a continuation chain should retain the former durations and stopping boundary exactly");
+  expect(unrelatedEvent.durationTicks == 6 && baseEvent.durationTicks == 15 && extensionEvent.durationTicks == 7 &&
+             std::get<NotePerformanceEvent>(track.events[2]).durationTicks == 20,
+         "revising an explicit tie must update its own chain and preserve interleaved notes");
 }
 
 void tempoMapPreservesOrderingAndBoundsDurationConversion() {

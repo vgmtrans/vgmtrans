@@ -42,7 +42,9 @@ struct NoteDraft {
   double bendBaseKey;
   bool extendsPrevious;
   bool restartsEnvelope;
+  std::optional<u32> portamentoOverlap;
   NoteAction action = NoteAction::Attack;
+  bool selectsSourceInstrument = false;
   size_t outputIndex = 0;  // Preserve the boundary's position among coincident source controls.
 
   explicit NoteDraft(const NotePerformanceEvent& note)
@@ -54,6 +56,7 @@ struct NoteDraft {
 struct NoteSpan {
   const NotePerformanceEvent& source;
   u64 endTick = 0;  // Source gate including ties, independent of MIDI overlap and hardware deadlines.
+  std::optional<size_t> previousVoiceIndex;
   // Native portamento replaces the source boundaries with these segments.
   // Otherwise the source boundaries retain their individual LFO decisions.
   bool usesPortamento = false;
@@ -67,12 +70,23 @@ class SourcePitchTimeline {
   SourcePitchTimeline(const std::vector<PerformanceEvent>& events, const ResolvedPerformance& performance)
       : initial_{.context = PerformancePitchBendContext{performance}} {
     Point current = initial_;
+    std::unordered_set<PerformanceVoiceId> sourceVoices;
     for (const auto& event : events) {
       current.order = performanceEventHeader(event).order();
-      bool changed = current.context.apply(event, performance);
+      const auto previousContext = current.context;
+      if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+        // A new logical anchor or synthetic MIDI attack does not reselect the
+        // source instrument of a continuing voice.
+        if (sourceVoices.insert(note->voice).second && (note->note.valid() || !note->extendsPrevious)) {
+          current.context.selectInstrument(performance.selectionFor(*note).instrument);
+        }
+      } else {
+        current.context.apply(event, performance);
+      }
+      bool changed = current.context != previousContext;
       if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
           bend && bend->layer == kPrimaryPitchBendLayer &&
-          (!current.primary || current.primary->header.order() < bend->header.order())) {
+          (!current.primary || current.primary->header.order() <= bend->header.order())) {
         current.primary = bend;
         changed = true;
       }
@@ -135,41 +149,40 @@ struct PitchBendState {
 
 using PitchBendWrites = std::vector<PitchBendWrite>;
 
-[[nodiscard]] NoteSpan* findNote(std::vector<NoteSpan>& notes, PerformanceNoteId id) {
-  const auto found = std::ranges::find_if(notes, [id](const NoteSpan& note) { return note.source.note == id; });
-  return found == notes.end() ? nullptr : &*found;
+using NoteIndex = std::unordered_map<PerformanceNoteId, size_t>;
+
+[[nodiscard]] NoteSpan* findNote(std::vector<NoteSpan>& notes, const NoteIndex& noteIndex, PerformanceNoteId id) {
+  const auto found = noteIndex.find(id);
+  return found == noteIndex.end() ? nullptr : &notes[found->second];
 }
 
-// Source voices are explicit. Only the preceding physical MIDI note needs to
-// be recovered here, because portamento can change its bend reference key.
+// Source voices are explicit. Store the preceding span's index so collection
+// remains linear and vector growth cannot invalidate the relationship.
 [[nodiscard]] NoteSpan* previousVoiceNote(std::vector<NoteSpan>& notes, const NoteSpan& note) {
-  NoteSpan* previous = nullptr;
-  for (auto& candidate : notes) {
-    if (&candidate == &note) {
-      break;
-    }
-    if (candidate.source.voice == note.source.voice) {
-      previous = &candidate;
-    }
-  }
-  return previous;
+  return note.previousVoiceIndex ? &notes[*note.previousVoiceIndex] : nullptr;
 }
 
-[[nodiscard]] std::vector<NoteSpan> collectNotes(const PerformanceTrack& track) {
+[[nodiscard]] std::vector<NoteSpan> collectNotes(const PerformanceTrack& track, NoteIndex& noteIndex) {
   std::vector<NoteSpan> notes;
+  std::unordered_map<PerformanceVoiceId, size_t> lastSpanByVoice;
   for (const auto& event : track.events) {
     const auto* source = std::get_if<NotePerformanceEvent>(&event);
     if (source == nullptr || !source->note.valid()) {
       continue;
     }
-    if (auto* note = findNote(notes, source->note)) {
-      note->endTick = std::max(note->endTick, addTicks(source->header.tick, source->durationTicks));
-      note->segments.front().endTick = note->endTick;
+    const auto [found, inserted] = noteIndex.try_emplace(source->note, notes.size());
+    if (!inserted) {
+      auto& note = notes[found->second];
+      note.endTick = std::max(note.endTick, addTicks(source->header.tick, source->durationTicks));
+      note.segments.front().endTick = note.endTick;
     } else {
+      const auto [voice, fresh] = lastSpanByVoice.try_emplace(source->voice, notes.size());
+      const auto previous = fresh ? std::nullopt : std::optional{voice->second};
       auto& span = notes.emplace_back(NoteSpan{
           .source = *source, .endTick = addTicks(source->header.tick, source->durationTicks),
-          .segments = {NoteDraft{*source}}});
-      span.segments.front().extendsPrevious = previousVoiceNote(notes, span) != nullptr;
+          .previousVoiceIndex = previous, .segments = {NoteDraft{*source}}});
+      span.segments.front().extendsPrevious = previous.has_value();
+      voice->second = found->second;
     }
   }
   return notes;
@@ -239,6 +252,37 @@ void addWarning(std::vector<Diagnostic>& diagnostics, const PerformanceAutomatio
     return false;
   }
   return note.endTick > automation.realization.startTick && note.source.header.tick <= automation.realization.endTick;
+}
+
+// A delayed envelope can establish pitch at its source note boundary (also a
+// same-key tie), but a later explicit slide cannot rewrite an earlier curve.
+// Inspect source transitions only: generated key changes are not source slides.
+[[nodiscard]] const NotePerformanceEvent* initialPitchBoundary(
+    const PerformanceTrack& track, std::vector<NoteSpan>& notes, const NoteIndex& noteIndex,
+    const NoteSpan& note, const PerformanceAutomation& automation) {
+  if (automation.realization.startTick <= note.source.header.tick) return nullptr;
+  const auto order = std::pair{automation.realization.startTick, automation.header.sequence};
+  const NotePerformanceEvent* boundary = &note.source;
+  for (const auto& event : track.events) {
+    if (const auto* source = std::get_if<NotePerformanceEvent>(&event);
+        source && source->note == note.source.note && source->header.order() <= order) {
+      boundary = source;
+    }
+  }
+  bool beforeCurrent = true;
+  for (const auto& earlier : track.automations) {
+    if (&earlier == &automation) { beforeCurrent = false; continue; }
+    const auto* intent = pitchTransitionIntent(earlier);
+    if (!intent || (earlier.realization.endReason != PerformanceAutomationEndReason::Completed &&
+                    earlier.realization.endTick <= earlier.realization.startTick)) continue;
+    const auto earlierOrder = std::pair{std::max(note.source.header.tick, earlier.realization.startTick),
+                                        earlier.header.sequence};
+    if (earlierOrder < boundary->header.order() || earlierOrder > order ||
+        (earlierOrder == order && !beforeCurrent)) continue;
+    const auto* anchor = findNote(notes, noteIndex, intent->note);
+    if (anchor && affectsNote(earlier, *intent, *anchor, note)) return nullptr;
+  }
+  return boundary;
 }
 
 [[nodiscard]] PitchBendWrite transitionPitchBend(const PerformanceAutomation& automation,
@@ -345,7 +389,8 @@ PitchBendState resolvePitchBends(PitchBendWrites& writes, PitchBendLayerId heldT
 
 [[nodiscard]] bool appendPitchBends(PitchBendWrites& bends, const PerformanceAutomation& automation,
                                     const PitchTransitionIntent& transition, const NoteSpan& note,
-                                    bool held, bool retainReleaseTail, PitchBendLayerId heldTransitionLayer,
+                                    const NotePerformanceEvent* initialBoundary, bool held, bool retainReleaseTail,
+                                    PitchBendLayerId heldTransitionLayer,
                                     const SourcePitchTimeline& sourcePitch) {
   const u64 startTick = std::max(note.source.header.tick, automation.realization.startTick);
   const u64 endTick =
@@ -354,9 +399,11 @@ PitchBendState resolvePitchBends(PitchBendWrites& writes, PitchBendLayerId heldT
     return false;
   }
 
-  const double noteBaseKey = bendBaseKeyAt(note, note.source.header.tick);
-  const bool needsInitialPitch = startTick > note.source.header.tick &&
-                                 std::abs(transition.startKey - noteBaseKey) > 0.000001;
+  const u64 initialTick = initialBoundary ? initialBoundary->header.tick : startTick;
+  const double noteBaseKey = bendBaseKeyAt(note, initialTick);
+  const bool needsInitialPitch = initialBoundary && startTick > initialTick &&
+      (std::abs(transition.startKey - noteBaseKey) > 0.000001 ||
+       std::abs(transition.startKey - initialBoundary->key) > 0.000001);
   // Ordinary curve samples already specify their pitch. History matters only
   // when inheriting a held pitch or deciding whether to establish an earlier start.
   const bool startPitchEstablished =
@@ -365,7 +412,7 @@ PitchBendState resolvePitchBends(PitchBendWrites& writes, PitchBendLayerId heldT
   const bool establishesHeldPitch = held && !startPitchEstablished;
   if (needsInitialPitch && !startPitchEstablished) {
     // Held transitions start on a note boundary; only absolute slides need this earlier write.
-    bends.push_back(transitionPitchBend(automation, false, note.source.header.tick, transition.startKey - noteBaseKey));
+    bends.push_back(transitionPitchBend(automation, false, initialTick, transition.startKey - noteBaseKey));
   }
 
   const auto appendAt = [&](u64 tick) {
@@ -458,13 +505,14 @@ PitchBendState resolvePitchBends(PitchBendWrites& writes, PitchBendLayerId heldT
 }
 
 void lowerPitchBends(std::vector<Diagnostic>& diagnostics, std::vector<MidiTrackEvent>& events,
-                     const std::vector<NoteDraft*>& physicalNotes, std::vector<NoteSpan>& notes, const std::vector<const PerformanceAutomation*>& transitions,
-                     const SourcePitchTimeline& sourcePitch) {
+                     const std::vector<NoteDraft*>& physicalNotes, std::vector<NoteSpan>& notes, const NoteIndex& noteIndex,
+                     const std::vector<const PerformanceAutomation*>& transitions,
+                     const SourcePitchTimeline& sourcePitch, const PerformanceTrack& track) {
   auto bends = takeSourcePitchBends(events);
   const PitchBendLayerId heldTransitionLayer = unusedPitchBendLayer(bends);
   for (const auto* automation : transitions) {
     const auto& transition = *pitchTransitionIntent(*automation);
-    const auto* anchor = findNote(notes, transition.note);
+    const auto* anchor = findNote(notes, noteIndex, transition.note);
     if (anchor == nullptr) {
       addWarning(diagnostics, *automation, "Pitch transition did not reference a rendered note");
       continue;
@@ -480,7 +528,9 @@ void lowerPitchBends(std::vector<Diagnostic>& diagnostics, std::vector<MidiTrack
     }
     bool rendered = false;
     for (const auto* note : affectedNotes) {
-      rendered |= appendPitchBends(bends, *automation, transition, *note, held, note == affectedNotes.back(),
+      rendered |= appendPitchBends(bends, *automation, transition, *note,
+                                   initialPitchBoundary(track, notes, noteIndex, *note, *automation),
+                                   held, note == affectedNotes.back(),
                                    heldTransitionLayer, sourcePitch);
     }
     if (rendered) {
@@ -497,13 +547,34 @@ void lowerPitchBends(std::vector<Diagnostic>& diagnostics, std::vector<MidiTrack
                     [&](PitchBendPerformanceEvent bend) { events.emplace_back(std::move(bend)); });
 }
 
+void placeInitialPortamentoKey(NoteSpan& note, const NotePerformanceEvent& boundary, double key) {
+  auto segment = std::prev(std::ranges::upper_bound(note.segments, boundary.header.tick, {},
+                                                   [](const NoteDraft& draft) { return draft.header.tick; }));
+  if (std::abs(segment->key - key) < 0.000001) return;
+  if (boundary.header.tick > segment->header.tick) {
+    auto next = *segment;
+    segment->endTick = std::min(segment->endTick, boundary.header.tick);
+    next.source = &boundary;
+    next.header = boundary.header;
+    segment = note.segments.insert(std::next(segment), next);
+  }
+  segment->key = segment->bendBaseKey = key;
+  // A changed initial key on a tie needs its own physical attack.
+  if (boundary.header.tick > note.source.header.tick) {
+    segment->extendsPrevious = false;
+    segment->restartsEnvelope = false;
+    segment->portamentoOverlap = 0;
+  }
+}
+
 void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
-                        const PitchTransitionIntent& transition, bool held, bool sourceEstablishesStart) {
+                        const PitchTransitionIntent& transition, bool held) {
   const u64 startTick = automation.realization.startTick;
   if (startTick <= note.source.header.tick) {
     note.segments.front().key = transition.targetKey;
     note.segments.front().bendBaseKey = transition.targetKey;
     note.segments.front().extendsPrevious = false;
+    note.segments.front().portamentoOverlap = transition.portamentoRendering.overlapTicks;
     if (held) {
       note.segments.front().restartsEnvelope = false;
     }
@@ -518,10 +589,6 @@ void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
     if (segment.endTick > clampedStart) {
       const u32 overlap = transition.portamentoRendering.overlapTicks;
       segment.endTick = std::min(note.endTick, addTicks(clampedStart, overlap));
-      if (!sourceEstablishesStart) {
-        segment.key = transition.startKey;
-        segment.bendBaseKey = transition.startKey;
-      }
     }
   }
   if (clampedStart < note.endTick) {
@@ -532,16 +599,18 @@ void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
     segment.key = segment.bendBaseKey = transition.targetKey;
     segment.extendsPrevious = false;
     segment.restartsEnvelope = false;
+    segment.portamentoOverlap = transition.portamentoRendering.overlapTicks;
   }
 }
 
 void lowerPortamento(std::vector<Diagnostic>& diagnostics, std::vector<MidiTrackEvent>& events,
-                     std::vector<NoteSpan>& notes,
+                     std::vector<NoteSpan>& notes, const NoteIndex& noteIndex,
                      const std::vector<const PerformanceAutomation*>& transitions, const PerformanceTempoMap& tempos,
-                     u64& nextSequence, const SourcePitchTimeline& sourcePitch) {
+                     u64& nextSequence, const SourcePitchTimeline& sourcePitch, const ResolvedPerformance& resolved,
+                     const PerformanceTrack& track) {
   for (const auto* automation : transitions) {
     const auto& transition = *pitchTransitionIntent(*automation);
-    auto* note = findNote(notes, transition.note);
+    auto* note = findNote(notes, noteIndex, transition.note);
     if (note == nullptr) {
       addWarning(diagnostics, *automation, "Pitch transition did not reference a rendered note");
       continue;
@@ -563,15 +632,21 @@ void lowerPortamento(std::vector<Diagnostic>& diagnostics, std::vector<MidiTrack
     // Allow the source's finite wheel register to quantize the declared start.
     const bool sourceEstablishesStart =
         sourceBend && std::abs(bendBaseKeyAt(*sourceNote, startTick) + *sourceBend - transition.startKey) < 0.02;
-    note->usesPortamento = true;
-    if (startTick <= note->source.header.tick && previous != nullptr) {
-      previous->usesPortamento = true;
-      auto& segment = previous->segments.back();
-      const u32 overlap = transition.portamentoRendering.overlapTicks;
-      const u64 overlapEnd = addTicks(startTick, overlap);
-      segment.endTick = std::max(segment.endTick, overlapEnd);
+    const auto limit = resolved.voiceFor(note->source).endLimit;
+    if (!sourceEstablishesStart) {
+      if (const auto* boundary = initialPitchBoundary(track, notes, noteIndex, *note, *automation);
+          boundary && boundary->header.tick < startTick && (!limit || boundary->header.tick < *limit)) {
+        placeInitialPortamentoKey(*note, *boundary, transition.startKey);
+        note->usesPortamento = true;
+      }
     }
-    splitForPortamento(*note, *automation, transition, previous != nullptr, sourceEstablishesStart);
+    // Initial placement can precede the deadline even when the future attack
+    // cannot. Suppress only that attack, its overlap, and its controllers.
+    const bool continuation = previous || startTick > note->source.header.tick || !note->source.restartsEnvelope;
+    if (continuation && limit && startTick >= *limit) continue;
+    note->usesPortamento = true;
+    if (previous) previous->usesPortamento = true;
+    splitForPortamento(*note, *automation, transition, previous != nullptr);
 
     if (sourceEstablishesStart && std::abs(*sourceBend) > 0.000001) {
       events.emplace_back(PitchBendPerformanceEvent{
@@ -598,7 +673,7 @@ void lowerPortamento(std::vector<Diagnostic>& diagnostics, std::vector<MidiTrack
 
 std::vector<NoteDraft*> appendSourceEvents(
     std::vector<MidiTrackEvent>& events, const std::vector<PerformanceEvent>& sourceEvents,
-    std::vector<NoteSpan>& notes, bool renderPortamentoSettings, u64& nextSequence,
+    std::vector<NoteSpan>& notes, const NoteIndex& noteIndex, bool renderPortamentoSettings, u64& nextSequence,
     const ResolvedPerformance& resolved, std::deque<NoteDraft>& ties) {
   std::vector<NoteDraft*> boundaries;
   const auto append = [&](NoteDraft& note) {
@@ -610,8 +685,14 @@ std::vector<NoteDraft*> appendSourceEvents(
     std::visit([&](const auto& source) {
       using Event = std::decay_t<decltype(source)>;
       if constexpr (std::is_same_v<Event, NotePerformanceEvent>) {
-        auto* span = source.note.valid() ? findNote(notes, source.note) : nullptr;
+        auto* span = source.note.valid() ? findNote(notes, noteIndex, source.note) : nullptr;
         if (span && span->usesPortamento) {
+          // Keep the original boundary in source order even when coincident
+          // commands have equal sequence numbers. Only new fragments are
+          // appended after the lowering controls below.
+          if (&source == &span->source) {
+            append(span->segments.front());
+          }
           return;
         }
         auto& note = span && &source == &span->source ? span->segments.front() : ties.emplace_back(source);
@@ -650,12 +731,12 @@ std::vector<NoteDraft*> appendSourceEvents(
     if (!note.usesPortamento) {
       continue;
     }
-    for (auto& segment : note.segments) {
-      if (segment.endTick <= segment.header.tick) {
+    for (auto segment = std::next(note.segments.begin()); segment != note.segments.end(); ++segment) {
+      if (segment->endTick <= segment->header.tick) {
         continue;
       }
-      segment.header.sequence = nextSequence++;
-      append(segment);
+      segment->header.sequence = nextSequence++;
+      append(*segment);
     }
   }
   std::ranges::stable_sort(boundaries, {}, [](const NoteDraft* note) { return note->header.order(); });
@@ -668,6 +749,9 @@ void planPhysicalNotes(const std::vector<NoteDraft*>& notes, const ResolvedPerfo
   std::unordered_map<PerformanceVoiceId, NoteDraft*> previous;
   for (auto* note : notes) {
     auto& attack = previous[note->source->voice];
+    // MIDI portamento may require another Note On with the voice's preset.
+    // Only the first source attack gives that preset ownership of the wheel.
+    note->selectsSourceInstrument = attack == nullptr && !note->extendsPrevious;
     if (note->extendsPrevious && attack != nullptr) {
       note->bendBaseKey = attack->bendBaseKey;
     }
@@ -683,6 +767,11 @@ void planPhysicalNotes(const std::vector<NoteDraft*>& notes, const ResolvedPerfo
       note->action = NoteAction::Continue;
     } else {
       note->bendBaseKey = note->key;
+      if (attack != nullptr && note->portamentoOverlap) {
+        // Transfer the voice's remaining gate to the new physical key.
+        note->endTick = std::max(note->endTick, attack->endTick);
+        attack->endTick = std::min(addTicks(note->header.tick, *note->portamentoOverlap), note->endTick);
+      }
       attack = note;
     }
   }
@@ -700,6 +789,7 @@ void planPhysicalNotes(const std::vector<NoteDraft*>& notes, const ResolvedPerfo
   };
   if (!boundary.expired && !note.extendsPrevious) {
     boundary.instrument = resolved.selectionFor(*note.source);
+    boundary.selectsSourceInstrument = note.selectsSourceInstrument;
   }
   if (note.action == NoteAction::Attack) {
     boundary.attack = detail::MidiAttack{
@@ -760,7 +850,8 @@ std::vector<detail::MidiTrackEvent> detail::planMidiTrack(
              std::tie(rhs->realization.startTick, rhs->header.sequence);
     });
   };
-  auto notes = collectNotes(track);
+  NoteIndex noteIndex;
+  auto notes = collectNotes(track, noteIndex);
   // A changed key is already a source voice operation. Only MIDI needs an
   // instantaneous pitch transition when no explicit boundary slide replaces it.
   std::vector<PerformanceAutomation> keyChanges;
@@ -809,7 +900,8 @@ std::vector<detail::MidiTrackEvent> detail::planMidiTrack(
   std::vector<MidiTrackEvent> events;
   events.reserve(track.events.size() + (portamentoTransitions.size() + pitchBendTransitions.size()) * 4);
   if (!portamentoTransitions.empty()) {
-    lowerPortamento(diagnostics, events, notes, portamentoTransitions, tempos, nextSequence, *sourcePitch);
+    lowerPortamento(diagnostics, events, notes, noteIndex, portamentoTransitions, tempos,
+                    nextSequence, *sourcePitch, resolved, track);
   }
   const bool renderPortamentoSettings =
       !portamentoTransitions.empty() || options.pitchTransitions == MidiPitchTransitionRendering::Portamento ||
@@ -818,14 +910,14 @@ std::vector<detail::MidiTrackEvent> detail::planMidiTrack(
   // Tie boundaries have stable addresses; span segments are no longer split
   // after this point. Gate planning and pitch sampling share those same records.
   std::deque<NoteDraft> ties;
-  const auto physicalNotes = appendSourceEvents(events, track.events, notes, renderPortamentoSettings,
+  const auto physicalNotes = appendSourceEvents(events, track.events, notes, noteIndex, renderPortamentoSettings,
                                                 nextSequence, resolved, ties);
   planPhysicalNotes(physicalNotes, resolved);
   for (const auto* note : physicalNotes) {
     events[note->outputIndex] = finishNote(*note, resolved, options);
   }
   if (!pitchBendTransitions.empty()) {
-    lowerPitchBends(diagnostics, events, physicalNotes, notes, pitchBendTransitions, *sourcePitch);
+    lowerPitchBends(diagnostics, events, physicalNotes, notes, noteIndex, pitchBendTransitions, *sourcePitch, track);
   }
   std::ranges::stable_sort(events, {},
                            [](const MidiTrackEvent& event) { return performanceEventHeader(event).order(); });

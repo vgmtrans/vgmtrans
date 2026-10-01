@@ -1224,6 +1224,27 @@ bool compareCapcomSnesSummary(std::span<const u8> aramBytes, const std::string& 
   return compareSummary(legacy, value, out);
 }
 
+ExportRequest midiParityRequest(
+    u32 sequenceLoops = 0,
+    ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators,
+    MidiExportOptions midiOptions = {},
+    ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange) {
+  // Legacy MIDI selects the original instruments, not generated envelope
+  // variants. Choose that policy explicitly and keep every diagnostic fatal.
+  // Core export tests check the separate default MIDI-only warning contract.
+  return ExportRequest{
+      .kinds = {ExportKind::Midi},
+      .sequence = {
+          .loopPolicy = LoopPolicy::PlayOnce,
+          .sequenceLoops = sequenceLoops,
+          .midi = midiOptions,
+      },
+      .modulationScaling = modulationScaling,
+      .modulationConversion = modulationConversion,
+      .dynamicEnvelopes = DynamicEnvelopePolicy::Ignore,
+  };
+}
+
 std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string& name) {
   Session session;
   vgmtrans::formats::registerValueFormats(session);
@@ -1241,16 +1262,7 @@ std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string
     throw std::runtime_error(message.str());
   }
 
-  const auto artifacts = session.exportCollection(
-      project.collections().front().id, ExportRequest{
-                                            .kinds = {ExportKind::Midi},
-                                            .sequence =
-                                                {
-                                                    .loopPolicy = LoopPolicy::PlayOnce,
-                                                    .sequenceLoops = 0,
-                                                },
-                                            .modulationConversion = ModulationConversionPolicy::SynthModulators,
-                                        });
+  const auto artifacts = session.exportCollection(project.collections().front().id, midiParityRequest());
 
   for (const auto& artifact : artifacts) {
     if (artifact.mediaType == "audio/midi") {
@@ -1265,16 +1277,7 @@ std::vector<u8> valueCapcomSnesMidi(std::vector<u8> aramBytes, const std::string
 }
 
 std::vector<u8> valueCapcomSnesMidi(Session& session, CollectionId collection) {
-  const auto artifacts =
-      session.exportCollection(collection, ExportRequest{
-                                               .kinds = {ExportKind::Midi},
-                                               .sequence =
-                                                   {
-                                                       .loopPolicy = LoopPolicy::PlayOnce,
-                                                       .sequenceLoops = 0,
-                                                   },
-                                               .modulationConversion = ModulationConversionPolicy::SynthModulators,
-                                           });
+  const auto artifacts = session.exportCollection(collection, midiParityRequest());
 
   for (const auto& artifact : artifacts) {
     if (artifact.mediaType == "audio/midi") {
@@ -1938,17 +1941,8 @@ std::map<std::string, std::vector<u8>> legacyCollectionMidis(const std::filesyst
 std::vector<u8> valueCollectionMidi(Session& session, CollectionId collection, u32 sequenceLoops,
                                     ModulationConversionPolicy modulationConversion, MidiExportOptions midiOptions,
                                     ModulationScalingPolicy modulationScaling) {
-  const auto artifacts = session.exportCollection(collection, ExportRequest{
-                                                                  .kinds = {ExportKind::Midi},
-                                                                  .sequence =
-                                                                      {
-                                                                          .loopPolicy = LoopPolicy::PlayOnce,
-                                                                          .sequenceLoops = sequenceLoops,
-                                                                          .midi = midiOptions,
-                                                                      },
-                                                                  .modulationScaling = modulationScaling,
-                                                                  .modulationConversion = modulationConversion,
-                                                              });
+  const auto artifacts = session.exportCollection(
+      collection, midiParityRequest(sequenceLoops, modulationConversion, midiOptions, modulationScaling));
 
   for (const auto& artifact : artifacts) {
     if (artifact.mediaType == "audio/midi") {

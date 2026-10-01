@@ -24,8 +24,13 @@ namespace vgmtrans::core {
 
 namespace {
 
+constexpr size_t kExternalSampleScope = std::numeric_limits<size_t>::max();
+
 struct SynthSampleIndexKey {
   u32 owner = invalidIdValue;
+  // One scanned bank may have different collection-local preparations in a
+  // stitched export. External pools still share their original asset identity.
+  size_t bankScope = kExternalSampleScope;
   u32 index = invalidIdValue;
   bool phaseInverted = false;
   u32 startFrame = 0;
@@ -38,9 +43,18 @@ using SynthSampleIndexMap = std::map<SynthSampleIndexKey, std::optional<u32>>;
 
 constexpr double kPerceivedHalfLoudnessDb = 10.0;
 
+// Valid regions refer to their own bank's local samples or to an external pool.
+[[nodiscard]] SynthSampleIndexKey sampleKey(const Region& region, const SoundBankAsset& bank, size_t bankScope) {
+  return {.owner = region.sample.owner().value,
+          .bankScope = region.sample.owner() == bank.metadata.id ? bankScope : kExternalSampleScope,
+          .index = region.sample.index(),
+          .phaseInverted = region.invertSamplePhase,
+          .startFrame = region.sampleStartFrame};
+}
+
 void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, AssetId owner,
                      const SamplePool& pool, const SynthExportInput& input, const SourceStore& sources,
-                     const SynthSampleDecodeOptions& options) {
+                     const SynthSampleDecodeOptions& options, size_t bankScope = kExternalSampleScope) {
   // Decode once into the final sample table, including any phase-inverted
   // variants. Container exporters share its indexes and source diagnostics.
   const SampleFilter selectedFilter = resolveSampleFilter(input.sampleFiltering, pool.preferredFilter);
@@ -48,10 +62,10 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
 
   for (u32 sampleIndex = 0; sampleIndex < pool.samples.size(); ++sampleIndex) {
     if (!discardUnreferenced) {
-      indexes.try_emplace({owner.value, sampleIndex});
+      indexes.try_emplace({owner.value, bankScope, sampleIndex});
     }
-    const auto first = indexes.lower_bound({owner.value, sampleIndex});
-    const auto last = indexes.upper_bound({owner.value, sampleIndex, true, std::numeric_limits<u32>::max()});
+    const auto first = indexes.lower_bound({owner.value, bankScope, sampleIndex});
+    const auto last = indexes.upper_bound({owner.value, bankScope, sampleIndex, true, std::numeric_limits<u32>::max()});
     if (first == last) continue;
     const auto& sample = pool.samples[sampleIndex];
     if (!sources.contains(sample.encodedData.source)) {
@@ -113,11 +127,11 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
 
 [[nodiscard]] SynthSampleIndexMap referencedSamples(std::span<const SynthBankSelection> banks) {
   SynthSampleIndexMap samples;
-  for (const auto& bank : banks) {
+  for (size_t bankScope = 0; bankScope < banks.size(); ++bankScope) {
+    const auto& bank = banks[bankScope];
     for (const auto& selected : bank.instruments) {
       for (const auto& region : selected.instrument->regions) {
-        samples.try_emplace(SynthSampleIndexKey{region.sample.owner().value, region.sample.index(),
-                                                region.invertSamplePhase, region.sampleStartFrame});
+        samples.try_emplace(sampleKey(region, *bank.bank, bankScope));
       }
     }
   }
@@ -136,7 +150,8 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
   // Drop only regions whose samples cannot be resolved. The rest of the instrument can
   // still produce a useful partial export.
   std::vector<ResolvedSynthInstrument> instruments;
-  for (const auto& selectedBank : input.soundBanks) {
+  for (size_t bankScope = 0; bankScope < input.soundBanks.size(); ++bankScope) {
+    const auto& selectedBank = input.soundBanks[bankScope];
     const u32 step = regionSamplingStep(*selectedBank.bank, diagnostics);
     for (const auto& selected : selectedBank.instruments) {
       const auto& instrument = *selected.instrument;
@@ -146,8 +161,7 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
           .modulation = lowerModulation(instrument.modulation),
       };
       for (auto& region : sampleRegionResponses(instrument.regions, step)) {
-        const auto sample = samples.at(
-            {region.sample.owner().value, region.sample.index(), region.invertSamplePhase, region.sampleStartFrame});
+        const auto sample = samples.at(sampleKey(region, *selectedBank.bank, bankScope));
         if (!sample) {
           diagnostics.push_back(exportError("Region sample reference was not found", region.range));
           continue;
@@ -399,9 +413,9 @@ PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceSt
                                    const SynthSampleDecodeOptions& options) {
   PreparedSynthData prepared;
   auto samplesByReference = referencedSamples(input.soundBanks);
-  for (const auto& selected : input.soundBanks) {
-    const auto& bank = *selected.bank;
-    decodeSynthPool(prepared, samplesByReference, bank.metadata.id, bank.localSamples, input, sources, options);
+  for (size_t bankScope = 0; bankScope < input.soundBanks.size(); ++bankScope) {
+    const auto& bank = *input.soundBanks[bankScope].bank;
+    decodeSynthPool(prepared, samplesByReference, bank.metadata.id, bank.localSamples, input, sources, options, bankScope);
   }
   for (const auto* pool : input.samplePools) {
     if (pool != nullptr) {

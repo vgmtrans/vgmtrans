@@ -33,12 +33,12 @@ void reviseNoteEnd(NotePerformanceEvent& note, u64 endTick) {
   note.durationTicks = static_cast<u32>(std::min<u64>(duration, std::numeric_limits<u32>::max()));
 }
 
-[[nodiscard]] bool reviseNoteEnd(std::vector<PerformanceEvent>& events, std::optional<PerformanceNoteId> target,
+[[nodiscard]] bool reviseNoteEnd(std::vector<PerformanceEvent>& events, PerformanceNoteId target,
                                  u64 endTick) {
   bool found = false;
   for (auto event = events.rbegin(); event != events.rend(); ++event) {
     auto* note = std::get_if<NotePerformanceEvent>(&*event);
-    if (note == nullptr || (target && note->note != *target)) {
+    if (note == nullptr || note->note != target) {
       continue;
     }
     found = true;
@@ -202,7 +202,8 @@ PerformanceNoteId PerformanceEmitter::continueVoice(PerformanceNoteId previousNo
 }
 
 bool PerformanceEmitter::setPreviousNoteEnd(u64 endTick) {
-  return reviseNoteEnd(track_.events, std::nullopt, endTick);
+  const auto* previous = lastNote(track_, std::nullopt);
+  return previous != nullptr && setNoteEnd(previous->note, endTick);
 }
 
 bool PerformanceEmitter::setNoteEnd(PerformanceNoteId target, u64 endTick) {

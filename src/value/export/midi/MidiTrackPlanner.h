@@ -27,6 +27,9 @@ struct MidiNoteBoundary {
   PerformanceEventHeader header;
   std::optional<MidiAttack> attack;
   std::optional<ResolvedInstrument> instrument;
+  // A synthetic portamento attack keeps the voice's preset but does not change
+  // the source sensitivity established by later instrument commands.
+  bool selectsSourceInstrument = false;
   bool restartVibrato = false;
   bool restartTremolo = false;
   bool restartPan = false;

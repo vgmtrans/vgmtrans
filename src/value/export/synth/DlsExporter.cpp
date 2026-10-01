@@ -216,8 +216,12 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
   return makeListChunk("INFO", std::array{Chunk{"INAM", std::move(inam)}});
 }
 
-[[nodiscard]] Chunk inshChunk(const ResolvedSynthInstrument& instrument) {
-  const u32 dlsBank = (instrument.address.bank & 0x7f) << 8;
+[[nodiscard]] Chunk inshChunk(const ResolvedSynthInstrument& instrument, MidiBankSelectStyle bankSelectStyle) {
+  const u32 bank = instrument.address.bank;
+  // DLS leaves bit 7 clear between its seven-bit CC0 and CC32 fields.
+  const u32 dlsBank = bankSelectStyle == MidiBankSelectStyle::MsbAndLsb
+                          ? (((bank >> 7) & 0x7f) << 8) | (bank & 0x7f)
+                          : (bank & 0x7f) << 8;
   std::vector<u8> payload;
   writeLe32(payload, static_cast<u32>(instrument.regions.size()));
   writeLe32(payload, dlsBank);
@@ -339,20 +343,21 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   return makeListChunk("lrgn", regions);
 }
 
-[[nodiscard]] Chunk insList(const ResolvedSynthInstrument& instrument, std::span<const DecodedSynthSample> samples) {
+[[nodiscard]] Chunk insList(const ResolvedSynthInstrument& instrument, std::span<const DecodedSynthSample> samples,
+                            MidiBankSelectStyle bankSelectStyle) {
   return makeListChunk("ins ", std::array{
-                                   inshChunk(instrument),
+                                   inshChunk(instrument, bankSelectStyle),
                                    lrgnList(instrument, samples),
                                    infoList(instrument.instrument->name, "Instrument"),
                                });
 }
 
 [[nodiscard]] Chunk linsList(std::span<const ResolvedSynthInstrument> instruments,
-                             std::span<const DecodedSynthSample> samples) {
+                             std::span<const DecodedSynthSample> samples, MidiBankSelectStyle bankSelectStyle) {
   std::vector<Chunk> instrumentChunks;
   instrumentChunks.reserve(instruments.size());
   for (const auto& instrument : instruments) {
-    instrumentChunks.push_back(insList(instrument, samples));
+    instrumentChunks.push_back(insList(instrument, samples, bankSelectStyle));
   }
   return makeListChunk("lins", instrumentChunks);
 }
@@ -426,7 +431,7 @@ SynthExportResult buildDls(const SynthExportInput& input, const SourceStore& sou
       .bytes = makeRiff("DLS ",
                         std::array{
                             colhChunk(instruments),
-                            linsList(instruments, samples),
+                            linsList(instruments, samples, input.bankSelectStyle),
                             ptblChunk(waves),
                             makeListChunk("wvpl", waves),
                             infoList(input.name, "DLS"),

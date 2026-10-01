@@ -258,6 +258,7 @@ Artifact exportSoundBank(const SessionSnapshot& snapshot, const SourceStore& sou
           .filterSamplesToReferencedInstruments = true,
           .modulationScaling = request.modulationScaling,
           .sampleFiltering = request.sampleFiltering,
+          .bankSelectStyle = request.sequence.midi.bankSelectStyle,
       },
       format, sources);
   artifact.diagnostics.insert(artifact.diagnostics.begin(), std::make_move_iterator(binding.diagnostics.begin()),
@@ -340,6 +341,7 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
           .samplePools = prepared.samplePools,
           .modulationConversion = synthConversion,
           .sampleFiltering = request.sampleFiltering,
+          .bankSelectStyle = request.sequence.midi.bankSelectStyle,
       },
       sources);
 
@@ -429,6 +431,7 @@ std::vector<Artifact> exportCollectionImpl(const SessionSnapshot& snapshot, cons
       .modulationScaling = request.modulationScaling,
       .modulationConversion = synthConversion,
       .sampleFiltering = request.sampleFiltering,
+      .bankSelectStyle = request.sequence.midi.bankSelectStyle,
   };
   if (selectedSoundBank) {
     std::erase_if(synthInput.soundBanks, [&](const SynthBankSelection& selected) {

@@ -79,6 +79,14 @@ void resolveContext(ModulationPerformanceEvent& event, double secondsPerTick) {
 }  // namespace
 
 void resolveTempoRelativeModulation(PerformanceSequence& performance) {
+  // Recompute derived timing from source commands, including after callers
+  // revise the tempo map. Derived copies must never become new source state.
+  for (auto& track : performance.tracks) {
+    std::erase_if(track.events, [](const PerformanceEvent& event) {
+      const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+      return modulation && modulation->tempoDerived;
+    });
+  }
   const bool hasTempoRelativeModulation = std::ranges::any_of(performance.tracks, [](const PerformanceTrack& track) {
     return std::ranges::any_of(track.events, isTempoRelative);
   });
@@ -125,6 +133,7 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
         for (const auto& [key, modulation] : states[trackIndex]) {
           auto update = *modulation;
           update.header = derivedHeader(*tempo, track);
+          update.tempoDerived = true;
           resolveContext(update, secondsPerTick);
           derived[trackIndex].emplace_back(std::move(update));
         }

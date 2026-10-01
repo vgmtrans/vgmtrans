@@ -21,18 +21,14 @@ class PerformancePitchBendContext {
     selectInstrument(performance.initialInstrument());
   }
 
-  // Returns true only when the effective pitch context changes.
-  [[nodiscard]] bool apply(const PerformanceEvent& event, const ResolvedPerformance& performance) {
-    const auto previous = *this;
+  // Apply source controls. The planner explicitly selects each source voice's
+  // first attack; a raw note's extendsPrevious flag only describes its anchor.
+  void apply(const PerformanceEvent& event, const ResolvedPerformance& performance) {
     if (const auto* range = std::get_if<PitchBendRangePerformanceEvent>(&event)) {
       sourceRangeCents_ = range->cents;
     } else if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event)) {
       selectInstrument(performance.selectionFor(*selection).instrument);
-    } else if (const auto* note = std::get_if<NotePerformanceEvent>(&event);
-               note != nullptr && !note->extendsPrevious) {
-      selectInstrument(performance.selectionFor(*note).instrument);
     }
-    return *this != previous;
   }
 
   void setSourceRangeCents(u16 cents) noexcept { sourceRangeCents_ = cents; }
@@ -47,11 +43,11 @@ class PerformancePitchBendContext {
 
   friend bool operator==(const PerformancePitchBendContext&, const PerformancePitchBendContext&) noexcept = default;
 
- private:
   void selectInstrument(const Instrument* instrument) {
     instrumentRangeCents_ = instrument == nullptr ? std::nullopt : instrument->pitchBendRangeCents;
   }
 
+ private:
   u16 sourceRangeCents_ = 200;
   std::optional<u16> instrumentRangeCents_;
 };

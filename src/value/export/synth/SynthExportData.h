@@ -7,6 +7,7 @@
 #pragma once
 
 #include "value/base/Source.h"
+#include "value/export/ExportTypes.h"
 #include "value/export/ResolvedPerformance.h"
 #include "value/export/synth/ModulationScaling.h"
 #include "value/synth/SampleFiltering.h"
@@ -41,6 +42,8 @@ struct SynthExportInput {
   ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
   ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;
   SampleFilteringPolicy sampleFiltering = SampleFilteringPolicy::FormatPreferred;
+  // DLS stores the actual CC0/CC32 pair, so it must match the companion MIDI.
+  MidiBankSelectStyle bankSelectStyle = MidiBankSelectStyle::MsbOnly;
 };
 
 struct SynthExportResult {
