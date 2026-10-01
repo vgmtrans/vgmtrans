@@ -21,16 +21,6 @@ class PerformancePitchBendContext {
     selectInstrument(performance.initialInstrument());
   }
 
-  // Apply source controls. The planner explicitly selects each source voice's
-  // first attack; a raw note's extendsPrevious flag only describes its anchor.
-  void apply(const PerformanceEvent& event, const ResolvedPerformance& performance) {
-    if (const auto* range = std::get_if<PitchBendRangePerformanceEvent>(&event)) {
-      sourceRangeCents_ = range->cents;
-    } else if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event)) {
-      selectInstrument(performance.selectionFor(*selection).instrument);
-    }
-  }
-
   void setSourceRangeCents(u16 cents) noexcept { sourceRangeCents_ = cents; }
   void setInstrumentRangeCents(std::optional<u16> cents) noexcept { instrumentRangeCents_ = cents; }
 

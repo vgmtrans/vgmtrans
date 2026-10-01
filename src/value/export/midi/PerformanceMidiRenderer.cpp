@@ -1199,22 +1199,21 @@ private:
           } else if constexpr (std::is_same_v<TypedEvent, LegatoPedalPerformanceEvent>) {
             addController(typedEvent.header.tick, MidiController::Legato, typedEvent.enabled ? 127 : 0);
           } else if constexpr (std::is_same_v<TypedEvent, ModulationPerformanceEvent>) {
-            if (typedEvent.tempoDerived &&
-                (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation ||
-                 typedEvent.target == ModulationPerformanceTarget::PanRate ||
-                 (typedEvent.pitchLayer != kPrimaryPitchBendLayer &&
-                  (typedEvent.target == ModulationPerformanceTarget::VibratoRate ||
-                   typedEvent.target == ModulationPerformanceTarget::VibratoDelay)))) {
-              // These oscillators already retain source cycles/ticks. A tempo
-              // conversion updates synth controls only, not live source state.
-              return;
-            }
+            const bool vibrato = typedEvent.target == ModulationPerformanceTarget::VibratoDepth ||
+                                 typedEvent.target == ModulationPerformanceTarget::VibratoRate ||
+                                 typedEvent.target == ModulationPerformanceTarget::VibratoDelay;
+            const bool pan = typedEvent.target == ModulationPerformanceTarget::PanDepth ||
+                             typedEvent.target == ModulationPerformanceTarget::PanRate;
+            // Pan has no MIDI LFO; secondary pitch layers also require simulation.
+            const bool simulate = modulationConversion == ModulationConversionPolicy::SequenceEventSimulation ||
+                                  pan || (vibrato && typedEvent.pitchLayer != kPrimaryPitchBendLayer);
+            // Source-clocked oscillators already follow tempo; these updates are for synth controls.
+            if (simulate && typedEvent.tempoDerived) return;
             const double normalizedAmount = modulationControllerAmount(typedEvent, modulationProfile);
             const u8 value = midiNormalized7(normalizedAmount);
             if (typedEvent.target == ModulationPerformanceTarget::VibratoDelay ||
                 typedEvent.target == ModulationPerformanceTarget::TremoloDelay) {
-              const bool vibrato = typedEvent.target == ModulationPerformanceTarget::VibratoDelay;
-              if (typedEvent.context.delay) {
+              if (simulate && typedEvent.context.delay) {
                 const auto& delay = *typedEvent.context.delay;
                 auto& lfo = vibrato ? pitchLfo(typedEvent.pitchLayer).oscillator : tremolo;
                 const auto fallback = vibrato || delay.milliseconds
@@ -1222,17 +1221,13 @@ private:
                                           : LfoInitialPhaseFallback::UnipolarTremoloNominalGain;
                 setLfoDelay(lfo, typedEvent.header.tick, delay, fallback);
               }
-              if (modulationConversion != ModulationConversionPolicy::SequenceEventSimulation &&
-                  (!vibrato || typedEvent.pitchLayer == kPrimaryPitchBendLayer)) {
+              if (!simulate) {
                 addController(typedEvent.header.tick,
                               vibrato ? MidiController::VibratoDelay : MidiController::TremoloDelay, value);
               }
               return;
             }
-            const bool pitchTarget = typedEvent.target == ModulationPerformanceTarget::VibratoDepth ||
-                                     typedEvent.target == ModulationPerformanceTarget::VibratoRate;
-            if (pitchTarget && (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation ||
-                                typedEvent.pitchLayer != kPrimaryPitchBendLayer)) {
+            if (vibrato && simulate) {
               auto& lfo = pitchLfo(typedEvent.pitchLayer).oscillator;
               configureLfo(lfo, typedEvent.header.tick, typedEvent);
               if (typedEvent.target == ModulationPerformanceTarget::VibratoDepth) {
@@ -1244,16 +1239,14 @@ private:
               updateRestartedVibratoOutput(typedEvent);
               return;
             }
-            // MIDI has no pan-LFO controller, so both policies simulate it.
-            if (typedEvent.target == ModulationPerformanceTarget::PanDepth ||
-                typedEvent.target == ModulationPerformanceTarget::PanRate) {
+            if (pan) {
               configureLfo(panLfo, typedEvent.header.tick, typedEvent);
               if (typedEvent.target == ModulationPerformanceTarget::PanDepth) {
                 setSimulatedPanDepth(typedEvent.header.tick, typedEvent.panDepth.value_or(normalizedAmount));
               }
               return;
             }
-            if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
+            if (simulate) {
               if (typedEvent.target == ModulationPerformanceTarget::TremoloDepth) {
                 const bool physicalDecibels = typedEvent.volumeDepthDecibels.has_value();
                 const bool physicalLinearGain = typedEvent.volumeDepthLinearGain.has_value();
