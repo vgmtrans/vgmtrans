@@ -212,7 +212,8 @@ private:
 
 // Opaque association between a source motion object and its structured
 // performance automation. Formats retain this small handle, never an IR
-// container or pointer into one.
+// container or pointer into one. The VM keeps automation records intact until
+// playback finishes, so section changes cannot invalidate retained bindings.
 class PerformanceAutomationBinding {
 public:
   PerformanceAutomationBinding() = default;

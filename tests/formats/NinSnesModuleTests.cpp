@@ -892,6 +892,35 @@ void ninSnesPlaylistCarriesTiesAcrossSectionParserResets() {
          "a fade in the next section should continue from the preceding channel level");
 }
 
+void ninSnesSectionChangesPreservePitchAutomationBindings() {
+  const auto ended = render(sequenceBytes({4, 0x7f, 0x80, 0xf9, 6, 4, 4, 0}));
+  expect(ended.tracks[0].automations.empty(),
+         "the actual song end must still discard a slide whose delayed start is never reached");
+  for (const u8 delay : {2, 6}) {
+    for (const bool tied : {false, true}) {
+      auto bytes = sequenceBytes({4, 0x7f, 0x80, 0xf9, delay, 4, 4, 0});
+      writeLe16(bytes, 0x102, 0x220);
+      writeSection(bytes, 0x220, {{0, 0x320}});
+      // The next section starts at tick 4, either during the slide or before
+      // its delayed start. A tie keeps it running; a fresh note cancels it.
+      std::ranges::copy(std::initializer_list<u8>{12, 0x7f, tied ? u8{0xc8} : u8{0x84}, 0},
+                        bytes.begin() + 0x320);
+      const auto performance = render(std::move(bytes));
+      expect(performance.diagnostics.empty() && performance.tracks[0].automations.size() == 1,
+             "section changes must retain bindings until the driver finishes or interrupts their effects");
+      const auto& slide = performance.tracks[0].automations.front();
+      expect(slide.realization.startTick == delay &&
+                 slide.realization.endTick == (tied ? delay + 4u : std::max<u32>(delay, 4)) &&
+                 slide.realization.endReason == (tied ? PerformanceAutomationEndReason::Completed
+                                                     : PerformanceAutomationEndReason::Interrupted),
+             "a section boundary itself must neither shorten a continuing slide nor discard a pending one");
+      const auto midi = renderTestMidi(performance, {.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+      expect(std::abs(midiPitchSemitonesAt(midi.tracks[0].events, delay + 4) - (tied ? 4.0 : 0.0)) < 0.002,
+             "a tied slide must reach its target after the section change; a new note must retain its own pitch");
+    }
+  }
+}
+
 void ninSnesKonamiZeroDurationRateContinuesHeldVoice() {
   std::vector<u8> bytes(kAramSize);
   writeLe16(bytes, 0x100, 0x200);
@@ -2302,6 +2331,7 @@ void runNinSnesTests() {
   ninSnesControllerFadesRemainInTheSourceDomain();
   ninSnesPrepassClearsMasterVolumeAutomationBinding();
   ninSnesPlaylistCarriesTiesAcrossSectionParserResets();
+  ninSnesSectionChangesPreservePitchAutomationBindings();
   ninSnesKonamiZeroDurationRateContinuesHeldVoice();
   ninSnesF9UsesSharedPitchTransitions();
   ninSnesPercussionStartsPerNoteVibratoFade();

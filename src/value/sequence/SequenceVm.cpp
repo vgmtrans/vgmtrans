@@ -112,7 +112,7 @@ void addInitialTrackEvents(PerformanceEmitter out, const SequenceProgramBehavior
   }
 }
 
-void endTrackAt(PerformanceTrack& track, u64 endTick, bool retainBoundaryEvents = false) {
+void trimTrackEventsAt(PerformanceTrack& track, u64 endTick, bool retainBoundaryEvents = false) {
   std::erase_if(track.events, [&](const PerformanceEvent& event) {
     const u64 tick = performanceEventHeader(event).tick;
     if (tick > endTick || (!retainBoundaryEvents && tick == endTick)) {
@@ -125,13 +125,6 @@ void endTrackAt(PerformanceTrack& track, u64 endTick, bool retainBoundaryEvents 
     if (auto* note = std::get_if<NotePerformanceEvent>(&event)) {
       note->durationTicks = static_cast<u32>(std::min<u64>(note->durationTicks, endTick - note->header.tick));
     }
-  }
-  std::erase_if(track.automations, [=](const PerformanceAutomation& automation) {
-    return retainBoundaryEvents ? automation.header.tick > endTick : automation.header.tick >= endTick;
-  });
-  for (auto& automation : track.automations) {
-    automation.realization.startTick = std::min(automation.realization.startTick, endTick);
-    automation.realization.endTick = std::min(automation.realization.endTick, endTick);
   }
   track.endTick = endTick;
 }
@@ -406,7 +399,7 @@ public:
   void trimAt(u64 tick, bool retainBoundaryEvents) {
     for (auto& channel : channels_) {
       outputAt(channel, tick, lastCommand_).allNotesOff();
-      endTrackAt(channel.performance, tick, retainBoundaryEvents);
+      trimTrackEventsAt(channel.performance, tick, retainBoundaryEvents);
     }
   }
 
@@ -424,7 +417,16 @@ public:
       auto& track = channel.performance;
       track.endTick = tick_;
       if (endTick) {
-        endTrackAt(track, *endTick);
+        trimTrackEventsAt(track, *endTick);
+        // Keep automation history intact while source playback can still use
+        // its bindings. Section changes preserve the driver's live effects.
+        std::erase_if(track.automations, [=](const PerformanceAutomation& automation) {
+          return automation.header.tick >= *endTick;
+        });
+        for (auto& automation : track.automations) {
+          automation.realization.startTick = std::min(automation.realization.startTick, *endTick);
+          automation.realization.endTick = std::min(automation.realization.endTick, *endTick);
+        }
       }
       // Future-dated events retain source order at the same tick.
       std::ranges::stable_sort(track.events, [](const PerformanceEvent& lhs, const PerformanceEvent& rhs) {
