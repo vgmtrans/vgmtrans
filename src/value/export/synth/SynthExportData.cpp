@@ -26,6 +26,7 @@ namespace vgmtrans::core {
 namespace {
 
 // Local samples belong to one selected bank; external pools share an asset ID.
+// Selections stay fixed during preparation, so their addresses provide private identities.
 using SampleOwner = std::variant<u32, const SynthBankSelection*>;
 
 struct SynthSampleIndexKey {
@@ -43,9 +44,9 @@ using SynthSampleIndexMap = std::map<SynthSampleIndexKey, std::optional<u32>>;
 constexpr double kPerceivedHalfLoudnessDb = 10.0;
 
 // Valid regions refer to their own bank's local samples or to an external pool.
-[[nodiscard]] SynthSampleIndexKey sampleKey(const Region& region, const SynthBankSelection& bank) {
-  return {.owner = region.sample.owner() == bank.bank->metadata.id ? SampleOwner{&bank}
-                                                                 : SampleOwner{region.sample.owner().value},
+[[nodiscard]] SynthSampleIndexKey sampleKey(const Region& region, const SynthBankSelection& selectedBank) {
+  const bool local = region.sample.owner() == selectedBank.bank->metadata.id;
+  return {.owner = local ? SampleOwner{&selectedBank} : SampleOwner{region.sample.owner().value},
           .index = region.sample.index(),
           .phaseInverted = region.invertSamplePhase,
           .startFrame = region.sampleStartFrame};

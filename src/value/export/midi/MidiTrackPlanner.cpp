@@ -56,7 +56,7 @@ struct NoteDraft {
 struct NoteSpan {
   const NotePerformanceEvent& source;
   u64 endTick = 0;  // Source gate including ties, independent of MIDI overlap and hardware deadlines.
-  NoteSpan* previousVoice = nullptr;
+  NoteSpan* previousInVoice = nullptr;
   // Native portamento replaces the source boundaries with these segments.
   // Otherwise the source boundaries retain their individual LFO decisions.
   bool usesPortamento = false;
@@ -78,10 +78,12 @@ class SourcePitchTimeline {
         current.context.setSourceRangeCents(range->cents);
       } else if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event)) {
         current.context.selectInstrument(performance.selectionFor(*selection).instrument);
-      } else if (const auto* note = std::get_if<NotePerformanceEvent>(&event);
-                 note && sourceVoices.insert(note->voice).second && (note->note.valid() || !note->extendsPrevious)) {
+      } else if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+        const bool firstInVoice = sourceVoices.insert(note->voice).second;
         // Only the first source attack selects sensitivity, not later voice anchors.
-        current.context.selectInstrument(performance.selectionFor(*note).instrument);
+        if (firstInVoice && (note->note.valid() || !note->extendsPrevious)) {
+          current.context.selectInstrument(performance.selectionFor(*note).instrument);
+        }
       }
       bool changed = current.context != previousContext;
       if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
@@ -171,12 +173,13 @@ using NoteIndex = std::unordered_map<PerformanceNoteId, NoteSpan*>;
       note.endTick = std::max(note.endTick, addTicks(source->header.tick, source->durationTicks));
       note.segments.front().endTick = note.endTick;
     } else {
-      auto& previous = lastSpanByVoice[source->voice];
+      auto& lastSpan = lastSpanByVoice[source->voice];
       auto& span = notes.emplace_back(NoteSpan{
           .source = *source, .endTick = addTicks(source->header.tick, source->durationTicks),
-          .previousVoice = previous, .segments = {NoteDraft{*source}}});
-      span.segments.front().extendsPrevious = previous != nullptr;
-      previous = found->second = &span;
+          .previousInVoice = lastSpan, .segments = {NoteDraft{*source}}});
+      span.segments.front().extendsPrevious = lastSpan != nullptr;
+      found->second = &span;
+      lastSpan = &span;
     }
   }
   return notes;
@@ -513,7 +516,7 @@ void lowerPitchBends(std::vector<Diagnostic>& diagnostics, std::vector<MidiTrack
     }
 
     const bool held = automation->realization.startTick <= anchor->source.header.tick &&
-                      anchor->previousVoice != nullptr;
+                      anchor->previousInVoice != nullptr;
     std::vector<const NoteSpan*> affectedNotes;
     for (const auto& note : notes) {
       if (affectsNote(*automation, transition, *anchor, note)) {
@@ -607,7 +610,7 @@ void lowerPortamento(std::vector<Diagnostic>& diagnostics, std::vector<MidiTrack
     if (startTick >= note->endTick) {
       continue;
     }
-    auto* previous = startTick <= note->source.header.tick ? note->previousVoice : nullptr;
+    auto* previous = startTick <= note->source.header.tick ? note->previousInVoice : nullptr;
     const NoteSpan* sourceNote = previous != nullptr ? previous : note;
     auto at = automation->header;
     at.tick = startTick;
@@ -846,7 +849,7 @@ std::vector<detail::MidiTrackEvent> detail::planMidiTrack(
     }
   }
   for (const auto& note : notes) {
-    const auto* previous = note.previousVoice;
+    const auto* previous = note.previousInVoice;
     if (previous == nullptr) {
       continue;
     }
