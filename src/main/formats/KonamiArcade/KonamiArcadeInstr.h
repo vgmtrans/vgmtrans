@@ -65,6 +65,7 @@ public:
     u8 default_duration;
     u8 attenuation;
   };
+  using DrumTable = std::array<drum, 0x60>;
 
   KonamiArcadeInstrSet(RawFile *file,
                        u32 offset,
@@ -76,13 +77,13 @@ public:
 
   void addSampleInfoChildren(VGMItem* sampInfoItem, u32 off);
   bool parseInstrPointers() override;
-  const std::array<drum, 46>& drums() { return m_drums;}
+  const DrumTable& drums() { return m_drums;}
 
 private:
   KonamiArcadeFormatVer m_fmtVer;
   u32 m_drumTableOffset;
   u32 m_drumSampleTableOffset;
-  std::array<drum, 46> m_drums;
+  DrumTable m_drums;
 };
 
 // ********************

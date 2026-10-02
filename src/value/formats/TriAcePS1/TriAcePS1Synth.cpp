@@ -1,0 +1,199 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include "value/formats/TriAcePS1/TriAcePS1.h"
+
+#include "value/base/RecordReader.h"
+#include "value/synth/PsxAdpcm.h"
+#include "value/synth/PsxSpu.h"
+#include "value/synth/SynthMath.h"
+
+#include <fmt/format.h>
+
+#include <algorithm>
+#include <set>
+#include <utility>
+#include <vector>
+
+namespace vgmtrans::formats::triace_ps1 {
+
+using namespace core;
+
+namespace {
+
+constexpr u32 kBankHeaderSize = 12;
+constexpr u32 kInstrumentHeaderSize = 8;
+constexpr u32 kRegionSize = 20;
+// The driver's pitch table is 0x0fcd at index 59 and reaches unity between
+// indices 59 and 60. This is the exact source-domain root before region tuning.
+constexpr double kDriverUnityKey = 59.216912152;
+
+struct ParsedRegion {
+  KeyRange keys;
+  VelocityRange velocities;
+  u32 sampleOffset = 0;
+  u32 loopOffset = 0;
+  u8 level = 0;
+  s8 semitone = 0;
+  s8 fine = 0;
+  SourceRecord source;
+};
+
+struct ParsedInstrument {
+  u8 program = 0;
+  u8 bank = 0;
+  u16 adsr1 = 0;
+  u16 adsr2 = 0;
+  SourceRecord source;
+  std::vector<ParsedRegion> regions;
+};
+
+[[nodiscard]] std::vector<ParsedInstrument> readInstruments(ByteReader reader, const TriAcePs1BankLayout& layout,
+                                                            std::vector<Diagnostic>* diagnostics) {
+  std::vector<ParsedInstrument> instruments;
+  const u32 end = layout.offset + layout.instrumentSectionSize - 4;
+  for (u32 cursor = layout.offset + kBankHeaderSize; cursor < end;) {
+    const u8 count = reader.u8At(cursor + 7);
+    const u32 recordSize = kInstrumentHeaderSize + static_cast<u32>(count) * kRegionSize;
+    RecordReader header(reader, cursor, cursor + kInstrumentHeaderSize, diagnostics);
+    ParsedInstrument instrument{
+        .program = *header.u8At(0, "program", SourceValueDisplay::Hex),
+        .bank = *header.u8At(1, "bank", SourceValueDisplay::Hex),
+        .adsr1 = *header.u16leAt(2, "adsr1", SourceValueDisplay::Hex),
+        .adsr2 = *header.u16leAt(4, "adsr2", SourceValueDisplay::Hex),
+    };
+    header.u8At(6, "unknown_06", SourceValueDisplay::Hex);
+    header.u8At(7, "region_count");
+    instrument.source = std::move(header).finish();
+    instrument.regions.reserve(count);
+
+    for (u32 index = 0; index < count; ++index) {
+      const u32 regionOffset = cursor + kInstrumentHeaderSize + index * kRegionSize;
+      RecordReader region(reader, regionOffset, regionOffset + kRegionSize, diagnostics);
+      ParsedRegion parsed{
+          .keys =
+              KeyRange{
+                  .low = *region.u8At(0, "key_low", SourceValueDisplay::MidiNote),
+                  .high = *region.u8At(1, "key_high", SourceValueDisplay::MidiNote),
+              },
+          .velocities =
+              VelocityRange{
+                  .low = *region.u8At(2, "velocity_low"),
+                  .high = *region.u8At(3, "velocity_high"),
+              },
+          .sampleOffset = *region.u32leAt(4, "sample_offset", SourceValueDisplay::Address),
+          .loopOffset = *region.u32leAt(8, "loop_offset", SourceValueDisplay::Address),
+          .level = *region.u8At(12, "level"),
+          .semitone = *region.s8At(13, "semitone_tune"),
+          .fine = *region.s8At(14, "fine_tune"),
+      };
+      region.u8At(15, "unknown_0f", SourceValueDisplay::Hex);
+      region.u32leAt(16, "unknown_10", SourceValueDisplay::Hex);
+      parsed.source = std::move(region).finish();
+      instrument.regions.push_back(std::move(parsed));
+    }
+    instruments.push_back(std::move(instrument));
+    cursor += recordSize;
+  }
+  return instruments;
+}
+
+}  // namespace
+
+std::optional<ScanSoundBankDraft> addTriAcePs1Bank(ScanResultBuilder& result, const TriAcePs1BankLayout& layout) {
+  const ByteReader reader = result.reader();
+  auto parsed = readInstruments(reader, layout, &result.diagnostics());
+  std::set<u32> offsets;
+  for (const auto& instrument : parsed) {
+    for (const auto& region : instrument.regions) {
+      if (region.sampleOffset < layout.sampleSectionSize) {
+        offsets.insert(region.sampleOffset);
+      }
+    }
+  }
+  const auto streams = inspectPsxAdpcmStreams(reader, layout.sampleSectionOffset, offsets,
+                                              layout.sampleSectionOffset + layout.sampleSectionSize);
+  if (streams.empty()) {
+    return std::nullopt;
+  }
+
+  u8 maximumLevel = 0;
+  for (const auto& instrument : parsed) {
+    for (const auto& region : instrument.regions) {
+      if (streams.contains(region.sampleOffset)) {
+        maximumLevel = std::max(maximumLevel, region.level);
+      }
+    }
+  }
+  if (maximumLevel == 0) {
+    return std::nullopt;
+  }
+
+  const std::string name = fmt::format("TriAcePS1 Bank {:X}", layout.offset);
+  auto bank = result.soundBank(name, reader.range(layout.offset, layout.length));
+  auto& instruments = bank.instruments();
+  auto& samples = bank.localSamples();
+  const SourceRange bankRange = reader.range(layout.offset, layout.length);
+  instruments.include(bankRange);
+  samples.include(bankRange);
+
+  instruments
+      .source(SourceRole::Header, "TriAcePS1 Bank Header", reader.range(layout.offset, kBankHeaderSize),
+              "triace-ps1-bank-header")
+      .field("size", reader.range(layout.offset, 4), layout.length)
+      .field("instrument_section_size", reader.range(layout.offset + 4, 2), layout.instrumentSectionSize)
+      .field("unknown_06", reader.range(layout.offset + 6, 2), layout.unknown06, SourceValueDisplay::Hex)
+      .field("unknown_08", reader.range(layout.offset + 8, 2), layout.unknown08, SourceValueDisplay::Hex)
+      .field("unknown_0a", reader.range(layout.offset + 10, 2), layout.unknown0a, SourceValueDisplay::Hex);
+  const SourceAnnotationId instrumentRoot =
+      instruments
+          .source(SourceRole::Table, "Instrument Table",
+                  reader.range(layout.offset + kBankHeaderSize, layout.instrumentSectionSize - kBankHeaderSize),
+                  "triace-ps1-instrument-table")
+          .id();
+  const SourceAnnotationId sampleRoot =
+      samples
+          .source(SourceRole::SamplePool, "SPU Sample Data",
+                  reader.range(layout.sampleSectionOffset, layout.sampleSectionSize), "triace-ps1-sample-data")
+          .id();
+
+  addPsxAdpcmSamples(samples, streams, kPs1SpuSampleRate, sampleRoot);
+
+  for (const auto& source : parsed) {
+    auto instrument = instruments.append(Instrument{
+        .identity = triAcePs1InstrumentIdentity(source.bank, source.program),
+        .name = fmt::format("Instrument {:02X}:{:02X}", source.bank, source.program),
+        .range = reader.range(source.source.range.offset,
+                              kInstrumentHeaderSize + static_cast<u32>(source.regions.size()) * kRegionSize),
+    });
+    instrument.source(instrument.value().name, source.source, "triace-ps1-instrument").parent(instrumentRoot);
+
+    for (const auto& sourceRegion : source.regions) {
+      const auto sample = samples.find(sourceRegion.sampleOffset);
+      if (!sample) {
+        continue;
+      }
+      Region region{
+          .keyRange = sourceRegion.keys,
+          .velocityRange = sourceRegion.velocities,
+          .range = sourceRegion.source.range,
+          .unityKey = kDriverUnityKey - sourceRegion.semitone - sourceRegion.fine / 64.0,
+          .envelope = psxSpuEnvelope(source.adsr1, source.adsr2),
+          // The driver multiplies this byte directly. Normalize the loudest
+          // region in a bank so values above 0x7f retain their intended boost.
+          .attenuationDb = linearAmplitudeToAttenuationDb(sourceRegion.level / static_cast<double>(maximumLevel)),
+      };
+      if (sourceRegion.loopOffset >= sourceRegion.sampleOffset) {
+        region.loop = streams.at(sourceRegion.sampleOffset).loopAt(sourceRegion.loopOffset - sourceRegion.sampleOffset);
+      }
+      instrument.region(*sample, std::move(region)).source("Region", sourceRegion.source, "triace-ps1-region");
+    }
+  }
+
+  return bank;
+}
+
+}  // namespace vgmtrans::formats::triace_ps1

@@ -17,7 +17,7 @@ KonamiArcadeSeq::KonamiArcadeSeq(
   KonamiArcadeFormatVer fmtVer,
   u32 offset,
   u32 ramOffset,
-  const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
+  const KonamiArcadeInstrSet::DrumTable& drums,
   float nmiRate,
   const std::string& name
 )
@@ -334,7 +334,7 @@ bool KonamiArcadeTrack::readEvent() {
 
     u32 actualDuration;
     if (m_duration == 0) {
-      if (percussionEnabled() && (note - 24) < 46) {
+      if (percussionEnabled()) {
         auto seq = static_cast<KonamiArcadeSeq*>(parentSeq);
         auto& drum = seq->drums()[note-24];
         u8 defaultDrumDur = drum.default_duration;

@@ -1,15 +1,13 @@
 /*
-* VGMTrans (c) 2002-2025
-* Licensed under the zlib license,
-* refer to the included LICENSE.txt file
-*/
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
 #pragma once
 
-#include "Options.h"
-
-#include <memory>
-#include <string_view>
+#include "main/ConversionTypes.h"
+#include "value/export/ExportTypes.h"
 
 #include <QByteArray>
 #include <QObject>
@@ -18,118 +16,76 @@
 
 class Settings;
 
-class QtOptionsStore : public OptionStore {
-public:
-  explicit QtOptionsStore(QSettings& s) : m_settings(s) {}
-
-  std::unique_ptr<Group> beginGroup(std::string_view path) override {
-    m_settings.beginGroup(QString::fromUtf8(path.data(), int(path.size())));
-    struct G : Group {
-      explicit G(QSettings& s) : s(s) {}
-      ~G() override { s.endGroup(); }
-      QSettings& s;
-    };
-    return std::make_unique<G>(m_settings);
-  }
-
-  int getInt(std::string_view key, int def) const override {
-    return m_settings.value(QString::fromUtf8(key.data(), int(key.size())), def).toInt();
-  }
-
-  void setInt(std::string_view key, int value) override {
-    m_settings.setValue(QString::fromUtf8(key.data(), int(key.size())), value);
-  }
-
-  int getBool(std::string_view key, bool def) const override {
-    return m_settings.value(QString::fromUtf8(key.data(), int(key.size())), def).toBool();
-  }
-
-  void setBool(std::string_view key, bool value) override {
-    m_settings.setValue(QString::fromUtf8(key.data(), int(key.size())), value);
-  }
-
-private:
-  QSettings& m_settings;
-};
-
-
 struct SettingsGroup {
-  SettingsGroup(Settings* parent);
-  Settings* parent;
+  explicit SettingsGroup(Settings* owner);
+  Settings* owner;
   QSettings& settings;
 };
 
-class Settings : public QObject {
+class Settings final : public QObject {
   Q_OBJECT
   friend struct SettingsGroup;
 
 public:
-  static auto the() {
+  static Settings* the() {
     static Settings* instance = new Settings();
     return instance;
   }
 
-  Settings(const Settings&) = delete;
-  Settings&operator=(const Settings&) = delete;
-  Settings(Settings&&) = delete;
-  Settings&operator=(Settings&&) = delete;
-
-  struct VGMFileTreeViewSettings : public SettingsGroup {
-    VGMFileTreeViewSettings(Settings* parent): SettingsGroup(parent) {}
-
-    bool showDetails() const;
-    void setShowDetails(bool) const;
-  };
-  VGMFileTreeViewSettings VGMFileTreeView;
-
-  struct ConversionSettings : public SettingsGroup {
+  struct VGMFileTreeViewSettings : SettingsGroup {
     using SettingsGroup::SettingsGroup;
+    [[nodiscard]] bool showDetails() const;
+    void setShowDetails(bool showDetails) const;
+  } VGMFileTreeView;
 
-    void loadIntoOptionsStore() const;
-    void saveFromOptionsStore() const;
-
-    BankSelectStyle bankSelectStyle() const {
-      return ConversionOptions::the().bankSelectStyle();
-    }
-    void setBankSelectStyle(BankSelectStyle s) const;
-
-    int numSequenceLoops() const {
-      return ConversionOptions::the().numSequenceLoops();
-    }
-    void setNumSequenceLoops(int n) const;
-
-    bool skipChannel10() const {
-      return ConversionOptions::the().skipChannel10();
-    }
+  struct ConversionSettings : SettingsGroup {
+    using SettingsGroup::SettingsGroup;
+    static constexpr int kMaxSequenceLoops = 100;
+    [[nodiscard]] BankSelectStyle bankSelectStyle() const;
+    void setBankSelectStyle(BankSelectStyle style) const;
+    [[nodiscard]] int numSequenceLoops() const;
+    void setNumSequenceLoops(int loops) const;
+    [[nodiscard]] bool skipChannel10() const;
     void setSkipChannel10(bool skip) const;
-  };
-  ConversionSettings conversion;
+    [[nodiscard]] bool terminatePreviousVoice() const;
+    void setTerminatePreviousVoice(bool enabled) const;
+    [[nodiscard]] vgmtrans::core::MidiPitchTransitionRendering pitchTransitionRendering() const;
+    void setPitchTransitionRendering(vgmtrans::core::MidiPitchTransitionRendering rendering) const;
+    [[nodiscard]] vgmtrans::core::MidiTuningRendering tuningRendering() const;
+    void setTuningRendering(vgmtrans::core::MidiTuningRendering rendering) const;
+    [[nodiscard]] vgmtrans::core::ModulationConversionPolicy modulationConversion() const;
+    void setModulationConversion(vgmtrans::core::ModulationConversionPolicy policy) const;
+    [[nodiscard]] vgmtrans::core::DynamicEnvelopePolicy dynamicEnvelopeConversion() const;
+    void setDynamicEnvelopeConversion(vgmtrans::core::DynamicEnvelopePolicy policy) const;
+    [[nodiscard]] bool exportOnlyUsedInstruments() const;
+    void setExportOnlyUsedInstruments(bool enabled) const;
+    [[nodiscard]] vgmtrans::core::SampleFilteringPolicy sampleFiltering() const;
+    void setSampleFiltering(vgmtrans::core::SampleFilteringPolicy filtering) const;
+  } conversion;
 
-  struct RecentFilesSettings : public SettingsGroup {
+  struct RecentFilesSettings : SettingsGroup {
     using SettingsGroup::SettingsGroup;
-
-    QStringList list() const;
+    [[nodiscard]] QStringList list() const;
     void add(const QString& path) const;
     void clear() const;
-  };
-  RecentFilesSettings recentFiles;
+  } recentFiles;
 
-  struct MainWindowSettings : public SettingsGroup {
+  struct MainWindowSettings : SettingsGroup {
     using SettingsGroup::SettingsGroup;
-
-    QByteArray windowGeometry() const;
+    [[nodiscard]] QByteArray windowGeometry() const;
     void setWindowGeometry(const QByteArray& geometry) const;
-
-    QByteArray dockState() const;
+    [[nodiscard]] QByteArray dockState() const;
     void setDockState(const QByteArray& dockState) const;
     void clearDockState() const;
-
-    QByteArray floatingDockGeometry(const QString& dockName) const;
+    [[nodiscard]] QByteArray floatingDockGeometry(const QString& dockName) const;
     void setFloatingDockGeometry(const QString& dockName, const QByteArray& geometry) const;
-  };
-  MainWindowSettings mainWindow;
+  } mainWindow;
+
+signals:
+  void vgmFileTreeShowDetailsChanged(bool showDetails);
+  void conversionOptionsChanged();
 
 private:
-  explicit Settings(QObject *parent = nullptr);
+  explicit Settings(QObject* parent = nullptr);
   QSettings settings;
 };

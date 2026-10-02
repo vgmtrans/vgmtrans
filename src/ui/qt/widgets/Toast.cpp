@@ -6,7 +6,7 @@
 
 #include "Toast.h"
 
-#include "Helpers.h"
+#include "ToastWindow.h"
 #include "UIHelpers.h"
 
 #include <QColor>
@@ -174,7 +174,7 @@ void Toast::cancelAnimations() noexcept {
 
 void Toast::dismiss() noexcept {
   if (m_useToolWindow)
-    qtSetMacWindowChildOf(this, nullptr);
+    setToastWindowChildOf(this, nullptr);
   if (!m_emittedDismissed) {
     m_emittedDismissed = true;
     emit dismissed(this);
@@ -211,7 +211,7 @@ void Toast::showMessage(const QString& message, ToastType type, QWidget* anchorW
 
   show();
   if (m_useToolWindow)
-    qtSetMacWindowChildOf(this, parentWidget());
+    setToastWindowChildOf(this, parentWidget());
   raise();
   startFadeIn();
 }

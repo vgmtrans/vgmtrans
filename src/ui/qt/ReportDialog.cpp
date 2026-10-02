@@ -6,11 +6,9 @@
 
 #include "ReportDialog.h"
 
-#include "RawFile.h"
-#include "Root.h"
-#include "util/Helpers.h"
+#include "application/WorkspaceController.h"
+#include "util/ExternalUrl.h"
 #include <version.h>
-#include "VGMFile.h"
 
 #include <QCryptographicHash>
 #include <QFrame>
@@ -30,7 +28,23 @@
 #include <QUrlQuery>
 #include <QVBoxLayout>
 
-ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
+namespace {
+QIcon iconForAsset(const vgmtrans::core::Asset& asset) {
+  if (std::holds_alternative<vgmtrans::core::SequenceProgramAsset>(asset)) {
+    return QIcon(QStringLiteral(":/icons/sequence.svg"));
+  }
+  if (std::holds_alternative<vgmtrans::core::SoundBankAsset>(asset)) {
+    return QIcon(QStringLiteral(":/icons/instrument-set.svg"));
+  }
+  if (std::holds_alternative<vgmtrans::core::SamplePoolAsset>(asset)) {
+    return QIcon(QStringLiteral(":/icons/sample-collection.svg"));
+  }
+  return QIcon(QStringLiteral(":/icons/binary.svg"));
+}
+}  // namespace
+
+ReportDialog::ReportDialog(vgmtrans::ui::WorkspaceController& workspace, QWidget* parent)
+    : QWidget(parent), m_workspace(workspace) {
   setWindowFlags(Qt::Window);
   setWindowTitle(tr("Report a Bug"));
 
@@ -39,22 +53,20 @@ ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
   layout->setContentsMargins(20, 20, 20, 20);
 
 #ifdef Q_OS_MAC
-  /* I know that this is a Qt sin, but the default 
+  /* I know that this is a Qt sin, but the default
   macOS theme is very inconsistent in squared vs rounded elements */
-  this->setStyleSheet(
-      "QPlainTextEdit, QLineEdit {"
-      "  background-color: palette(base);"
-      "  border: 1px solid palette(mid);"
-      "  border-radius: 5px;"
-      "  padding: 4px;"
-      "}"
-  );
+  this->setStyleSheet("QPlainTextEdit, QLineEdit {"
+                      "  background-color: palette(base);"
+                      "  border: 1px solid palette(mid);"
+                      "  border-radius: 5px;"
+                      "  padding: 4px;"
+                      "}");
 #endif
 
   auto* info_label = new QLabel(this);
-  info_label->setText(tr(
-    "Use this form to auto-fill a bug report on our GitHub  <a href=\"https://github.com/vgmtrans/vgmtrans/issues\">issue tracker</a>.<br/>"
-    "<b>You must be logged in to a GitHub account.</b>"));
+  info_label->setText(tr("Use this form to auto-fill a bug report on our GitHub  <a "
+                         "href=\"https://github.com/vgmtrans/vgmtrans/issues\">issue tracker</a>.<br/>"
+                         "<b>You must be logged in to a GitHub account.</b>"));
   info_label->setTextFormat(Qt::RichText);
   info_label->setOpenExternalLinks(true);
   info_label->setTextInteractionFlags(Qt::TextBrowserInteraction);
@@ -90,7 +102,10 @@ ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
   m_desc_edit = new QPlainTextEdit(this);
   m_desc_edit->setFixedHeight(100);
   m_desc_edit->setTabChangesFocus(true);
-  m_desc_edit->setPlaceholderText(tr("Instead of:\n\"MIDI is broken\"\nWrite:\n\"Track 3 is missing percussion after 00:12.\nThe original game playback includes drums at that timestamp.\"\n\nIf this also involves exported files, it's easier to understand if you mention where, e.g. \"broken in FL Studio 25\"."));
+  m_desc_edit->setPlaceholderText(
+      tr("Instead of:\n\"MIDI is broken\"\nWrite:\n\"Track 3 is missing percussion after 00:12.\nThe original game "
+         "playback includes drums at that timestamp.\"\n\nIf this also involves exported files, it's easier to "
+         "understand if you mention where, e.g. \"broken in FL Studio 25\"."));
   auto* desc_label = new QLabel(tr("&Description <span style=\"color:red\">*</span>"), this);
   desc_label->setTextFormat(Qt::RichText);
   desc_label->setBuddy(m_desc_edit);
@@ -112,14 +127,15 @@ ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
   m_expected_edit = new QPlainTextEdit(this);
   m_expected_edit->setFixedHeight(100);
   m_expected_edit->setTabChangesFocus(true);
-  m_expected_edit->setPlaceholderText(tr("Actual:\nTrack 2 is silent after 00:15.\n\nExpected:\nTrack 2 should contain the melody heard in-game."));
+  m_expected_edit->setPlaceholderText(
+      tr("Actual:\nTrack 2 is silent after 00:15.\n\nExpected:\nTrack 2 should contain the melody heard in-game."));
   auto* expected_label = new QLabel(tr("E&xpected Behavior <span style=\"color:red\">*</span>"), this);
   expected_label->setTextFormat(Qt::RichText);
   expected_label->setBuddy(m_expected_edit);
   details_layout->addWidget(expected_label);
   details_layout->addWidget(m_expected_edit);
   scroll_layout->addLayout(details_layout);
-  
+
   auto* files_label = new QLabel(tr("Affected Files"), this);
   scroll_layout->addWidget(files_label);
 
@@ -130,11 +146,11 @@ ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
   auto* raw_vbox = new QVBoxLayout(raw_group);
   m_raw_list = new QListWidget(raw_group);
   m_raw_list->setSelectionMode(QAbstractItemView::NoSelection);
-  for (const auto& raw_file : pRoot->rawFiles()) {
-    auto* item = new QListWidgetItem(QString::fromStdString(raw_file->name()), m_raw_list);
+  for (const auto& source : m_workspace.snapshot().sources()) {
+    auto* item = new QListWidgetItem(QString::fromStdString(source.name), m_raw_list);
     item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
     item->setCheckState(Qt::Unchecked);
-    item->setData(Qt::UserRole, QVariant::fromValue(static_cast<void*>(raw_file)));
+    item->setData(Qt::UserRole, source.id.value);
   }
   m_raw_list->setMinimumHeight(200);
   raw_vbox->addWidget(m_raw_list);
@@ -142,7 +158,7 @@ ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
 
   auto* vgm_group = new QGroupBox(tr("VGM Files"), this);
   auto* vgm_vbox = new QVBoxLayout(vgm_group);
-  
+
   auto* search_edit = new QLineEdit(vgm_group);
   search_edit->setPlaceholderText(tr("Search files..."));
   vgm_vbox->addWidget(search_edit);
@@ -153,23 +169,22 @@ ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
   m_vgm_tree->setColumnWidth(0, 250);
   m_vgm_tree->setSelectionMode(QAbstractItemView::NoSelection);
 
-  for (const auto& vgm_file_var : pRoot->vgmFiles()) {
-    if (auto* vgm_file = variantToVGMFile(vgm_file_var)) {
-      auto* item = new QTreeWidgetItem(m_vgm_tree);
-      item->setText(0, QString::fromStdString(vgm_file->name()));
-      item->setText(1, QString::fromStdString(vgm_file->formatName()));
-      item->setIcon(0, iconForFile(vgm_file_var));
-      item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
-      item->setCheckState(0, Qt::Unchecked);
-      item->setData(0, Qt::UserRole, QVariant::fromValue(static_cast<void*>(vgm_file)));
-    }
+  for (const auto& asset : m_workspace.snapshot().assets()) {
+    const auto& metadata = vgmtrans::core::metadata(asset);
+    auto* item = new QTreeWidgetItem(m_vgm_tree);
+    item->setText(0, QString::fromStdString(metadata.name));
+    item->setText(1, QString::fromStdString(metadata.format));
+    item->setIcon(0, iconForAsset(asset));
+    item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+    item->setCheckState(0, Qt::Unchecked);
+    item->setData(0, Qt::UserRole, metadata.id.value);
   }
 
   connect(search_edit, &QLineEdit::textChanged, [this](const QString& text) {
     for (int i = 0; i < m_vgm_tree->topLevelItemCount(); ++i) {
       auto* item = m_vgm_tree->topLevelItem(i);
-      bool match = item->text(0).contains(text, Qt::CaseInsensitive) || 
-                   item->text(1).contains(text, Qt::CaseInsensitive);
+      bool match =
+          item->text(0).contains(text, Qt::CaseInsensitive) || item->text(1).contains(text, Qt::CaseInsensitive);
       item->setHidden(!match);
     }
   });
@@ -195,7 +210,6 @@ ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
   auto* button_layout = new QHBoxLayout();
   button_layout->addStretch();
 
-
   auto* close_button = new QPushButton(tr("Close"), this);
   button_layout->addWidget(close_button);
 
@@ -215,11 +229,7 @@ ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
   connect(m_steps_edit, &QPlainTextEdit::textChanged, trigger_update);
   connect(m_expected_edit, &QPlainTextEdit::textChanged, trigger_update);
   connect(m_raw_list, &QListWidget::itemChanged, trigger_update);
-  connect(m_vgm_tree, &QTreeWidget::itemChanged, [this](QTreeWidgetItem*, int) { 
-    m_update_timer->start(300); 
-  });
-
-
+  connect(m_vgm_tree, &QTreeWidget::itemChanged, [this](QTreeWidgetItem*, int) { m_update_timer->start(300); });
 
   connect(m_submit_button, &QPushButton::clicked, this, &ReportDialog::submitReport);
   connect(close_button, &QPushButton::clicked, this, &QWidget::close);
@@ -247,22 +257,29 @@ QUrl ReportDialog::buildReportUrl() const {
   query.addQueryItem("steps", m_steps_edit->toPlainText().trimmed());
   query.addQueryItem("expected", m_expected_edit->toPlainText().trimmed());
 
-  const QString system_details = QString("VGMTrans version: %1 (%2, %3)\nOperating system: %4")
-                                    .arg(VGMTRANS_VERSION, VGMTRANS_REVISION, VGMTRANS_BRANCH, QSysInfo::prettyProductName());
+  const QString system_details =
+      QString("VGMTrans version: %1 (%2, %3)\nOperating system: %4")
+          .arg(VGMTRANS_VERSION, VGMTRANS_REVISION, VGMTRANS_BRANCH, QSysInfo::prettyProductName());
   query.addQueryItem("system_details", system_details);
 
   QStringList assets;
   for (int i = 0; i < m_raw_list->count(); ++i) {
     if (auto* item = m_raw_list->item(i); item->checkState() == Qt::Checked) {
       QString sha = item->data(Qt::UserRole + 1).toString();
-      auto* raw_file = static_cast<RawFile*>(item->data(Qt::UserRole).value<void*>());
+      const auto sourceId = vgmtrans::core::SourceId{item->data(Qt::UserRole).toUInt()};
+      const auto* source = m_workspace.snapshot().source(sourceId);
+      if (source == nullptr) {
+        continue;
+      }
 
       if (sha.isEmpty()) {
-        QByteArray data = QByteArray::fromRawData(raw_file->data(), static_cast<int>(raw_file->size()));
+        const std::span<const u8> bytes = m_workspace.sourceBytes(sourceId);
+        const QByteArray data =
+            QByteArray::fromRawData(reinterpret_cast<const char*>(bytes.data()), static_cast<qsizetype>(bytes.size()));
         sha = QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex();
         item->setData(Qt::UserRole + 1, sha);
       }
-      assets << QString("%1 (%2)").arg(QString::fromStdString(raw_file->name()), sha);
+      assets << QString("%1 (%2)").arg(QString::fromStdString(source->name), sha);
     }
   }
 
@@ -280,10 +297,8 @@ QUrl ReportDialog::buildReportUrl() const {
 }
 
 void ReportDialog::updateUrlStatus() {
-  bool valid = !m_title_edit->text().trimmed().isEmpty() &&
-               !m_desc_edit->toPlainText().trimmed().isEmpty() &&
-               !m_steps_edit->toPlainText().trimmed().isEmpty() &&
-               !m_expected_edit->toPlainText().trimmed().isEmpty();
+  bool valid = !m_title_edit->text().trimmed().isEmpty() && !m_desc_edit->toPlainText().trimmed().isEmpty() &&
+               !m_steps_edit->toPlainText().trimmed().isEmpty() && !m_expected_edit->toPlainText().trimmed().isEmpty();
 
   m_submit_button->setEnabled(valid);
 
@@ -293,6 +308,6 @@ void ReportDialog::updateUrlStatus() {
 }
 
 void ReportDialog::submitReport() {
-  qtOpenUrl(buildReportUrl());
+  openExternalUrl(buildReportUrl());
   m_feedback_label->setText(tr("GitHub opened in browser. You can now close this window."));
 }

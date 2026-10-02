@@ -22,9 +22,13 @@ class NDSTrack
     : public SeqTrack {
  public:
   NDSTrack(NDSSeq *parentFile, u32 offset = 0, u32 length = 0);
-  void resetVars();
-  virtual bool readEvent();
+  void resetVars() override;
+  void loadTrackMainLoop(u32 stopOffset, s32 stopTime) override;
+  bool readEvent() override;
 
   u32 dur;
   bool noteWithDelta;
+
+ private:
+  bool canRunEventAtStopTime(u32 stopOffset) const;
 };

@@ -8,9 +8,9 @@
 
 #include "HexView.h"
 #include "HexViewRhiRenderer.h"
-#include "LogManager.h"
 #include "workarea/rhi/RhiWindowDragDropEvents.h"
 
+#include <QDebug>
 #include <QEvent>
 #include <QExposeEvent>
 #if QT_CONFIG(opengl)
@@ -229,9 +229,9 @@ void HexViewRhiWindow::initIfNeeded() {
     return;
   }
 
-  L_DEBUG("HexViewRhiWindow init: backend={} surface={} size={}x{} dpr={}",
-          int(m_rhi->backend()), int(surfaceType()), size().width(), size().height(),
-          devicePixelRatio());
+  qDebug() << "HexViewRhiWindow init: backend=" << int(m_rhi->backend())
+           << "surface=" << int(surfaceType()) << "size=" << size()
+           << "dpr=" << devicePixelRatio();
 
   if (m_renderer) {
     m_renderer->initIfNeeded(m_rhi);
@@ -252,16 +252,16 @@ void HexViewRhiWindow::resizeSwapChain() {
 
   const QSize pixelSize = size() * devicePixelRatio();
   if (pixelSize.isEmpty()) {
-    L_DEBUG("HexViewRhiWindow resizeSwapChain skipped: empty pixel size size={}x{} dpr={}",
-            size().width(), size().height(), devicePixelRatio());
+    qDebug() << "HexViewRhiWindow resizeSwapChain skipped: empty pixel size size="
+             << size() << "dpr=" << devicePixelRatio();
     return;
   }
 
   m_sc->setDepthStencil(nullptr);
 
   m_hasSwapChain = m_sc->createOrResize();
-  L_DEBUG("HexViewRhiWindow swapchain resized pixelSize={}x{} sampleCount={}",
-          pixelSize.width(), pixelSize.height(), m_sc->sampleCount());
+  qDebug() << "HexViewRhiWindow swapchain resized pixelSize=" << pixelSize
+           << "sampleCount=" << m_sc->sampleCount();
 }
 
 void HexViewRhiWindow::renderFrame() {
@@ -279,13 +279,13 @@ void HexViewRhiWindow::renderFrame() {
 
   const QSize currentPixelSize = m_sc->currentPixelSize();
   if (currentPixelSize.isEmpty()) {
-    L_DEBUG("HexViewRhiWindow renderFrame skipped: swapchain pixel size empty");
+    qDebug() << "HexViewRhiWindow renderFrame skipped: swapchain pixel size empty";
     return;
   }
 
   const QRhi::FrameOpResult result = m_rhi->beginFrame(m_sc);
   if (result == QRhi::FrameOpSwapChainOutOfDate) {
-    L_DEBUG("HexViewRhiWindow frame: swapchain out of date");
+    qDebug() << "HexViewRhiWindow frame: swapchain out of date";
     resizeSwapChain();
     if (!m_hasSwapChain) {
       return;
@@ -294,7 +294,7 @@ void HexViewRhiWindow::renderFrame() {
     return;
   }
   if (result != QRhi::FrameOpSuccess) {
-    L_DEBUG("HexViewRhiWindow frame: beginFrame failed {}", int(result));
+    qDebug() << "HexViewRhiWindow frame: beginFrame failed" << int(result);
     return;
   }
 

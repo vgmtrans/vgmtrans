@@ -1,0 +1,171 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include "value/sequence/PerformanceModel.h"
+
+#include <algorithm>
+#include <cmath>
+#include <iterator>
+#include <limits>
+#include <optional>
+
+namespace vgmtrans::core {
+
+double effectivePitchBendSemitones(const PitchBendPerformanceEvent& bend, u16 sourceRangeCents,
+                                   std::optional<u16> instrumentRangeCents) noexcept {
+  if (!bend.normalizedWheelPosition) {
+    return bend.semitones;
+  }
+  const double range = instrumentRangeCents.value_or(sourceRangeCents) / 100.0;
+  return std::clamp(*bend.normalizedWheelPosition, -1.0, 1.0) * range;
+}
+
+const PitchTransitionIntent* pitchTransitionIntent(const PerformanceAutomation& automation) {
+  return std::get_if<PitchTransitionIntent>(&automation.intent);
+}
+
+PitchTransitionIntent* pitchTransitionIntent(PerformanceAutomation& automation) {
+  return std::get_if<PitchTransitionIntent>(&automation.intent);
+}
+
+std::optional<double> pitchTransitionKeyAt(const PerformanceTrack& track, PerformanceNoteId note,
+                                           PerformanceLaneId lane, u64 tick) {
+  for (auto previous = track.automations.rbegin(); previous != track.automations.rend(); ++previous) {
+    const auto* transition = pitchTransitionIntent(*previous);
+    if (transition == nullptr || transition->note != note || transition->lane != lane ||
+        previous->realization.startTick > tick) {
+      continue;
+    }
+    if (previous->realization.endReason != PerformanceAutomationEndReason::Completed &&
+        previous->realization.endTick <= previous->realization.startTick) {
+      continue;
+    }
+    const u64 realizedTick = std::min(tick, previous->realization.endTick);
+    const u64 elapsed = realizedTick - previous->realization.startTick;
+    return pitchTransitionValueAt(*transition,
+                                  static_cast<u32>(std::min<u64>(elapsed, std::numeric_limits<u32>::max())));
+  }
+  return std::nullopt;
+}
+
+double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elapsedTicks) {
+  const u32 duration = transition.timing.timelineTicks;
+  const u32 clampedElapsed = std::min(elapsedTicks, duration);
+
+  if (const auto* sampled = std::get_if<SampledAutomationCurve>(&transition.curve);
+      sampled != nullptr && !sampled->samples.empty()) {
+    const auto upper = std::ranges::upper_bound(sampled->samples, clampedElapsed, {}, &AutomationSample::tickOffset);
+    return upper == sampled->samples.begin() ? sampled->samples.front().value : std::prev(upper)->value;
+  }
+
+  if (duration == 0) {
+    return transition.targetKey;
+  }
+  const double position = static_cast<double>(clampedElapsed) / static_cast<double>(duration);
+  return transition.startKey + ((transition.targetKey - transition.startKey) * position);
+}
+
+PerformanceTempoMap::PerformanceTempoMap(const PerformanceSequence& performance)
+    : ppqn_(std::max<u32>(performance.timebase.ppqn, 1)),
+      initialTempoMicrosecondsPerQuarter_(performance.initialTempoMicrosecondsPerQuarter) {
+  for (const auto* tempo : orderedPerformanceEvents<TempoPerformanceEvent>(performance)) {
+    if (points_.empty() || points_.back().microsecondsPerQuarter != tempo->microsecondsPerQuarter) {
+      points_.push_back(Point{.tick = tempo->header.tick, .microsecondsPerQuarter = tempo->microsecondsPerQuarter});
+    }
+  }
+  if (initialTempoMicrosecondsPerQuarter_ != 500000 && (points_.empty() || points_.front().tick != 0)) {
+    points_.insert(points_.begin(), Point{.tick = 0, .microsecondsPerQuarter = initialTempoMicrosecondsPerQuarter_});
+  }
+}
+
+u32 PerformanceTempoMap::microsecondsPerQuarterAt(u64 tick) const {
+  const auto upper = std::ranges::upper_bound(points_, tick, {}, &Point::tick);
+  return upper == points_.begin() ? initialTempoMicrosecondsPerQuarter_ : std::prev(upper)->microsecondsPerQuarter;
+}
+
+double PerformanceTempoMap::tickSeconds(u64 tick) const {
+  return (static_cast<double>(microsecondsPerQuarterAt(tick)) / 1'000'000.0) / ppqn_;
+}
+
+double PerformanceTempoMap::durationMilliseconds(u64 startTick, u32 durationTicks) const {
+  if (durationTicks == 0) {
+    return 0.0;
+  }
+
+  const u64 endTick = addTicks(startTick, durationTicks);
+  u32 tempo = microsecondsPerQuarterAt(startTick);
+  u64 cursor = startTick;
+  double microseconds = 0.0;
+
+  for (auto change = std::ranges::upper_bound(points_, startTick, {}, &Point::tick); change != points_.end();
+       ++change) {
+    if (change->tick >= endTick) {
+      break;
+    }
+    microseconds += static_cast<double>(change->tick - cursor) * tempo / ppqn_;
+    cursor = change->tick;
+    tempo = change->microsecondsPerQuarter;
+  }
+  microseconds += static_cast<double>(endTick - cursor) * tempo / ppqn_;
+  return microseconds / 1000.0;
+}
+
+u32 PerformanceTempoMap::durationTicksForMilliseconds(u64 startTick, double milliseconds) const {
+  if (!(milliseconds > 0.0) || !std::isfinite(milliseconds)) {
+    return 0;
+  }
+  double remainingMicroseconds = milliseconds * 1000.0;
+  u32 tempo = microsecondsPerQuarterAt(startTick);
+  u64 cursor = startTick;
+
+  for (auto change = std::ranges::upper_bound(points_, startTick, {}, &Point::tick); change != points_.end();
+       ++change) {
+    const u64 segmentTicks = change->tick - cursor;
+    const double segmentMicroseconds = static_cast<double>(segmentTicks) * tempo / ppqn_;
+    if (remainingMicroseconds <= segmentMicroseconds) {
+      break;
+    }
+    remainingMicroseconds -= segmentMicroseconds;
+    cursor = change->tick;
+    if (cursor - startTick >= std::numeric_limits<u32>::max()) {
+      return std::numeric_limits<u32>::max();
+    }
+    tempo = change->microsecondsPerQuarter;
+  }
+
+  const u64 elapsedTicks = cursor - startTick;
+  const double exactTailTicks = remainingMicroseconds * ppqn_ / std::max<u32>(tempo, 1);
+  if (exactTailTicks >= std::numeric_limits<u32>::max() - elapsedTicks) {
+    return std::numeric_limits<u32>::max();
+  }
+  const auto wholeTailTicks = static_cast<u64>(exactTailTicks);
+  const u64 ticks = elapsedTicks + wholeTailTicks + (exactTailTicks - wholeTailTicks > 0.5 ? 1 : 0);
+  return static_cast<u32>(std::min<u64>(ticks, std::numeric_limits<u32>::max()));
+}
+
+const PerformanceTrack* performanceTrackById(const PerformanceSequence& sequence, TrackId id) {
+  const auto found =
+      std::ranges::find_if(sequence.tracks, [id](const PerformanceTrack& track) { return track.id == id; });
+  if (found == sequence.tracks.end()) {
+    return nullptr;
+  }
+  return &*found;
+}
+
+std::vector<const PerformanceEvent*> performanceEventsForCommand(const PerformanceTrack& track,
+                                                                 SourceCommandRef command) {
+  std::vector<const PerformanceEvent*> events;
+  for (const auto& event : track.events) {
+    if (performanceEventHeader(event).sourceCommand == command) {
+      events.push_back(&event);
+    }
+  }
+  std::ranges::stable_sort(events, {},
+                           [](const PerformanceEvent* event) { return performanceEventHeader(*event).order(); });
+  return events;
+}
+
+}  // namespace vgmtrans::core
