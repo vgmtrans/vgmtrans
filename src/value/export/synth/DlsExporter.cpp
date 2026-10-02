@@ -415,14 +415,13 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 SynthExportResult buildDls(const SynthExportInput& input, const SourceStore& sources) {
   // DLS accepts the decoded PCM view directly. After shared sample/instrument resolution,
   // this function is mostly RIFF table assembly.
-  auto [samples, instruments, diagnostics] = prepareSynthData(input, sources);
+  auto [samples, instruments, diagnostics, valid] = prepareSynthData(input, sources);
 
-  if (samples.empty()) {
-    diagnostics.push_back(exportError("No decodable samples available for DLS export"));
-    return SynthExportResult{.diagnostics = std::move(diagnostics)};
-  }
-  if (instruments.empty()) {
-    diagnostics.push_back(exportError("No playable instruments available for DLS export"));
+  if (!valid || samples.empty() || instruments.empty()) {
+    if (valid) {
+      diagnostics.push_back(exportError(samples.empty() ? "No decodable samples available for DLS export"
+                                                       : "No playable instruments available for DLS export"));
+    }
     return SynthExportResult{.diagnostics = std::move(diagnostics)};
   }
 

@@ -244,14 +244,28 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
 
 }  // namespace
 
-std::vector<SynthBankSelection> selectSynthBanks(std::span<const SoundBankAsset* const> soundBanks) {
+std::optional<std::vector<SynthBankSelection>> prepareSynthBanks(
+    std::span<const SoundBankAsset* const> soundBanks, std::vector<Diagnostic>& diagnostics) {
+  std::vector<std::optional<InstrumentAddress>> preferred;
+  for (const auto* bank : soundBanks) {
+    if (!bank) continue;
+    for (const auto& instrument : bank->instruments) {
+      preferred.push_back(resolveInstrumentAddress(instrument.explicitAddress, instrument.identity));
+    }
+  }
+  const auto addresses = allocateInstrumentAddresses(preferred);
+  if (!addresses) {
+    diagnostics.push_back({.severity = Severity::Error, .code = "instrument-addresses-exhausted",
+                           .message = "Cannot allocate another portable bank/program address"});
+    return std::nullopt;
+  }
   std::vector<SynthBankSelection> result;
+  size_t index = 0;
   for (const auto* bank : soundBanks) {
     if (!bank) continue;
     SynthBankSelection selected{.bank = bank};
     for (const auto& instrument : bank->instruments) {
-      selected.instruments.push_back(
-          {&instrument, resolveInstrumentAddress(instrument.explicitAddress, instrument.identity)});
+      selected.instruments.push_back({&instrument, (*addresses)[index++]});
     }
     result.push_back(std::move(selected));
   }
@@ -410,6 +424,17 @@ std::vector<Region> sampleRegionResponses(std::span<const Region> regions, u32 s
 PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceStore& sources,
                                    const SynthSampleDecodeOptions& options) {
   PreparedSynthData prepared;
+  std::set<InstrumentAddress> addresses;
+  for (const auto& selected : input.soundBanks) {
+    for (const auto& instrument : selected.instruments) {
+      const auto address = instrument.address;
+      if (address.bank >= 128 || address.program >= 128 || !addresses.insert(address).second) {
+        prepared.diagnostics.push_back(exportError("Synth preset addresses must be unique and in 0..127"));
+        prepared.valid = false;
+        return prepared;
+      }
+    }
+  }
   auto samplesByReference = referencedSamples(input.soundBanks);
   for (const auto& selected : input.soundBanks) {
     decodeSynthPool(prepared, samplesByReference, &selected, selected.bank->localSamples, input, sources, options);

@@ -110,13 +110,6 @@ struct SfLayout {
   return name.empty() ? fallback : name;
 }
 
-[[nodiscard]] u16 sf2Bank(u32 bank) {
-  if (bank > 128) {
-    return static_cast<u16>((bank >> 8) & 0x7f);
-  }
-  return static_cast<u16>(bank);
-}
-
 [[nodiscard]] s16 clampS16(s32 value) {
   return static_cast<s16>(std::clamp<s32>(value, std::numeric_limits<s16>::min(), std::numeric_limits<s16>::max()));
 }
@@ -126,10 +119,6 @@ struct SfLayout {
     return 0;
   }
   return clampS16(static_cast<s32>(reverb * 1000.0));
-}
-
-[[nodiscard]] u16 clampU16(u32 value) {
-  return static_cast<u16>(std::min<u32>(value, std::numeric_limits<u16>::max()));
 }
 
 [[nodiscard]] std::pair<s16, s16> splitTuneCents(s32 cents) {
@@ -406,8 +395,8 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
   for (const auto& preset : presets) {
     const auto& resolved = *preset.source;
     writeFixedString(headers, sf2Name(resolved.instrument->name, "Preset"), 20);
-    writeLe16(headers, clampU16(resolved.address.program));
-    writeLe16(headers, sf2Bank(resolved.address.bank));
+    writeLe16(headers, static_cast<u16>(resolved.address.program));
+    writeLe16(headers, static_cast<u16>(resolved.address.bank));
     writeIndex(headers, bags.size() / 4);
     writeLe32(headers, 0);
     writeLe32(headers, 0);
@@ -576,19 +565,18 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
 SynthExportResult buildSoundFont2(const SynthExportInput& input, const SourceStore& sources) {
   // SoundFont 2 sample data is mono PCM16. Shared decode/resolve helpers do the expensive
   // source work once before this file-specific table writer assembles RIFF chunks.
-  auto [samples, instruments, diagnostics] =
+  auto [samples, instruments, diagnostics, valid] =
       prepareSynthData(input, sources,
                        SynthSampleDecodeOptions{
                            .requireMono = true,
                            .nonMonoWarning = "Skipping non-mono sample for SoundFont2 export",
                        });
 
-  if (samples.empty()) {
-    diagnostics.push_back(exportError("No decodable samples available for SoundFont2 export"));
-    return SynthExportResult{.diagnostics = std::move(diagnostics)};
-  }
-  if (instruments.empty()) {
-    diagnostics.push_back(exportError("No playable instruments available for SoundFont2 export"));
+  if (!valid || samples.empty() || instruments.empty()) {
+    if (valid) {
+      diagnostics.push_back(exportError(samples.empty() ? "No decodable samples available for SoundFont2 export"
+                                                       : "No playable instruments available for SoundFont2 export"));
+    }
     return SynthExportResult{.diagnostics = std::move(diagnostics)};
   }
   const auto layout = sf2Layout(instruments);

@@ -13,6 +13,7 @@
 #include "value/synth/SampleFiltering.h"
 #include "value/synth/SynthModel.h"
 
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -27,14 +28,17 @@ struct SynthBankSelection {
   std::vector<ResolvedInstrument> instruments;
 };
 
-[[nodiscard]] std::vector<SynthBankSelection> selectSynthBanks(
-    std::span<const SoundBankAsset* const> soundBanks);
+// Prepare full banks with the same portable allocator as performance export.
+// Address exhaustion returns no selection and appends an error diagnostic.
+[[nodiscard]] std::optional<std::vector<SynthBankSelection>> prepareSynthBanks(
+    std::span<const SoundBankAsset* const> soundBanks, std::vector<Diagnostic>& diagnostics);
 [[nodiscard]] std::vector<SynthBankSelection> selectSynthBanks(
     const ResolvedPerformance& performance);
 
 struct SynthExportInput {
   std::string name;
-  // Owns the completed selection; bank/instrument data remain borrowed.
+  // Owns the completed selection; addresses are unique and in 0..127.
+  // Bank/instrument data remain borrowed.
   std::vector<SynthBankSelection> soundBanks;
   std::span<const SamplePoolAsset* const> samplePools;
   bool filterSamplesToReferencedInstruments = false;
@@ -86,6 +90,7 @@ struct PreparedSynthData {
   std::vector<DecodedSynthSample> samples;
   std::vector<ResolvedSynthInstrument> instruments;
   std::vector<Diagnostic> diagnostics;
+  bool valid = true;  // False when input validation prevents preparation.
 };
 
 // SF2 and DLS have one decay followed by a fixed sustain level. Approximate a

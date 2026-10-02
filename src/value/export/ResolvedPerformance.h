@@ -12,6 +12,7 @@
 #include <memory>
 #include <optional>
 #include <set>
+#include <span>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -24,8 +25,17 @@ struct InstrumentPreparationOptions {
   std::optional<u32> firstBank;
 };
 
+// Allocate unique companion presets in the shared 128-bank, 128-program range.
+// Source addresses are preferences; reserved addresses name external MIDI presets.
+// firstBank limits allocation to [firstBank, 128) for a stitched part.
+// Failure leaves no partial plan. This also prepares banks without a sequence.
+[[nodiscard]] std::optional<std::vector<InstrumentAddress>> allocateInstrumentAddresses(
+    std::span<const std::optional<InstrumentAddress>> preferred,
+    std::span<const InstrumentAddress> reserved = {}, u32 firstBank = 0);
+
 // An instrument definition and its output address. Null means an external
-// preset. The definition is borrowed; its owning bank must outlive conversion.
+// preset. Owned presets always have bank/program in 0..127. The definition is
+// borrowed; its owning bank must outlive conversion.
 struct ResolvedInstrument {
   const Instrument* instrument = nullptr;
   InstrumentAddress address;

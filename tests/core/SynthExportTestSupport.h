@@ -7,14 +7,24 @@
 #pragma once
 
 #include "value/base/Types.h"
+#include "value/export/synth/SynthExportData.h"
 
 #include <algorithm>
 #include <iterator>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace {
+
+std::vector<vgmtrans::core::SynthBankSelection> prepareSynthBanksForTest(
+    std::span<const vgmtrans::core::SoundBankAsset* const> banks) {
+  std::vector<vgmtrans::core::Diagnostic> diagnostics;
+  auto selected = vgmtrans::core::prepareSynthBanks(banks, diagnostics);
+  if (!selected) throw std::runtime_error("Test synth bank address preparation failed");
+  return std::move(*selected);
+}
 
 // Inspect the serialized bytes independently of the production writers.
 u32 readLe32(const std::vector<u8>& bytes, size_t offset) {

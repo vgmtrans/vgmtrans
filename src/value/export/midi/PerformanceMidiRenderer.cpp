@@ -15,6 +15,7 @@
 #include <cmath>
 #include <map>
 #include <optional>
+#include <set>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -1322,10 +1323,25 @@ MidiSequence renderMidiSequence(const ResolvedPerformance& resolved,
   const auto globalTransposes = orderedPerformanceEvents<GlobalTransposePerformanceEvent>(performance);
   const auto globalTimeSignatures = orderedPerformanceEvents<TimeSignaturePerformanceEvent>(performance);
   const double levelHeadroom = panLevelHeadroom(performance);
+  std::set<InstrumentAddress> reportedExternal;
 
   for (size_t trackIndex = 0; trackIndex < performance.tracks.size(); ++trackIndex) {
     const auto& performanceTrack = performance.tracks[trackIndex];
     const auto events = detail::planMidiTrack(resolved, trackIndex, options, globalTempos, sequence.diagnostics);
+    for (const auto& event : events) {
+      const ResolvedInstrument* selection = nullptr;
+      if (const auto* change = std::get_if<MidiInstrumentEvent>(&event)) selection = &change->selection;
+      if (const auto* note = std::get_if<MidiNoteBoundary>(&event); note && note->instrument) selection = &*note->instrument;
+      if (selection && !selection->instrument &&
+          (selection->address.program >= 128 || selection->address.bank >=
+              (options.bankSelectStyle == MidiBankSelectStyle::MsbOnly ? 128u : 16384u)) &&
+          reportedExternal.insert(selection->address).second) {
+        sequence.diagnostics.push_back({
+            .severity = Severity::Warning, .code = "external-instrument-address-out-of-range",
+            .message = "External preset cannot be represented exactly by the selected MIDI bank/program encoding",
+        });
+      }
+    }
     const auto timeline = midiTimeline(events, globalReverb);
     MidiTrack midiTrack{
         .name = performanceTrack.name.empty() ? "Track " + std::to_string(performanceTrack.sourceTrackNumber)

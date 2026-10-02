@@ -212,6 +212,166 @@ void layoutSeparatesCollisionsAndRejectsOverflow() {
 
 }
 
+void nonportableSourceAddressesShareOneCompanionPlan() {
+  SourceStore sources;
+  const auto source = sources.add(SourceFile{.name = "addresses.pcm"}, {0, 32, 64, 96});
+  SoundBankAsset bank{.metadata = {.id = AssetId{10}},
+      .localSamples = {.samples = {Sample{.codec = AudioCodec::PcmS8, .encodedData = {source, 0, 4}, .sampleRate = 16000}}}};
+  const std::array sourceAddresses{InstrumentAddress{1, 5}, InstrumentAddress{256, 5},
+      InstrumentAddress{128, 7}, InstrumentAddress{127, 0}, InstrumentAddress{2, 255}, InstrumentAddress{0, 0}};
+  PerformanceTrackFixture fixture{static_cast<u64>(sourceAddresses.size())};
+  for (u32 index = 0; index < sourceAddresses.size(); ++index) {
+    bank.instruments.push_back(Instrument{.explicitAddress = sourceAddresses[index],
+        .regions = {Region{.sample = SampleRef::resolved(bank.metadata.id, 0)}}});
+    fixture.out.at(index).instrument(sourceAddresses[index].bank, sourceAddresses[index].program);
+    fixture.out.at(index).note(60 + index, 1, 1);
+  }
+  for (const auto firstBank : {std::optional<u32>{}, std::optional<u32>{11}}) {
+    const auto resolved = preparePerformance({.tracks = {fixture.track}}, {bank}, {.firstBank = firstBank});
+    expect(resolved.valid(), "large source addresses should relocate without losing their instruments");
+    const auto selected = selectSynthBanks(resolved);
+    const auto sf2 = buildSoundFont2({.soundBanks = selected}, sources);
+    const size_t phdr = asciiOffset(sf2.bytes, "phdr") + 8;
+    std::set<InstrumentAddress> presets;
+    for (u32 index = 0; index < sourceAddresses.size(); ++index) {
+      const auto address = resolved.selectionFor(InstrumentHandle{0, index}).address;
+      expect(address.bank < 128 && address.program < 128 && presets.insert(address).second &&
+                 readLe16(sf2.bytes, phdr + index * 38 + 22) == address.bank &&
+                 readLe16(sf2.bytes, phdr + index * 38 + 20) == address.program &&
+                 resolved.soundBanks()[0].instruments[index].explicitAddress == sourceAddresses[index],
+             "companion addresses must be unique and portable while source preferences remain unchanged");
+      if (!firstBank && sourceAddresses[index].bank < 128 && sourceAddresses[index].program < 128) {
+        expect(address == sourceAddresses[index], "relocation must preserve even later portable preferences");
+      }
+    }
+    for (const auto mode : {MidiBankSelectStyle::MsbOnly, MidiBankSelectStyle::MsbAndLsb}) {
+      const auto dls = buildDls({.soundBanks = selected, .bankSelectStyle = mode}, sources);
+      std::set<InstrumentAddress> dlsPresets;
+      for (size_t offset = 0; offset + 20 <= dls.bytes.size(); ++offset) {
+        if (std::string_view(reinterpret_cast<const char*>(dls.bytes.data() + offset), 4) != "insh") continue;
+        const u32 encodedBank = readLe32(dls.bytes, offset + 12);
+        const u32 bankNumber = mode == MidiBankSelectStyle::MsbOnly ? encodedBank >> 8
+            : ((encodedBank >> 8) * 128 + (encodedBank & 127));
+        dlsPresets.insert({bankNumber, readLe32(dls.bytes, offset + 16)});
+      }
+      expect(dlsPresets == presets && dls.diagnostics.empty() && sf2.diagnostics.empty(),
+             "both DLS bank encodings must select the same presets as SF2");
+      auto midi = renderMidiSequence(resolved, {.bankSelectStyle = mode});
+      auto& events = midi.tracks[0].events;
+      std::ranges::stable_sort(events, {}, [](const MidiEvent& event) { return std::pair{event.tick, event.priority}; });
+      InstrumentAddress current;
+      size_t attacks = 0;
+      for (const auto& event : events) {
+        if (const auto* change = midiBankSelect(event)) current.bank = change->bank;
+        if (const auto* change = midiChannelMessage(event, MidiChannelMessageKind::ProgramChange)) current.program = change->value;
+        if (midiNote(event)) {
+          expect(current == resolved.selectionFor(InstrumentHandle{0, static_cast<u32>(attacks)}).address &&
+                     presets.contains(current), "each MIDI attack must address its own companion preset");
+          ++attacks;
+        }
+      }
+      expect(attacks == sourceAddresses.size(), "relocation must retain all attacks");
+    }
+  }
+  test::SessionSnapshotBuilder builder;
+  builder.assets.emplace_back(bank);
+  const auto snapshot = builder.finish();
+  const std::array banks{&bank};
+  const auto selected = prepareSynthBanksForTest(banks);
+  for (const auto format : {SynthExportFormat::SoundFont2, SynthExportFormat::Dls}) {
+    const auto standalone = exportSoundBank(snapshot, sources, bank.metadata.id, format, {});
+    const auto direct = format == SynthExportFormat::SoundFont2
+        ? buildSoundFont2({.name = "sound-bank-10", .soundBanks = selected, .filterSamplesToReferencedInstruments = true}, sources)
+        : buildDls({.name = "sound-bank-10", .soundBanks = selected, .filterSamplesToReferencedInstruments = true}, sources);
+    expect(!standalone.bytes.empty() && standalone.diagnostics.empty() && standalone.bytes == direct.bytes,
+           "standalone bank export must use the same portable allocator without requiring a sequence");
+  }
+}
+
+void externalMidiAddressesReserveTheirEncodedSelections() {
+  for (const auto external : {InstrumentAddress{256, 5}, InstrumentAddress{16385, 255}}) {
+    const InstrumentAddress encoded{external.bank & 127, std::min<u32>(external.program, 127)};
+    PerformanceTrackFixture fixture{2};
+    fixture.out.instrument(external.bank, external.program);
+    const auto externalNote = fixture.out.note(60, 1, 1);
+    fixture.out.at(1).instrument(InstrumentIdentity{"owned", 0});
+    const auto ownedNote = fixture.out.at(1).note(62, 1, 1);
+    const auto resolved = preparePerformance({.tracks = {fixture.track}},
+        {SoundBankAsset{.instruments = {Instrument{.explicitAddress = encoded, .identity = InstrumentIdentity{"owned", 0}}}}});
+    expect(resolved.selectionFor(noteById(resolved.performance(), externalNote)).address == external &&
+               resolved.selectionFor(noteById(resolved.performance(), ownedNote)).address != encoded,
+           "external requests must remain intact without aliasing a relocated owned preset");
+    const auto msb = renderMidiSequence(resolved);
+    expect(std::ranges::count(msb.diagnostics, std::string("external-instrument-address-out-of-range"), &Diagnostic::code) == 1,
+           "lossy external MIDI encoding must be diagnosed once per preset");
+    if (external.bank < 16384 && external.program < 128) {
+      expect(renderMidiSequence(resolved, {.bankSelectStyle = MidiBankSelectStyle::MsbAndLsb}).diagnostics.empty(),
+             "a representable external bank must remain available to MSB/LSB MIDI output");
+    }
+  }
+  SourceStore sources;
+  const auto source = sources.add(SourceFile{.name = "capacity.pcm"}, {0, 32, 64, 96});
+  SoundBankAsset full{.metadata = {.id = AssetId{10}},
+      .localSamples = {.samples = {Sample{.codec = AudioCodec::PcmS8, .encodedData = {source, 0, 4}, .sampleRate = 16000}}}};
+  full.instruments.resize(128 * 128 + 1);
+  const auto failed = preparePerformance({}, {full});
+  expect(!failed.valid() && failed.instrumentAddresses().empty(), "address exhaustion must leave no partial performance plan");
+  const std::array banks{&full};
+  std::vector<Diagnostic> diagnostics;
+  expect(prepareSynthBanks({}, diagnostics).has_value() && diagnostics.empty(), "empty bank preparation must succeed");
+  expect(!prepareSynthBanks(banks, diagnostics) && diagnostics.size() == 1 &&
+             diagnostics[0].code == "instrument-addresses-exhausted",
+         "standalone bank preparation must report the same exhaustion without a partial selection");
+  test::SessionSnapshotBuilder builder;
+  builder.sources = sources.sourceFiles();
+  builder.assets.emplace_back(full);
+  builder.collections = {{.id = CollectionId{0}, .selection = {.soundBanks = {full.metadata.id}},
+      .inputs = {.banks = {{.bank = full.metadata.id}}}}};
+  const auto snapshot = builder.finish();
+  const auto wav = exportCollection(snapshot, sources, CollectionId{0}, {.kinds = {ExportKind::Wav}});
+  expect(wav.size() == 1 && !wav[0].bytes.empty() && wav[0].diagnostics.empty(),
+         "WAV-only export must not require preset addresses");
+  for (const auto format : {SynthExportFormat::SoundFont2, SynthExportFormat::Dls}) {
+    const auto artifact = exportSoundBank(snapshot, sources, full.metadata.id, format, {});
+    expect(artifact.bytes.empty() && artifact.diagnostics.size() == 1 &&
+               artifact.diagnostics[0].code == "instrument-addresses-exhausted",
+           "failed standalone preparation must stop before sample conversion");
+  }
+  const auto occupied = preparePerformance({}, {SoundBankAsset{.metadata = full.metadata,
+      .instruments = {Instrument{.explicitAddress = InstrumentAddress{1, 5},
+          .regions = {Region{.sample = SampleRef::resolved(full.metadata.id, 0)}}}}, .localSamples = full.localSamples}});
+  auto invalid = selectSynthBanks(occupied);
+  expect(!buildSoundFont2({.soundBanks = invalid}, sources).bytes.empty() &&
+             !buildDls({.soundBanks = invalid}, sources).bytes.empty(), "the validation fixture must have usable samples");
+  invalid[0].instruments.push_back(invalid[0].instruments[0]);
+  for (const auto address : {InstrumentAddress{1, 5}, InstrumentAddress{128, 5}, InstrumentAddress{1, 128}}) {
+    invalid[0].instruments.back().address = address;
+    const auto sf2 = buildSoundFont2({.soundBanks = invalid}, sources);
+    const auto dls = buildDls({.soundBanks = invalid}, sources);
+    for (const auto* artifact : {&sf2, &dls}) {
+      expect(artifact->bytes.empty() && artifact->diagnostics.size() == 1 &&
+                 artifact->diagnostics[0].message == "Synth preset addresses must be unique and in 0..127",
+             "writers must reject invalid addresses without a misleading missing-samples error");
+    }
+  }
+}
+
+void stitchedAllocationAccountsForAdditionalBanks() {
+  SoundBankAsset bank;
+  for (u32 program = 0; program <= 128; ++program) {
+    bank.instruments.push_back(Instrument{.explicitAddress = InstrumentAddress{0, program}});
+  }
+  const auto prepared = preparePerformance({}, {bank}, {.firstBank = 126});
+  expect(prepared.valid() && prepared.bankMapping().at(0) == 126 && prepared.nextBank() == 128 &&
+             prepared.selectionFor(InstrumentHandle{0, 128}).address == InstrumentAddress{127, 0},
+         "stitching must reserve any additional banks needed to relocate presets");
+  const auto exhausted = preparePerformance({}, {bank}, {.firstBank = 127});
+  expect(!exhausted.valid() && exhausted.instrumentAddresses().empty() &&
+             std::ranges::count(exhausted.performance().diagnostics, std::string("instrument-addresses-exhausted"),
+                                &Diagnostic::code) == 1,
+         "stitching must fail without a partial plan when its remaining portable slots are exhausted");
+}
+
 void preparedOwnershipSurvivesCopiesAndMoves() {
   const auto makePrepared = [](u32 firstBank) {
     SoundBankAsset bank{.instruments = {
@@ -343,7 +503,8 @@ void collectionExportsRequireACompanionForVariants() {
                                    .dynamicEnvelopes = DynamicEnvelopePolicy::Ignore};
       const auto collection = exportCollection(bankSnapshot, sources, CollectionId{0}, request);
       const auto standalone = exportSoundBank(bankSnapshot, sources, AssetId{1}, SynthExportFormat::Dls, request);
-      const u32 expected = style == MidiBankSelectStyle::MsbOnly ? 256 : (bank == 1 ? 1 : 257);
+      const u32 preparedBank = bank < 128 ? bank : 0;
+      const u32 expected = style == MidiBankSelectStyle::MsbOnly ? preparedBank << 8 : preparedBank;
       for (const auto* artifact : {&collection[0], &standalone}) {
         expect(readLe32(artifact->bytes, asciiOffset(artifact->bytes, "insh") + 12) == expected,
                "collection and standalone DLS headers must encode the requested CC0/CC32 bank mode");
@@ -419,7 +580,7 @@ void completedCollectionsRetainInputsAcrossRenderingOutcomes() {
                prepared.soundBanks()[0].instruments.size() == (rendered ? 2 : 1),
            "moves and copies must retain bank data, metadata, and external sample owners in every outcome");
     const auto banks = prepared.soundBankView();
-    const auto synth = buildSoundFont2({.soundBanks = selectSynthBanks(banks), .samplePools = prepared.samplePools}, sources);
+    const auto synth = buildSoundFont2({.soundBanks = prepareSynthBanksForTest(banks), .samplePools = prepared.samplePools}, sources);
     expect(!synth.bytes.empty() && synth.diagnostics.empty(),
            "retained inputs must remain usable for synth export after their original owners are destroyed");
     if (rendered) {
@@ -621,6 +782,9 @@ void runResolvedInstrumentTests() {
   resolvedVariantsShareAddressesWithBothSynthWriters();
   resolutionChoosesAndDiagnosesOneDefinition();
   layoutSeparatesCollisionsAndRejectsOverflow();
+  nonportableSourceAddressesShareOneCompanionPlan();
+  externalMidiAddressesReserveTheirEncodedSelections();
+  stitchedAllocationAccountsForAdditionalBanks();
   preparedOwnershipSurvivesCopiesAndMoves();
   laterSourceSelectionsCannotFindGeneratedVariants();
   collectionExportsRequireACompanionForVariants();

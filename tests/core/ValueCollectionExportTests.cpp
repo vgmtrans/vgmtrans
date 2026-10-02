@@ -920,7 +920,7 @@ void exportDiagnosticsPreserveSourceRanges() {
   const auto sf2BadRegion = buildSoundFont2(
       SynthExportInput{
           .name = "Probe",
-          .soundBanks = selectSynthBanks(soundBanks),
+          .soundBanks = prepareSynthBanksForTest(soundBanks),
           .samplePools = validSamples,
       },
       sources);
@@ -933,7 +933,7 @@ void exportDiagnosticsPreserveSourceRanges() {
   const auto dlsBadRegion = buildDls(
       SynthExportInput{
           .name = "Probe",
-          .soundBanks = selectSynthBanks(soundBanks),
+          .soundBanks = prepareSynthBanksForTest(soundBanks),
           .samplePools = validSamples,
       },
       sources);
@@ -1111,7 +1111,7 @@ void synthPreparationKeepsSampleIdentityAndPhaseOrdering() {
   const std::array<const SoundBankAsset*, 1> banks{&bank};
   const std::array<const SamplePoolAsset*, 1> pools{&pool};
   const auto prepared = prepareSynthData(
-      SynthExportInput{.soundBanks = selectSynthBanks(banks), .samplePools = pools, .filterSamplesToReferencedInstruments = true},
+      SynthExportInput{.soundBanks = prepareSynthBanksForTest(banks), .samplePools = pools, .filterSamplesToReferencedInstruments = true},
       sources);
   expect(prepared.diagnostics.empty() && prepared.samples.size() == 4 && prepared.instruments.size() == 1,
          "filtered preparation should skip unused invalid samples and share repeated phase references");
@@ -1131,7 +1131,7 @@ void synthPreparationKeepsSampleIdentityAndPhaseOrdering() {
   bank.localSamples.samples[0].loop = {.enabled = true, .start = 1, .length = 1};
   bank.instruments[0].regions[1].sampleStartFrame = 1;
   const auto trimmed = prepareSynthData(
-      SynthExportInput{.soundBanks = selectSynthBanks(banks), .samplePools = pools, .filterSamplesToReferencedInstruments = true},
+      SynthExportInput{.soundBanks = prepareSynthBanksForTest(banks), .samplePools = pools, .filterSamplesToReferencedInstruments = true},
       sources);
   const auto& sustain = trimmed.samples[trimmed.instruments[0].regions[1].sampleIndex].decoded;
   expect(trimmed.diagnostics.empty() && sustain.pcm == std::vector<s16>{-1000} &&
@@ -1141,7 +1141,7 @@ void synthPreparationKeepsSampleIdentityAndPhaseOrdering() {
   second.localSamples.samples[0].encodedData = {sources.add(SourceFile{}, {0, 1, 0, 2}), 0, 4};
   const std::array copies{&bank, &second};
   for (bool filter : {false, true}) {
-    const auto separate = prepareSynthData({.soundBanks = selectSynthBanks(copies), .samplePools = pools,
+    const auto separate = prepareSynthData({.soundBanks = prepareSynthBanksForTest(copies), .samplePools = pools,
                                             .filterSamplesToReferencedInstruments = filter}, sources);
     const auto local = [&](size_t copy) -> const auto& {
       return separate.samples[separate.instruments[copy].regions[1].sampleIndex].decoded;

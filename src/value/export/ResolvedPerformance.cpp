@@ -8,7 +8,6 @@
 #include "value/synth/SynthMath.h"
 
 #include <algorithm>
-#include <array>
 #include <bitset>
 #include <cmath>
 #include <stdexcept>
@@ -470,9 +469,44 @@ ResolvedInstrument ResolvedPerformance::selectionFor(const InstrumentPerformance
   return selectedInstrument(change.instrument);
 }
 
+std::optional<std::vector<InstrumentAddress>> allocateInstrumentAddresses(
+    std::span<const std::optional<InstrumentAddress>> preferred,
+    std::span<const InstrumentAddress> reserved, u32 firstBank) {
+  if (firstBank > 128 || preferred.size() > (128 - firstBank) * 128) return std::nullopt;
+  const auto portable = [firstBank](InstrumentAddress address) {
+    return address.bank >= firstBank && address.bank < 128 && address.program < 128;
+  };
+  std::bitset<128 * 128> occupied;
+  for (const auto address : reserved) {
+    if (portable(address)) occupied.set(address.bank * 128 + address.program);
+  }
+  std::vector<InstrumentAddress> addresses(preferred.size());
+  std::vector<size_t> pending;
+  // Claim valid preferences first so relocation cannot steal a later preset.
+  for (size_t index = 0; index < preferred.size(); ++index) {
+    const auto address = preferred[index];
+    if (address && portable(*address) && !occupied[address->bank * 128 + address->program]) {
+      addresses[index] = *address;
+      occupied.set(address->bank * 128 + address->program);
+    } else {
+      pending.push_back(index);
+    }
+  }
+  u32 next = firstBank * 128;
+  for (const auto index : pending) {
+    while (next < occupied.size() && occupied[next]) ++next;
+    if (next == occupied.size()) return std::nullopt;
+    occupied.set(next);
+    addresses[index] = {next / 128, next % 128};
+    ++next;
+  }
+  return addresses;
+}
+
 u32 ResolvedPerformance::nextBank() const {
   u32 next = 0;
   for (const auto& [source, target] : banks_) next = std::max(next, target + 1);
+  for (const auto& [handle, address] : addresses_) next = std::max(next, address.bank + 1);
   return next;
 }
 
@@ -494,75 +528,52 @@ void ResolvedPerformance::assignAddresses(const InstrumentPreparationOptions& op
     }
   }
 
-  const auto aliases = [&](InstrumentAddress address) {
-    const u32 program = std::min<u32>(address.program, 127);
-    if (options.firstBank) return std::array{InstrumentAddress{address.bank, program},
-                                            InstrumentAddress{address.bank, program}};
-    return std::array{InstrumentAddress{address.bank & 127, program},
-                      InstrumentAddress{address.bank > 128 ? (address.bank >> 8) & 127 : address.bank, program}};
-  };
-  std::set<InstrumentAddress> externalAliases;
-  for (const auto& [bank, program] : external) {
-    for (const auto alias : aliases({bank, program})) externalAliases.insert(alias);
-  }
-  // Preserve legacy nonportable banks (notably SF2 percussion bank 128).
-  // Moving them requires channel-role/bank-mode policy, not numeric compaction.
-  const auto canRetain = [&](InstrumentAddress address) {
-    return (!options.firstBank && address.bank >= 128) ||
-           (address.program < 128 && !externalAliases.contains(address));
-  };
-  std::bitset<128 * 128> reserved;
-  const auto reserve = [&](InstrumentAddress address) {
-    for (const auto alias : aliases(address)) {
-      if (alias.bank < 128) reserved.set(alias.bank * 128 + alias.program);
-    }
-  };
-  std::map<InstrumentHandle, std::optional<InstrumentAddress>> preferred;
+  std::vector<InstrumentHandle> handles;
+  std::vector<std::optional<InstrumentAddress>> preferred;
   for (u32 bank = 0; bank < soundBanks().size(); ++bank) {
     const auto& instruments = soundBanks()[bank].instruments;
     for (u32 index = 0; index < instruments.size(); ++index) {
       const InstrumentHandle handle{bank, index};
       if (options.onlyUsedInstruments && !needed.contains(handle)) continue;
-      const auto& instrument = instruments[index];
-      const auto address = instrument.explicitAddress;
-      preferred.emplace(handle, address);
-      if (address && canRetain(*address)) reserve(*address);
+      handles.push_back(handle);
+      preferred.push_back(instruments[index].explicitAddress);
     }
   }
-  for (const auto& [bank, program] : external) reserve({bank, program});
-
-  u32 next = 0;
-  std::set<std::pair<u32, u32>> assigned;
-  for (const auto& [handle, preferredAddress] : preferred) {
-    if (preferredAddress && canRetain(*preferredAddress) &&
-        assigned.emplace(preferredAddress->bank, preferredAddress->program).second) {
-      addresses_.emplace(handle, *preferredAddress);
-      continue;
-    }
-    while (next < reserved.size() && reserved[next]) ++next;
-    if (next == reserved.size()) {
-      valid_ = false;
-      performance_.diagnostics.push_back({.severity = Severity::Error, .code = "instrument-addresses-exhausted",
-                                    .message = "Cannot allocate another portable bank/program address"});
-      return;
-    }
-    reserved.set(next);
-    addresses_.emplace(handle, InstrumentAddress{next / 128, next % 128});
-    ++next;
-  }
+  const u32 firstBank = options.firstBank.value_or(0);
   if (options.firstBank) {
+    // Preserve each stitched part's logical bank groups, then allocate within
+    // its remaining portable namespace. Variants use the first available slots.
     std::set<u32> sourceBanks{0};
-    for (const auto& [handle, address] : addresses_) sourceBanks.insert(address.bank);
+    for (const auto address : preferred) {
+      if (address) sourceBanks.insert(address->bank);
+    }
     for (const auto& [bank, program] : external) sourceBanks.insert(bank);
-    if (*options.firstBank > 128 || sourceBanks.size() > 128 - *options.firstBank) {
+    if (firstBank > 128 || sourceBanks.size() > 128 - firstBank) {
       valid_ = false;
       performance_.diagnostics.push_back({.severity = Severity::Error, .code = "instrument-banks-exhausted",
-                                    .message = "Stitched collections require more than 128 preset banks"});
+                                         .message = "Stitched collections require more than 128 preset banks"});
       return;
     }
-    u32 bank = *options.firstBank;
+    u32 bank = firstBank;
     for (const u32 source : sourceBanks) banks_.emplace(source, bank++);
-    for (auto& [handle, address] : addresses_) address.bank = banks_.at(address.bank);
+    for (auto& address : preferred) {
+      if (address) address->bank = banks_.at(address->bank);
+    }
+  }
+  std::vector<InstrumentAddress> reserved;
+  for (const auto& [bank, rawProgram] : external) {
+    // Within the portable range, an MSB/LSB alias is the same or out of range.
+    reserved.push_back({options.firstBank ? banks_.at(bank) : bank & 127, std::min<u32>(rawProgram, 127)});
+  }
+  const auto addresses = allocateInstrumentAddresses(preferred, reserved, firstBank);
+  if (!addresses) {
+    valid_ = false;
+    performance_.diagnostics.push_back({.severity = Severity::Error, .code = "instrument-addresses-exhausted",
+                                      .message = "Cannot allocate another portable bank/program address"});
+    return;
+  }
+  for (size_t index = 0; index < handles.size(); ++index) {
+    addresses_.emplace(handles[index], (*addresses)[index]);
   }
 }
 
