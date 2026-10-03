@@ -5,6 +5,7 @@
  */
 
 #include "value/extractors/SnesSpcExtractor.h"
+#include "value/scan/BytePattern.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -29,14 +30,6 @@ constexpr u64 kExtendedId666Offset = 0x10200;
 constexpr std::string_view kSpcSignature = "SNES-SPC700 Sound File Data";
 constexpr std::string_view kExtendedId666Signature = "xid6";
 
-[[nodiscard]] bool hasSpcSignature(std::span<const u8> bytes) {
-  if (bytes.size() < kMinimumSpcSize || bytes.size() < kSpcSignature.size()) {
-    return false;
-  }
-  return std::ranges::equal(kSpcSignature, bytes.subspan(0, kSpcSignature.size())) && bytes[0x21] == 0x1a &&
-         bytes[0x22] == 0x1a;
-}
-
 [[nodiscard]] std::string sourceName(const SourceFile& source) {
   if (!source.name.empty()) {
     return source.name;
@@ -58,32 +51,16 @@ constexpr std::string_view kExtendedId666Signature = "xid6";
   return std::string(reinterpret_cast<const char*>(field.data()), static_cast<size_t>(end - field.begin()));
 }
 
-[[nodiscard]] bool matches(std::span<const u8> bytes, u64 offset, std::string_view signature) {
-  if (offset > bytes.size() || signature.size() > bytes.size() - offset) {
-    return false;
-  }
-  const auto field = bytes.subspan(offset, signature.size());
-  return std::equal(signature.begin(), signature.end(), field.begin(), field.end());
-}
-
-[[nodiscard]] u16 le16(std::span<const u8> bytes, u64 offset) {
-  return static_cast<u16>(bytes[offset] | (bytes[offset + 1] << 8));
-}
-
-[[nodiscard]] u32 le32(std::span<const u8> bytes, u64 offset) {
-  return static_cast<u32>(bytes[offset]) | (static_cast<u32>(bytes[offset + 1]) << 8) |
-         (static_cast<u32>(bytes[offset + 2]) << 16) | (static_cast<u32>(bytes[offset + 3]) << 24);
-}
-
-[[nodiscard]] std::optional<std::string> spcTitle(std::span<const u8> bytes) {
+[[nodiscard]] std::optional<std::string> spcTitle(ByteReader reader) {
+  const auto bytes = reader.slice(0, reader.size());
   // Prefer extended ID666 titles when present, but fall back to the fixed SPC title field.
   std::string title;
   if (bytes.size() > 0x23 && bytes[0x23] == 0x1a) {
     title = nullTerminatedString(bytes, kId666TitleOffset, kId666TitleSize);
   }
 
-  if (matches(bytes, kExtendedId666Offset, kExtendedId666Signature) && bytes.size() >= kExtendedId666Offset + 8) {
-    const u32 chunkSize = le32(bytes, kExtendedId666Offset + 4);
+  if (reader.has(kExtendedId666Offset, 8) && matchesBytes(reader, kExtendedId666Offset, kExtendedId666Signature)) {
+    const u32 chunkSize = reader.le32(kExtendedId666Offset + 4);
     const u64 chunkBegin = kExtendedId666Offset + 8;
     const u64 remaining = bytes.size() - chunkBegin;
     const u64 chunkEnd = chunkBegin + std::min<u64>(remaining, chunkSize);
@@ -91,7 +68,7 @@ constexpr std::string_view kExtendedId666Signature = "xid6";
     for (u64 offset = chunkBegin; offset + 4 <= chunkEnd;) {
       const u8 id = bytes[offset];
       const u8 type = bytes[offset + 1];
-      const u16 headerData = le16(bytes, offset + 2);
+      const u16 headerData = reader.le16(offset + 2);
 
       if (type == 1) {
         const u64 dataBegin = offset + 4;
@@ -122,8 +99,9 @@ constexpr std::string_view kExtendedId666Signature = "xid6";
 [[nodiscard]] ExtractionResult extractSnesSpc(const ExtractionInput& input) {
   // SPC files are snapshots. The actual format scanners want the 64 KiB ARAM image, so
   // expose RAM as a derived child source and let normal SNES modules scan that.
-  const auto spcBytes = input.reader.slice(0, input.reader.size());
-  if (!hasSpcSignature(spcBytes)) {
+  const auto reader = input.reader;
+  if (reader.size() < kMinimumSpcSize || !matchesBytes(reader, 0, kSpcSignature) || reader.u8At(0x21) != 0x1a ||
+      reader.u8At(0x22) != 0x1a) {
     return {};
   }
 
@@ -136,7 +114,7 @@ constexpr std::string_view kExtendedId666Signature = "xid6";
       .file =
           SourceFile{
               .name = sourceName(input.source) + " - ram",
-              .title = spcTitle(spcBytes),
+              .title = spcTitle(reader),
               .path = input.source.path,
               .origin = origin,
               .knownFormat = std::string(source_formats::kSnesAram),

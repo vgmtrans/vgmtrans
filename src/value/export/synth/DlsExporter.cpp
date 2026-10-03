@@ -245,7 +245,7 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
   // wsmp carries sample playback metadata for a region: unity key, fine tune,
   // attenuation, and loop points.
   const Loop loop = effectiveRegionLoop(region, sample);
-  const double effectiveUnityKey = region.unityKey - (sample.pitch.cents / 100.0);
+  const double effectiveUnityKey = region.unityKey - (sample.pitchCents / 100.0);
   const u8 unityKey = clampU7(static_cast<s32>(std::lround(effectiveUnityKey)));
   const s16 fineTune = clampS16(static_cast<s32>(std::lround((unityKey - effectiveUnityKey) * 100.0)));
 

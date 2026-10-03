@@ -66,7 +66,7 @@ struct SynthSampleDecodeOptions {
 // One entry in the flat sample table consumed by synth container writers.
 struct DecodedSynthSample {
   std::string name;
-  Tuning pitch;
+  s32 pitchCents = 0;
   double attenuationDb = 0.0;
   DecodedSample decoded;
 };

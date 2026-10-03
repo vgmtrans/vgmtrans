@@ -5,6 +5,7 @@
  */
 
 #include "value/extractors/SnesRsnExtractor.h"
+#include "value/scan/BytePattern.h"
 
 #include "unarr.h"
 
@@ -23,11 +24,6 @@ namespace {
 
 constexpr std::array<u8, 7> kRarSignature{'R', 'a', 'r', '!', 0x1a, 0x07, 0x00};
 
-[[nodiscard]] bool hasRarSignature(std::span<const u8> bytes) {
-  return bytes.size() >= kRarSignature.size() &&
-         std::ranges::equal(kRarSignature, bytes.subspan(0, kRarSignature.size()));
-}
-
 [[nodiscard]] Diagnostic warning(std::string message, SourceRange range) {
   return Diagnostic{.severity = Severity::Warning, .message = std::move(message), .range = range};
 }
@@ -38,7 +34,7 @@ constexpr std::array<u8, 7> kRarSignature{'R', 'a', 'r', '!', 0x1a, 0x07, 0x00};
   // RSN is a RAR archive convention for SPC sets. Extract every entry as a derived source
   // so the SPC extractor and SNES format scanners can process them normally.
   const auto bytes = input.reader.slice(0, input.reader.size());
-  if (!hasRarSignature(bytes)) {
+  if (!matchesBytes(input.reader, 0, kRarSignature)) {
     return {};
   }
 

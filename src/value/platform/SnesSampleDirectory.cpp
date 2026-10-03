@@ -32,11 +32,7 @@ std::optional<SnesBrrStream> inspectSnesBrrStream(ByteReader reader, u32 startAd
 
 std::optional<SnesSampleDirectoryEntry> SnesSampleDirectory::entry(u8 index, bool inspectStream) const {
   const u32 entryAddress = baseAddress_ + static_cast<u32>(index) * 4;
-  auto result = readSnesSampleDirectoryEntry(reader_, entryAddress, inspectStream);
-  if (result) {
-    result->index = index;
-  }
-  return result;
+  return readSnesSampleDirectoryEntry(reader_, entryAddress, inspectStream);
 }
 
 std::optional<SnesSampleDirectoryEntry> readSnesSampleDirectoryEntry(ByteReader reader, u32 entryAddress,

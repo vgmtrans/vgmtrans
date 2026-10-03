@@ -486,7 +486,7 @@ void samples(Context& context, Args args) {
                                codecName(sample.codec), sample.sampleRate, sample.channels,
                                rangeText(sample.encodedData));
     if (args.size() > 1) {
-      context.out << fmt::format("  pitch {} cents | {} dB | loop {} start {} length {}\n", sample.pitch.cents,
+      context.out << fmt::format("  pitch {} cents | {} dB | loop {} start {} length {}\n", sample.pitchCents,
                                  sample.attenuationDb, sample.loop.enabled, sample.loop.start, sample.loop.length);
     }
   });

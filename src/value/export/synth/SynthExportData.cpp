@@ -117,7 +117,7 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
       outputIndex = static_cast<u32>(prepared.samples.size());
       prepared.samples.push_back(DecodedSynthSample{
           .name = sample.name + (key.startFrame ? " [sustain]" : "") + (key.phaseInverted ? " [inverted]" : ""),
-          .pitch = sample.pitch,
+          .pitchCents = sample.pitchCents,
           .attenuationDb = sample.attenuationDb,
           .decoded = std::move(audio),
       });

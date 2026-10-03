@@ -34,6 +34,8 @@ public:
   AnnotationBuilder source(SourceRole role, std::string_view label, SourceRange range, std::string_view kind = {});
   AnnotationBuilder source(SourceRole role, std::string_view label, const SourceRecord& record,
                            std::string_view kind = {});
+  // Explicit ranges take precedence over ranges observed while adding values.
+  void include(SourceRange range);
   [[nodiscard]] SourceRange range() const noexcept;
   void warning(std::string message, SourceRange range = {});
   void error(std::string message, SourceRange range = {});
@@ -75,7 +77,6 @@ public:
   Entry add(u64 sourceKey, Sample sample);
   [[nodiscard]] std::optional<SampleRef> find(u64 sourceKey) const;
 
-  SamplePoolBuilder& include(SourceRange range);
   [[nodiscard]] bool empty() const noexcept { return samples_.empty(); }
   [[nodiscard]] size_t size() const noexcept { return samples_.size(); }
 
@@ -138,7 +139,6 @@ public:
   Entry add(u64 groupingKey, Instrument instrument);
   Entry getOrAdd(u64 groupingKey, Instrument initialValue);
 
-  InstrumentSetBuilder& include(SourceRange range);
   [[nodiscard]] bool empty() const noexcept { return instruments_.empty(); }
   [[nodiscard]] size_t size() const noexcept { return instruments_.size(); }
 

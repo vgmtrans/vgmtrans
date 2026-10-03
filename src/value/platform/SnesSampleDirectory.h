@@ -30,7 +30,6 @@ struct SnesBrrStream {
 [[nodiscard]] std::optional<SnesBrrStream> inspectSnesBrrStream(ByteReader reader, u32 startAddress);
 
 struct SnesSampleDirectoryEntry {
-  u8 index = 0;
   SourceRange entryRange;
   u16 startAddress = 0;
   u16 loopAddress = 0;

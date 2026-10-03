@@ -513,7 +513,7 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
   for (size_t i = 0; i < samples.size(); ++i) {
     const auto& sample = samples[i];
     const auto* region = firstRegions[i];
-    const auto pitch = region ? sf2SampleHeaderPitch(sf2RegionPitch(*region).rootKey, clampS16(sample.pitch.cents))
+    const auto pitch = region ? sf2SampleHeaderPitch(sf2RegionPitch(*region).rootKey, clampS16(sample.pitchCents))
                               : SfSampleHeaderPitch{};
     const auto loop = region ? effectiveSfLoop(*region, sample) : sample.decoded.loop;
     // Offsets include each preceding sample's required silence padding.

@@ -73,10 +73,6 @@ private:
   u32 index_ = invalidIdValue;
 };
 
-struct Tuning {
-  s32 cents = 0;
-};
-
 struct Loop {
   bool enabled = false;
   u32 start = 0;
@@ -102,7 +98,7 @@ struct Region {
   VelocityRange velocityRange;
   SampleRef sample;
   SourceRange range;
-  // Exact region unity key before the independent Sample::pitch correction. A
+  // Exact region unity key before the independent Sample::pitchCents correction. A
   // fractional value preserves sub-semitone tuning without target-specific
   // root/coarse/fine fields.
   double unityKey = 60.0;
@@ -173,7 +169,7 @@ struct Sample {
   // explicit avoids copying or mutating source bytes during scanning.
   bool reverse = false;
   Loop loop;
-  Tuning pitch;
+  s32 pitchCents = 0;
   u64 codecParameter = 0;
   double attenuationDb = 0.0;
 };

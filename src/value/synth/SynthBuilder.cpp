@@ -93,8 +93,8 @@ void annotateSynthValue(AnnotationBuilder annotation, const Sample& sample) {
     annotation.derived("reverse", true, SourceValueDisplay::Boolean);
   }
   annotateLoop(annotation, sample.loop);
-  if (sample.pitch.cents != 0) {
-    annotation.derived("pitch_cents", sample.pitch.cents, SourceValueDisplay::Cents);
+  if (sample.pitchCents != 0) {
+    annotation.derived("pitch_cents", sample.pitchCents, SourceValueDisplay::Cents);
   }
   if (sample.attenuationDb != 0.0) {
     annotation.derived("attenuation_db", sample.attenuationDb, SourceValueDisplay::Decibels);
@@ -176,6 +176,10 @@ SourceRange detail::SynthBuilderSources::range() const noexcept {
   return includedRange_.valid() ? includedRange_ : observedRange_;
 }
 
+void detail::SynthBuilderSources::include(SourceRange range) {
+  includedRange_.include(range);
+}
+
 void detail::SynthBuilderSources::warning(std::string message, SourceRange range) {
   report(Severity::Warning, {}, std::move(message), range);
 }
@@ -225,11 +229,6 @@ std::optional<SampleRef> SamplePoolBuilder::find(u64 sourceKey) const {
     return std::nullopt;
   }
   return SampleRef::resolved(asset_, found->second);
-}
-
-SamplePoolBuilder& SamplePoolBuilder::include(SourceRange range) {
-  includedRange_.include(range);
-  return *this;
 }
 
 BuiltSamplePool SamplePoolBuilder::finish() && {
@@ -336,11 +335,6 @@ InstrumentSetBuilder::Entry InstrumentSetBuilder::getOrAdd(u64 groupingKey, Inst
     return Entry{*this, found->second};
   }
   return add(groupingKey, std::move(initialValue));
-}
-
-InstrumentSetBuilder& InstrumentSetBuilder::include(SourceRange range) {
-  includedRange_.include(range);
-  return *this;
 }
 
 BuiltInstrumentSet InstrumentSetBuilder::finish() && {

@@ -628,7 +628,7 @@ void soundFontSampleHeadersUseTheFirstReferencingRegion() {
       .encodedData = {.source = source, .size = 4},
       .sampleRate = 32000,
       .loop = {.enabled = true, .start = 1, .length = 2},
-      .pitch = {.cents = 125},
+      .pitchCents = 125,
   });
   bank.instruments.push_back(Instrument{.regions = {
       Region{.sample = SampleRef::resolved(bank.metadata.id, 0),
