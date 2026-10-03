@@ -34,17 +34,14 @@ std::vector<u8> encodePcm16Wav(const DecodedSample& sample) {
   constexpr u16 bytesPerSample = 2;
   constexpr u32 riffHeaderBytesAfterSize = 36;
 
-  if (sample.pcm.size() > std::numeric_limits<u32>::max() / bytesPerSample) {
+  if (sample.pcm.size() > (std::numeric_limits<u32>::max() - riffHeaderBytesAfterSize) / bytesPerSample) {
     throw std::overflow_error("PCM sample is too large to export as RIFF/WAVE");
   }
 
   const u32 dataBytes = static_cast<u32>(sample.pcm.size() * bytesPerSample);
-  if (dataBytes > std::numeric_limits<u32>::max() - riffHeaderBytesAfterSize) {
-    throw std::overflow_error("PCM sample is too large to export as RIFF/WAVE");
-  }
 
   std::vector<u8> bytes;
-  bytes.reserve(44 + dataBytes);
+  bytes.reserve(size_t{44} + dataBytes);
   writeAscii(bytes, "RIFF");
   writeLe32(bytes, riffHeaderBytesAfterSize + dataBytes);
   writeAscii(bytes, "WAVE");

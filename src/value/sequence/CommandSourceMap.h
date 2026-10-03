@@ -41,7 +41,7 @@ private:
 
   SourceRange startRange_;
   SourceMapBuilder* sourceMap_ = nullptr;
-  std::optional<SourceAnnotationId> annotation_;
+  SourceAnnotationId annotation_;
   std::optional<SourceAnnotationId> commandParent_;
   std::optional<AssetId> rootSequenceAsset_;
   u32 trackIndex_ = 0;

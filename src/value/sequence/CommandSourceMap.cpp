@@ -122,7 +122,7 @@ TrackProgram TrackDecodeSession::finish() {
   TrackProgram track{
       .streams = {{.channels = {trackIndex_}}},
       .startAddress = Address{startRange_.offset},
-      .annotation = annotation_.value_or(SourceAnnotationId{}),
+      .annotation = annotation_,
   };
   track.commands.reserve(commands_.size());
   SourceRange span;
@@ -143,8 +143,8 @@ TrackProgram TrackDecodeSession::finish() {
         .execution = std::move(decoded.execution),
     });
   }
-  if (sourceMap_ != nullptr && annotation_) {
-    AnnotationBuilder{*sourceMap_, *annotation_}.range(span.valid() ? span : startRange_);
+  if (sourceMap_ != nullptr && annotation_.valid()) {
+    AnnotationBuilder{*sourceMap_, annotation_}.range(span.valid() ? span : startRange_);
   }
   return track;
 }

@@ -1,7 +1,7 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Seventeen validated batches remove 912 net production lines from
+`cb9e0b766`. Eighteen validated batches remove 917 net production lines from
 `src/value`. All 44 CTest suites pass; the latest real-file replay preserves
 all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
 records appear at the end of this document.
@@ -5167,3 +5167,89 @@ Next: evaluate constructing ScanResult only when finalizing pending drafts, simp
 WAV's exact RIFF capacity bound, and remove a duplicate polling guard only where
 SequenceVM already guarantees eligibility. Continue tracing actual data ownership
 and responsibility rather than treating every optional field as removable.
+
+
+## Cleanup2 eighteenth batch: finalize one result and poll eligible commands
+
+This batch removes five net production lines across seven files, bringing cleanup2
+to 917 removed. The existing synth fixture gains nine meaningful diagnostic-order
+lines; cumulative tests gain 436 lines.
+
+- ScanResultBuilder keeps pending assets and a stable diagnostics vector while
+  scanning, then constructs the complete ScanResult locally after required-program
+  preflight. Remove the unused retained output staging value. Synth builders keep
+  the same stable sinks; finish moves diagnostics only after all callbacks and
+  annotations are complete. Ordinary return also permits named-return elision.
+  Builder size shrinks 576 to 528 bytes. Missing-program repair remains safe before
+  any consumption. If a later finalization fails after consumption, unpublished
+  partial assets now release immediately rather than at builder destruction;
+  these destructive failures do not establish a repair/retry contract.
+- TrackDecodeSession keeps its annotation identity directly. Its invalid ID already
+  expresses absence, as in TrackProgram and SourceCommand. Remove the duplicate
+  optional representation and value_or/dereference protocol. Parent and root-owner
+  options retain their actual presence semantics. The transient session shrinks
+  88 to 80 bytes, with no net line change.
+- SequenceVM alone checks whether the pending command supplies a wait predicate
+  before selecting the channel and invoking the runtime. Remove the compiled
+  bridge's duplicate guard; its responsibility is constructing the typed playback
+  and calling that known predicate. Missing runtime callbacks, leading delays,
+  budgets and bodyless command execution retain their existing VM behavior.
+- Clarify note-reset comments: the shared rule is applied after the planner resolves
+  attacks versus continuations and also controls pan LFOs; explicit vibrato/tremolo
+  overrides apply on continuations. The actual fields and behavior stay intact.
+- WAV checks its complete RIFF payload budget before PCM multiplication, replacing
+  two checks with the exact bound. Both former rejection paths used the same
+  exception. Upfront reservation uses size_t{44} + dataBytes, correcting u32
+  capacity overflow at the final four accepted lengths. RIFF payload encoding
+  and accepted PCM counts remain unchanged.
+
+Validation:
+
+- The full 334-step macOS Release build is warning-free; all 44 CTest suites pass.
+  Final headers, tests, core/formats/fmt archives and shell are frozen together.
+- Scanner traces preserve 1,283 lines and 84,355 bytes under focused sanitizers:
+  required-program repair, mixed ordered assets, duplicate samples, inspection,
+  finalization diagnostics and exact errors for manually finished domains/custom
+  allocator failures. Complete registry/synth fixtures pass ASan/UBSan/float-cast-
+  overflow; the changed unit is Werror-clean. A weak-owner probe confirms repair
+  retains data, successful output owns it, and destructive partial failure releases
+  it earlier as described above. The permanent fixture checks finalization warnings
+  follow scan warnings with exact ranges.
+- Warm scanner construction still allocates zero. Cold construction defers five
+  one-time empty SourceMap initialization allocations/224 requested bytes to
+  finalization. This is not a completed-scan allocation saving.
+- Annotation traces preserve 45,360 cases, 162,540 lines and 5,306,744 bytes:
+  valid/invalid source IDs, track numbers, large starts through u64 max, tracked/
+  trackless/unmapped decoding, absent/valid/invalid parents and owners, empty and
+  populated commands, and five allocator policies including invalid IDs. Complete
+  cursor fixtures pass with changed CommandSourceMap units and ASan/UBSan/float-
+  cast-overflow. Invalid allocated IDs still remain visible in the map and never
+  enter its lookup indexes; skipped invalid-ID range updates were already inert.
+- Polling preserves 62,208 cases and 39,796,849 trace bytes with focused sanitizers,
+  including delay/readiness/budget combinations, routing and undeclared channels,
+  shared/independent streams, source tracks, startup/tick/beforeCommand hooks,
+  bodyless commands and missing predicate/runtime callbacks. Complete cursor/VM
+  fixtures pass. Linked archive boundaries remain Release.
+- WAV preserves 505 complete captures and 7,160,770 bytes with both changed units
+  and full synth-export fixtures instrumented. All channel/rate exception strings
+  match. Numeric predicates match 1,196,614 boundary/extreme/random counts; the
+  exact maximum is 2,147,483,629 PCM values/4,294,967,258 data bytes. Configured
+  arithmetic proves the four formerly wrapped reservation capacities become
+  4,294,967,296/298/300/302. No multi-GiB allocation was attempted.
+- The frozen eighteenth shell preserves all 252 input/policy comparisons and
+  3,922 artifact hashes, inventories, diagnostics and exit statuses against 17.
+
+Retain the LFO reset representation: its eighteen configurations express thirteen
+distinct attack/continuation policies, exceeding even three completed booleans.
+Portamento can change that final attack decision, and explicit overrides differ
+from inherited defaults on ties. An independent 270-case planner probe confirms
+those distinctions. Retain preparation view vectors and typed callback wrappers:
+lazy views defer failure until after prefix mutation, and early cardinality checks
+change malformed-input error precedence. Retain short explicit endian reads and
+immutable chunk iteration rather than adding a new width/order or borrowed-view
+lifetime protocol to replace a few straightforward operations.
+
+Next: evaluate delaying cursor operation type erasure until the durable command-body
+boundary, remove dead arrival writes after a stream has no command, and make the
+shared byte-reader bounds predicate as direct as its other bounds checks. These
+candidates preserve the existing authoring DSL and execution/storage models.

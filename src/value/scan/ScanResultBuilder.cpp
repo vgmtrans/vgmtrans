@@ -117,8 +117,8 @@ ScanSoundBankDraft ScanResultBuilder::soundBank(std::string name, SourceRange ra
   drafts_.emplace_back(ScanSoundBankDraft::Pending{
       .id = id,
       .name = std::move(name),
-      .instruments = InstrumentSetBuilder{id, &sourceMap_, &result_.diagnostics},
-      .samples = SamplePoolBuilder{id, &sourceMap_, &result_.diagnostics},
+      .instruments = InstrumentSetBuilder{id, &sourceMap_, &diagnostics_},
+      .samples = SamplePoolBuilder{id, &sourceMap_, &diagnostics_},
   });
   ScanSoundBankDraft draft{std::get<ScanSoundBankDraft::Pending>(drafts_.back())};
   draft.instruments().include(range);
@@ -130,7 +130,7 @@ ScanSamplePoolDraft ScanResultBuilder::samplePool(std::string name, SourceRange 
   drafts_.emplace_back(ScanSamplePoolDraft::Pending{
       .id = id,
       .name = std::move(name),
-      .samples = SamplePoolBuilder{id, &sourceMap_, &result_.diagnostics},
+      .samples = SamplePoolBuilder{id, &sourceMap_, &diagnostics_},
   });
   ScanSamplePoolDraft draft{std::get<ScanSamplePoolDraft::Pending>(drafts_.back())};
   draft.samples().include(range);
@@ -144,7 +144,7 @@ AssetId ScanResultBuilder::misc(std::string name, SourceRange range) {
 }
 
 void ScanResultBuilder::diagnostic(Diagnostic diagnostic) {
-  result_.diagnostics.push_back(std::move(diagnostic));
+  diagnostics_.push_back(std::move(diagnostic));
 }
 
 void ScanResultBuilder::warning(std::string message, SourceRange range) {
@@ -158,7 +158,8 @@ ScanResult ScanResultBuilder::finish() {
     }
   }
 
-  result_.assets.reserve(result_.assets.size() + drafts_.size());
+  ScanResult result;
+  result.assets.reserve(drafts_.size());
   for (auto& draft : drafts_) {
     Asset asset = std::visit(
         [this](auto& pending) -> Asset {
@@ -197,27 +198,28 @@ ScanResult ScanResultBuilder::finish() {
           }
         },
         draft);
-    result_.assets.push_back(std::move(asset));
+    result.assets.push_back(std::move(asset));
   }
 
   // Synth drafts may add annotations while finishing, so infer bounds only
   // after all assets and their source metadata have been materialized.
-  result_.sourceMap = sourceMap_.finish();
-  for (auto& asset : result_.assets) {
+  result.sourceMap = sourceMap_.finish();
+  for (auto& asset : result.assets) {
     auto* sequence = std::get_if<SequenceProgramAsset>(&asset);
     if (sequence == nullptr || sequence->metadata.range.valid()) {
       continue;
     }
     auto& range = sequence->metadata.range;
-    for (const auto id : result_.sourceMap.annotationsForAsset(sequence->metadata.id)) {
-      const auto annotated = result_.sourceMap.get(id).range;
+    for (const auto id : result.sourceMap.annotationsForAsset(sequence->metadata.id)) {
+      const auto annotated = result.sourceMap.get(id).range;
       if (annotated.source == source()) {
         range.include(annotated);
       }
     }
     range = sequenceSourceRange(reader(), range, sequence->program);
   }
-  return std::move(result_);
+  result.diagnostics = std::move(diagnostics_);
+  return result;
 }
 
 void ScanResultBuilder::setPrivateData(AssetPrivateData& target, AssetPrivateData data) {

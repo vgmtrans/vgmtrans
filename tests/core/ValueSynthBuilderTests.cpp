@@ -475,11 +475,20 @@ void soundBankOwnsNoncontiguousSamplesWithoutInventingOneSourceRange() {
   ScanResultBuilder result(input, "SynthBuilderProbe");
   const SourceRange instrumentTable = input.reader.range(8, 8);
   const SourceRange sampleData = input.reader.range(192, 9);
+  result.sourceMap() = SourceMapBuilder([&] {
+    result.warning("Finalization warning", sampleData);
+    return ids.nextSourceAnnotationId();
+  });
+  result.warning("Scanning warning", instrumentTable);
   auto bank = result.soundBank("Noncontiguous Bank", instrumentTable);
   const auto sample = bank.localSamples().add(4, Sample{.name = "Local Sample", .encodedData = sampleData});
   bank.instruments().add(0, Instrument{.name = "Instrument"}).region(sample.ref(), Region{});
 
   const ScanResult scan = result.finish();
+  expect(scan.diagnostics.size() == 2 && scan.diagnostics[0].message == "Scanning warning" &&
+             scan.diagnostics[0].range == instrumentTable && scan.diagnostics[1].message == "Finalization warning" &&
+             scan.diagnostics[1].range == sampleData,
+         "diagnostics emitted while finishing synth source metadata should follow earlier scanning diagnostics");
   const auto* soundBank = std::get_if<SoundBankAsset>(&scan.assets.front());
   expect(scan.assets.size() == 1 && soundBank != nullptr,
          "a bank and its local samples should publish as one asset");

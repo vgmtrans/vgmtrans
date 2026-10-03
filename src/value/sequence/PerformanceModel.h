@@ -83,12 +83,11 @@ struct NotePerformanceEvent {
   // Source override for a fresh attack. Preparation consumes this into the
   // sounding voice's resolved instrument; continuations keep that instrument.
   std::optional<InstrumentSelection> instrument;
-  // Source voices normally restart their LFOs on a fresh attack, but some
-  // drivers can disable that reset or suppress it for legato notes.
+  // Shared rule for restarting LFOs on a new attack. Consumers apply it
+  // after resolving continuations; pan LFOs also follow this rule.
   bool restartsLfoPhase = true;
-  // Target-specific overrides preserve formats where pitch and amplitude LFOs
-  // have independent note-reset rules. Absent overrides retain the legacy
-  // combined restartsLfoPhase behavior.
+  // Explicit vibrato/tremolo decisions also apply on continuations.
+  // Absent overrides use the shared attack rule above.
   std::optional<bool> restartsVibratoLfoPhase;
   std::optional<bool> restartsTremoloLfoPhase;
   // Source-level extensions normally share one identity. A stable identity

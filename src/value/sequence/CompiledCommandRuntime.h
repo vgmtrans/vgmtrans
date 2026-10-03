@@ -104,9 +104,6 @@ struct CompiledCommandRuntime {
 
   [[nodiscard]] static bool readyDuringWait(const SourceCommand& command, std::any& programState, std::any& trackState,
                                             PerformanceEmitter& out, VmApi& vm) {
-    if (!command.execution.duringWait) {
-      return false;
-    }
     return withPlayback(programState, trackState, out, vm,
                         [&](Playback& playback) { return command.execution.duringWait(&playback); });
   }

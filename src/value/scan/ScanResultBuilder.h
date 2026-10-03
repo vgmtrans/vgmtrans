@@ -145,7 +145,7 @@ public:
   [[nodiscard]] ByteReader reader() const noexcept { return input_.reader; }
   [[nodiscard]] std::string sourceDisplayName() const;
   [[nodiscard]] SourceMapBuilder& sourceMap() noexcept { return sourceMap_; }
-  [[nodiscard]] std::vector<Diagnostic>& diagnostics() noexcept { return result_.diagnostics; }
+  [[nodiscard]] std::vector<Diagnostic>& diagnostics() noexcept { return diagnostics_; }
 
   // Without an explicit range, finish() spans the sequence's owned source
   // annotations and decoded commands in this input. Container bounds can be
@@ -171,7 +171,7 @@ private:
 
   ScanInput input_;
   std::string format_;
-  ScanResult result_;
+  std::vector<Diagnostic> diagnostics_;
   SourceMapBuilder sourceMap_;
 
   using PendingAsset = std::variant<ScanSequenceDraft::Pending, ScanSoundBankDraft::Pending,
