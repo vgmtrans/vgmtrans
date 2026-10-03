@@ -117,7 +117,7 @@ struct SfLayout {
   if (!std::isfinite(reverb)) {
     return 0;
   }
-  return clampS16(static_cast<s32>(reverb * 1000.0));
+  return static_cast<s16>(std::clamp(reverb * 1000.0, -32768.0, 32767.0));
 }
 
 [[nodiscard]] std::pair<s16, s16> splitTuneCents(s32 cents) {

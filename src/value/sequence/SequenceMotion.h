@@ -94,7 +94,7 @@ public:
     }
 
     step_ = plan.mode == SequenceMotionMode::TargetOverTicks
-                ? static_cast<ValueType>((plan.target - current_) / static_cast<ValueType>(plan.ticks))
+                ? static_cast<ValueType>((plan.target - current_) / static_cast<s64>(plan.ticks))
                 : plan.step;
     if (!plan.usesTicks() && (current_ == target_ || step_ == ValueType{})) {
       if (current_ != target_) {

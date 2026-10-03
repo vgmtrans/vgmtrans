@@ -1,7 +1,7 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Twenty-three validated batches remove 988 net production lines from
+`cb9e0b766`. Twenty-four validated batches remove 990 net production lines from
 `src/value`. All 44 CTest suites pass; the latest real-file replay preserves
 all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
 records appear at the end of this document.
@@ -5714,3 +5714,88 @@ Keep that failure boundary rather than deleting a guard on an incorrect premise.
 Next: probe SourceMap's similarly filtered query indexes, shared linear-motion
 narrowed duration division, and DLS's one-use encoded PCM child owner against
 frozen 23. Keep positive/negative arithmetic and exporter failure order explicit.
+
+## Cleanup2 twenty-fourth batch: one wave payload and full-width arithmetic
+
+Four production files remove two net lines, bringing cleanup2 to 990 removed.
+Two regression fixtures gain 42 lines; cumulative tests gain 519. The two numeric
+fixes change one expression each rather than introducing policies or state.
+
+- DLS waveList writes the encoded PCM directly after its existing fmt child.
+  Delete dataChunk and its complete temporary PCM payload. Check the child size,
+  prepare the existing INFO child, reserve the complete wave size once, then
+  write the data header/PCM and append INFO. Retain the wave-pool/offset staging
+  and existing parent checks: their error order is distinct from the child copy.
+  This is line-neutral and removes an owner rather than hiding it in a helper.
+- SequenceLinearMotion divides by the full duration as s64, independently of
+  ValueType. Narrowing ticks to ValueType could produce a zero or negative
+  divisor. A signed wide divisor also preserves descending integral fades;
+  simply removing the cast would introduce unsigned arithmetic. Retain numerator
+  arithmetic, integer truncation, delays, supplied-step modes and exact target
+  completion. The regression covers ascending/descending UINT_MAX durations,
+  unsigned-byte duration 256 and signed-short duration 65536.
+- SF2 reverb conversion clips the scaled double before casting to s16. The
+  former intermediate s32 conversion overflowed for valid large finite sends,
+  before its intended clipping could occur. Keep nonfinite input handling and
+  the existing signed-16 limits. The public export fixture confirms that 1e7 and
+  DBL_MAX pass synth validation and serialize the saturated generator correctly.
+- Delete unused sptr/uptr aliases. Whole source/tests/documentation and ignored
+  build/project searches find no type consumer. Unrelated third-party C variables
+  with the same spelling use their own pointer declarations. Keep the fixed-width
+  integer aliases and size_t used throughout the codebase.
+
+Validation:
+
+- The full 559-step macOS Release build is warning-free; all 44 CTest suites pass.
+  Freeze matching source headers, tests, core/formats/fmt/Qt value archives and shell.
+  The twenty-fourth shell preserves all 252 input/policy comparisons and 3,922
+  artifact hashes, inventories, diagnostics and exit statuses against 23.
+- DLS preserves 5,298 private wave captures, 33 wave-pool/order/error traces and
+  19 complete synth artifacts: 23,186,119 bytes in Release and focused sanitizers,
+  SHA256 cc7b42e007f42d7087babf61a2fff9305174da38cc6d75577ea49f719e6a66b3.
+  This includes 3,276 valid wave cases, 2,016 invalid-rate failures, six exhaustive
+  signed-PCM/long-name captures, unchanged inputs and existing overflow assertions.
+  Across 5,292 allocation cases, 3,198 improve and 2,094 remain equal; none grow.
+  Requested bytes improve in 3,250 and remain equal in 2,042. Aggregate savings
+  are 8,216 allocations/20,805,616 requested bytes. A 16,384-value PCM wave with a
+  one-character name improves from 19 allocations/131,404 bytes to 16/32,982.
+  The initial reserve draft excluded INFO and regressed 104 small-wave cases;
+  reject that draft and include the complete known wave payload in the reserve.
+  Forty alignment/reserve boundaries and nine data-size edges retain the maximum
+  even child size of 4,294,967,294. Huge physical allocations and native allocation
+  failure ordering are not claimed equivalent.
+- Motion preserves 1,166,688 defined cases/128,756,673 bytes under focused
+  sanitizers: 1,048,576 native-duration cases, 102,128 all-mode/lifecycle cases,
+  14,688 floating-point bit-level cases and 1,296 unsigned modular boundaries.
+  A separate 2,433-case narrowed/large-duration matrix intentionally corrects
+  336 output lines. Independently reproduce both old zero-divisor failures
+  (u8/256 and descending s16/65536); the candidate finishes on the declared target
+  tick cleanly. Complete model/VM fixtures pass; 28 configured syntax entries are
+  Werror-clean. The numerator's existing overflow/custom-scalar contracts are
+  outside this divisor fix; no broader arithmetic change is claimed.
+- SF2 preserves 393,239 defined private conversions, eleven public valid-bank
+  exports and 19 existing synth artifacts: 18,246,938 bytes in Release and focused
+  ASan/UBSan/float-cast-overflow, SHA256
+  bfc0b257d967b9db3a9c029d1be9249b292dfdba7058fd6e32cf459a4abef483.
+  Extending the public fixture with both large sends produces matching candidate
+  Release/sanitizer captures of 18,248,450 bytes, SHA256
+  6406185af9044d75a1f3ad89f75fe90d413c14bf2d5302dc11778ce951781a8c.
+  The original exporter fails UBSan running that same public fixture. Corrected
+  undefined conversions are not included in old/new parity claims.
+- Focused sanitizer probes rebuild changed writers/resolvers, probes and fixtures
+  while linking matching unchanged Release archives. Allocation figures measure
+  cumulative requests rather than peak RSS.
+
+Reject deleting SourceMap's invalid-ID gates merely because its stored indexes
+filter invalid IDs. The values match across malformed/joined/copied/removed graphs,
+but these multi-part queries would replace immediate sentinel rejection with a
+linear search. At 512 parts, invalid assetOwner lookup grows from about 1.80 ns to
+1,196 ns and annotationsForAsset from 2.82 ns to 1,097 ns (median of three runs).
+The six-line reduction removes no responsibility and degrades that established
+fast path. Keep it. Also retain canonical prepared Region storage and nullable
+SynthBankSelection pointers: flattening adds a second field projection, and the
+selection vector requires assignment during filtering.
+
+Next: remove the full PerformanceEvent variant from the private buffer that only
+ever holds derived ModulationPerformanceEvent values; continue probing ownership
+and state boundaries rather than introducing another general framework.

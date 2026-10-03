@@ -362,21 +362,21 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   return Chunk{"fmt ", std::move(payload)};
 }
 
-[[nodiscard]] Chunk dataChunk(const DecodedSynthSample& sample) {
-  std::vector<u8> payload;
-  payload.reserve(sample.decoded.pcm.size() * 2);
-  for (const s16 value : sample.decoded.pcm) {
-    writeLeS16(payload, value);
-  }
-  return Chunk{"data", std::move(payload)};
-}
-
 [[nodiscard]] Chunk waveList(const DecodedSynthSample& sample) {
-  return makeListChunk("wave", std::array{
-                                   fmtChunk(sample),
-                                   dataChunk(sample),
-                                   infoList(sample.name, "Wave"),
-                               });
+  auto wave = makeListChunk("wave", std::array{fmtChunk(sample)});
+  if (sample.decoded.pcm.size() > std::numeric_limits<u32>::max() / 2) {
+    throw std::overflow_error("RIFF chunk is too large");
+  }
+  const auto dataBytes = static_cast<u32>(sample.decoded.pcm.size() * 2);
+  const auto info = infoList(sample.name, "Wave");
+  wave.payload.reserve(wave.payload.size() + 8 + dataBytes + 8 + info.payload.size());
+  writeAscii(wave.payload, "data");
+  writeLe32(wave.payload, dataBytes);
+  for (const s16 value : sample.decoded.pcm) {
+    writeLeS16(wave.payload, value);
+  }
+  appendChunk(wave.payload, info);
+  return wave;
 }
 
 [[nodiscard]] Chunk ptblChunk(std::span<const Chunk> waveChunks) {

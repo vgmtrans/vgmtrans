@@ -187,6 +187,36 @@ void sequenceMotionPreservesDelayAndTargetCompletion() {
          "zero-step motion must finish immediately instead of remaining active forever");
 }
 
+void sequenceMotionKeepsDurationIndependentOfValueWidth() {
+  for (const s32 target : {-100, 100}) {
+    SequenceLinearMotion<s32> motion{-target};
+    motion.begin(SequenceMotionPlan<s32>::targetOverTicks(target, std::numeric_limits<u32>::max(), 1));
+    expect(motion.tick().status == SequenceMotionStatus::Delayed && motion.current() == -target,
+           "a large-duration fade must preserve its initial value during the delay");
+    expect(motion.tick().status == SequenceMotionStatus::Running && motion.current() == -target && motion.active(),
+           "a large positive duration must not reverse ascending or descending integer fades");
+  }
+
+  SequenceLinearMotion<u8> narrow{100};
+  narrow.begin(SequenceMotionPlan<u8>::targetOverTicks(200, 256));
+  for (u32 tick = 0; tick < 255; ++tick) {
+    expect(narrow.tick().status == SequenceMotionStatus::Running && narrow.current() == 100,
+           "a duration wider than the value must retain its zero truncated step");
+  }
+  expect(narrow.tick().status == SequenceMotionStatus::Finished && narrow.current() == 200 && !narrow.active(),
+         "a narrow integer fade must reach its target on the full declared duration");
+
+  SequenceLinearMotion<s16> descending{100};
+  descending.begin(SequenceMotionPlan<s16>::targetOverTicks(-100, 65536));
+  for (u32 tick = 0; tick < 65535; ++tick) {
+    expect(descending.tick().status == SequenceMotionStatus::Running && descending.current() == 100,
+           "a descending narrow integer fade must divide by the full positive duration");
+  }
+  expect(descending.tick().status == SequenceMotionStatus::Finished && descending.current() == -100 &&
+             !descending.active(),
+         "a descending narrow integer fade must still finish on its exact target tick");
+}
+
 void lfoDepthFadeKeepsItsUnsignedDuration() {
   SequenceLfoDepthFadeState fade;
   const s32 maximumDepth = std::numeric_limits<s32>::max();
@@ -599,6 +629,7 @@ void runValueSequenceModelTests() {
   sequenceValidationProtectsPositionalCommandStorage();
   performanceEmitterBindsScalarAutomationWithoutExposingStorage();
   sequenceMotionPreservesDelayAndTargetCompletion();
+  sequenceMotionKeepsDurationIndependentOfValueWidth();
   fixedPointMotionRetargetsFromTheRoundedSourceValue();
   lfoDepthFadeKeepsItsUnsignedDuration();
   performanceBoundValueOwnsReplacementLifecycle();

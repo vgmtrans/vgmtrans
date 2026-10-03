@@ -17,6 +17,7 @@
 #include "value/export/synth/SynthExportData.h"
 #include "value/synth/PsxSpu.h"
 #include "value/synth/SnesDsp.h"
+#include "value/validation/SynthValidation.h"
 
 #include <algorithm>
 #include <array>
@@ -608,6 +609,16 @@ void soundFontExporterWritesSfbkRiffFile() {
          "presets whose modulation becomes identical after scaling should share an SF2 instrument");
 
   soundBank.instruments.resize(1);
+  for (const double reverb : {1e7, std::numeric_limits<double>::max()}) {
+    soundBank.instruments.front().reverb = reverb;
+    expect(validateSoundBank(soundBank).empty(), "Large finite reverb sends should remain valid synth values");
+    const auto saturated = buildSoundFont2(
+        SynthExportInput{.name = "Reverb", .soundBanks = prepareSynthBanksForTest(soundBanks), .samplePools = samples},
+        sources);
+    expect(saturated.diagnostics.empty() &&
+               soundFontGeneratorContains(saturated.bytes, "pgen", 16, std::numeric_limits<s16>::max()),
+           "SoundFont export should clamp large finite reverb sends before integer conversion");
+  }
   auto& regions = soundBank.instruments.front().regions;
   const Region region = regions.front();
   regions.resize(5000, region);
