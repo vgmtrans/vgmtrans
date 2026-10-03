@@ -91,8 +91,8 @@ void sequenceVmRoutesOneStreamAcrossIndependentChannels() {
     int key = 60;
   };
   struct StreamState {
-    explicit StreamState(StreamStateContext source)
-        : tempo(source.sequence.behavior.initialTempoMicrosecondsPerQuarter) {}
+    explicit StreamState(const SequenceProgram& source)
+        : tempo(source.behavior.initialTempoMicrosecondsPerQuarter) {}
     void beginSection(bool) { ++entries; }
     u32 tempo;
     u32 entries = 0;
@@ -503,7 +503,7 @@ void sequenceVmRequiresCommandBudgetBeforeEnteringASection() {
   std::vector<std::string> callbacks;
   const SequenceRuntime runtime{
       .createProgramState = [&](const SequenceProgram&) { return &callbacks; },
-      .createStreamState = [&](StreamStateContext) { return &callbacks; },
+      .createStreamState = [&](const SequenceProgram&) { return &callbacks; },
       .beginStreamSection = [](std::any& state, bool first) {
         (*std::any_cast<std::vector<std::string>*>(state)).push_back(first ? "first stream" : "later stream");
       },

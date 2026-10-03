@@ -335,8 +335,7 @@ std::shared_ptr<const SourceInspection> Session::inspect(AssetId asset) const {
 }
 
 CollectionPlayback Session::preparePlayback(CollectionId id, const PlaybackRequest& request) const {
-  const auto current = snapshot();
-  return core::prepareCollectionPlayback(current, sources_, id, request);
+  return core::prepareCollectionPlayback(snapshot(), sources_, id, request);
 }
 
 Artifact Session::exportSequenceMidi(AssetId id, const SequenceRenderOptions& request) const {
@@ -352,13 +351,11 @@ std::vector<Artifact> Session::exportSamples(AssetId id) const {
 }
 
 std::vector<Artifact> Session::exportCollection(CollectionId id, const ExportRequest& request) const {
-  const auto current = snapshot();
-  return core::exportCollection(current, sources_, id, request);
+  return core::exportCollection(snapshot(), sources_, id, request);
 }
 
 std::vector<CollectionExport> Session::exportAllCollections(const ExportRequest& request) const {
-  const auto current = snapshot();
-  return core::exportAllCollections(current, sources_, request);
+  return core::exportAllCollections(snapshot(), sources_, request);
 }
 
 CollectionStitchResult Session::stitchCollections(std::span<const CollectionId> collections,

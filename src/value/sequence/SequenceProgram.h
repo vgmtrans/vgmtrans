@@ -28,7 +28,6 @@ struct SequenceProgram;
 struct SourceCommand;
 struct TrackProgram;
 struct TrackStateContext;
-struct StreamStateContext;
 
 enum class PitchTransitionRenderingHint {
   Portamento,
@@ -41,7 +40,7 @@ enum class PitchTransitionRenderingHint {
 struct SequenceRuntime {
   std::function<std::any(const SequenceProgram&)> createProgramState;
   std::function<std::any(TrackStateContext)> createTrackState;
-  std::function<std::any(StreamStateContext)> createStreamState;
+  std::function<std::any(const SequenceProgram&)> createStreamState;
   // Enter an active section before its first delay when command budget remains:
   // stream state first, then each playback track. first is true only on this
   // stream's first entry.
@@ -221,17 +220,9 @@ struct TrackProgram {
   [[nodiscard]] std::optional<u32> commandIndex(Address address) const;
 };
 
-// Borrowed source data for one execution stream. Stream state does not belong
-// to any particular playback track or channel.
-struct StreamStateContext {
-  const SequenceProgram& sequence;
-  const TrackProgram& sourceTrack;
-};
-
 // Borrowed initialization data for one playback track (one musical channel in
 // an interleaved stream). The decoded source track stays alive during playback.
 struct TrackStateContext {
-  const SequenceProgram& sequence;
   const TrackProgram& sourceTrack;
   u32 sourceTrackNumber;
 };

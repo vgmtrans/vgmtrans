@@ -41,17 +41,19 @@ bool unsignedFieldEquals(const SourceAnnotation& annotation, std::string_view na
 void envelopeAnnotationsPreservePhysicalValues() {
   SourceMapBuilder sourceMap;
   const SourceRange range{.source = SourceId{3}, .offset = 10, .size = 4};
-  const auto empty = sourceMap.annotation(SourceRole::Region, "Empty", range);
-  annotateSynthValue(empty, Region{});
-  const auto timed = sourceMap.annotation(SourceRole::Region, "Timed", range);
-  annotateSynthValue(timed, Region{.envelope = Envelope{
-                                       .attackSeconds = 0.0,
-                                       .holdSeconds = std::numeric_limits<double>::infinity(),
-                                       .decaySeconds = 1.25,
-                                       .secondDecaySeconds = std::numeric_limits<double>::infinity(),
-                                       .releaseSeconds = 2.5,
-                                       .sustainAmplitude = 0.0,
-                                   }});
+  InstrumentSetBuilder instruments{AssetId{0}, &sourceMap};
+  const auto instrument = instruments.append(Instrument{});
+  const auto empty = instrument.region({}, Region{}).source("Empty", range);
+  const Envelope envelope{
+      .attackSeconds = 0.0,
+      .holdSeconds = std::numeric_limits<double>::infinity(),
+      .decaySeconds = 1.25,
+      .secondDecaySeconds = std::numeric_limits<double>::infinity(),
+      .releaseSeconds = 2.5,
+      .sustainAmplitude = 0.0,
+  };
+  const auto timed = instrument.region({}, Region{.envelope = envelope}).source("Timed", range);
+  static_cast<void>(std::move(instruments).finish());
   const auto map = sourceMap.finish();
   const auto& emptyFields = map.get(empty.id()).fields;
   const auto& fields = map.get(timed.id()).fields;
@@ -611,7 +613,6 @@ void entryValuesAreReadOnlyAndInitialRangesRemainAuthoritative() {
 
   static_assert(std::is_same_v<decltype(sample.value()), const Sample&>);
   static_assert(std::is_same_v<decltype(instrument.value()), const Instrument&>);
-  static_assert(std::is_same_v<decltype(region.value()), const Region&>);
 
   const ScanResult scan = result.finish();
   const auto* instrumentAsset = std::get_if<SoundBankAsset>(&scan.assets[0]);

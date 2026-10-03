@@ -17,29 +17,28 @@ namespace vgmtrans::core {
 
 namespace {
 
-template <typename T>
-[[nodiscard]] std::shared_ptr<const std::vector<T>> sharedVector(std::vector<T> values) {
+[[nodiscard]] std::shared_ptr<const std::vector<Asset>> sharedAssets(std::vector<Asset> values) {
   if (values.empty()) {
-    static const auto empty = std::make_shared<const std::vector<T>>();
+    static const auto empty = std::make_shared<const std::vector<Asset>>();
     return empty;
   }
-  return std::make_shared<const std::vector<T>>(std::move(values));
+  return std::make_shared<const std::vector<Asset>>(std::move(values));
 }
 
-template <typename T, typename Predicate>
-[[nodiscard]] std::shared_ptr<const std::vector<T>> without(const std::shared_ptr<const std::vector<T>>& values,
-                                                            Predicate remove) {
+template <typename Predicate>
+[[nodiscard]] std::shared_ptr<const std::vector<Asset>> without(const std::shared_ptr<const std::vector<Asset>>& values,
+                                                              Predicate remove) {
   if (!std::ranges::any_of(*values, remove)) {
     return values;
   }
-  std::vector<T> filtered;
+  std::vector<Asset> filtered;
   filtered.reserve(values->size());
   for (const auto& value : *values) {
     if (!remove(value)) {
       filtered.push_back(value);
     }
   }
-  return sharedVector(std::move(filtered));
+  return sharedAssets(std::move(filtered));
 }
 
 [[nodiscard]] bool referencesAnyAsset(const CollectionMembers& members, const std::unordered_set<AssetId>& assetIds) {
@@ -69,7 +68,7 @@ void SessionState::appendScan(ScanResult result) {
 
   if (!result.assets.empty() || !result.sourceMap.empty()) {
     scanChunks_.push_back(ScanChunk{
-        .assets = sharedVector(std::move(result.assets)),
+        .assets = sharedAssets(std::move(result.assets)),
         .sourceMap = std::move(result.sourceMap),
     });
     const auto& chunk = scanChunks_.back();

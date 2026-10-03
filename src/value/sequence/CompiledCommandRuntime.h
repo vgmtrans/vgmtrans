@@ -40,13 +40,17 @@ template <class State, class Context>
 }
 
 template <class State, class Context, class Config>
-[[nodiscard]] std::any createCompiledState(const Context& context, const Config& config) {
+inline constexpr bool consumesCompiledConfig = std::constructible_from<State, const Context&, const Config&> ||
+                                                std::constructible_from<State, const Config&>;
+
+template <class State, class Context, class Config>
+[[nodiscard]] std::function<std::any(Context)> compiledStateFactory(std::shared_ptr<const Config> settings) {
   if constexpr (std::constructible_from<State, const Context&, const Config&>) {
-    return State{context, config};
+    return [settings = std::move(settings)](Context context) -> std::any { return State{context, *settings}; };
   } else if constexpr (std::constructible_from<State, const Config&>) {
-    return State{config};
+    return [settings = std::move(settings)](Context) -> std::any { return State{*settings}; };
   } else {
-    return createCompiledState<State>(context);
+    return createCompiledState<State, Context>;
   }
 }
 
@@ -149,16 +153,10 @@ template <class Playback, class ProgramState = EmptyCompiledProgramState>
 [[nodiscard]] SequenceRuntime makeCompiledRuntime() {
   using Compiled = CompiledCommandRuntime<Playback, ProgramState>;
   SequenceRuntime runtime;
-  runtime.createProgramState = [](const SequenceProgram& program) {
-    return detail::createCompiledState<ProgramState>(program);
-  };
-  runtime.createTrackState = [](TrackStateContext context) {
-    return detail::createCompiledState<typename Playback::TrackState>(context);
-  };
+  runtime.createProgramState = detail::createCompiledState<ProgramState, SequenceProgram>;
+  runtime.createTrackState = detail::createCompiledState<typename Playback::TrackState, TrackStateContext>;
   if constexpr (!std::is_void_v<typename Playback::StreamState>) {
-    runtime.createStreamState = [](StreamStateContext context) {
-      return detail::createCompiledState<typename Playback::StreamState>(context);
-    };
+    runtime.createStreamState = detail::createCompiledState<typename Playback::StreamState, SequenceProgram>;
   }
   Compiled::installHooks(runtime);
   return runtime;
@@ -171,27 +169,16 @@ template <class Playback, class ProgramState = EmptyCompiledProgramState, class 
   using Compiled = CompiledCommandRuntime<Playback, ProgramState>;
   using TrackState = typename Playback::TrackState;
   using StreamState = typename Playback::StreamState;
-  constexpr bool programConsumesConfig = std::constructible_from<ProgramState, const SequenceProgram&, const Config&> ||
-                                         std::constructible_from<ProgramState, const Config&>;
-  constexpr bool trackConsumesConfig = std::constructible_from<TrackState, const TrackStateContext&, const Config&> ||
-                                       std::constructible_from<TrackState, const Config&>;
-  constexpr bool streamConsumesConfig =
-      std::constructible_from<StreamState, const StreamStateContext&, const Config&> ||
-      std::constructible_from<StreamState, const Config&>;
-  static_assert(programConsumesConfig || trackConsumesConfig || streamConsumesConfig,
+  static_assert(detail::consumesCompiledConfig<ProgramState, const SequenceProgram&, Config> ||
+                    detail::consumesCompiledConfig<TrackState, TrackStateContext, Config> ||
+                    detail::consumesCompiledConfig<StreamState, const SequenceProgram&, Config>,
                 "A supplied runtime Config must be consumed by program, stream, or channel state");
   SequenceRuntime runtime;
   auto settings = std::make_shared<const Config>(std::move(config));
-  runtime.createProgramState = [settings](const SequenceProgram& sequence) {
-    return detail::createCompiledState<ProgramState>(sequence, *settings);
-  };
-  runtime.createTrackState = [settings](TrackStateContext context) {
-    return detail::createCompiledState<TrackState>(context, *settings);
-  };
+  runtime.createProgramState = detail::compiledStateFactory<ProgramState, const SequenceProgram&>(settings);
+  runtime.createTrackState = detail::compiledStateFactory<TrackState, TrackStateContext>(settings);
   if constexpr (!std::is_void_v<StreamState>) {
-    runtime.createStreamState = [settings](StreamStateContext context) {
-      return detail::createCompiledState<StreamState>(context, *settings);
-    };
+    runtime.createStreamState = detail::compiledStateFactory<StreamState, const SequenceProgram&>(settings);
   }
   Compiled::installHooks(runtime);
   return runtime;

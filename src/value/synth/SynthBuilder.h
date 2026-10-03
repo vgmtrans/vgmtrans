@@ -18,13 +18,6 @@
 
 namespace vgmtrans::core {
 
-// Add the stable, exporter-neutral properties and sample links of a synth value to a source
-// annotation. Builders do this automatically at finish time; scanners that
-// describe values before building them can use the same projection directly.
-void annotateSynthValue(AnnotationBuilder annotation, const Sample& sample);
-void annotateSynthValue(AnnotationBuilder annotation, const Instrument& instrument);
-void annotateSynthValue(AnnotationBuilder annotation, const Region& region);
-
 namespace detail {
 
 // Shared source ownership, range inference, and diagnostics for synth builders.
@@ -160,8 +153,7 @@ public:
     RegionEntry() = default;
 
     [[nodiscard]] explicit operator bool() const noexcept;
-    // Complete the region before region(); this view is for inspection and annotation.
-    [[nodiscard]] const Region& value() const;
+    // Complete the region before region(); entries add its source annotations.
     AnnotationBuilder source(std::string_view label, SourceRange range, std::string_view kind = {}) const;
     AnnotationBuilder source(std::string_view label, const SourceRecord& record, std::string_view kind = {}) const;
 

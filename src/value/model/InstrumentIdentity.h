@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "value/base/CoreTypes.h"
+#include "value/base/Types.h"
 
 #include <compare>
 #include <optional>

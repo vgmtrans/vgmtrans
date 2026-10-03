@@ -88,8 +88,8 @@ struct TrackState {
 };
 
 struct StreamState {
-  explicit StreamState(StreamStateContext source)
-      : tempo(source.sequence.behavior.initialTempoMicrosecondsPerQuarter), ppqn(source.sequence.timebase.ppqn) {}
+  explicit StreamState(const SequenceProgram& source)
+      : tempo(source.behavior.initialTempoMicrosecondsPerQuarter), ppqn(source.timebase.ppqn) {}
 
   u32 tempo;
   u16 ppqn;

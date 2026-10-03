@@ -143,7 +143,6 @@ public:
   [[nodiscard]] SourceId source() const noexcept { return input_.source.id; }
   [[nodiscard]] const SourceFile& sourceFile() const noexcept { return input_.source; }
   [[nodiscard]] ByteReader reader() const noexcept { return input_.reader; }
-  [[nodiscard]] std::string_view format() const noexcept { return format_; }
   [[nodiscard]] std::string sourceDisplayName() const;
   [[nodiscard]] SourceMapBuilder& sourceMap() noexcept { return sourceMap_; }
   [[nodiscard]] std::vector<Diagnostic>& diagnostics() noexcept { return result_.diagnostics; }

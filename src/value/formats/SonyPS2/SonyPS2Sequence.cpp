@@ -97,10 +97,10 @@ struct TrackState {
 };
 
 struct StreamState {
-  explicit StreamState(StreamStateContext source)
-      : tempo(source.sequence.behavior.initialTempoMicrosecondsPerQuarter),
-        ppqn(std::max<u16>(source.sequence.timebase.ppqn, 1)),
-        sectionPan(source.sequence.behavior.initialChannelPan.value_or(0.5)), sectionTempo(tempo) {}
+  explicit StreamState(const SequenceProgram& source)
+      : tempo(source.behavior.initialTempoMicrosecondsPerQuarter),
+        ppqn(std::max<u16>(source.timebase.ppqn, 1)),
+        sectionPan(source.behavior.initialChannelPan.value_or(0.5)), sectionTempo(tempo) {}
 
   void beginSection(bool) { tempo = sectionTempo; }
 

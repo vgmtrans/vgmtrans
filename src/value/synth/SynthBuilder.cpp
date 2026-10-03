@@ -80,8 +80,6 @@ void annotateEnvelope(AnnotationBuilder& annotation, const Envelope& envelope) {
   return {"Unknown", 16};
 }
 
-}  // namespace
-
 void annotateSynthValue(AnnotationBuilder annotation, const Sample& sample) {
   const auto [codecName, bitsPerSample] = audioCodecInfo(sample.codec);
   annotation.derived("codec", codecName, SourceValueDisplay::Enum)
@@ -136,6 +134,8 @@ void annotateSynthValue(AnnotationBuilder annotation, const Region& region) {
   }
   annotateEnvelope(annotation, region.envelope);
 }
+
+}  // namespace
 
 detail::SynthBuilderSources::SynthBuilderSources(AssetId asset, SourceMapBuilder* sourceMap,
                                                  std::vector<Diagnostic>* diagnostics)
@@ -380,13 +380,6 @@ InstrumentSetBuilder::RegionEntry::RegionEntry(InstrumentSetBuilder& builder, u3
 
 InstrumentSetBuilder::RegionEntry::operator bool() const noexcept {
   return builder_ != nullptr && builder_->validRegion(instrumentIndex_, regionIndex_);
-}
-
-const Region& InstrumentSetBuilder::RegionEntry::value() const {
-  if (!*this) {
-    throw std::logic_error("Invalid InstrumentSetBuilder region entry");
-  }
-  return builder_->instruments_[instrumentIndex_].regions[regionIndex_];
 }
 
 AnnotationBuilder InstrumentSetBuilder::RegionEntry::source(std::string_view label, SourceRange range,

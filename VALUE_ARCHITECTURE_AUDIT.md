@@ -1,7 +1,7 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Fifteen validated batches remove 849 net production lines from
+`cb9e0b766`. Sixteen validated batches remove 891 net production lines from
 `src/value`. All 44 CTest suites pass; the latest real-file replay preserves
 all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
 records appear at the end of this document.
@@ -5015,3 +5015,80 @@ mean native export policy, and simulation still needs fixed no-boost attenuation
 Next: narrow the construction contexts to fields their state constructors read,
 borrow Namco's immutable DriverData from its runtime owner, and evaluate whether
 configured state factories need to retain settings for states that ignore them.
+
+## Cleanup2 sixteenth batch: smaller initialization interfaces
+
+This batch removes 42 net production lines, bringing cleanup2 to 891 removed.
+The existing synth fixture gains one net line; cumulative tests gain 427 lines.
+
+- Stream state constructors take the existing SequenceProgram directly. Remove
+  StreamStateContext, whose unused sourceTrack field left only that program
+  reference. HeartBeatPS1, SonyPS2, factories and fixtures use song defaults
+  directly. TrackStateContext drops its unread sequence field while retaining
+  the source track and channel number its constructors actually read. The
+  transient track-construction value shrinks 24 to 16 bytes, not retained state.
+- Configured factories select their constructor and retained settings together.
+  Replace the private context/config state-creation overload with the factory
+  selector; only constructors that consume Config retain its shared owner.
+  States that ignore Config use the existing context/default constructor helper
+  directly. One private trait also states the existing unused-Config rejection.
+  The three no-config factories use that helper's function specializations
+  directly instead of captureless forwarding lambdas. Constructor precedence
+  remains context+config, config, context, then default; public format authoring
+  still uses the same makeCompiledRuntime overloads. Factory target introspection
+  has no consumers. These changes remove 13 header lines without new public types.
+- Namco ProgramState borrows immutable DriverData from that owned runtime Config,
+  keeping mutable echo state separate. It shrinks 168 to 136 bytes and avoids
+  an extra RetainedSource owner on state creation/copy. Readers and analysis
+  projections retain their original ownership contracts.
+- Synth projection's three overloads become private functions in the existing
+  anonymous namespace. All production projection already runs inside the builder
+  at finish; remove the public declarations and unused RegionEntry::value getter.
+  The physical-envelope fixture exercises ordinary instrument/region construction
+  and finish, preserving every field/order/zero/infinity/unit assertion. Live
+  sample/instrument inspection and entry-level source annotation APIs remain.
+- Remove the unused scanner format getter. Two headers require numeric Types
+  rather than CoreTypes. Session's three remaining eager export/playback wrappers
+  pass snapshot() directly, consistently with its other wrappers; their results
+  own their data. SessionState's shared-vector helper becomes concrete sharedAssets
+  because both of its private callers only operate on Asset; filtering remains
+  generic only in its actual predicate.
+
+Validation:
+
+- The full 349-step macOS Release build is warning-free; all 44 CTest suites pass.
+  The complete final headers, tests, core/formats/fmt archives and shell are frozen.
+- Final factory/context overlays pass complete cursor and VM fixtures under
+  ASan/UBSan/float-cast-overflow. All 148 configured/unconfigured construction
+  combinations preserve 12,844 trace bytes: precedence, void stream, borrowed
+  settings, runtime copy, original-owner release, and state isolation. The
+  measured 136 allocations/23,392 requested bytes stay identical; captures already
+  fit libc++'s std::function storage, so no closure-allocation saving is claimed.
+- Context narrowing preserves 171,938 VM cases and 206,284,725 trace bytes with
+  focused sanitizers. Complete HeartBeatPS1/SonyPS2 fixtures and 160 varied song
+  defaults preserve 15,439 bytes, including five direct performance/fifteen MIDI
+  captures. Changed native format closures, context headers, and VM compile
+  together against frozen before archives. All 45 configured syntax units pass.
+- Namco preserves 6,368 complete performance/MIDI captures and 82,858,671 bytes:
+  all three versions, mono/stereo, all 256 generated control configurations,
+  repeats, loop policies, truncation, copied runtimes after source/program release,
+  repeated-render resets, independent echo and owned analysis projections. Focused
+  ASan/UBSan/float-cast-overflow checks include final source-owner expiry.
+- Complete synth-builder fixtures pass focused ASan/UBSan with changed builder
+  and test units. Both numeric-only includes pass 35 actual configured callers
+  and nine self-contained header checks. No legacy consumer includes either
+  narrowed header. Release archive boundaries remain uninstrumented.
+- The frozen sixteenth shell preserves all 252 input/policy comparisons and
+  3,922 artifact hashes, inventories, diagnostics and exit statuses against 15.
+
+Retain symmetric CommandFlow constructors rather than moving their useful authoring
+surface into verbose test aggregates or a test-only factory. Retain the live
+sequenceUsesSemantic helper used by Hudson's unsupported-command fixture. Also
+retain dependency eligibility's canonical asset lookup: a hand-built catalog can
+contain duplicate or invalid IDs, so a listed candidate's metadata need not be
+the metadata selected by catalog.asset(id).
+
+Next: remove unused source/error authoring overloads and redundant reader queries,
+and construct adapted instruments directly instead of deep-copying then replacing
+their source region vectors. The latter may add a few lines while making ownership
+clearer and avoiding substantial work; line count alone does not decide it.

@@ -216,12 +216,12 @@ public:
     if (stream.channels.empty()) {
       throw std::invalid_argument("A sequence stream must have at least one channel");
     }
-    streamState_ = runtime.createStreamState ? runtime.createStreamState({program, track}) : std::any{};
+    streamState_ = runtime.createStreamState ? runtime.createStreamState(program) : std::any{};
     channels_.reserve(stream.channels.size());
     for (const u32 number : stream.channels) {
       channels_.push_back(VmChannel{
           .performance = {.id = TrackId{nextTrack++}, .sourceTrackNumber = number, .name = track.name},
-          .state = runtime.createTrackState ? runtime.createTrackState({program, track, number}) : std::any{},
+          .state = runtime.createTrackState ? runtime.createTrackState({track, number}) : std::any{},
       });
       auto& channel = channels_.back();
       addInitialTrackEvents(outputAt(channel, 0), behavior_, channel.performance.id.value == 0);

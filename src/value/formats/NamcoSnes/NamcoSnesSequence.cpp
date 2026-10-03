@@ -140,7 +140,7 @@ struct DriverData {
 struct ProgramState {
   explicit ProgramState(const DriverData& data) : data(data) {}
 
-  DriverData data;
+  const DriverData& data;
   ReverbPerformanceEvent echo{.voiceMask = 0};
 };
 
