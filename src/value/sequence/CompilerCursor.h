@@ -722,7 +722,9 @@ private:
            SemanticOperandRole role) {
     if (role != SemanticOperandRole::Value) {
       auto& operand = operands_.emplace_back();
-      operand.value = value;
+      if (const auto* number = std::get_if<u64>(&value)) {
+        operand.value = *number;
+      }
       operand.role = role;
     }
     if (!name.empty()) {

@@ -9,6 +9,7 @@
 #include "value/base/Source.h"
 #include "value/sequence/SequenceProgram.h"
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -39,10 +40,10 @@ enum class SemanticOperandRole : u8 {
   InstrumentTablePointer,
 };
 
-// Only tagged values are needed after decoding for channel attribution and
-// instrument/control-flow links. Their display fields use SourceField directly.
+// Relationships use unsigned values. An empty value retains the position of a
+// non-unsigned tag; its full display value remains in SourceField.
 struct SemanticOperand {
-  SourceValue value = false;
+  std::optional<u64> value;
   SemanticOperandRole role = SemanticOperandRole::Value;
 };
 

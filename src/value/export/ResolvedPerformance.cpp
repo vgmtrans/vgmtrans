@@ -367,10 +367,11 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
       voice.instrument = resolve(sourceInstrument.value_or(selected), &note->header);
 
       const bool hasEnvelope = options.dynamicEnvelopes && lane.envelope.fields != EnvelopeFields::None;
-      const bool envelopeOnly = hasEnvelope && !materializeStereo;
+      if (!hasEnvelope && !materializeStereo) continue;
+      const bool envelopeOnly = !materializeStereo;
       const auto* baseRef = std::get_if<InstrumentHandle>(&voice.instrument);
       if (!baseRef) {
-        if ((hasEnvelope || materializeStereo) && !warnedMissingInstrument) {
+        if (!warnedMissingInstrument) {
           diagnostics.push_back(instrumentNotFoundWarning(envelopeOnly, note->header));
           warnedMissingInstrument = true;
         }
@@ -378,63 +379,59 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
       }
 
       const auto& base = soundBanks[baseRef->bank].instruments[baseRef->instrument];
-      std::optional<InstrumentHandle> variantHandle;
-      if (hasEnvelope || materializeStereo) {
-        // Evaluate native responses before overriding them. Sample the whole
-        // bank once, keeping its resolution independent of the variants added.
-        if (sampledBanks.insert(baseRef->bank).second) {
-          auto& bank = soundBanks[baseRef->bank];
-          const u32 step = regionSamplingStep(bank, diagnostics);
-          for (auto& instrument : bank.instruments) {
-            if (std::ranges::any_of(instrument.regions,
-                                    [](const Region& region) { return bool(region.response.evaluate); })) {
-              instrument.regions = sampleRegionResponses(instrument.regions, step);
-            }
-          }
-        }
-
-        if (base.regions.empty()) {
-          if (regionlessInstrumentWarnings.insert(*baseRef).second) {
-            diagnostics.push_back(noRegionsWarning(envelopeOnly, note->header));
-          }
-        } else {
-          std::vector<Region> regions;
-          regions.reserve(base.regions.size() * (materializeStereo ? 2 : 1));
-          for (auto region : base.regions) {
-            if (hasEnvelope) {
-              region.envelope = applyEnvelopeOverride(region.envelope, lane.envelope);
-            }
-            if (materializeStereo) {
-              appendStereoLayers(regions, region, leftGain, rightGain, lane.pan);
-            } else {
-              regions.push_back(std::move(region));
-            }
-          }
-
-          if (materializeStereo ||
-              !std::ranges::equal(regions, base.regions, {}, &Region::envelope, &Region::envelope)) {
-            if (const auto* existing = findVariant(variants, *baseRef, regions, soundBanks)) {
-              variantHandle = existing->variant;
-            } else {
-              Instrument variant = base;
-              variant.regions = std::move(regions);
-              variant.identity.reset();
-              variant.explicitAddress.reset();
-              if (envelopeOnly) {
-                variant.name = base.name.empty() ? "Dynamic envelope" : base.name + " [dynamic envelope]";
-              } else {
-                variant.name = base.name.empty() ? "Instrument variant" : base.name + " [variant]";
-              }
-              auto& bank = soundBanks[baseRef->bank];
-              variantHandle = InstrumentHandle{baseRef->bank, static_cast<u32>(bank.instruments.size())};
-              variants.push_back({*baseRef, *variantHandle});
-              bank.instruments.push_back(std::move(variant));
-            }
+      // Evaluate native responses before overriding them. Sample the whole
+      // bank once, keeping its resolution independent of the variants added.
+      if (sampledBanks.insert(baseRef->bank).second) {
+        auto& bank = soundBanks[baseRef->bank];
+        const u32 step = regionSamplingStep(bank, diagnostics);
+        for (auto& instrument : bank.instruments) {
+          if (std::ranges::any_of(instrument.regions,
+                                  [](const Region& region) { return bool(region.response.evaluate); })) {
+            instrument.regions = sampleRegionResponses(instrument.regions, step);
           }
         }
       }
 
-      if (variantHandle) voice.instrument = *variantHandle;
+      if (base.regions.empty()) {
+        if (regionlessInstrumentWarnings.insert(*baseRef).second) {
+          diagnostics.push_back(noRegionsWarning(envelopeOnly, note->header));
+        }
+        continue;
+      }
+
+      std::vector<Region> regions;
+      regions.reserve(base.regions.size() * (materializeStereo ? 2 : 1));
+      for (auto region : base.regions) {
+        if (hasEnvelope) {
+          region.envelope = applyEnvelopeOverride(region.envelope, lane.envelope);
+        }
+        if (materializeStereo) {
+          appendStereoLayers(regions, region, leftGain, rightGain, lane.pan);
+        } else {
+          regions.push_back(std::move(region));
+        }
+      }
+      if (!materializeStereo &&
+          std::ranges::equal(regions, base.regions, {}, &Region::envelope, &Region::envelope)) continue;
+      if (const auto* existing = findVariant(variants, *baseRef, regions, soundBanks)) {
+        voice.instrument = existing->variant;
+        continue;
+      }
+
+      Instrument variant = base;
+      variant.regions = std::move(regions);
+      variant.identity.reset();
+      variant.explicitAddress.reset();
+      if (envelopeOnly) {
+        variant.name = base.name.empty() ? "Dynamic envelope" : base.name + " [dynamic envelope]";
+      } else {
+        variant.name = base.name.empty() ? "Instrument variant" : base.name + " [variant]";
+      }
+      auto& bank = soundBanks[baseRef->bank];
+      const InstrumentHandle handle{baseRef->bank, static_cast<u32>(bank.instruments.size())};
+      variants.push_back({*baseRef, handle});
+      bank.instruments.push_back(std::move(variant));
+      voice.instrument = handle;
     }
 
     if (materializeStereo) {

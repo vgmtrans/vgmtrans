@@ -4268,3 +4268,58 @@ Validation:
 
 Further work now probes the transient relationship value representation and
 linearizes instrument-variant preparation without changing attack/gate policy.
+
+## Cleanup2: store relationship values and prepare variants directly
+
+The sixth batch removes another 16 production lines, bringing the branch to
+474 net lines removed from `src/value`. The operand change adds three lines to
+preserve tag ordering explicitly; the variant pass removes three lines while
+removing considerably more nesting. No permanent test infrastructure is added.
+
+- `SemanticOperand` holds an optional unsigned value rather than the complete
+  display-value variant. Only unsigned relationships are consumed after decode;
+  complete display values remain in `SourceField`. Nonnumeric tags still occupy
+  their original positions, so an invalid first channel and repeated invalid
+  bank/program tags retain their previous behavior. Signed values, booleans,
+  and floating-point values are never coerced into relationship addresses.
+  The x86-64 operand representation shrinks from 40 to 24 bytes.
+- Instrument variant preparation uses early exits for unchanged, unresolved,
+  regionless, and reused selections. The optional pending variant handle and
+  three nesting levels disappear. Native responses still sample the entire bank
+  once before regionless checks, warning order stays exact, and attacks and
+  continuations retain distinct instrument/gate behavior.
+- Four synth draft accessors return their owned builder members inline beside
+  `id()`. The format-facing signatures are unchanged; a reader no longer needs
+  to visit the implementation file for these ordinary member accesses.
+
+Validation:
+
+- Warning-free full macOS Release build (279 steps), including shell, Qt, and
+  parity harness; all 44 CTest suites pass.
+- An independent operand probe matches 29,044 cases and 5,148,914 trace bytes.
+  It covers all six display-value alternatives, unsigned bounds, nonfinite
+  values, repeated tags, all pointer/control-flow roles, complete annotation
+  fields and links, Akao's actual reference collector, Nin prefix ordering,
+  and truncated reads. ASan, UBSan, and float-cast-overflow checks are clean.
+- Independent variant preparation captures match all existing fixtures and
+  2,056 generated cases: 2,073 preparations and 42,141,206 serialized bytes.
+  Cases exercise dynamic/stereo policy, native response budgets, selection
+  fallbacks, envelope clearing/restoration, ties and lane order, used presets,
+  address exhaustion, voice deadlines, ordered diagnostics, and MIDI policies.
+  ASan and UBSan report no findings. Libc++ container annotations were disabled
+  consistently in this temporary probe when linking its unchanged unsanitized
+  baseline archive; allocation/access and undefined-behavior checks remain active.
+- The frozen sixth-batch executable matches committed `691f68f04` across all
+  252 real-file input/policy comparisons: all 3,922 artifacts, inventories,
+  diagnostics, and exit statuses are identical. This includes the two MIDI
+  files recovered by title sanitization; all 3,920 original baseline artifacts
+  remain byte-identical.
+
+Further boundary review keeps typed playback, stream-state contexts, pure
+motion, and bound performance values. Playback serves 42 driver families;
+three require shared-stream specialization. Ten families use bound values to
+interrupt emitted automation independently of their source arithmetic. Folding
+these responsibilities together would either couple pure motion to performance
+containers or repeat interruption rules in the formats. Required draft validation
+also remains a separate pass before consuming any payload. Moving publication
+into every materialization branch saves little and repeats the publication rule.

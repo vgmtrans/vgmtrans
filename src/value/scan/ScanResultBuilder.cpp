@@ -92,22 +92,6 @@ ScanSequenceDraft& ScanSequenceDraft::includeMisc(const ScanMiscDraft& asset) {
   return includeMisc(asset.id());
 }
 
-InstrumentSetBuilder& ScanSoundBankDraft::instruments() {
-  return pending_->instruments;
-}
-
-SamplePoolBuilder& ScanSoundBankDraft::localSamples() {
-  return pending_->samples;
-}
-
-SamplePoolBuilder& ScanSamplePoolDraft::samples() {
-  return pending_->samples;
-}
-
-const SamplePoolBuilder& ScanSamplePoolDraft::samples() const {
-  return pending_->samples;
-}
-
 ScanMiscDraft& ScanMiscDraft::payload(std::vector<u8> payload) {
   if (pending_->payload) {
     throw std::logic_error("ScanResultBuilder misc draft was given more than one payload");

@@ -76,8 +76,8 @@ class ScanSoundBankDraft {
 public:
   [[nodiscard]] AssetId id() const noexcept { return pending_->id; }
 
-  [[nodiscard]] InstrumentSetBuilder& instruments();
-  [[nodiscard]] SamplePoolBuilder& localSamples();
+  [[nodiscard]] InstrumentSetBuilder& instruments() { return pending_->instruments; }
+  [[nodiscard]] SamplePoolBuilder& localSamples() { return pending_->samples; }
   // Record a known pool, or supply a callback to choose pools when collections are rebuilt.
   ScanSoundBankDraft& useSamples(AssetId samples);
   ScanSoundBankDraft& useSamples(const ScanSamplePoolDraft& samples);
@@ -113,8 +113,8 @@ class ScanSamplePoolDraft {
 public:
   [[nodiscard]] AssetId id() const noexcept { return pending_->id; }
 
-  [[nodiscard]] SamplePoolBuilder& samples();
-  [[nodiscard]] const SamplePoolBuilder& samples() const;
+  [[nodiscard]] SamplePoolBuilder& samples() { return pending_->samples; }
+  [[nodiscard]] const SamplePoolBuilder& samples() const { return pending_->samples; }
 
   template <typename T>
   ScanSamplePoolDraft& data(T value);

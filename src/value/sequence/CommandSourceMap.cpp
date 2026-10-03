@@ -19,11 +19,10 @@ namespace vgmtrans::core {
 namespace {
 
 [[nodiscard]] std::optional<u32> operandUnsigned32(const SemanticOperand& operand) {
-  const auto* value = std::get_if<u64>(&operand.value);
-  if (value == nullptr || *value > std::numeric_limits<u32>::max()) {
+  if (!operand.value || *operand.value > std::numeric_limits<u32>::max()) {
     return std::nullopt;
   }
-  return static_cast<u32>(*value);
+  return static_cast<u32>(*operand.value);
 }
 
 [[nodiscard]] std::optional<SourceLinkRole> linkRole(SemanticOperandRole role) {
@@ -71,9 +70,9 @@ namespace {
   std::optional<u32> instrumentProgram;
   for (const auto& operand : command.operands) {
     if (const auto role = linkRole(operand.role)) {
-      if (const auto* destination = std::get_if<u64>(&operand.value)) {
+      if (operand.value) {
         annotation.link(
-            *role, SourceTarget{SourceRange{.source = command.range.source, .offset = *destination, .size = 1}});
+            *role, SourceTarget{SourceRange{.source = command.range.source, .offset = *operand.value, .size = 1}});
       }
     }
     if (operand.role == SemanticOperandRole::InstrumentBank) {
