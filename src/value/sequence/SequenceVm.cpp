@@ -205,7 +205,7 @@ struct VmChannel {
 class VmStreamExecutor {
 public:
   VmStreamExecutor(const SequenceProgram& program, const TrackProgram& track, const SequenceStream& stream,
-                   const SequenceRuntime& runtime, TrackId sourceTrackId, u32& nextTrack,
+                   const SequenceRuntime& runtime, TrackId sourceTrackId, size_t& nextTrack,
                    const SequenceVmOptions& options, PerformanceSequence& targetSequence, u64& outputSequence,
                    std::any& programState, bool startsActive = true)
       : track_(track), sourceTrackId_(sourceTrackId), sequenceRuntime_(runtime), behavior_(program.behavior),
@@ -219,7 +219,7 @@ public:
     channels_.reserve(stream.channels.size());
     for (const u32 number : stream.channels) {
       channels_.push_back(VmChannel{
-          .performance = {.id = TrackId{nextTrack++}, .sourceTrackNumber = number, .name = track.name},
+          .performance = {.id = TrackId{static_cast<u32>(nextTrack++)}, .sourceTrackNumber = number, .name = track.name},
           .state = runtime.createTrackState ? runtime.createTrackState({track, number}) : std::any{},
       });
       auto& channel = channels_.back();
@@ -870,7 +870,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
     u64 outputSequence = 0;
     std::vector<detail::VmStreamExecutor> executors;
     executors.reserve(program.streamCount());
-    u32 nextTrack = 0;
+    size_t nextTrack = 0;
     const bool hasSectionPlaylist = program.sectionPlaylist.has_value();
     for (size_t trackIndex = 0; trackIndex < program.tracks.size(); ++trackIndex) {
       const TrackProgram& track = program.tracks[trackIndex];
@@ -991,7 +991,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
       }
     }
 
-    target.tracks.reserve(program.playbackTrackCount());
+    target.tracks.reserve(nextTrack);
     for (auto& executor : executors) {
       executor.finish(sequenceEndTick);
     }

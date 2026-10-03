@@ -1,7 +1,7 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Twenty validated batches remove 955 net production lines from
+`cb9e0b766`. Twenty-one validated batches remove 977 net production lines from
 `src/value`. All 44 CTest suites pass; the latest real-file replay preserves
 all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
 records appear at the end of this document.
@@ -5426,3 +5426,100 @@ Next: eliminate the second VM playback-track count, assess direct MIDI track
 serialization into its final buffer, and test whether source inspection can own
 its complete annotation/field child projection. These should remove duplicate
 responsibilities without adding a framework or hiding format behavior.
+
+
+## Cleanup2 twenty-first batch: count once and serialize into the final buffer
+
+This batch removes 22 net production lines across six files, bringing cleanup2
+to 977 removed. One existing VM fixture drops its mirrored helper-count clause;
+its actual rendered-track assertion remains. Cumulative tests still gain 420 lines.
+
+- The VM's existing allocation position already counts every declared output
+  channel while constructing executors. Keep that position as size_t, casting
+  explicitly only when assigning TrackId, and reserve the result tracks with it.
+  Remove SequenceProgram.playbackTrackCount() and the second traversal. The
+  size_t count retains the previous reservation extent, while IDs retain their
+  existing u32 conversion behavior. No parallel counter or channel view is added.
+- MIDI appends each sorted track's encoded messages directly to the complete SMF
+  byte vector and fills its four-byte track length afterward. Delete the owned
+  trackData buffer and its complete copy. Message expansion/order, delta encoding,
+  clipping and header narrowing stay in their existing functions. Four local
+  lines are added to remove an entire buffer owner; no generic patch abstraction
+  or new intermediate model is introduced.
+- DLS writes its fixed-size articulation connections directly after the eight-byte
+  art2 header, then fills the count from the complete record bytes. Delete the
+  connections buffer and copy without adding a mutable record counter. Generator,
+  modulator, envelope and instrument/region scope order and filtering remain.
+  This adds three local lines, following makeRiff's existing fill-after-write
+  approach. Wave preparation and offset/error-precedence stages remain distinct.
+- Removing the unused SourceMap range queries in 20 also removes the only users
+  of SourceRange::contains(SourceRange) and intersects(SourceRange). A fresh,
+  independently repeated whole-source/test/member-pointer audit finds no callers.
+  Delete those two unused inline predicates and their comments. Retain the live
+  point query containsOffset(), range accumulation, validity and endpoints. NDS's
+  unrelated private subtraction-based contains(bounds,offset,size) stays intact.
+
+Validation:
+
+- The full 373-step macOS Release build is warning-free and all 44 CTest suites
+  pass. Freeze matching headers, tests, core/formats/fmt and shell. The twenty-first
+  shell preserves all 252 input/policy comparisons and 3,922 artifact hashes,
+  inventories, diagnostics and exit statuses against 20.
+- Complete VM fixtures and both changed implementation units pass ASan/UBSan/
+  float-cast-overflow against matching frozen 20. Preserve 171,938 general,
+  zero-budget, synchronized, playlist and nested cases/206,284,725 trace bytes.
+  Another 640 geometry/runtime/budget/playlist cases preserve 255,208 bytes;
+  20 seeded allocation positions around the u32 boundary preserve 2,179 bytes of
+  IDs and initial global event placement. Existing count state changes type, not
+  retained storage. Configured implementations/fixture are warning-free.
+- MIDI preserves 85,681 complete captures/231,627,507 bytes in both Release and
+  focused sanitizers against frozen 20, SHA256
+  8ddf2579a9e8daed5acf9991174ec9a91ff35bfa775b41e3a2cc1e0e8923097f.
+  These are 75,043 renderer/fixture captures plus 10,638 raw encoder captures:
+  10,584 main boundary cases, seven empty-track counts, eleven payload lengths and
+  36 allocation cases. Raw cases include coincident priorities, note clipping and
+  zero duration, unknown message kinds, timebase/tick extremes, embedded-NUL/high-
+  byte names, meta/SysEx length boundaries and 65,535/65,536 tracks. All ten existing
+  fixed expected-SMF encoding tests pass independently in both builds.
+- All 36 MIDI allocation cases improve. Four tracks each containing 100,000 notes
+  plus 128-byte markers avoid 59 allocations/75,632,068 requested bytes:
+  511,534,149 becomes 435,902,081. This removes a per-track serialized owner rather
+  than changing the necessary sorted wire-message representation.
+- DLS preserves 972 private articulation captures plus all existing synth fixtures
+  (19 successful SF2/DLS artifact/ordered-diagnostic captures and overflow asserts),
+  24,708,750 bytes in Release and focused sanitizers, SHA256
+  fcdf5525dfc56ea8566db1c67490c14cf5e00ebd6b6c9e98583f32eb8405af11.
+  Cases cover every destination/source, amount clamp boundaries, all modulation
+  scopes, absent/negative/zero/finite/Inf/NaN envelope times, sustain/pan boundaries,
+  unsupported routes and count high bytes through 65,536 generators/modulators per
+  scope. All 36 allocation cases save five allocations: default 470 requested
+  bytes becomes 375; large dual scopes 13,500,630 becomes 10,944,631. Changed units
+  and probes are warning-free; one preexisting unused fixture-helper warning stays.
+- Probe/changed-unit sanitizer checks link unchanged matching Release archives;
+  they do not establish that every linked archive is instrumented. Allocation
+  counts are cumulative requests, not peak-RSS measurements.
+
+Rejected source-inspection centralization:
+
+A concrete prototype replaced annotation-only children with SourceInspectionItem
+children, centralizing opted-in field projection and removing Qt's field-leaf
+branch. Its 2,400 admitted graphs preserve 111,088 lines/5,144,449 bytes under focused
+sanitizers, including source-released inspections, field leaves, hierarchy/order
+and derived/foreign-field behavior. Qt/shell temporary units are Werror-clean.
+The simple version removes seven net lines; using the known field owner directly
+in its comparator reduces the saving to four, while still doing field work the
+shell does not need. Every nonempty parent adds one vector allocation: 3,072
+requested bytes at 256 field-only children and 49,152 at 4,096. Refined complete-
+print medians over three runs are 36.58 to 48.32 microseconds for repeated-offset
+256 fields, 509.69 to 917.50 for 4,096, and 267.82 to 387.15 for 512 annotation
+children plus 256 fields. Contiguous 256 fields are closer, 35.93 to 38.43.
+
+Retain the existing distinction: core annotation traversal serves the shell's
+annotation intent, while Qt projects field children for presentation. The proposed
+private comparator optimization also works in the current Qt boundary and does
+not uniquely justify changing the shared API. Avoid broadening work or adding a
+second projection protocol for a four-line gain.
+
+Next: test consuming fresh ranged cursor operands instead of copying their returned
+strings, and correct a discovered MIDI signed-pitch clipping overflow before adding
+its wire-format bias. Continue probing actual ownership and failure boundaries.

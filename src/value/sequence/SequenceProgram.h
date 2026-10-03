@@ -316,7 +316,6 @@ struct SequenceProgram {
   std::vector<TrackProgram> tracks;
   std::optional<SectionPlaylist> sectionPlaylist;
 
-  [[nodiscard]] size_t playbackTrackCount() const;
   [[nodiscard]] size_t streamCount() const;
 };
 

@@ -22,16 +22,6 @@ std::optional<u32> TrackProgram::commandIndex(Address address) const {
   return static_cast<u32>(std::distance(commands.begin(), found));
 }
 
-size_t SequenceProgram::playbackTrackCount() const {
-  size_t count = 0;
-  for (const auto& track : tracks) {
-    for (const auto& stream : track.streams) {
-      count += stream.channels.size();
-    }
-  }
-  return count;
-}
-
 size_t SequenceProgram::streamCount() const {
   size_t count = 0;
   for (const auto& track : tracks) {

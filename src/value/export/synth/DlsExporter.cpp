@@ -282,35 +282,38 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   // Each region gets a DLS2 articulation list. Region envelope/pan is always written;
   // instrument- and region-level modulation are appended as additional connections.
   const Region& region = resolvedRegion.region;
-  std::vector<u8> connections;
-  writeConnection(connections, kDlsConnDstPan, dlsPanScale(region.pan));
+  std::vector<u8> art;
+  writeLe32(art, 8);
+  writeLe32(art, 0);
+  writeConnection(art, kDlsConnDstPan, dlsPanScale(region.pan));
   const Envelope envelope = approximateEnvelopeAsAdsr(region.envelope, kDlsVolumeEnvelopeRangeDb);
   const bool explicitEnvelope = hasExplicitEnvelope(envelope);
-  writeConnection(connections, kDlsConnDstEg1AttackTime, dlsEnvelopeTimecents(envelope.attackSeconds));
-  writeConnection(connections, kDlsConnDstEg1HoldTime, dlsEnvelopeTimecents(envelope.holdSeconds));
-  writeConnection(connections, kDlsConnDstEg1DecayTime, dlsEnvelopeTimecents(envelope.decaySeconds));
-  writeConnection(connections, kDlsConnDstEg1SustainLevel,
+  writeConnection(art, kDlsConnDstEg1AttackTime, dlsEnvelopeTimecents(envelope.attackSeconds));
+  writeConnection(art, kDlsConnDstEg1HoldTime, dlsEnvelopeTimecents(envelope.holdSeconds));
+  writeConnection(art, kDlsConnDstEg1DecayTime, dlsEnvelopeTimecents(envelope.decaySeconds));
+  writeConnection(art, kDlsConnDstEg1SustainLevel,
                   explicitEnvelope ? dlsSustainLevel(envelope) : kDlsSustainLevelFullScale);
-  writeConnection(connections, kDlsConnDstEg1ReleaseTime, dlsEnvelopeTimecents(envelope.releaseSeconds));
+  writeConnection(art, kDlsConnDstEg1ReleaseTime, dlsEnvelopeTimecents(envelope.releaseSeconds));
   const auto writeModulation = [&](const LoweredSynthModulation& scope) {
     for (const auto& generator : scope.generators) {
       if (const auto connection = dlsConnectionForGenerator(generator)) {
-        writeConnection(connections, *connection);
+        writeConnection(art, *connection);
       }
     }
     for (const auto& modulator : scope.modulators) {
       if (const auto connection = dlsConnectionForModulator(modulator)) {
-        writeConnection(connections, *connection);
+        writeConnection(art, *connection);
       }
     }
   };
   writeModulation(instrument.modulation);
   writeModulation(resolvedRegion.modulation);
 
-  std::vector<u8> art;
-  writeLe32(art, 8);
-  writeLe32(art, static_cast<u32>(connections.size() / 12));
-  art.insert(art.end(), connections.begin(), connections.end());
+  // Fill the count after writing the fixed-size connections directly after the header.
+  const u32 connectionCount = static_cast<u32>((art.size() - 8) / 12);
+  for (u32 byte = 0; byte < 4; ++byte) {
+    art[4 + byte] = static_cast<u8>(connectionCount >> (8 * byte));
+  }
   return makeListChunk("lar2", std::array{Chunk{"art2", std::move(art)}});
 }
 

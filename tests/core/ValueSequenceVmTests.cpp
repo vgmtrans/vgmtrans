@@ -126,7 +126,7 @@ void sequenceVmRoutesOneStreamAcrossIndependentChannels() {
   add({}, 0, &Playback::tempo);  // Source channel metadata must not route global commands.
   track.commands.back().flow = CommandFlow::end(Address{6});
   const SequenceProgram program{.runtime = makeCompiledRuntime<Playback>(), .tracks = {track}};
-  expect(program.streamCount() == 1 && program.playbackTrackCount() == 2 && validateSequenceProgram(program).empty(),
+  expect(program.streamCount() == 1 && validateSequenceProgram(program).empty(),
          "one execution stream should declare two independent output channels");
   const auto performance = SequenceVm().render(program);
   expect(performance.diagnostics.empty() && performance.tracks.size() == 2 && performance.sourceSpans.size() == 6,

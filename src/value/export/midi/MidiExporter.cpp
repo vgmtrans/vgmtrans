@@ -159,17 +159,21 @@ void appendTrack(std::vector<u8>& bytes, const MidiTrack& track, Timebase timeba
     return a.priority < b.priority;
   });
 
-  std::vector<u8> trackData;
+  writeAscii(bytes, "MTrk");
+  const size_t sizeOffset = bytes.size();
+  writeBe32(bytes, 0);
   u64 previousTick = 0;
   for (const auto& message : messages) {
-    writeVariableLength(trackData, message.tick - previousTick);
-    trackData.insert(trackData.end(), message.bytes.begin(), message.bytes.end());
+    writeVariableLength(bytes, message.tick - previousTick);
+    bytes.insert(bytes.end(), message.bytes.begin(), message.bytes.end());
     previousTick = message.tick;
   }
 
-  writeAscii(bytes, "MTrk");
-  writeBe32(bytes, static_cast<u32>(trackData.size()));
-  bytes.insert(bytes.end(), trackData.begin(), trackData.end());
+  // Fill the track length after writing directly into the final buffer.
+  const u32 trackSize = static_cast<u32>(bytes.size() - sizeOffset - 4);
+  for (u32 byte = 0; byte < 4; ++byte) {
+    bytes[sizeOffset + byte] = static_cast<u8>(trackSize >> (24 - 8 * byte));
+  }
 }
 
 }  // namespace
