@@ -76,12 +76,6 @@ struct SfSampleHeaderPitch {
   s8 correction = 0;
 };
 
-struct SfModulatorRecord {
-  u16 source = 0;
-  u16 destination = 0;
-  s16 amount = 0;
-};
-
 using SfEnvelope = std::array<s16, kSfEnvelopeGenerators.size()>;
 
 struct SfPreset {
@@ -204,22 +198,23 @@ struct SfLayout {
   return std::nullopt;
 }
 
-[[nodiscard]] std::optional<SfModulatorRecord> sf2ModulatorFor(const SynthModulator& modulator) {
+void writeModulator(std::vector<u8>& bytes, const SynthModulator& modulator) {
   // SynthModulator names common controller behavior. This function chooses the SF2 controller
-  // and generator numbers that represent it in the file.
+  // and generator numbers and writes their complete SF2 record.
   const auto source = modulator.source == SynthSource::ChannelPressure
                           ? std::optional{kSfModChannelPressure}
                           : sf2DefaultSourceForDestination(modulator.destination);
   const auto destination = sf2GeneratorForDestination(modulator.destination);
   if (!source || !destination) {
-    return std::nullopt;
+    return;
   }
 
-  return SfModulatorRecord{
-      .source = *source,
-      .destination = *destination,
-      .amount = clampS16(modulator.amount),
-  };
+  const s16 amount = clampS16(modulator.amount);
+  writeLe16(bytes, *source);
+  writeLe16(bytes, *destination);
+  writeLeS16(bytes, amount);
+  writeLe16(bytes, 0);
+  writeLe16(bytes, kSfTransformLinear);
 }
 
 [[nodiscard]] u16 sf2Attenuation(const Region& region, const DecodedSynthSample& sample) {
@@ -446,12 +441,7 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
       }
     }
     for (const auto& modulator : modulation.modulators) {
-      if (const auto record = sf2ModulatorFor(modulator)) {
-        writeWordGen(modulators, record->source, record->destination);
-        writeLeS16(modulators, record->amount);
-        writeLe16(modulators, 0);
-        writeLe16(modulators, kSfTransformLinear);
-      }
+      writeModulator(modulators, modulator);
     }
   };
 

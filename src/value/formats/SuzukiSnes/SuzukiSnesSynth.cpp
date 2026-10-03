@@ -76,7 +76,7 @@ struct Patch {
     // Zero ADSR and $ffff tuning are unused-slot sentinels in these tables.
     // Skip only the affected program: programs are an indirection table, so a
     // hole in one SRCN must not hide later valid mappings.
-    if (volume > 0x7f || adsr == 0 || rawTuning == 0xffff || !directory || !directory->stream ||
+    if (volume > 0x7f || adsr == 0 || rawTuning == 0xffff || !directory ||
         directory->startAddress < layout.spcDirAddress) {
       continue;
     }

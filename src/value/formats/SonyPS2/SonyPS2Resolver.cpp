@@ -290,9 +290,9 @@ SequenceRuntime prepareSonyPs2Sequence(SequencePreparationContext& context) {
   std::vector<ProgramRuntimeInfo> programs;
   u32 bankNumber = 0;
   for (const auto& bank : context.banks<SoundBankData>(kFormatName)) {
-    for (auto program : bank.data.runtimePrograms) {
-      program.bank = static_cast<u8>(std::min<u32>(bankNumber, 255));
+    for (const auto& program : bank.data.runtimePrograms) {
       programs.push_back(program);
+      programs.back().bank = static_cast<u8>(std::min<u32>(bankNumber, 255));
     }
     ++bankNumber;
   }

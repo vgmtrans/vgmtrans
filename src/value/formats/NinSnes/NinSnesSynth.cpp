@@ -99,10 +99,7 @@ struct InstrumentRegion {
     return false;
   }
   const auto directory = readSnesSampleDirectoryEntry(reader, directoryAddress + info.srcn * 4, inspectSample);
-  if (!directory || directory->startAddress > directory->loopAddress || !directory->loopAddressIsBlockAligned()) {
-    return false;
-  }
-  if (inspectSample && !directory->stream) {
+  if (!directory || !directory->loopAddressIsBlockAligned()) {
     return false;
   }
   return true;

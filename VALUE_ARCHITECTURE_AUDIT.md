@@ -1,15 +1,15 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Thirty-one validated batches remove 1,076 net production lines
+`cb9e0b766`. Thirty-two validated batches remove 1,089 net production lines
 from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 30 exactly;
-72 expanded raw inventories match, and one differs only by pre-existing concurrent
-sample-pool ID scheduling confirmed in original/30/31 repetitions. Raw evidence
-and the narrow comparison are retained below. The cleanup2 records appear at the
-end of this document.
+cover 37 of 38 registered families. All export records match batch 31 exactly;
+71 expanded raw inventories match, and two differ only by pre-existing concurrent
+sample-pool ID scheduling established in earlier original/cleanup repetitions.
+Raw evidence and the narrow comparison are retained below. The cleanup2 records
+appear at the end of this document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
 
@@ -6770,3 +6770,129 @@ writer, assess Sony PS2's copied program/track split data with lifetime proofs,
 and remove redundant SNES predicates only after verifying both inspection modes
 and malformed source/diagnostic order. Keep SequenceVM and source/export ownership
 boundaries; do not add move/view APIs without a meaningful reduction.
+
+
+## Cleanup2 thirty-second batch: write records directly and copy into final owners
+
+This batch removes 13 net production lines across five files, bringing cleanup2
+to 1,089 removed: 984 architecture lines and 105 format lines. The physical diff
+is 15 additions/28 deletions. Cumulatively, production C++/headers are 1,891
+additions/2,980 deletions across 157 paths; architecture is 1,570/2,554 across 88,
+and formats are 321/426 across 69. No fixture changes; tests still gain 559 lines.
+
+- The SF2 writer encodes one SynthModulator directly into its target byte buffer.
+  Remove the private SfModulatorRecord and the optional-return/unpack boundary;
+  the resolved source/destination guard and s16 amount clamp precede all writes.
+  Keep the exact five little-endian record fields, including zero amount-source
+  and linear transform. Invalid SynthSource values retain the existing default-
+  controller fallback; this introduces no new input-validation or numeric policy.
+  Remove ten lines. Keep the DLS connection representation that multiple stages
+  genuinely inspect and modify, and keep the neutral SynthModulator model.
+- SNES format validation relies on the directory reader's inspected-success
+  guarantee. Remove Hudson/Suzuki's stream-presence checks after inspect=true,
+  Nin's equivalent conditional check, and Nin's separate start>loop comparison
+  already included by loopAddressIsBlockAligned. Remove three lines. Keep the
+  optional stream for inspect=false discovery, all format-specific alignment,
+  Suzuki's sample-start/DIR rule, tuning bounds and unused volume/ADSR/tuning
+  sentinels. This changes no platform helper, source metadata or sample policy.
+- Sony PS2 sequence preparation copies each immutable selected program directly
+  into its final RuntimeConfig vector, then stamps the final element's bank.
+  Remove the temporary owning ProgramRuntimeInfo and its second copy of pitch-
+  bend zones. This is LOC-neutral; the prepared runtime still owns its program
+  table and original scanned tables remain immutable. Keep selected order,
+  foreign-format exclusion, bank clamping and first matching program precedence.
+  Prefer this form over moving a local copy: the destination is now visibly the
+  only new owner, with no additional borrow API or durable layout change.
+
+Validation:
+
+- Complete macOS Release integration finishes all 52 steps without warnings;
+  all 44 CTest suites pass. Freeze matching sources/headers/tests, four archives
+  and shell. Shell SHA256 is
+  e5e2bb8fbdfde480bab84309c398e707251082eee914c4485844601fb84ef24a.
+- Original corpus against frozen 31 preserves all 252 input/policy records and
+  3,922 artifacts exactly. Expanded archive replay preserves all 894 export
+  records, 858 artifact names/sizes/hashes and 218,240,549 bytes per binary.
+  All 852 successful exports and 42 existing failures remain exact; the five
+  unsupported DSF inventory failures also remain exact. Combined real input
+  coverage is still 37/38 registered families; KonamiTMNT2 remains synthetic-only.
+- Seventy-one expanded raw inventories match. Onimusha 2/053.psf2 (volume 35)
+  and Growlanser II/Hoot Hoot.psf2 (36) only swap concurrent SonyPS1/SonyPS2 pool
+  IDs 0/1 with the coherent selected-pool reference. Both initial pairs and four
+  automatic same-binary repeats, eight records total, match under the existing
+  narrow asset-declaration/member-ID mapping. Every other source/parent/asset/
+  collection value, label/range, status and the two ordered Sony warnings stay
+  exact. All six exports per input match. Preserve raw differences and link prior
+  original/cleanup repetition evidence; no unnecessary new repetition or broader
+  normalization. The difference is the same established scheduling pattern.
+- SF2 preserves 29,700 raw record cases in Release and focused sanitizers:
+  2,136,645 bytes, SHA256
+  3657a680e13874711df7ecb067446d0ae7df1fc84f857cd8805c36862abf0186.
+  Include all seven destinations, Unknown/invalid enums, pressure/default/invalid
+  source fallback, s32/s16 extremes, empty/three-byte prefixes, five capacities
+  and injected allocation requests 0..4. Independent field/LE/routing assertions
+  pass; all 4,725 actual bad_alloc cases preserve partial bytes/capacity/failure.
+  Allocation traces stay identical at 18,270 successful requests/193,725 bytes
+  per runner; no heap or throughput improvement claim.
+- SF2 public proof preserves 3,768 artifact captures: 17,023,170 bytes, SHA256
+  a837e6bc76a760d3a5eff15e3842caef714e9651f0b9745e1f4c4fc37e58ed4e.
+  Cover 24 complete SynthExport fixture captures, 672 loop/alias cases and 3,072
+  instrument/region modulation cases across all four rounding modes. The complete
+  Modulation suite also passes; its internal checks are not additional captures.
+  Native/simulated policies, gain/depth/controller choices and zero/subnormal/
+  huge/nonfinite rates retain artifacts and ordered diagnostics. No floating-point
+  flag equality or correction of the known zero-Hz policy is claimed. Actual
+  Debug/Release/RelWithDebInfo production Werror checks pass after application.
+  The writer/probes/two full suites are sanitizer-instrumented; other frozen
+  core/fmt units remain Release with matching libc++ annotation settings.
+- SNES comparison refreshes against matching frozen 31: 69,060 cases and 8,405,042
+  exact bytes. Three full Hudson/Nin/Suzuki suites and 182 captured native
+  performance/MIDI renders pass. Cover 66,240 direct Nin header cases across both
+  inspection modes/23 profiles, plus 1,380 synth cases with sparse invalid and
+  later valid rows. Direct Nin coverage includes 7,728 admitted uninspected rows
+  without a stream and 2,806 inspected rows with guaranteed streams. Ordered
+  diagnostics, annotation/field/link/ID/range data, bank/sample values and decoded
+  PCM stay exact. Six paired configured Release/Werror checks and focused
+  ASan/UBSan/float-cast-overflow checks pass; no platform contract change.
+- Sony compares 1,920 cases and the complete SonyPS2 fixture in before/move-local/
+  direct-final-owner forms under Release and focused sanitizers. Six traces match
+  67,632,968 bytes, SHA256
+  ecf3ce69e826d4b3a4278688f7f1722a3c95c1d064babb5e0095c3d5cb1db05b.
+  Cover 0/1/2/4/16/128/256/257 banks, 0/1/4/16 programs, 0/1/2/4/16 zones,
+  reversal, duplicates, empty/overlapping zones, missing/wrong retained data and
+  foreign-format banks. Full config/source tables and ordered diagnostics match;
+  native IR capture covers headers/order and selected payloads plus exact MIDI,
+  not a serialization of every hypothetical event field.
+- Sony destroys source tables, snapshots, contexts and MIDI input bytes before
+  inspecting returned owned RuntimeConfig, then destroys runtime/program before
+  observing durable performance/MIDI. Preparation allocations drop
+  461,328->238,224 requests and 60,781,376->53,084,288 requested bytes; 336 cases
+  improve, none grow, and both candidate forms have the same counts. Maximum
+  saving is 4,112 requests/394,752 bytes. ProgramRuntimeInfo stays 48 bytes and
+  RuntimeConfig 24. This is scoped preparation allocation accounting, not peak
+  RSS or arbitrary allocator-failure timing equivalence. Three configured Release
+  Werror checks pass. Resolver, Sony sequence, runner and full fixture are
+  instrumented; other matching frozen-31 archives remain Release.
+
+Rejected validator reduction: remove the three explicit invalid-annotation-ID
+clauses because SourceMap::find cannot index invalid IDs. A temporary comparison
+passes four full Session/Registry/SourceMap/SynthBuilder suites and 16,496 malformed
+cases in Release and focused sanitizers: 95,930,807 exact bytes, SHA256
+fa419a7700d1be14957b79928bb54605df824f4827a574268e413e56373511e3.
+Six actual three-configuration Werror checks pass. Nonetheless it saves only one
+line and routes invalid references through every immutable Part lookup, losing
+immediate rejection. Scan validation reads result.sourceMap; it does not implicitly
+join existing source maps. A snapshot's multi-part map can still be copied into a
+public result with an invalid diagnostic annotation. Prior measured query-gate
+regressions establish the index-traversal concern, but no new validator timing
+claim is made. Keep current predicates and no additional find fast-path/API.
+
+Evidence: sony-runtime-owner31, redundant-snes-checks32, reference-resolution32,
+pass32-baseline, comparison-pass32.json and volume-coverage27/pass31-vs-pass32
+summary/report/classification files under /tmp/vgmtrans-cleanup2. SF2 private/public
+and exact application evidence stays in /tmp/vgmtrans-sf2-modulator-write31.
+
+Next: independently prove a Sony track's immutable zone view across program
+switches, held notes and VM passes before any application. Separately measure a
+fixed-domain SRCN set against the current ordered vector normalization, including
+sparse workloads, template code size and public range/consumption boundaries.

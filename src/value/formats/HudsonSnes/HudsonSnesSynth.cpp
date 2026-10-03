@@ -59,7 +59,7 @@ struct Patch {
   for (const InstrumentRow& row : recipes.instruments) {
     const u32 tuning = layout.tuningTableAddress + row.srcn * 4u;
     const auto directory = readSnesSampleDirectoryEntry(reader, layout.spcDirAddress + row.srcn * 4u, true);
-    if (!reader.has(tuning, 4) || !directory || !directory->stream || !directory->loopAddressIsBlockAligned()) {
+    if (!reader.has(tuning, 4) || !directory || !directory->loopAddressIsBlockAligned()) {
       continue;
     }
     patches.push_back(Patch{
