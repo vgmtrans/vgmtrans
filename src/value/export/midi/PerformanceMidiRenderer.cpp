@@ -247,6 +247,7 @@ class PitchBendLayers {
 
 using detail::MidiNoteBoundary;
 using detail::MidiInstrumentEvent;
+using detail::MidiPortamentoEvent;
 using detail::MidiTrackEvent;
 using MidiTimeline = std::vector<const MidiTrackEvent*>;
 
@@ -1135,7 +1136,7 @@ private:
           } else if constexpr (std::is_same_v<TypedEvent, PitchBendRangePerformanceEvent>) {
             pitchBendContext.setSourceRangeCents(typedEvent.cents);
             pitchRequested = true;
-          } else if constexpr (std::is_same_v<TypedEvent, PortamentoPerformanceEvent>) {
+          } else if constexpr (std::is_same_v<TypedEvent, MidiPortamentoEvent>) {
             if (typedEvent.timeMilliseconds) {
               midi::appendController14(track, typedEvent.header.tick, channel, MidiController::PortamentoTime,
                                        data14(*typedEvent.timeMilliseconds), true);

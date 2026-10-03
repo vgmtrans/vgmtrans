@@ -133,10 +133,9 @@ void sourceMapBuilderRecordsAnnotationsFieldsAndLinks() {
          "source map should preserve field display hints");
   expect(headerAnnotation.fieldsAsChildren && !sourceMap.get(command.id()).fieldsAsChildren,
          "field child projection should be explicit and disabled by default");
-  expect(headerAnnotation.links.size() == 1 && headerAnnotation.links[0].role == SourceLinkRole::PointsTo,
-         "source map should preserve structured links");
-  expect(sourceMap.linksTo(SourceTarget{tableRange}) == std::vector<SourceAnnotationId>{header.id()},
-         "source map should find annotations linking to a target range");
+  expect(headerAnnotation.links.size() == 1 && headerAnnotation.links[0].role == SourceLinkRole::PointsTo &&
+             headerAnnotation.links[0].target == SourceTarget{tableRange},
+         "source map should preserve structured links and their exact targets");
 
   expect(sourceMap.get(table.id()).parent == header.id(), "source map should preserve source containment");
   expect(sourceMap.get(command.id()).sequenceSemantic == SequenceSemantic::Pitch,
@@ -149,17 +148,6 @@ void sourceMapBuilderRecordsAnnotationsFieldsAndLinks() {
          "command annotation should own decoded operand fields for inspectors and HexView");
 
   expect(sourceMap.annotationsForSource(source).size() == 3, "source map should index annotations by source");
-  expect(sourceMap.at(source, 10) == std::vector<SourceAnnotationId>{table.id(), command.id()},
-         "source map should find annotations at a byte offset");
-  expect(sourceMap.intersecting(SourceRange{.source = source, .offset = 10, .size = 1}) ==
-             std::vector<SourceAnnotationId>{table.id(), command.id()},
-         "HexView-style range lookup should return the same annotations that own decoded fields");
-  expect(sourceMap.intersecting(SourceRange{.source = source, .offset = 9, .size = 1}) ==
-             std::vector<SourceAnnotationId>{table.id()},
-         "source map should find intersecting annotations");
-  expect(sourceMap.containing(SourceRange{.source = source, .offset = 10, .size = 2}) ==
-             std::vector<SourceAnnotationId>{table.id(), command.id()},
-         "source map should find annotations containing a range");
   expect(sourceMap.withRole(source, SourceRole::Header) == std::vector<SourceAnnotationId>{header.id()},
          "source map should filter annotations by source role");
   expect(

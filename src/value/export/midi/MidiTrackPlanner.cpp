@@ -28,6 +28,7 @@ namespace {
 
 using detail::MidiNoteBoundary;
 using detail::MidiInstrumentEvent;
+using detail::MidiPortamentoEvent;
 using detail::MidiTrackEvent;
 
 // Private planning state. Source properties remain borrowed; key, gate and
@@ -642,7 +643,7 @@ void lowerPortamento(std::vector<Diagnostic>& diagnostics, std::vector<MidiTrack
       });
     }
 
-    events.emplace_back(PortamentoPerformanceEvent{
+    events.emplace_back(MidiPortamentoEvent{
         .header = atTick(automation->header, startTick, nextSequence),
         .timeMilliseconds = transition.portamentoRendering.useCurrentTiming
                                 ? std::nullopt
@@ -650,7 +651,7 @@ void lowerPortamento(std::vector<Diagnostic>& diagnostics, std::vector<MidiTrack
         .previousKey = transition.startKey,
     });
     if (transition.portamentoRendering.restoreTimeMilliseconds) {
-      events.emplace_back(PortamentoPerformanceEvent{
+      events.emplace_back(MidiPortamentoEvent{
           .header = atTick(automation->header, note->endTick, nextSequence),
           .timeMilliseconds = *transition.portamentoRendering.restoreTimeMilliseconds,
       });
@@ -700,11 +701,10 @@ std::vector<NoteDraft*> appendSourceEvents(
         // These commands have already been applied by preparation or global timing.
       } else if constexpr (std::is_same_v<Event, PitchTransitionSettingsPerformanceEvent>) {
         if (renderPortamentoSettings) {
-          events.emplace_back(PortamentoPerformanceEvent{
+          events.emplace_back(MidiPortamentoEvent{
               .header = source.header, .timeMilliseconds = source.timeMilliseconds});
         }
-      } else if constexpr (std::is_same_v<Event, PortamentoPerformanceEvent> ||
-                           std::is_same_v<Event, PortamentoEnablePerformanceEvent>) {
+      } else if constexpr (std::is_same_v<Event, PortamentoEnablePerformanceEvent>) {
         if (renderPortamentoSettings) {
           events.emplace_back(source);
         }

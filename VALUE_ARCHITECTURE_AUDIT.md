@@ -1,7 +1,7 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Nineteen validated batches remove 924 net production lines from
+`cb9e0b766`. Twenty validated batches remove 955 net production lines from
 `src/value`. All 44 CTest suites pass; the latest real-file replay preserves
 all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
 records appear at the end of this document.
@@ -5357,3 +5357,72 @@ state into the MIDI planner. Keep actual source portamento enable, physical pitc
 settings and musical slide intent in the neutral performance model. Continue
 probing ownership and dead state without reducing distinct runtime responsibilities
 merely because their fields look similar.
+
+
+## Cleanup2 twentieth batch: keep MIDI controls private and queries purposeful
+
+This batch removes 31 net production lines across seven files, bringing cleanup2
+to 955 removed. Six existing fixtures lose 19 mirrored/obsolete-query lines;
+cumulative tests still gain 420 lines against the branch baseline.
+
+- Remove four unused public SourceMap queries: intersecting(), containing(), at()
+  and linksTo(). No production callers, chained uses or member-function pointers
+  use them. The fixture checks the stored link's exact role/target directly.
+  SourceRange predicates, SourceInspection.itemAt() and the actually used source,
+  asset, hierarchy, role and semantic indexes remain. No generic query framework
+  replaces the removed convenience surface.
+- Remove PortamentoPerformanceEvent from the target-neutral PerformanceEvent
+  variant. All three producers are in MIDI lowering; source formats emit physical
+  pitch settings and PitchTransitionIntent instead. Place the unchanged flat
+  representation in detail::MidiPortamentoEvent next to the other planner events.
+  Remove the impossible source passthrough branch. Keep the live source
+  PortamentoEnablePerformanceEvent used by SonyPS2 and other consumers.
+- PerformanceAutomationBinding::clear() invalidates only its owner. That already
+  defines absence, and every operation gates index access on that owner. Remove
+  the redundant private index reset; copies and subsequent assignment retain
+  their ordinary value semantics. No new sentinel or optional is introduced.
+
+Validation:
+
+- The full 354-step macOS Release build is warning-free and all 44 CTest suites
+  pass. Freeze the complete matching headers, tests, core/formats/fmt and shell,
+  because deleting a variant alternative changes neutral tags even though sizes
+  do not change. The twentieth shell preserves all 252 input/policy comparisons
+  and 3,922 artifact hashes, inventories, diagnostics and exit statuses against 19.
+- SourceMap's complete fixture passes with its changed implementation and fixture
+  under ASan/UBSan/float-cast-overflow against frozen 19. The changed model is
+  Werror-clean; existing shared test-helper unused warnings are suppressed for
+  that fixture. Final files byte-match the tested overlay. Retained graph storage,
+  indexing, fields, links and ownership behavior do not change.
+- For portamento, rebuild all 44 candidate value-core units and both probes/full
+  MIDI renderer and pitch fixtures under focused sanitizers, paired with a fully
+  matching baseline. Preserve 75,043 captures/144,890,623 MIDI, structured-event and
+  diagnostic trace bytes: 74,912 generated renders plus 131 fixture renders.
+  Another 7,776 targeted cases preserve 6,001,440 bytes of neutral source notes,
+  settings, enables, tempos and slide intent, native planned controls/attacks and
+  MIDI. Eight directly touched implementation/test units pass strict warning-free
+  syntax checks. There are no production neutral variant-index consumers.
+- PerformanceEvent has 22 alternatives instead of 23. PerformanceEvent and the
+  private MidiTrackEvent both remain 352 bytes; no layout-size saving is claimed.
+  Four format fixtures still check their meaningful source slide intent and
+  exported behavior; the positive MIDI planner assertion now names its private
+  type. The type system itself excludes flat MIDI controls from source events.
+- Clear-invalidation preserves 11,520 cases/123,264 lines/2,856,866 bytes, including
+  binding indexes zero/one/three/eight, inherited output associations, foreign
+  tracks, scheduling methods and tick extremes. Another 128 lifecycle cases
+  preserve 832 lines/9,970 bytes across repeated clear, interruption, emptied
+  automation storage and every pitch-binding option after the old track is
+  destroyed. Both probes and the changed emitter unit pass focused sanitizers;
+  unchanged core/fmt archive boundaries remain Release.
+
+Retain actual musical compatibility contracts: source portamento enable, physical
+pitch settings, channel pan, global transpose, legato, mono defaults and time
+signatures all have format authors. Retain diagnostic annotation presence: an
+explicit invalid reference is diagnosed, while absence requests no lookup. Keep
+AssetPrivateData's standard erased immutable owner rather than replacing it with
+manual RTTI/tag synchronization solely for a smaller representation.
+
+Next: eliminate the second VM playback-track count, assess direct MIDI track
+serialization into its final buffer, and test whether source inspection can own
+its complete annotation/field child projection. These should remove duplicate
+responsibilities without adding a framework or hiding format behavior.

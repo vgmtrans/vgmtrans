@@ -36,6 +36,15 @@ struct MidiNoteBoundary {
   bool expired = false;
 };
 
+// Completed native portamento controls, chosen from source pitch intent.
+struct MidiPortamentoEvent {
+  PerformanceEventHeader header;
+  // Absent time retains the currently configured glide rate.
+  std::optional<double> timeMilliseconds;
+  // A source key triggers a glide from that pitch; absent only sets its time.
+  std::optional<double> previousKey;
+};
+
 struct MidiInstrumentEvent {
   PerformanceEventHeader header;
   ResolvedInstrument selection;
@@ -49,7 +58,7 @@ using MidiTrackEvent = std::variant<
     MidiNoteBoundary, MidiInstrumentEvent, LevelPerformanceEvent, ExpressionPerformanceEvent,
     PanPerformanceEvent, ChannelPanPerformanceEvent,
     StereoBalancePerformanceEvent, MasterLevelPerformanceEvent, ReverbPerformanceEvent, MonoModePerformanceEvent,
-    TuningPerformanceEvent, PortamentoPerformanceEvent, PortamentoEnablePerformanceEvent, PitchBendPerformanceEvent,
+    TuningPerformanceEvent, MidiPortamentoEvent, PortamentoEnablePerformanceEvent, PitchBendPerformanceEvent,
     PitchBendRangePerformanceEvent,
     LegatoPedalPerformanceEvent, ModulationPerformanceEvent, MarkerPerformanceEvent>;
 

@@ -255,18 +255,6 @@ struct LfoDelay {
   LfoDelayUpdateMode updateMode = LfoDelayUpdateMode::CurrentAndFutureNotes;
 };
 
-struct PortamentoPerformanceEvent {
-  PerformanceEventHeader header;
-  // Flat lowering state. Formats describe glides through PitchTransitionIntent
-  // and PitchTransitionSettingsPerformanceEvent. Absent time retains the
-  // currently configured glide rate.
-  std::optional<double> timeMilliseconds;
-  // A missing source key configures the glide time without triggering a
-  // transition. A present key also identifies the pitch the next note should
-  // glide from.
-  std::optional<double> previousKey;
-};
-
 struct PortamentoEnablePerformanceEvent {
   PerformanceEventHeader header;
   bool enabled = false;
@@ -427,7 +415,7 @@ using PerformanceEvent =
                  EnvelopePerformanceEvent, LevelPerformanceEvent, ExpressionPerformanceEvent, PanPerformanceEvent,
                  ChannelPanPerformanceEvent, StereoBalancePerformanceEvent, MasterLevelPerformanceEvent,
                  ReverbPerformanceEvent, MonoModePerformanceEvent, TuningPerformanceEvent,
-                 GlobalTransposePerformanceEvent, PortamentoPerformanceEvent, PortamentoEnablePerformanceEvent,
+                 GlobalTransposePerformanceEvent, PortamentoEnablePerformanceEvent,
                  PitchBendPerformanceEvent, PitchBendRangePerformanceEvent, PitchTransitionSettingsPerformanceEvent,
                  LegatoPedalPerformanceEvent, ModulationPerformanceEvent, MarkerPerformanceEvent>;
 

@@ -1528,8 +1528,7 @@ void capcomSnesSequenceEmitsStructuredPitchSlides() {
          "a repeated CapcomSnes target should extend the active glide without creating a snap transition");
   expect(std::ranges::none_of(performance.tracks[0].events,
                               [](const PerformanceEvent& event) {
-                                return std::holds_alternative<PortamentoPerformanceEvent>(event) ||
-                                       std::holds_alternative<PitchBendPerformanceEvent>(event);
+                                return std::holds_alternative<PitchBendPerformanceEvent>(event);
                               }),
          "CapcomSnes format code should leave MIDI slide representation to export");
 

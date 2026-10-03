@@ -232,16 +232,12 @@ public:
   [[nodiscard]] const SourceAnnotation& get(SourceAnnotationId id) const;
 
   [[nodiscard]] std::vector<SourceAnnotationId> annotationsForSource(SourceId source) const;
-  [[nodiscard]] std::vector<SourceAnnotationId> intersecting(SourceRange range) const;
-  [[nodiscard]] std::vector<SourceAnnotationId> containing(SourceRange range) const;
-  [[nodiscard]] std::vector<SourceAnnotationId> at(SourceId source, u64 offset) const;
   [[nodiscard]] std::vector<SourceAnnotationId> ownedBy(ObjectRef object) const;
   [[nodiscard]] std::optional<AssetId> assetOwner(SourceAnnotationId id) const;
   [[nodiscard]] std::vector<SourceAnnotationId> annotationsForAsset(AssetId asset) const;
   [[nodiscard]] std::vector<SourceAnnotationId> childrenOf(SourceAnnotationId parent) const;
   [[nodiscard]] std::vector<SourceAnnotationId> withRole(SourceId source, SourceRole role) const;
   [[nodiscard]] std::vector<SourceAnnotationId> withSequenceSemantic(SourceId source, SequenceSemantic semantic) const;
-  [[nodiscard]] std::vector<SourceAnnotationId> linksTo(const SourceTarget& target) const;
 
 private:
   friend class SessionState;

@@ -219,10 +219,7 @@ public:
   PerformanceAutomationBinding() = default;
 
   [[nodiscard]] bool valid() const noexcept { return owner_ != nullptr; }
-  void clear() noexcept {
-    owner_ = nullptr;
-    automation_ = 0;
-  }
+  void clear() noexcept { owner_ = nullptr; }
   [[nodiscard]] PerformanceEmitter output(const PerformanceEmitter& out) const;
   [[nodiscard]] PerformanceEmitter at(const PerformanceEmitter& out, u64 tick) const {
     return output(out.at(tick));

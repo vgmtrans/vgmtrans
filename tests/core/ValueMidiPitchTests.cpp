@@ -612,7 +612,7 @@ void sourceKeyChangeUsesRealizedPitchWithPortamento() {
   const auto lowered = detail::planMidiTrack(prepared, 0, {},
                                                      PerformanceTempoMap{prepared.performance()}, diagnostics);
   expect(std::ranges::any_of(lowered, [](const auto& event) {
-           const auto* glide = std::get_if<PortamentoPerformanceEvent>(&event);
+           const auto* glide = std::get_if<detail::MidiPortamentoEvent>(&event);
            return glide && glide->header.tick == 4 && glide->previousKey == 62.0;
          }),
          "an implicit key change must start portamento from the interrupted glide's realized pitch");

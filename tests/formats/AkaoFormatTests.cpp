@@ -859,8 +859,7 @@ void akaoPortamentoRetainsPitchTransitionIntent() {
          "Akao portamento should retain its note anchor, keys, new attack, and tick-relative duration");
   expect(std::ranges::none_of(performance.tracks[0].events,
                               [](const PerformanceEvent& event) {
-                                return std::holds_alternative<PortamentoPerformanceEvent>(event) ||
-                                       std::holds_alternative<PortamentoEnablePerformanceEvent>(event);
+                                return std::holds_alternative<PortamentoEnablePerformanceEvent>(event);
                               }),
          "Akao format code should not preselect a MIDI portamento representation");
 

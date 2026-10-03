@@ -164,22 +164,6 @@ std::vector<SourceAnnotationId> SourceMap::annotationsForSource(SourceId source)
   return idsFromIndex(storage_->parts, &Part::annotationsBySource, source);
 }
 
-std::vector<SourceAnnotationId> SourceMap::intersecting(SourceRange range) const {
-  return idsFromAnnotations(annotations(),
-                            [&](const SourceAnnotation& annotation) { return annotation.range.intersects(range); });
-}
-
-std::vector<SourceAnnotationId> SourceMap::containing(SourceRange range) const {
-  return idsFromAnnotations(annotations(),
-                            [&](const SourceAnnotation& annotation) { return annotation.range.contains(range); });
-}
-
-std::vector<SourceAnnotationId> SourceMap::at(SourceId source, u64 offset) const {
-  return idsFromAnnotations(annotations(), [&](const SourceAnnotation& annotation) {
-    return annotation.range.containsOffset(source, offset);
-  });
-}
-
 std::vector<SourceAnnotationId> SourceMap::ownedBy(ObjectRef object) const {
   return idsFromAnnotations(annotations(), [&](const SourceAnnotation& annotation) {
     return annotation.owner && *annotation.owner == object;
@@ -220,12 +204,6 @@ std::vector<SourceAnnotationId> SourceMap::withRole(SourceId source, SourceRole 
 std::vector<SourceAnnotationId> SourceMap::withSequenceSemantic(SourceId source, SequenceSemantic semantic) const {
   return idsFromAnnotations(annotations(), [&](const SourceAnnotation& annotation) {
     return annotation.range.source == source && annotation.sequenceSemantic == semantic;
-  });
-}
-
-std::vector<SourceAnnotationId> SourceMap::linksTo(const SourceTarget& target) const {
-  return idsFromAnnotations(annotations(), [&](const SourceAnnotation& annotation) {
-    return std::ranges::any_of(annotation.links, [&](const SourceLink& link) { return link.target == target; });
   });
 }
 
