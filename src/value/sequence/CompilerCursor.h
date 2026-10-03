@@ -75,7 +75,7 @@ using CommandResult = std::invoke_result_t<
     const Callable&, Playback&, const decltype(storedCommandValue(std::declval<Arguments>()))&...>;
 
 template <class Playback, class Callable, class... Arguments>
-[[nodiscard]] CommandBody makeCommandBody(Callable callable, Arguments... arguments) {
+[[nodiscard]] auto makeCommandBody(Callable callable, Arguments... arguments) {
   using Result = CommandResult<Playback, Callable, Arguments...>;
   static_assert(std::is_copy_constructible_v<Callable>, "Compiled sequence command callables must be copyable");
   static_assert(std::is_same_v<Result, void> || std::is_same_v<Result, Effects>,
@@ -437,7 +437,7 @@ public:
           presentation_.playback == CommandPlaybackStatus::NoOp) {
         presentation_.playback = CommandPlaybackStatus::AffectsPlayback;
       }
-      CommandBody next = detail::makeCommandBody<Playback>(std::move(callable), std::move(arguments)...);
+      auto next = detail::makeCommandBody<Playback>(std::move(callable), std::move(arguments)...);
       if (!execution_.body) {
         execution_.body = std::move(next);
         return *this;

@@ -151,10 +151,10 @@ Artifact exportStandaloneSequenceMidi(const SessionSnapshot& snapshot, AssetId s
     };
   }
 
-  const auto rendering = renderSequence(*sequence, request);
+  auto rendering = renderSequence(*sequence, request);
   std::optional<MidiSequence> midi;
   if (rendering.performance) {
-    const auto prepared = preparePerformance(*rendering.performance);
+    const auto prepared = preparePerformance(std::move(*rendering.performance));
     midi = renderMidiSequence(prepared, request.midi,
                               ModulationConversionPolicy::SequenceEventSimulation, &rendering.modulation);
   }

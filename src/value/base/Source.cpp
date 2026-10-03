@@ -122,10 +122,7 @@ ByteReader RetainedSource::reader() const noexcept {
 }
 
 bool ByteReader::has(u64 offset, u64 size) const noexcept {
-  if (offset > bytes_.size()) {
-    return false;
-  }
-  return size <= bytes_.size() - offset;
+  return offset <= bytes_.size() && size <= bytes_.size() - offset;
 }
 
 SourceRange ByteReader::range(u64 offset, u64 size) const noexcept {

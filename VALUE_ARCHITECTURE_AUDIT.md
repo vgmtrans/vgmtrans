@@ -1,7 +1,7 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Eighteen validated batches remove 917 net production lines from
+`cb9e0b766`. Nineteen validated batches remove 924 net production lines from
 `src/value`. All 44 CTest suites pass; the latest real-file replay preserves
 all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
 records appear at the end of this document.
@@ -5253,3 +5253,107 @@ Next: evaluate delaying cursor operation type erasure until the durable command-
 boundary, remove dead arrival writes after a stream has no command, and make the
 shared byte-reader bounds predicate as direct as its other bounds checks. These
 candidates preserve the existing authoring DSL and execution/storage models.
+
+
+## Cleanup2 nineteenth batch: borrow callback inputs and erase commands once
+
+This batch removes seven net production lines across six files, bringing cleanup2
+to 924 removed. The existing SSF extraction fixture gains three net lines checking
+that returned metadata survives the callback input; cumulative tests gain 439 lines.
+
+- ExtractionInput borrows SourceFile metadata for its synchronous callback, as it
+  already borrows the reader and sibling SourceStore. Each extracted output still
+  owns its metadata. Session's local resolved SourceFile stays owning: adding
+  children can reallocate the store's entries before later children or exception
+  handling use that original metadata. ScanInput stays owning because a scan
+  builder can survive its caller's temporary input. Correct the draft comment to
+  describe builder-owned pending assets. ExtractionInput shrinks 280 to 40 bytes.
+- Standalone MIDI export transfers its locally rendered PerformanceSequence into
+  preparation. It uses only the independent modulation profile and diagnostics
+  afterward. Collection preparation retains its source-performance copy because
+  playback and inspection expose it. No new owner or preparation wrapper is added.
+- Cursor operation construction returns its owned concrete lambda. Append composes
+  that lambda and erases only the final durable command body, avoiding an erased
+  std::function captured inside another erased std::function. The DSL, ownership,
+  execution semantics and stored Event/CommandBody sizes remain unchanged.
+- Remove five VM arrival writes immediately after clearing its command. Arrival
+  is read only for a present command. Every section or synchronized restart
+  establishes arrival itself; valid control-flow and fallthrough updates remain.
+- ByteReader::has directly short-circuits its two bounds conditions, preserving
+  subtraction safety and every accepted offset/length.
+
+Validation:
+
+- The complete 310-step macOS Release build is warning-free; all 44 CTest suites
+  pass. Freeze matching headers, tests, core/formats/fmt archives and shell. The
+  nineteenth shell preserves all 252 input/policy comparisons and 3,922 artifact
+  hashes, inventories, diagnostics and exit statuses against 18.
+- Extraction preserves 6,000 SPC cases/554,073 bytes and 9,984 PSF cases/456,931
+  bytes, including outputs inspected after their source/input scope expires.
+  Complete registry, session, source-map, SegSat, TriAce, MP2k, CUE, SonyPS2 and
+  SquarePS2 fixtures pass with Session and all six extractor implementation units
+  rebuilt consistently under ASan/UBSan/float-cast-overflow; eight configured units
+  pass Werror syntax checks. Input construction allocates zero for short metadata
+  before and after; long metadata falls from five allocations/560 requested bytes
+  to zero, and 40 attributes/24 segments from 222 allocations/21,808 bytes to zero.
+- Standalone MIDI preserves 13,954 complete artifact captures/73,829,902 bytes in
+  Release and focused sanitizers, covering 864 option combinations across eight
+  source patterns, unavailable or wrong-type assets, factory/executor/finalizer
+  errors, empty sequences/tracks, repeated exports and copied snapshots. Complete
+  session/collection-export fixtures pass. Every 16 allocation case improves: an
+  80,000-note/80,000-long-marker case avoids 160,013 allocations/75,531,024 requested
+  bytes; numeric notes with source spans avoid 30,730,208 requested bytes.
+- Real standalone export also preserves all 856 sequence assets in the 126-input
+  inventory from snapshots after their Sessions and SourceStores were destroyed:
+  16,218,005 captured bytes with SHA256
+  1c048b2428f933094d9677d3ec183405df8c62c14377590401a6f155f62e0725.
+  Every case reduces allocations; this inventory avoids 9,897 allocations and
+  533,822,224 requested bytes in total. Its largest SculptSoftSnes song has 98,340
+  events/243,636 source spans and avoids 42,446,784 requested bytes. The candidate
+  export unit and real-input probe also pass focused sanitizers; unchanged archives
+  remain Release. These are cumulative allocation requests, not peak-RSS claims.
+- Combined cursor/VM fixtures pass focused sanitizers. VM traces preserve 171,938
+  cases/206,284,725 bytes including synchronization, sections, nested calls/repeats
+  and zero command budgets. Cursor traces preserve 175,616 cases/36,193,594 bytes;
+  363 additional ownership/copy/execution-exception cases preserve 2,699,232 bytes,
+  including expired decoded inputs, long strings/embedded NULs, stateful copies,
+  waits and preceding side effects. All 84 construction/copy allocation cases
+  improve or stay equal: 3,006 allocations/1,251,936 requested bytes become
+  1,980 allocations/1,191,744 bytes. CommandBody remains 48 bytes and Event 224.
+- ByteReader preserves 48,114 slice/bounds cases plus fixed-width read outcomes,
+  80,179 lines and 4,817,370 bytes, with its implementation/probe instrumented:
+  source sizes through 1,024, valid/invalid IDs and offset/length extremes through
+  u64 max. All fixed-width read exception strings match.
+
+Cursor construction-failure boundary:
+
+Delaying erasure changes intermediate copy/move and allocation stages. Successful
+execution and execution exceptions are exact; arbitrary reuse of a command after
+append construction fails is not an equivalence claim. Neither implementation
+provides general append rollback: the former final boxing can already discard
+its previous body on allocation failure. Production decoders do not catch failed
+append and reuse the incomplete Event; scanning discards that failed decode.
+Ordinary captured native values have nonthrowing moves.
+
+A 1,512-case instrumented throwing-copy/move probe records 880 both-success cases
+with equal recovered execution, 168 shared copy failures and 320 shared move
+failures with equal reuse; 32 shared move failures retain fewer earlier operations
+in the candidate, and 112 fail only at its additional move stages. First/composed
+handler moves change 4 to 5/6; owned-argument moves 7 to 8/9; copy count stays one.
+A separate 208-case native allocation-failure probe records 180 both-success,
+13 shared failures with equal reuse, six shared failures with fewer retained earlier
+operations, and nine failures only in the former extra allocations; no candidate-
+only native allocation failures occur. Keep the simpler final-erasure boundary
+without introducing conditional erasure or a rollback protocol, and retain this
+explicit limitation rather than claiming all construction side effects are equal.
+
+Retain bulk decoded-field copying: real inputs have no non-opcode value strings
+beyond short-string storage, while per-field movement adds vector growth and a new
+private authoring protocol. Retain the intentional PreparationFailure channel;
+throwing arbitrary Diagnostic values would widen callback failure semantics.
+
+Next: remove unused SourceMap convenience queries and move flattened portamento
+state into the MIDI planner. Keep actual source portamento enable, physical pitch
+settings and musical slide intent in the neutral performance model. Continue
+probing ownership and dead state without reducing distinct runtime responsibilities
+merely because their fields look similar.

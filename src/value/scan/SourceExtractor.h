@@ -14,8 +14,9 @@
 
 namespace vgmtrans::core {
 
+// A borrowed view for the extraction callback; outputs own their metadata.
 struct ExtractionInput {
-  SourceFile source;
+  const SourceFile& source;
   ByteReader reader;
   // Read-only access to sibling archive members during extraction.
   const SourceStore& sources;

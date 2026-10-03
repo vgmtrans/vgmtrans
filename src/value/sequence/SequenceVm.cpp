@@ -548,7 +548,6 @@ private:
         outputAt(channel, tick_, endCommand).marker("Loop End");
       }
       position_.command = std::nullopt;
-      arrivedByControlFlow_ = false;
       return;
     }
 
@@ -572,7 +571,6 @@ private:
 
     loopStopTick_ = tick_;
     position_.command = std::nullopt;
-    arrivedByControlFlow_ = false;
   }
 
   void applyTransition(CommandId commandId, const SourceCommand& command, const CommandTransition& transition) {
@@ -589,7 +587,6 @@ private:
       case CommandTransitionKind::End:
       case CommandTransitionKind::EndSection:
         position_.command = std::nullopt;
-        arrivedByControlFlow_ = false;
         break;
 
       case CommandTransitionKind::Jump:
@@ -603,7 +600,6 @@ private:
           warn(fmt::format("Sequence call continuation ${:04X} was not decoded", command.flow.continuation.value),
                command.range);
           position_.command = std::nullopt;
-          arrivedByControlFlow_ = false;
           break;
         }
         position_.command = track_.commandIndex(transition.destination);
@@ -618,7 +614,6 @@ private:
         if (callStack_.empty()) {
           warn("Sequence return had no active call", command.range);
           position_.command = std::nullopt;
-          arrivedByControlFlow_ = false;
         } else {
           position_.command = callStack_.back();
           callStack_.pop_back();

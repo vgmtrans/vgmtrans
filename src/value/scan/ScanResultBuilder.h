@@ -25,7 +25,7 @@ class ScanResultBuilder;
 class ScanSoundBankDraft;
 class ScanSamplePoolDraft;
 
-// Drafts are lightweight views into result-owned pending assets. Creating a
+// Drafts are lightweight views into builder-owned pending assets. Creating a
 // draft is the publication decision: ScanResultBuilder::finish() materializes
 // it even when a sound bank or sample pool remains empty.
 class ScanSequenceDraft {
