@@ -420,10 +420,11 @@ PitchBendState resolvePitchBends(PitchBendWrites& writes, PitchBendLayerId heldT
     bends.push_back(transitionPitchBend(automation, held, tick, key - transitionBaseKey, false, establishesHeldPitch));
   };
 
-  if (const auto* sampled = std::get_if<SampledAutomationCurve>(&transition.curve)) {
+  if (transition.samples) {
+    const auto& samples = *transition.samples;
     std::vector<u64> sampleTicks{startTick, endTick};
-    sampleTicks.reserve(sampled->samples.size() + note.segments.size() + 2);
-    for (const AutomationSample& sample : sampled->samples) {
+    sampleTicks.reserve(samples.size() + note.segments.size() + 2);
+    for (const AutomationSample& sample : samples) {
       const u64 tick = addTicks(automation.realization.startTick, sample.tickOffset);
       if (tick >= startTick && tick <= endTick) {
         sampleTicks.push_back(tick);
@@ -601,7 +602,7 @@ void lowerPortamento(std::vector<Diagnostic>& diagnostics, std::vector<MidiTrack
       addWarning(diagnostics, *automation, "Pitch transition did not reference a rendered note");
       continue;
     }
-    if (std::holds_alternative<SampledAutomationCurve>(transition.curve)) {
+    if (transition.samples.has_value()) {
       addWarning(diagnostics, *automation,
                  "Native MIDI portamento cannot preserve the transition's exact sampled pitch curve");
     }

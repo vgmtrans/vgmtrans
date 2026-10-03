@@ -835,11 +835,11 @@ void konamiSnesProportionalPortamentoMatchesDriverCurve() {
   const auto* proportionalIntent = pitchTransitionIntent(proportional.tracks[0].automations.front());
   expect(proportionalIntent != nullptr, "V3 proportional portamento should use shared pitch-transition intent");
   const auto* physicalDuration = std::get_if<FixedDurationPitchSlideTiming>(&proportionalIntent->timing.physical);
-  const auto* sampledCurve = std::get_if<SampledAutomationCurve>(&proportionalIntent->curve);
+  const auto* sampledCurve = proportionalIntent->samples ? &*proportionalIntent->samples : nullptr;
   expect(physicalDuration != nullptr && physicalDuration->milliseconds == 40.0 &&
              proportionalIntent->timing.timelineTicks == 3 && sampledCurve != nullptr &&
-             sampledCurve->samples.size() == 4 && sampledCurve->samples[1].value == 46.56640625 &&
-             sampledCurve->samples[2].value == 46.984375,
+             sampledCurve->size() == 4 && (*sampledCurve)[1].value == 46.56640625 &&
+             (*sampledCurve)[2].value == 46.984375,
          "F0 $9b should preserve the driver's fast, front-loaded integer pitch curve");
 
   const MidiSequence pitchBend =
@@ -1309,7 +1309,7 @@ void konamiSnesCompiledPlaybackHandlesCallsLoopsTiesAndSlides() {
     return pitchTransitionIntent(automation) != nullptr;
   });
   expect(transition != tied.tracks[0].automations.end() &&
-             std::holds_alternative<LinearAutomationCurve>(pitchTransitionIntent(*transition)->curve) &&
+             !pitchTransitionIntent(*transition)->samples &&
              std::ranges::none_of(tied.tracks[0].events,
                                   [](const PerformanceEvent& event) {
                                     return std::holds_alternative<PitchBendPerformanceEvent>(event);

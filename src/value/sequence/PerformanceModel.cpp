@@ -55,10 +55,10 @@ double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elaps
   const u32 duration = transition.timing.timelineTicks;
   const u32 clampedElapsed = std::min(elapsedTicks, duration);
 
-  if (const auto* sampled = std::get_if<SampledAutomationCurve>(&transition.curve);
-      sampled != nullptr && !sampled->samples.empty()) {
-    const auto upper = std::ranges::upper_bound(sampled->samples, clampedElapsed, {}, &AutomationSample::tickOffset);
-    return upper == sampled->samples.begin() ? sampled->samples.front().value : std::prev(upper)->value;
+  if (transition.samples && !transition.samples->empty()) {
+    const auto& samples = *transition.samples;
+    const auto upper = std::ranges::upper_bound(samples, clampedElapsed, {}, &AutomationSample::tickOffset);
+    return upper == samples.begin() ? samples.front().value : std::prev(upper)->value;
   }
 
   if (duration == 0) {

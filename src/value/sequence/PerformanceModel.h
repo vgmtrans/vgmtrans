@@ -465,8 +465,6 @@ struct ScalarPerformanceAutomationIntent {
   u32 delayTicks = 0;
 };
 
-struct LinearAutomationCurve {};
-
 struct AutomationSample {
   // Offset from the automation's realized start tick.
   u32 tickOffset = 0;
@@ -476,12 +474,6 @@ struct AutomationSample {
 
   friend constexpr bool operator==(const AutomationSample&, const AutomationSample&) noexcept = default;
 };
-
-struct SampledAutomationCurve {
-  std::vector<AutomationSample> samples;
-};
-
-using PerformanceAutomationCurve = std::variant<LinearAutomationCurve, SampledAutomationCurve>;
 
 struct TempoRelativePitchSlideTiming {};
 
@@ -539,7 +531,9 @@ struct PitchTransitionIntent {
   double startKey = 0.0;
   double targetKey = 0.0;
   PitchSlideTiming timing;
-  PerformanceAutomationCurve curve = LinearAutomationCurve{};
+  // Missing samples select a linear glide between startKey and targetKey.
+  // A supplied list preserves the source driver's exact pitch staircase.
+  std::optional<std::vector<AutomationSample>> samples;
   // Empty inherits the format default; explicit export policy can still
   // override every transition.
   std::optional<PitchTransitionRenderingHint> preferredRendering;

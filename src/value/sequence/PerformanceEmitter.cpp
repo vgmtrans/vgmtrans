@@ -698,21 +698,20 @@ void PitchSlideBinding::sample(const PerformanceEmitter& out, double key) const 
     throw std::logic_error("Performance automation binding belongs to another track");
   }
   auto* pitch = intent();
-  if (!std::holds_alternative<SampledAutomationCurve>(pitch->curve)) {
-    SampledAutomationCurve sampled;
-    sampled.samples.push_back(AutomationSample{
+  if (!pitch->samples) {
+    auto& samples = pitch->samples.emplace();
+    samples.push_back(AutomationSample{
         .tickOffset = 0,
         .value = pitch->startKey,
     });
     if (pitch->timing.timelineTicks != 0) {
-      sampled.samples.push_back(AutomationSample{
+      samples.push_back(AutomationSample{
           .tickOffset = pitch->timing.timelineTicks,
           .value = pitch->targetKey,
       });
     }
-    pitch->curve = std::move(sampled);
   }
-  auto& samples = std::get<SampledAutomationCurve>(pitch->curve).samples;
+  auto& samples = *pitch->samples;
   const u64 startTick = owner_->automations[automation_].realization.startTick;
   const u64 elapsed = out.tick_ > startTick ? out.tick_ - startTick : 0;
   const u32 offset = static_cast<u32>(std::min<u64>(elapsed, std::numeric_limits<u32>::max()));
@@ -744,7 +743,7 @@ PitchTransitionIntent* PitchSlideBinding::intent() const {
 void PitchSlideBinding::makeImmediate() {
   if (auto* transition = intent()) {
     transition->timing = PitchSlideTiming::fromTicks(0);
-    transition->curve = LinearAutomationCurve{};
+    transition->samples.reset();
     transition->portamentoRendering.useCurrentTiming = false;
     auto& realization = owner_->automations[automation_].realization;
     realization.endTick = realization.startTick;

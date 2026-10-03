@@ -410,6 +410,39 @@ void midiNotePlanningKeepsReleasePitchPastExpiredContinuations() {
 
 }
 
+void performanceMidiRendererDistinguishesLinearAndEmptySampledPitch() {
+  PerformanceTrackFixture fixture{8};
+  const auto note = fixture.out.note(64, 1.0, 8);
+  fixture.out.pitchSlide(note, 60, 64, 4);
+  const auto linear = renderTestMidi({.tracks = {fixture.track}},
+                                    {.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  auto& transition = *pitchTransitionIntent(fixture.track.automations.front());
+  expect(!transition.samples && pitchTransitionValueAt(transition, 2) == 62,
+         "a slide without samples must retain linear interpolation");
+  const auto linearPortamento = renderTestMidi({.tracks = {fixture.track}},
+                                             {.pitchTransitions = MidiPitchTransitionRendering::Portamento});
+
+  transition.samples.emplace();
+  const auto sampled = renderTestMidi({.tracks = {fixture.track}},
+                                     {.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  const auto sampledPortamento = renderTestMidi({.tracks = {fixture.track}},
+                                              {.pitchTransitions = MidiPitchTransitionRendering::Portamento});
+  const auto hasInteriorBend = [](const MidiSequence& midi) {
+    return std::ranges::any_of(midi.tracks.front().events, [](const MidiEvent& event) {
+      return event.tick > 0 && event.tick < 4 && isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+    });
+  };
+  const auto warnsAboutSamples = [](const MidiSequence& midi) {
+    return std::ranges::any_of(midi.diagnostics, [](const Diagnostic& diagnostic) {
+      return diagnostic.message.find("exact sampled pitch curve") != std::string::npos;
+    });
+  };
+  expect(hasInteriorBend(linear) && !hasInteriorBend(sampled) && pitchTransitionValueAt(transition, 2) == 62,
+         "an empty sampled curve must retain its sparse endpoints and interpolation fallback");
+  expect(!warnsAboutSamples(linearPortamento) && warnsAboutSamples(sampledPortamento),
+         "native portamento must distinguish an absent sample list from a declared empty list");
+}
+
 void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
   PerformanceTrackFixture fixture{8};
   auto& track = fixture.track;
@@ -1500,6 +1533,7 @@ void runValueMidiPitchTests() {
   midiNotePlanningKeepsReleasePitchPastExpiredContinuations();
   sourceVoiceKeyChangesNeedNoPitchBinding();
   sourceKeyChangeUsesRealizedPitchWithPortamento();
+  performanceMidiRendererDistinguishesLinearAndEmptySampledPitch();
   performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering();
   performanceMidiRendererAllowsMixedPitchTransitionRendering();
   performanceMidiRendererRetainsHeldVoiceAcrossChainedPitchBends();

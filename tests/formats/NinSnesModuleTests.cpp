@@ -1025,13 +1025,13 @@ void ninSnesF9UsesSharedPitchTransitions() {
   expect(decodedSlide != commands.end() && decodedSlide->range.size == 4 && decodedSlide->address.value == 0x303 &&
              decodedSlide->execution.duringWait,
          "F9 should remain an independent source command with generic during-wait eligibility");
-  const auto* sampled = transition == nullptr ? nullptr : std::get_if<SampledAutomationCurve>(&transition->curve);
-  expect(sampled != nullptr && sampled->samples.size() == 4 && sampled->samples[0].tickOffset == 0 &&
-             sampled->samples[0].value == 24.0 && sampled->samples[1].tickOffset == 1 &&
-             std::abs(sampled->samples[1].value - (24.0 + 85.0 / 256.0)) < 0.000001 &&
-             sampled->samples[2].tickOffset == 2 &&
-             std::abs(sampled->samples[2].value - (24.0 + 170.0 / 256.0)) < 0.000001 &&
-             sampled->samples[3].tickOffset == 3 && sampled->samples[3].value == 25.0,
+  const auto* sampled = transition != nullptr && transition->samples ? &*transition->samples : nullptr;
+  expect(sampled != nullptr && sampled->size() == 4 && (*sampled)[0].tickOffset == 0 &&
+             (*sampled)[0].value == 24.0 && (*sampled)[1].tickOffset == 1 &&
+             std::abs((*sampled)[1].value - (24.0 + 85.0 / 256.0)) < 0.000001 &&
+             (*sampled)[2].tickOffset == 2 &&
+             std::abs((*sampled)[2].value - (24.0 + 170.0 / 256.0)) < 0.000001 &&
+             (*sampled)[3].tickOffset == 3 && (*sampled)[3].value == 25.0,
          "F9 should retain the driver's exact fixed-point pitch staircase");
   expect(std::ranges::none_of(
              performance.tracks[0].events,
@@ -1064,10 +1064,10 @@ void ninSnesF9UsesSharedPitchTransitions() {
   const PerformanceSequence afterEnvelope = renderCommands({0xf1, 0, 2, 2, 10, 0x7f, 0x80, 0xf9, 1, 3, 5, 0});
   const auto* envelopeTransition = pitchTransitionIntent(afterEnvelope.tracks[0].automations.front());
   const auto* envelopeSamples =
-      envelopeTransition == nullptr ? nullptr : std::get_if<SampledAutomationCurve>(&envelopeTransition->curve);
+      envelopeTransition != nullptr && envelopeTransition->samples ? &*envelopeTransition->samples : nullptr;
   expect(envelopeTransition != nullptr && afterEnvelope.tracks[0].automations.front().realization.startTick == 3 &&
              envelopeTransition->startKey == 26.0 && envelopeTransition->targetKey == 29.0 &&
-             envelopeSamples != nullptr && envelopeSamples->samples.size() == 4,
+             envelopeSamples != nullptr && envelopeSamples->size() == 4,
          "F9 should start from a completed pitch envelope without losing its queued timing");
 
   const MidiSequence envelopePitchBend = renderTestMidi(afterEnvelope);

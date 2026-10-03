@@ -305,13 +305,8 @@ public:
     // Braces sequence source reads before binding. There is deliberately no
     // loose argument-pack overload: invoke({read1(), read2()}) preserves order.
     template <auto Method>
-    Event& invoke(decltype(detail::commandArguments(Method)) arguments) {
+    Event& invoke(decltype(detail::commandArguments(Method)) arguments = {}) {
       return appendInvocation<false>(Method, std::move(arguments));
-    }
-
-    template <auto Method>
-    Event& invoke() {
-      return appendCallable(Method);
     }
 
     // Captures must own anything that needs to outlive decoding. Explicit
@@ -328,13 +323,8 @@ public:
 
     // Runtime control flow may override the command's decoded default path.
     template <auto Method>
-    Event& invokeFlow(decltype(detail::commandArguments(Method)) arguments) {
+    Event& invokeFlow(decltype(detail::commandArguments(Method)) arguments = {}) {
       return appendInvocation<true>(Method, std::move(arguments));
-    }
-
-    template <auto Method>
-    Event& invokeFlow() {
-      return appendInvocation<true>(Method, detail::CommandArguments<>{});
     }
 
     template <class Handler>

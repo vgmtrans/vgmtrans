@@ -394,9 +394,9 @@ void rareSnesPitchEnvelopeInvertsOnlyItsInitialSteps() {
          "Gang-Plank Galleon's pitch envelope should render as one transition");
 
   const auto* pitch = pitchTransitionIntent(performance.tracks.front().automations.front());
-  const auto* curve = pitch == nullptr ? nullptr : std::get_if<SampledAutomationCurve>(&pitch->curve);
-  expect(pitch != nullptr && pitch->targetKey > pitch->startKey && curve != nullptr && curve->samples.size() > 3 &&
-             curve->samples[1].value <= pitch->startKey && curve->samples.back().value == pitch->targetKey,
+  const auto* curve = pitch != nullptr && pitch->samples ? &*pitch->samples : nullptr;
+  expect(pitch != nullptr && pitch->targetKey > pitch->startKey && curve != nullptr && curve->size() > 3 &&
+             (*curve)[1].value <= pitch->startKey && curve->back().value == pitch->targetKey,
          "the initial inverted step should precede the remaining upward driver steps");
 
   const MidiSequence pitchBend =

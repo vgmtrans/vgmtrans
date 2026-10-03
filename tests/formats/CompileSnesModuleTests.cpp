@@ -248,7 +248,7 @@ void pitchSweepAdvancesThroughThePitchTable() {
   const PerformanceSequence downward = render(fixture({0x94, 0x02, 0x60, 0xde, 6, 0x94, 0x00, 0x82}));
   expect(!downward.tracks.front().automations.empty(), "an active pitch sweep should create a pitch transition");
   const auto* downSlide = pitchTransitionIntent(downward.tracks.front().automations.front());
-  expect(downSlide != nullptr && std::holds_alternative<LinearAutomationCurve>(downSlide->curve) &&
+  expect(downSlide != nullptr && !downSlide->samples &&
              std::abs(pitchTransitionValueAt(*downSlide, 1) - downSlide->startKey + 4.0) < 0.05 &&
              std::abs(pitchTransitionValueAt(*downSlide, 2) - downSlide->startKey + 8.0) < 0.05 &&
              pitchTransitionValueAt(*downSlide, 6) - downSlide->startKey < -20.0 &&

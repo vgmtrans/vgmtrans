@@ -1039,14 +1039,14 @@ void akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo() {
       [](const PerformanceAutomation& automation) { return pitchTransitionIntent(automation) != nullptr; });
   const auto* slideIntent =
       slideAutomation == slide.tracks.front().automations.end() ? nullptr : pitchTransitionIntent(*slideAutomation);
-  const auto* slideCurve = slideIntent == nullptr ? nullptr : std::get_if<SampledAutomationCurve>(&slideIntent->curve);
-  const bool retainsDriverCurve = slideCurve != nullptr && slideCurve->samples.size() == 3 &&
-                                  std::abs((slideCurve->samples[1].value - slideCurve->samples[0].value) -
-                                           (slideCurve->samples[2].value - slideCurve->samples[1].value)) > 0.1;
+  const auto* slideCurve = slideIntent != nullptr && slideIntent->samples ? &*slideIntent->samples : nullptr;
+  const bool retainsDriverCurve = slideCurve != nullptr && slideCurve->size() == 3 &&
+                                  std::abs(((*slideCurve)[1].value - (*slideCurve)[0].value) -
+                                           ((*slideCurve)[2].value - (*slideCurve)[1].value)) > 0.1;
   expect(slideNotes.size() == 1 && slideIntent != nullptr && slideIntent->note == slideNotes.front()->note &&
              slideIntent->preferredRendering == PitchTransitionRenderingHint::PitchBend &&
              slideIntent->timing.timelineTicks == 2 && retainsDriverCurve &&
-             slideCurve->samples.front().tickOffset == 0 && slideCurve->samples.back().tickOffset == 2,
+             slideCurve->front().tickOffset == 0 && slideCurve->back().tickOffset == 2,
          "a pending AkaoSnes pitch slide should attach its exact driver curve to the next sounding note");
 
   const MidiSequence bendSlide = renderTestMidi(slide);

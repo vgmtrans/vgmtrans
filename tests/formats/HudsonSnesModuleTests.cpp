@@ -325,11 +325,11 @@ void customPitchAttackAndPercussionPreserveDriverCurvesAndMixerRows() {
   const auto* transition = attack.tracks.front().automations.empty()
                                ? nullptr
                                : pitchTransitionIntent(attack.tracks.front().automations.front());
-  const auto* curve = transition == nullptr ? nullptr : std::get_if<SampledAutomationCurve>(&transition->curve);
-  expect(attack.diagnostics.empty() && transition != nullptr && curve != nullptr && curve->samples.size() >= 3 &&
+  const auto* curve = transition != nullptr && transition->samples ? &*transition->samples : nullptr;
+  expect(attack.diagnostics.empty() && transition != nullptr && curve != nullptr && curve->size() >= 3 &&
              transition->preferredRendering == PitchTransitionRenderingHint::PitchBend &&
-             std::abs(curve->samples.front().value - (24.0 - 32.0 / 127.0)) < 0.000001 &&
-             std::abs(curve->samples.back().value - (24.0 + 32.0 / 127.0)) < 0.000001,
+             std::abs(curve->front().value - (24.0 - 32.0 / 127.0)) < 0.000001 &&
+             std::abs(curve->back().value - (24.0 + 32.0 / 127.0)) < 0.000001,
          "custom Hudson pitch attacks should retain the driver's sampled waveform and physical pitch curve");
 
   ParsedHeader drums = runtimeData();

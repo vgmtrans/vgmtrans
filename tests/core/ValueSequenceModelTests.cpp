@@ -292,7 +292,8 @@ void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
 
   const auto& firstAutomation = track.automations[0];
   const auto& firstIntent = std::get<PitchTransitionIntent>(firstAutomation.intent);
-  const auto& firstSamples = std::get<SampledAutomationCurve>(firstIntent.curve).samples;
+  expect(firstIntent.samples.has_value(), "sampled pitch must retain its source samples");
+  const auto& firstSamples = *firstIntent.samples;
   expect(firstSamples.size() == 3 && firstSamples[0] == AutomationSample{.tickOffset = 0, .value = 60} &&
              firstSamples[1] == AutomationSample{.tickOffset = 3, .value = 61.5} &&
              firstSamples[2] == AutomationSample{.tickOffset = 8, .value = 64},
@@ -359,7 +360,7 @@ void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
              configuredIntent.preferredRendering == PitchTransitionRenderingHint::PitchBend &&
              configuredIntent.timing.timelineTicks == 0 &&
              std::holds_alternative<TempoRelativePitchSlideTiming>(configuredIntent.timing.physical) &&
-             std::holds_alternative<LinearAutomationCurve>(configuredIntent.curve) &&
+             !configuredIntent.samples &&
              track.automations[9].realization.endTick == 70 &&
              track.automations[9].realization.endReason == PerformanceAutomationEndReason::Completed &&
              out.at(70).currentPitchTransitionKey(stoppedNote) == 84.0,
