@@ -40,7 +40,6 @@ class PitchSlideBinding;
 
 class RepeatCounter {
 public:
-  [[nodiscard]] bool active() const;
   [[nodiscard]] bool firstVisit() const;
   [[nodiscard]] u32 remainingPlays() const;
   void start(u32 totalPlays);

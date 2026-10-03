@@ -24,6 +24,7 @@
 #include <limits>
 #include <mutex>
 #include <thread>
+#include <utility>
 
 using namespace vgmtrans::core;
 
@@ -1505,6 +1506,55 @@ void sessionExportsASequenceWithoutACollection() {
          "an opted-out sequence must support manual collections that survive an empty discovery rebuild");
 }
 
+void snapshotIndexesKeepFirstValidIdsAcrossCopyAndMove() {
+  test::SessionSnapshotBuilder builder;
+  constexpr u32 lastValidId = invalidIdValue - 1;
+  builder.sources = {
+      SourceFile{.id = SourceId{0}, .name = "First"},
+      SourceFile{.id = SourceId{0}, .name = "Duplicate"},
+      SourceFile{.name = "Invalid"},
+      SourceFile{.id = SourceId{lastValidId}, .name = "Last valid"},
+  };
+  builder.assets = {
+      MiscAsset{.metadata = {.id = AssetId{0}, .name = "First"}},
+      MiscAsset{.metadata = {.id = AssetId{0}, .name = "Duplicate"}},
+      MiscAsset{.metadata = {.name = "Invalid"}},
+      MiscAsset{.metadata = {.id = AssetId{lastValidId}, .name = "Last valid"}},
+  };
+  builder.collections = {
+      Collection{.id = CollectionId{0}, .name = "First"},
+      Collection{.id = CollectionId{0}, .name = "Duplicate"},
+      Collection{.name = "Invalid"},
+      Collection{.id = CollectionId{lastValidId}, .name = "Last valid"},
+  };
+  SessionSnapshot snapshot = builder.finish();
+  const auto* source = &snapshot.sources().front();
+  const auto* asset = &snapshot.assets().front();
+  const auto* collection = &snapshot.collections().front();
+  const SessionSnapshot copy = snapshot;
+  const SessionSnapshot moved = std::move(snapshot);
+
+  for (const auto* view : {&copy, &moved}) {
+    expect(view->source(SourceId{0}) == source && view->asset(AssetId{0}) == asset &&
+               view->collection(CollectionId{0}) == collection,
+           "snapshot copies and moves must retain the first value for each duplicate id");
+    expect(view->source(SourceId{lastValidId}) == &view->sources().back() &&
+               view->asset(AssetId{lastValidId}) == &view->assets().back() &&
+               view->collection(CollectionId{lastValidId}) == &view->collections().back(),
+           "snapshot indexes must accept the highest valid id in every domain");
+    expect(view->source(SourceId{}) == nullptr && view->asset(AssetId{}) == nullptr &&
+               view->collection(CollectionId{}) == nullptr && view->source(SourceId{1}) == nullptr &&
+               view->asset(AssetId{1}) == nullptr && view->collection(CollectionId{1}) == nullptr,
+           "snapshot indexes must exclude invalid ids and return null for missing ids");
+    expect(view->sources().size() == 4 && view->sources()[1].name == "Duplicate" &&
+               view->sources()[2].name == "Invalid" && view->assets().size() == 4 &&
+               metadata(view->assets()[1]).name == "Duplicate" && metadata(view->assets()[2]).name == "Invalid" &&
+               view->collections().size() == 4 && view->collections()[1].name == "Duplicate" &&
+               view->collections()[2].name == "Invalid",
+           "indexing must preserve duplicate and invalid values in their original order");
+  }
+}
+
 void snapshotFindsTheFirstCollectionContainingAnAsset() {
   test::SessionSnapshotBuilder builder;
   builder.assets.emplace_back(MiscAsset{.metadata = AssetMetadata{.id = AssetId{4}, .name = "Shared"}});
@@ -1575,5 +1625,6 @@ void runValueSessionTests() {
   sessionAddsSourceFromPath();
   sessionExportsAllCollections();
   sessionExportsASequenceWithoutACollection();
+  snapshotIndexesKeepFirstValidIdsAcrossCopyAndMove();
   snapshotFindsTheFirstCollectionContainingAnAsset();
 }

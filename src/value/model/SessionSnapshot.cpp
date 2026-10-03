@@ -26,10 +26,9 @@ SessionSnapshot::Storage::Storage(std::vector<SourceFile> sourcesValue, SharedSe
     : sources(std::move(sourcesValue)), assets(std::move(assetsValue)), collections(std::move(collectionsValue)),
       sourceMap(std::move(sourceMapValue)), diagnostics(std::move(diagnosticsValue)) {
   sourcesById.reserve(sources.size());
-  for (size_t i = 0; i < sources.size(); ++i) {
-    const SourceId id = sources[i].id;
-    if (id.valid()) {
-      sourcesById.emplace(id.value, i);
+  for (const auto& source : sources) {
+    if (source.id.valid()) {
+      sourcesById.emplace(source.id, &source);
     }
   }
 
@@ -37,15 +36,14 @@ SessionSnapshot::Storage::Storage(std::vector<SourceFile> sourcesValue, SharedSe
   for (const auto& asset : assets) {
     const AssetId id = metadata(asset).id;
     if (id.valid()) {
-      assetsById.emplace(id.value, &asset);
+      assetsById.emplace(id, &asset);
     }
   }
 
   collectionsById.reserve(collections.size());
-  for (size_t i = 0; i < collections.size(); ++i) {
-    const CollectionId id = collections[i].id;
-    if (id.valid()) {
-      collectionsById.emplace(id.value, i);
+  for (const auto& collection : collections) {
+    if (collection.id.valid()) {
+      collectionsById.emplace(collection.id, &collection);
     }
   }
 }
@@ -58,18 +56,18 @@ SessionSnapshot::SessionSnapshot(std::vector<SourceFile> sources, SharedSequence
 }
 
 const SourceFile* SessionSnapshot::source(SourceId id) const {
-  const auto found = storage_->sourcesById.find(id.value);
-  return found != storage_->sourcesById.end() ? &storage_->sources[found->second] : nullptr;
+  const auto found = storage_->sourcesById.find(id);
+  return found != storage_->sourcesById.end() ? found->second : nullptr;
 }
 
 const Asset* SessionSnapshot::asset(AssetId id) const {
-  const auto found = storage_->assetsById.find(id.value);
+  const auto found = storage_->assetsById.find(id);
   return found != storage_->assetsById.end() ? found->second : nullptr;
 }
 
 const Collection* SessionSnapshot::collection(CollectionId id) const {
-  const auto found = storage_->collectionsById.find(id.value);
-  return found != storage_->collectionsById.end() ? &storage_->collections[found->second] : nullptr;
+  const auto found = storage_->collectionsById.find(id);
+  return found != storage_->collectionsById.end() ? found->second : nullptr;
 }
 
 const Collection* SessionSnapshot::firstCollectionContaining(AssetId asset) const {

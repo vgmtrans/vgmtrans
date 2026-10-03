@@ -645,12 +645,6 @@ void flushLfo(SimulatedLfoState& lfo, u64 upToTick, const PerformanceTempoMap& t
   return semitones * lfoDepthScale(lfo);
 }
 
-[[nodiscard]] bool releaseHeldLfoOutput(SimulatedLfoState& lfo) {
-  const bool wasHeld = lfo.outputHeldUntilNextNote;
-  lfo.outputHeldUntilNextNote = false;
-  return wasHeld;
-}
-
 // Simulate channel state once. Pitch stays in semitones until the complete
 // path is available for sensitivity selection and MIDI encoding.
 class MidiTrackRenderer {
@@ -906,7 +900,7 @@ private:
   void releaseHeldPitchLfoOutputs() {
     for (auto& entry : pitchLfos) {
       auto& pitch = entry.second;
-      if (releaseHeldLfoOutput(pitch.oscillator) && pitch.semitones != 0.0) {
+      if (std::exchange(pitch.oscillator.outputHeldUntilNextNote, false) && pitch.semitones != 0.0) {
         pitch.semitones = 0.0;
       }
     }
@@ -981,10 +975,6 @@ private:
   }
 
   void restartSimulatedTremoloForNote(u64 tick, ModulationConversionPolicy modulationConversion) {
-    if (!tremolo.started) {
-      return;
-    }
-
     const auto fallback = !tremolo.shape && tremoloDepthUnit == TremoloDepthUnit::LegacyUnipolar
                               ? LfoInitialPhaseFallback::UnipolarTremoloNominalGain
                               : LfoInitialPhaseFallback::Zero;
@@ -997,10 +987,6 @@ private:
       simulatedTremoloGain = gain;
       addCombinedExpression(tick, modulationConversion);
     }
-  }
-
-  bool shouldRestartSimulatedTremoloForNote(const MidiNoteBoundary& note) const {
-    return note.restartTremolo && tremolo.started;
   }
 
   void addCombinedPan(u64 tick, bool force = false) {
@@ -1036,18 +1022,11 @@ private:
   }
 
   void restartSimulatedPanForNote(u64 tick) {
-    if (!panLfo.started) {
-      return;
-    }
     restartNoteLfo(panLfo, tick);
     if (simulatedPanOffset != 0.0) {
       simulatedPanOffset = 0.0;
       addCombinedPan(tick);
     }
-  }
-
-  bool shouldRestartSimulatedPanForNote(const MidiNoteBoundary& note) const {
-    return note.restartPan && panLfo.started;
   }
 
   void addMidiEvent(const MidiTrackEvent& event, u32 sourceTrackNumber,
@@ -1071,14 +1050,14 @@ private:
               releaseHeldPitchLfoOutputs();
             }
             if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
-              if (shouldRestartSimulatedTremoloForNote(typedEvent)) {
+              if (typedEvent.restartTremolo && tremolo.started) {
                 restartSimulatedTremoloForNote(typedEvent.header.tick, modulationConversion);
-              } else if (releaseHeldLfoOutput(tremolo) && simulatedTremoloGain != 1.0) {
+              } else if (std::exchange(tremolo.outputHeldUntilNextNote, false) && simulatedTremoloGain != 1.0) {
                 simulatedTremoloGain = 1.0;
                 addCombinedExpression(typedEvent.header.tick, modulationConversion);
               }
             }
-            if (shouldRestartSimulatedPanForNote(typedEvent)) {
+            if (typedEvent.restartPan && panLfo.started) {
               restartSimulatedPanForNote(typedEvent.header.tick);
             }
             if (!typedEvent.attack) {

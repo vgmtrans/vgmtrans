@@ -69,21 +69,21 @@ double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elaps
 }
 
 PerformanceTempoMap::PerformanceTempoMap(const PerformanceSequence& performance)
-    : ppqn_(std::max<u32>(performance.timebase.ppqn, 1)),
-      initialTempoMicrosecondsPerQuarter_(performance.initialTempoMicrosecondsPerQuarter) {
+    : ppqn_(std::max<u32>(performance.timebase.ppqn, 1)) {
   for (const auto* tempo : orderedPerformanceEvents<TempoPerformanceEvent>(performance)) {
     if (points_.empty() || points_.back().microsecondsPerQuarter != tempo->microsecondsPerQuarter) {
       points_.push_back(Point{.tick = tempo->header.tick, .microsecondsPerQuarter = tempo->microsecondsPerQuarter});
     }
   }
-  if (initialTempoMicrosecondsPerQuarter_ != 500000 && (points_.empty() || points_.front().tick != 0)) {
-    points_.insert(points_.begin(), Point{.tick = 0, .microsecondsPerQuarter = initialTempoMicrosecondsPerQuarter_});
+  const u32 initialTempo = performance.initialTempoMicrosecondsPerQuarter;
+  if (initialTempo != 500000 && (points_.empty() || points_.front().tick != 0)) {
+    points_.insert(points_.begin(), Point{.tick = 0, .microsecondsPerQuarter = initialTempo});
   }
 }
 
 u32 PerformanceTempoMap::microsecondsPerQuarterAt(u64 tick) const {
   const auto upper = std::ranges::upper_bound(points_, tick, {}, &Point::tick);
-  return upper == points_.begin() ? initialTempoMicrosecondsPerQuarter_ : std::prev(upper)->microsecondsPerQuarter;
+  return upper == points_.begin() ? 500000 : std::prev(upper)->microsecondsPerQuarter;
 }
 
 double PerformanceTempoMap::tickSeconds(u64 tick) const {

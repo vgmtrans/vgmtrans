@@ -68,9 +68,9 @@ private:
     std::vector<Collection> collections;
     SourceMap sourceMap;
     std::vector<Diagnostic> diagnostics;
-    std::unordered_map<u32, size_t> sourcesById;
-    std::unordered_map<u32, const Asset*> assetsById;
-    std::unordered_map<u32, size_t> collectionsById;
+    std::unordered_map<SourceId, const SourceFile*> sourcesById;
+    std::unordered_map<AssetId, const Asset*> assetsById;
+    std::unordered_map<CollectionId, const Collection*> collectionsById;
   };
 
   std::shared_ptr<const Storage> storage_;

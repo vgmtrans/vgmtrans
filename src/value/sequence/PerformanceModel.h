@@ -638,7 +638,6 @@ public:
 
 private:
   double ppqn_;
-  u32 initialTempoMicrosecondsPerQuarter_ = 500000;
   std::vector<Point> points_;
 };
 

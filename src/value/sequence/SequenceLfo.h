@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <optional>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -19,8 +18,8 @@ namespace vgmtrans::core {
 // deliberately opaque signed integers: each format chooses its own fixed-point
 // scale and converts the live value to semitones or decibels itself.
 //
-// Some drivers install a fade once and restart it on every note. Keeping its
-// motion plan separate from the active motion preserves that behavior while
+// Some drivers install a fade duration once and restart it on every note. Keeping
+// that duration separate from the active motion preserves that behavior while
 // allowing each format to choose the initial depth and delay. The
 // automation binding follows the live motion because each note may attach its
 // restarted fade to a different performance note.
@@ -48,35 +47,27 @@ public:
   // Cancels both future restarts and live motion while preserving the current
   // depth value.
   void clearFade() {
-    fadePlan_.reset();
+    fadeTicks_ = 0;
     fade_.clear();
     fade_.clearAutomation();
   }
 
-  // Installs the plan used by subsequent restart calls. A zero duration
-  // removes the reusable plan without interrupting a fade already in progress.
-  void configureLinearFade(u32 ticks) {
-    if (ticks == 0) {
-      fadePlan_.reset();
-      return;
-    }
-    fadePlan_ = SequenceMotionPlan<s32>::targetOverTicksWithStep(
-        targetDepth_, targetDepth_ / static_cast<s32>(ticks), ticks);
-  }
+  // Installs the duration used by subsequent restart calls. Zero removes the
+  // reusable fade without interrupting a fade already in progress.
+  void configureLinearFade(u32 ticks) { fadeTicks_ = ticks; }
 
-  [[nodiscard]] bool fadeConfigured() const { return fadePlan_.has_value(); }
-  [[nodiscard]] u32 fadeDurationTicks() const { return fadePlan_ ? fadePlan_->ticks : 0; }
+  [[nodiscard]] bool fadeConfigured() const { return fadeTicks_ != 0; }
+  [[nodiscard]] u32 fadeDurationTicks() const { return fadeTicks_; }
 
-  // Restarts the installed plan without consuming it. False means no reusable
-  // plan is configured and the live depth is left unchanged.
+  // Restarts the configured fade. False means no duration is configured and
+  // the live depth is left unchanged.
   [[nodiscard]] bool restartFade(u32 delayTicks, s32 initialDepth = 0) {
-    if (!fadePlan_) {
+    if (fadeTicks_ == 0) {
       return false;
     }
     fade_.reset(initialDepth);
-    auto plan = *fadePlan_;
-    plan.delay = delayTicks;
-    fade_.begin(plan);
+    fade_.begin(SequenceMotionPlan<s32>::targetOverTicksWithStep(
+        targetDepth_, targetDepth_ / static_cast<s32>(fadeTicks_), fadeTicks_, delayTicks));
     return true;
   }
 
@@ -100,7 +91,7 @@ public:
 
 private:
   s32 targetDepth_ = 0;
-  std::optional<SequenceMotionPlan<s32>> fadePlan_;
+  u32 fadeTicks_ = 0;
   PerformanceBoundValue<SequenceLinearMotion<s32>> fade_;
   double lastPhysicalDepth_ = 0.0;
 };

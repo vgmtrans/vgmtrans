@@ -716,12 +716,8 @@ private:
 RepeatCounter::RepeatCounter(std::map<u8, u32>& remaining, u8 slot) noexcept : remaining_(&remaining), slot_(slot) {
 }
 
-bool RepeatCounter::active() const {
-  return remaining_->contains(slot_);
-}
-
 bool RepeatCounter::firstVisit() const {
-  return !active();
+  return !remaining_->contains(slot_);
 }
 
 u32 RepeatCounter::remainingPlays() const {

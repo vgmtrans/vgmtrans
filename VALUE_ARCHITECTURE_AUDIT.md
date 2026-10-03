@@ -1,7 +1,7 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Eight validated batches remove 615 net production lines from
+`cb9e0b766`. Nine validated batches remove 656 net production lines from
 `src/value`. All 44 CTest suites pass; the latest real-file replay preserves
 all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
 records appear at the end of this document.
@@ -4445,3 +4445,65 @@ planner's chronological output remains a tested contract; removing its sort
 would shift that responsibility onto consumers, so the proposed change was
 rejected. Adding merge machinery to its renderer would increase conceptual
 overhead and was also rejected.
+
+## Cleanup2 ninth batch: canonical timing state and direct private operations
+
+This batch removes another 41 net production C++ lines, bringing cleanup2 to
+656 removed. Snapshot boundary/lifetime coverage adds 51 test lines. The
+public fade and rendering behavior remain unchanged.
+
+- LFO depth fades retain their configured duration rather than an optional
+  motion plan containing duplicate target, step, delay, and mode. Restart
+  constructs the same fixed linear plan from the duration and target. Zero
+  still disables future restarts without interrupting an active fade; depth
+  reset cancels both. The probe's state layout shrinks from 80 to 56 bytes.
+- Tempo maps retain their canonical points and normalized pulse count.
+  Nondefault initial tempo already resides in a tick-zero point, so the
+  additional initial-tempo member disappears. Explicit tick-zero events still
+  win, and queries before any point use the default 500,000 microseconds.
+  The probe's object layout shrinks from 40 to 32 bytes.
+- `RepeatCounter::firstVisit()` queries its counter directly. The sole separate
+  `active()` guard disappears; AkaoSnes finishes a counter idempotently. Its
+  independent native loop-break arithmetic remains explicit.
+- MIDI note boundaries state the simple tremolo/pan restart conditions directly.
+  Two forwarding predicates, two unreachable restart guards, and the held-output
+  forwarding helper disappear. Held flags use `std::exchange`. The zero-value
+  pitch guard remains to preserve negative-zero state, and vibrato retains its
+  real per-layer restart eligibility scan.
+- All immutable snapshot indexes use typed ID keys and direct pointers to their
+  owned values. Source and collection queries now follow the existing asset
+  pattern without vector-position bookkeeping. Const shared storage keeps these
+  pointers stable across snapshot copies/moves; first duplicates still win and
+  invalid IDs remain excluded. Copyable `AssetCatalog` retains its source indices
+  because its source vector has a different lifetime/copy contract.
+
+Validation:
+
+- The complete 338-step macOS Release build, including Qt, shell, and parity,
+  is warning-free. All 44 CTest suites pass.
+- ASan/UBSan/float-cast-overflow comparisons match 4,032 tempo cases and
+  7,138,566 trace bytes, including zero/nondefault/maximum initial tempo,
+  coincident writes, large divisions, saturated duration conversions, and
+  nonfinite duration queries.
+- The extended motion/LFO comparison matches 102,128 cases and 56,315,712 bytes
+  under the same sanitizers. It covers reusable fade cancellation/restart,
+  reconfiguration, delays, target/duration extremes, and signed-zero/Inf motion
+  observations. The VM matrix matches all 31,104 cases and 82,265,613 bytes.
+- Independently compiled renderer runners match 75,043 renders and
+  144,890,623 serialized bytes of complete output events/order, encoded MIDI,
+  and ordered diagnostics. Coverage includes the prior 19,584 LFO/level cases,
+  55,296 restart/held/delay/clock/note-boundary/coincident-control/global-reverb/
+  external-warning cases, 32 signed-zero cases, and 131 captures from both
+  unchanged MIDI fixture suites.
+- The focused snapshot fixture checks ID zero, the highest valid ID, duplicate
+  first-value identity, invalid/missing lookup, preserved vector order, and
+  copied/moved snapshot pointers in all three domains.
+- The frozen ninth-batch executable matches all eighth-batch corpus results:
+  252 comparisons and 3,922 artifact hashes, with identical inventories,
+  diagnostics, and exit statuses.
+
+Next: consolidate source-field capture/conversion, centralize C-string text
+conversion (which currently becomes boolean in ordinary annotations), and move
+inspection subset preparation into the inspection owner. Keep owned tempo-point
+query results: a reference getter would dangle in an ordinary range-for over a
+temporary tempo map under the project's C++20 lifetime rules.

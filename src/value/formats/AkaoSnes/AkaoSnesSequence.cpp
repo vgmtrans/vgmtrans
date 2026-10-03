@@ -1516,10 +1516,7 @@ struct Playback : SequencePlayback<TrackState> {
     } else if (context.version != AKAOSNES_V2 && context.version != AKAOSNES_V3 && frame.remainingPlays <= 1) {
       track.loopLevel = slot;
     }
-    RepeatCounter counter = vm.repeatCounter(slot);
-    if (counter.active()) {
-      counter.finish();
-    }
+    vm.repeatCounter(slot).finish();
     return vm.finiteBranch(destination);
   }
 
