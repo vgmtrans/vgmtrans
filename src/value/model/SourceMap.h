@@ -333,7 +333,6 @@ public:
   SourceMapBuilder() = default;
   explicit SourceMapBuilder(std::function<SourceAnnotationId()> nextId);
 
-  [[nodiscard]] AnnotationBuilder source(std::string_view label, SourceRange range);
   [[nodiscard]] AnnotationBuilder annotation(SourceRole role, std::string_view label, SourceRange range);
   [[nodiscard]] AnnotationBuilder annotation(SourceRole role, std::string_view label, const SourceRecord& record);
   [[nodiscard]] AnnotationBuilder section(std::string_view label, SourceRange range);

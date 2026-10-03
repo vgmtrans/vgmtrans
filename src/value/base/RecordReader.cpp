@@ -177,7 +177,7 @@ std::optional<::u8> RecordReader::peekU8() const {
 }
 
 std::span<const ::u8> RecordReader::bytes() const {
-  return reader_.slice(begin_, size());
+  return reader_.slice(range());
 }
 
 SourceRecord RecordReader::finish() && noexcept {

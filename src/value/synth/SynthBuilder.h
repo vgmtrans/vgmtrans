@@ -25,13 +25,10 @@ class SynthBuilderSources {
 public:
   // Asset-level structures receive the builder's owner automatically.
   AnnotationBuilder source(SourceRole role, std::string_view label, SourceRange range, std::string_view kind = {});
-  AnnotationBuilder source(SourceRole role, std::string_view label, const SourceRecord& record,
-                           std::string_view kind = {});
   // Explicit ranges take precedence over ranges observed while adding values.
   void include(SourceRange range);
   [[nodiscard]] SourceRange range() const noexcept;
   void warning(std::string message, SourceRange range = {});
-  void error(std::string message, SourceRange range = {});
 
 protected:
   SynthBuilderSources(AssetId asset, SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics);

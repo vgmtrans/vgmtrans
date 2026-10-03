@@ -151,10 +151,6 @@ void ScanResultBuilder::warning(std::string message, SourceRange range) {
   diagnostic(Diagnostic{.severity = Severity::Warning, .message = std::move(message), .range = range});
 }
 
-void ScanResultBuilder::error(std::string message, SourceRange range) {
-  diagnostic(Diagnostic{.severity = Severity::Error, .message = std::move(message), .range = range});
-}
-
 ScanResult ScanResultBuilder::finish() {
   for (const auto& draft : drafts_) {
     if (const auto* sequence = std::get_if<ScanSequenceDraft::Pending>(&draft); sequence && !sequence->program) {

@@ -157,7 +157,6 @@ public:
 
   void diagnostic(Diagnostic diagnostic);
   void warning(std::string message, SourceRange range);
-  void error(std::string message, SourceRange range);
 
   [[nodiscard]] ScanResult finish();
 

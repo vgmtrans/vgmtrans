@@ -1,7 +1,7 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Sixteen validated batches remove 891 net production lines from
+`cb9e0b766`. Seventeen validated batches remove 912 net production lines from
 `src/value`. All 44 CTest suites pass; the latest real-file replay preserves
 all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
 records appear at the end of this document.
@@ -5092,3 +5092,78 @@ Next: remove unused source/error authoring overloads and redundant reader querie
 and construct adapted instruments directly instead of deep-copying then replacing
 their source region vectors. The latter may add a few lines while making ownership
 clearer and avoiding substantial work; line count alone does not decide it.
+
+
+## Cleanup2 seventeenth batch: one reader window and direct adaptation
+
+This batch removes 21 net production lines across eleven files, bringing cleanup2
+to 912 removed. Existing fixture calls change without adding test lines;
+cumulative tests retain their 427-line increase.
+
+- RecordReader describes its consumed window through range(). Remove begin()/size()
+  queries with no production users; bytes() slices that same range directly.
+  Position, capture policy, complete-window finish, sticky read failure and
+  positioned-field recovery retain their existing meaning.
+- Remove unused authoring overloads: SourceMapBuilder::source, scanner error,
+  and the asset-level synth source-record/error helpers. Ordinary annotation,
+  warning/Diagnostic and range-based source APIs remain, as do actual entry-level
+  SourceRecord projection and AKAO record annotation. Fixtures declare the
+  existing SourceRole explicitly rather than retaining an unused facade.
+- Playlist visit insertion owns its freshly constructed state directly rather
+  than copying an intermediate immutable value. On an allowed replay, copy the
+  previous key before clearing the map, then move it into the reset visit table.
+  Duplicate-stop boundaries and the repeat-count state remain unchanged.
+- Construct adapted instruments from the retained metadata and adapted regions.
+  Remove copying every source region, then replacing that vector and clearing
+  identity/output preference. Name derivation stays unchanged. This adds four
+  lines but makes retained values and ownership explicit and avoids substantial
+  discarded work. All nine current Instrument fields are accounted for; future
+  metadata additions must also be considered at this explicit adaptation boundary.
+- The cursor's private by-value storedCommandValue helper already deduces an
+  unqualified value type. Remove its repeated remove_cvref_t expressions while
+  retaining owned string_view conversion and direct construction for movable
+  values, including explicit move constructors.
+
+Validation:
+
+- The full 354-step macOS Release build is warning-free; all 44 CTest suites pass.
+  Final headers, tests, core/formats/fmt archives and shell are frozen together.
+- Reader/authoring traces preserve 16,344 cases, 281,238 lines and 20,953,451 bytes
+  with focused ASan/UBSan checks, including invalid source identities, both
+  diagnostic policies, window/truncation/capture combinations and positioned
+  recovery. Complete synth-builder and source-map fixtures pass with changed
+  units instrumented; six actual configured translation units are Werror-clean.
+- Final playlist/VM/cursor overlays preserve 46,656 cases and 41,141,541 trace
+  bytes under ASan/UBSan/float-cast-overflow. Complete cursor/VM fixtures pass.
+  Six allocation cases at nested depths 0/1/2/4/8/12 drop from 171,340 to 98,798
+  allocations and 7,765,760 to 4,864,080 requested bytes; no case grows. The
+  depth-twelve case drops 163,843 to 94,210 allocations with identical output.
+- Direct adaptation preserves 2,205 complete preparations and 80,376,319 bytes:
+  every Instrument metadata field, YM2151 operators/LFO, regions, voice selection,
+  source attribution, address assignment, diagnostics and both MIDI pitch policies.
+  Complete variant/resolved fixtures and 48 additional SF2/DLS sample cases pass
+  focused sanitizers. The independent MIDI matrix preserves 75,043 renders and
+  144,890,623 bytes. Linked baseline archives remain Release; these are focused
+  changed-unit checks, not a fully instrumented application.
+- Twenty-four adaptation allocation cases cover 1/4/32/3,000 source regions and
+  1/4/16 envelope/stereo variants; no case grows. With long names, three
+  allocations disappear per variant. Sixteen 3,000-region variants avoid
+  19,203,072 requested bytes. This measures cumulative allocation requests during
+  preparation, not peak resident memory.
+- The frozen seventeenth shell preserves all 252 input/policy comparisons and
+  3,922 artifact hashes, inventories, diagnostics and exit statuses against 16.
+
+Retain MaskBytePattern's constexpr string and unsigned-byte representations:
+a single runtime view loses an existing constexpr construction path without
+removing logic. Retain separate SequenceCollectionOptions enablement/name because
+disabled sequences can retain their metadata. Retain the VM's owned channel
+grouping rather than adding borrowed spans, reserve/destruction ordering and a
+separate flattened owner. Retain source interval boundaries and late attack
+resolution in the MIDI planner; ties, expired intervals, orphan attacks and LFO
+restarts need those distinct meanings. SequenceProgramConfig remains decode
+configuration because its commandKindPrefix is not runtime playback state.
+
+Next: evaluate constructing ScanResult only when finalizing pending drafts, simplify
+WAV's exact RIFF capacity bound, and remove a duplicate polling guard only where
+SequenceVM already guarantees eligibility. Continue tracing actual data ownership
+and responsibility rather than treating every optional field as removable.

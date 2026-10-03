@@ -158,10 +158,10 @@ void recordReaderNormalizesWindowBoundaries() {
         Window{2, maximum, 2, 3}, Window{0, 3, 0, 3}}) {
     std::vector<Diagnostic> diagnostics;
     RecordReader record(reader, begin, end, &diagnostics);
-    expect(record.begin() == expectedBegin && record.position() == expectedBegin && record.bytes().empty(),
+    expect(record.range().offset == expectedBegin && record.position() == expectedBegin && record.bytes().empty(),
            "a record must start with an empty consumed range at a bounded source offset");
     const auto raw = record.rawBytes("payload", maximum);
-    expect(static_cast<bool>(raw) == (expectedSize != 0) && record.size() == expectedSize &&
+    expect(static_cast<bool>(raw) == (expectedSize != 0) && record.range().size == expectedSize &&
                record.bytes().size() == expectedSize && !record.ok() && diagnostics.size() == 1 &&
                diagnostics[0].range == reader.range(expectedBegin + expectedSize, 0),
            "oversized raw reads must retain available bytes and report truncation without throwing");

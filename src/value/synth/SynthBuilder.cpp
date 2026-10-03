@@ -164,11 +164,6 @@ AnnotationBuilder detail::SynthBuilderSources::annotateSource(SourceRole role, s
   return annotation;
 }
 
-AnnotationBuilder detail::SynthBuilderSources::source(SourceRole role, std::string_view label,
-                                                      const SourceRecord& record, std::string_view kind) {
-  return source(role, label, record.range, kind).fields(record.fields);
-}
-
 SourceRange detail::SynthBuilderSources::range() const noexcept {
   return includedRange_.valid() ? includedRange_ : observedRange_;
 }
@@ -179,10 +174,6 @@ void detail::SynthBuilderSources::include(SourceRange range) {
 
 void detail::SynthBuilderSources::warning(std::string message, SourceRange range) {
   report(Severity::Warning, {}, std::move(message), range);
-}
-
-void detail::SynthBuilderSources::error(std::string message, SourceRange range) {
-  report(Severity::Error, {}, std::move(message), range);
 }
 
 void detail::SynthBuilderSources::report(Severity severity, std::string code, std::string message, SourceRange range) {

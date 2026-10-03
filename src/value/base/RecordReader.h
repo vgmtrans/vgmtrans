@@ -68,11 +68,9 @@ public:
     field(name, {}, std::forward<T>(value), display);
   }
 
-  [[nodiscard]] u32 begin() const noexcept { return begin_; }
   [[nodiscard]] u32 position() const noexcept { return position_; }
-  [[nodiscard]] u32 size() const noexcept { return position_ - begin_; }
   [[nodiscard]] bool ok() const noexcept { return !failed_; }
-  [[nodiscard]] SourceRange range() const noexcept { return reader_.range(begin_, size()); }
+  [[nodiscard]] SourceRange range() const noexcept { return reader_.range(begin_, position_ - begin_); }
   [[nodiscard]] std::span<const ::u8> bytes() const;
   // The finished value covers the record bounds supplied to the constructor,
   // including reserved bytes that were intentionally not decoded as fields.

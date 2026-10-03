@@ -122,15 +122,14 @@ public:
   [[nodiscard]] PlaylistAdvance advance(u64 tick) {
     constexpr u32 kPlaylistCommandLimit = 100000;
     for (u32 executed = 0; current_ && executed < kPlaylistCommandLimit; ++executed) {
-      const PlaylistVisitState state{
-          .commandIndex = *current_,
-          .repeatRemaining = repeatRemaining_,
-      };
-      if (const auto [previous, inserted] = visited_.try_emplace(state, tick); !inserted) {
+      if (const auto [previous, inserted] = visited_.try_emplace(
+              PlaylistVisitState{.commandIndex = *current_, .repeatRemaining = repeatRemaining_}, tick);
+          !inserted) {
         if (options_.loopPolicy == LoopPolicy::PlayOnce && loopRepeats_ < options_.sequenceLoops) {
           ++loopRepeats_;
+          auto state = previous->first;
           visited_.clear();
-          visited_.emplace(state, tick);
+          visited_.emplace(std::move(state), tick);
         } else {
           return PlaylistAdvance{
               .preservedLoopStart =

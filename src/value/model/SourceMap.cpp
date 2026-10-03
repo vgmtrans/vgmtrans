@@ -351,10 +351,6 @@ AnnotationBuilder& AnnotationBuilder::link(SourceLinkRole role, SourceTarget tar
 SourceMapBuilder::SourceMapBuilder(std::function<SourceAnnotationId()> nextId) : nextId_(std::move(nextId)) {
 }
 
-AnnotationBuilder SourceMapBuilder::source(std::string_view label, SourceRange range) {
-  return annotation(SourceRole::Source, label, range);
-}
-
 AnnotationBuilder SourceMapBuilder::annotation(SourceRole role, std::string_view label, SourceRange range) {
   const auto id = nextId_ ? nextId_() : SourceAnnotationId{nextLocalId_++};
   if (id.valid() && annotationsById_.contains(id)) {

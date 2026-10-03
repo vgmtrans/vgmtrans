@@ -418,10 +418,14 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
         continue;
       }
 
-      Instrument variant = base;
-      variant.regions = std::move(regions);
-      variant.identity.reset();
-      variant.explicitAddress.reset();
+      Instrument variant{
+          .pitchBendRangeCents = base.pitchBendRangeCents,
+          .reverb = base.reverb,
+          .range = base.range,
+          .ym2151 = base.ym2151,
+          .regions = std::move(regions),
+          .modulation = base.modulation,
+      };
       if (envelopeOnly) {
         variant.name = base.name.empty() ? "Dynamic envelope" : base.name + " [dynamic envelope]";
       } else {

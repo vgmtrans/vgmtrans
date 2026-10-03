@@ -38,10 +38,10 @@ template <class T>
 
 template <class T>
 [[nodiscard]] auto storedCommandValue(T value) {
-  if constexpr (std::is_same_v<std::remove_cvref_t<T>, std::string_view>) {
+  if constexpr (std::is_same_v<T, std::string_view>) {
     return std::string(value);
   } else {
-    return std::remove_cvref_t<T>(std::move(value));
+    return T(std::move(value));
   }
 }
 
