@@ -35,8 +35,6 @@ constexpr u8 kPsf1Version = 0x01;
 constexpr u8 kPsf2Version = 0x02;
 constexpr u8 kSsfVersion = 0x11;
 constexpr u32 kGbaRomBase = 0x08000000;
-constexpr size_t kPsf1DataOffset = 0x800;
-constexpr size_t kPsf1LoadAddressOffset = 0x18;
 constexpr int kMaxRecursion = 10;
 
 struct PsfData {
@@ -53,32 +51,34 @@ struct Image {
   std::vector<u8> data;
 };
 
-[[nodiscard]] bool supportedVersion(u8 version) {
-  return version == kPsf1Version || version == kPsf2Version || version == kSsfVersion || version == kGsfVersion ||
-         version == kNds2sfVersion || version == kNcsfVersion;
-}
+struct ExecutableLayout {
+  size_t dataOffset;
+  size_t addressOffset;
+  std::string_view format;
+};
 
-[[nodiscard]] std::optional<size_t> dataOffsetForVersion(u8 version) {
+[[nodiscard]] std::optional<ExecutableLayout> executableLayout(u8 version) {
   switch (version) {
     case kPsf1Version:
-      return kPsf1DataOffset;
+      return ExecutableLayout{0x800, 0x18, source_formats::kPlayStationRam};
     case kSsfVersion:
       // SSF uses the ordinary PSF mini-header: a little-endian load address
       // followed immediately by bytes to overlay into Saturn sound RAM.
-      return 0x04;
+      return ExecutableLayout{0x04, 0x00, source_formats::kSaturnRam};
     case kGsfVersion:
-      return 0x0c;
+      return ExecutableLayout{0x0c, 0x04, source_formats::kGbaRom};
     case kNds2sfVersion:
-      return 0x08;
+      return ExecutableLayout{0x08, 0x00, source_formats::kNintendoDsRom};
     case kNcsfVersion:
-      return 0x00;
+      return ExecutableLayout{0x00, 0x00, source_formats::kNintendoDsRom};
     default:
       return std::nullopt;
   }
 }
 
 [[nodiscard]] bool hasPsfSignature(std::span<const u8> bytes) {
-  return bytes.size() >= 16 && bytes[0] == 'P' && bytes[1] == 'S' && bytes[2] == 'F' && supportedVersion(bytes[3]);
+  return bytes.size() >= 16 && bytes[0] == 'P' && bytes[1] == 'S' && bytes[2] == 'F' &&
+         (bytes[3] == kPsf2Version || executableLayout(bytes[3]).has_value());
 }
 
 [[nodiscard]] u32 le32(std::span<const u8> bytes, size_t offset) {
@@ -331,18 +331,12 @@ void overlayPsfExe(const PsfData& psf, Image& image) {
   if (psf.exe.empty()) {
     return;
   }
-  const auto dataOffset = dataOffsetForVersion(psf.version);
-  size_t addressOffset = 0;
-  if (psf.version == kPsf1Version) {
-    addressOffset = kPsf1LoadAddressOffset;
-  } else if (psf.version == kGsfVersion) {
-    addressOffset = 4;
-  }
-  if (!dataOffset || psf.exe.size() < *dataOffset || psf.exe.size() < addressOffset + 4) {
+  const auto layout = executableLayout(psf.version);
+  if (!layout || psf.exe.size() < layout->dataOffset || psf.exe.size() < layout->addressOffset + 4) {
     throw std::runtime_error("PSF executable header is invalid");
   }
-  const u32 address = le32(psf.exe, addressOffset);
-  const auto data = std::span<const u8>(psf.exe).subspan(*dataOffset);
+  const u32 address = le32(psf.exe, layout->addressOffset);
+  const auto data = std::span<const u8>(psf.exe).subspan(layout->dataOffset);
   size_t imageSize = data.size();
   if (psf.version == kGsfVersion) {
     const u32 declaredSize = le32(psf.exe, 8);
@@ -469,22 +463,6 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
   return std::nullopt;
 }
 
-[[nodiscard]] std::string_view extractedFormat(u8 version) {
-  switch (version) {
-    case kPsf1Version:
-      return source_formats::kPlayStationRam;
-    case kSsfVersion:
-      return source_formats::kSaturnRam;
-    case kGsfVersion:
-      return source_formats::kGbaRom;
-    case kNds2sfVersion:
-    case kNcsfVersion:
-      return source_formats::kNintendoDsRom;
-    default:
-      throw std::logic_error("Unsupported PSF version reached extraction");
-  }
-}
-
 }  // namespace
 
 [[nodiscard]] ExtractionResult extractPsf(const ExtractionInput& input) {
@@ -498,11 +476,11 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
   ExtractionResult result;
   const auto range = input.reader.range(0, input.reader.size());
   const auto psf = parsePsf(bytes);
+  const std::filesystem::path basePath =
+      input.source.path.empty() ? std::filesystem::path{} : input.source.path.parent_path();
 
   if (psf.version == kPsf2Version) {
     Psf2Filesystem filesystem;
-    const std::filesystem::path basePath =
-        input.source.path.empty() ? std::filesystem::path{} : input.source.path.parent_path();
     loadPsf2WithLibs(psf, basePath, filesystem, result.diagnostics, range);
     std::optional<std::string> ini;
     const auto iniMember = filesystem.find("psf2.ini");
@@ -534,8 +512,6 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
   }
 
   Image image;
-  const std::filesystem::path basePath =
-      input.source.path.empty() ? std::filesystem::path{} : input.source.path.parent_path();
   loadWithLibs(psf, basePath, image, result.diagnostics, range);
   if (image.data.empty()) {
     result.diagnostics.push_back(warning("PSF file did not produce an executable image", range));
@@ -546,7 +522,7 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
       .name = sourceName(input.source),
       .path = input.source.path,
       .origin = range,
-      .knownFormat = std::string(extractedFormat(psf.version)),
+      .knownFormat = std::string(executableLayout(psf.version)->format),
   };
   if (auto title = psf.tags.find("title"); title != psf.tags.end() && !title->second.empty()) {
     file.title = title->second;

@@ -1029,8 +1029,8 @@ struct Playback : SequencePlayback<TrackState> {
     const double envelope = context.version == AKAOSNES_V1 ? track.v1Envelope.level() : 1.0;
     // V1 additionally applies the DSP's 11-bit live envelope to its 7-bit
     // channel level; later versions have only the channel-level quantization.
-    const ValueQuantization quantization{.levels = context.version == AKAOSNES_V1 ? 2'048u : 128u};
-    output.level(channelLevel(volume) * envelope, quantization);
+    const u32 sourceLevels = context.version == AKAOSNES_V1 ? 2'048u : 128u;
+    output.level(channelLevel(volume) * envelope, sourceLevels);
   }
 
   void volume(u8 value) {

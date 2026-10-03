@@ -1,6 +1,12 @@
 # Value architecture simplification audit
 
-Starting revision: `e9f4450c3` (`core-rewrite-refactor`).
+Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
+`cb9e0b766`. Seven validated batches remove 579 net production lines from
+`src/value`. All 44 CTest suites pass; the latest real-file replay preserves
+all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
+records appear at the end of this document.
+
+Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
 
 The goal is to make format implementations and the shared architecture easier
 to understand, while retaining SequenceVM, conversion behavior, source
@@ -4323,3 +4329,67 @@ these responsibilities together would either couple pure motion to performance
 containers or repeat interruption rules in the formats. Required draft validation
 also remains a separate pass before consuming any payload. Moving publication
 into every materialization branch saves little and repeats the publication rule.
+
+## Cleanup2: return ordinary values and remove access adapters
+
+The seventh batch removes another 105 production lines from `src/value`,
+bringing the branch to 579 net lines removed. CMake drops one header entry;
+existing tests gain 18 lines overall for builder ownership/range contracts.
+
+- `SamplePoolBuilder::finish()` returns a `SamplePool`, and
+  `InstrumentSetBuilder::finish()` returns an instrument vector. The two
+  result-only wrapper types disappear. Scanner materialization reads the
+  builders' existing ranges after finalization, retaining explicit range
+  precedence, inferred bounds, and bank-to-local-sample fallback. Entries and
+  sparse lookups still invalidate at finish; incomplete required scanner
+  payloads remain repairable before any materialization begins.
+- Removed `SessionSnapshotAccess` and its header. The immutable snapshot takes
+  its owning values directly, and Session emplaces it without an intermediate
+  factory result. The former factory was already publicly callable and did no
+  validation. Immutable storage, indexing, and revision caching are unchanged.
+- Removed `SharedSequenceAccess`. Its two owners construct shared sequences
+  directly through friendship; chunk construction remains private, and the
+  same storage constructor still normalizes chunks and calculates offsets.
+- Source level counts are ordinary `u32 sourceLevels` fields and arguments.
+  The single-field `ValueQuantization` type disappears from core and 25 format
+  implementations. Counts still describe distinct native source values:
+  128 means codes 0–127; zero means continuous/unknown. MIDI preserves the
+  exact greater-than-128 resolution threshold and zero-count tremolo reset.
+- Tempo-relative modulation filtering and derived event headers sit at their
+  actual use sites, removing two single-use private adapters. LFO interval
+  timing drops an impossible zero-after-increment branch: the strict loop
+  upper bound already prevents overflow.
+- PSF executable payload/address offsets and output source format share one
+  version-specific layout value. Separate support/format/offset branches and
+  repeated base-path construction disappear. PSF2's filesystem path remains
+  explicit; mixed library overlays and GSF declared zero tails are unchanged.
+
+Validation:
+
+- Full macOS Release build, Qt/shell/parity included, and all 44 CTest suites
+  pass. The initial build caught three modulation helpers still consumed by
+  legacy `src/main`; their complete original public API was restored before
+  the successful warning-free 157-step repair build. Future API-removal searches
+  include all of `src` and `tests`, rather than only the value implementation.
+- Existing MIDI fixtures pass in independently captured before/after runners;
+  all 49 MIDI outputs and ordered diagnostics match exactly (15,736 bytes).
+  Another 19,584-case renderer comparison matches 3,402,640 bytes, covering
+  level counts from zero through `u32` maximum, all nine resolution pairs,
+  both modulation policies, layered LFOs, tremolo resets, controller repetition,
+  and pan/headroom changes.
+- Tempo-relative fixtures pass in independent sanitizer runners. Four captured
+  inputs, repeated recomputation, complete context/provenance/event ordering,
+  and eight MIDI traces match exactly (6,587 bytes); sanitizers report no findings.
+- Independently compiled PSF extractors match 9,984 cases and 456,931 bytes of
+  extracted source metadata, payloads, diagnostics, and exact exceptions. Cases
+  include all 256 version bytes and truncated headers, every supported layout,
+  CRC/header/decompression failures, load-address boundaries, GSF declared sizes,
+  titles, missing/no-path libraries, numbered libraries, and mixed-version
+  overlays. ASan, UBSan, and float-cast-overflow checks are clean.
+- The frozen seventh-batch executable matches every sixth-batch corpus result:
+  all 252 comparisons and 3,922 artifact hashes, with identical inventories,
+  diagnostics, and exit statuses.
+
+The next pass flattens dependency request wrappers and investigates using the
+ordinary diagnostic value for collection problems. Preserve missing owner
+references in the collection while exporting only live owner attribution.

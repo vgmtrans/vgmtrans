@@ -225,7 +225,7 @@ struct Playback : SequencePlayback<TrackState> {
   void emitMix() {
     const auto [left, right] = channelGains();
     const double level = std::max(std::abs(left), std::abs(right));
-    out.level(level, ValueQuantization{.levels = 256});
+    out.level(level, 256);
     out.stereoBalance(level == 0.0 ? 1.0 : left / level, level == 0.0 ? 1.0 : right / level);
   }
 

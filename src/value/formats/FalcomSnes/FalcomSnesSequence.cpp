@@ -206,7 +206,7 @@ struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   void emitMix() const {
-    out.level(math::level(track.volume), ValueQuantization{.levels = 128});
+    out.level(math::level(track.volume), 128);
     emitPan();
   }
 
@@ -320,7 +320,7 @@ struct Playback : SequencePlayback<TrackState> {
 
   void adjustVolume(int amount) {
     track.volume = static_cast<u8>(std::clamp<int>(track.volume + amount, 0, 0x7f));
-    out.level(math::level(track.volume), ValueQuantization{.levels = 128});
+    out.level(math::level(track.volume), 128);
   }
 
   void setPan(u8 value) {

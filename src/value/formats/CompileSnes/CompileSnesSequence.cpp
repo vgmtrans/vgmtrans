@@ -434,7 +434,7 @@ struct Playback : SequencePlayback<TrackState> {
 
   void emitLevel() const {
     const u8 envelope = track.volumeEnvelope.index == 0 ? 0xff : track.volumeEnvelope.value;
-    out.level(math::volumeGain(track.volume, envelope), ValueQuantization{.levels = 128});
+    out.level(math::volumeGain(track.volume, envelope), 128);
   }
 
   void emitPan() const {

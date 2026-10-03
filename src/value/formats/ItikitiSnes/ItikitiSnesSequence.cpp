@@ -197,8 +197,7 @@ struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   void emitLevel(PerformanceEmitter output) const {
-    output.level(math::channelGain(static_cast<u8>(track.volume.currentRaw()), track.channelVolume),
-                 ValueQuantization{.levels = 256});
+    output.level(math::channelGain(static_cast<u8>(track.volume.currentRaw()), track.channelVolume), 256);
   }
 
   void emitPan(PerformanceEmitter output) const {

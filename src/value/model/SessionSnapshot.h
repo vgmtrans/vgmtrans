@@ -22,10 +22,6 @@
 
 namespace vgmtrans::core {
 
-namespace detail {
-class SessionSnapshotAccess;
-}
-
 struct MiscAsset {
   AssetMetadata metadata;
   std::vector<u8> payload;
@@ -40,6 +36,9 @@ using Asset = std::variant<SequenceProgramAsset, SoundBankAsset, SamplePoolAsset
 // logical sequences even when their backing is shared in multiple chunks.
 class SessionSnapshot {
 public:
+  SessionSnapshot(std::vector<SourceFile> sources, SharedSequence<Asset> assets, std::vector<Collection> collections,
+                  SourceMap sourceMap, std::vector<Diagnostic> diagnostics);
+
   [[nodiscard]] const std::vector<SourceFile>& sources() const noexcept { return storage_->sources; }
   [[nodiscard]] const SharedSequence<Asset>& assets() const noexcept { return storage_->assets; }
   [[nodiscard]] const std::vector<Collection>& collections() const noexcept { return storage_->collections; }
@@ -60,8 +59,6 @@ public:
   [[nodiscard]] size_t countCollectionsContaining(AssetId asset) const;
 
 private:
-  friend class detail::SessionSnapshotAccess;
-
   struct Storage {
     Storage(std::vector<SourceFile> sources, SharedSequence<Asset> assets, std::vector<Collection> collections,
             SourceMap sourceMap, std::vector<Diagnostic> diagnostics);
@@ -75,9 +72,6 @@ private:
     std::unordered_map<u32, const Asset*> assetsById;
     std::unordered_map<u32, size_t> collectionsById;
   };
-
-  SessionSnapshot(std::vector<SourceFile> sources, SharedSequence<Asset> assets, std::vector<Collection> collections,
-                  SourceMap sourceMap, std::vector<Diagnostic> diagnostics);
 
   std::shared_ptr<const Storage> storage_;
 };

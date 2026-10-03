@@ -257,7 +257,7 @@ void akaoPointerInstrumentsSelectTheirExportedPrograms() {
     };
     InstrumentSetBuilder builder{AssetId{99}};
     (void)buildAkaoInstrumentSet(input, analysis, builder);
-    SoundBankAsset bank{.instruments = std::move(builder).finish().values};
+    SoundBankAsset bank{.instruments = std::move(builder).finish()};
     expect(bank.instruments.size() == 2, "pointer fixture should export both instrument tables");
     const auto config = makeAkaoConfig(version);
     const SequenceProgram program{
@@ -967,8 +967,8 @@ void akaoMelodicRegionsDropAdvancingOverlaps() {
   InstrumentSetBuilder builder{AssetId{99}};
   (void)buildAkaoInstrumentSet(input, analysis, builder);
   const auto instruments = std::move(builder).finish();
-  expect(instruments.values.size() == 1, "Akao overlap fixture should parse one melodic instrument");
-  const auto& regions = instruments.values.front().regions;
+  expect(instruments.size() == 1, "Akao overlap fixture should parse one melodic instrument");
+  const auto& regions = instruments.front().regions;
   expect(regions.size() == 3, "Akao advancing overlapping key regions should match legacy filtering");
   expect(regions[0].keyRange.low == 0 && regions[0].keyRange.high == 0x20,
          "Akao first overlap fixture region should keep its high key");

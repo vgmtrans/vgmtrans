@@ -416,8 +416,7 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   void emitLevel(PerformanceEmitter output) {
-    output.level(math::channelGain(track.channelMaster, channelVolume(), track.alternateVolume),
-                 ValueQuantization{.levels = 256});
+    output.level(math::channelGain(track.channelMaster, channelVolume(), track.alternateVolume), 256);
   }
 
   void emitLevel() { emitLevel(out); }

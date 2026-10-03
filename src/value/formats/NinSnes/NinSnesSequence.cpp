@@ -885,7 +885,7 @@ void Playback::tempoFade(u8 length, u8 value) {
 
 void Playback::volume(u8 value) {
   track.volume.setCurrentAt(vm.tick(), value);
-  out.level(math::levelGain(value), ValueQuantization{.levels = 256});
+  out.level(math::levelGain(value), 256);
 }
 
 void Playback::volumeFade(u8 length, u8 value) {
@@ -954,8 +954,7 @@ void Playback::advancePanFade() {
 
 void Playback::advanceVolumeFade() {
   track.volume.tickRaw([&](s32 value) {
-    track.volume.output(out).level(math::levelGain(static_cast<u8>(std::clamp<s32>(value, 0, 0xff))),
-                                   ValueQuantization{.levels = 256});
+    track.volume.output(out).level(math::levelGain(static_cast<u8>(std::clamp<s32>(value, 0, 0xff))), 256);
   });
 }
 

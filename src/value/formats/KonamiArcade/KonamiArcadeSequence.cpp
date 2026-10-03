@@ -603,7 +603,7 @@ struct Playback : SequencePlayback<TrackState> {
 
   void volume(u8 raw) {
     track.volume.setCurrentAt(vm.tick(), raw);
-    out.level(LevelScale::linearFromLinear(volumeGain(raw)), ValueQuantization{.levels = 128});
+    out.level(LevelScale::linearFromLinear(volumeGain(raw)), 128);
   }
 
   void reverb(u8 firstNibble, u8 secondNibble) { out.reverb(reverbGain(firstNibble, secondNibble, isGx())); }
@@ -749,7 +749,7 @@ struct Playback : SequencePlayback<TrackState> {
     track.volume.tickChanged([&](double value) {
       track.volume.output(out).level(
           LevelScale::linearFromLinear(volumeGain(static_cast<u8>(std::clamp(value, 0.0, 255.0)))),
-          ValueQuantization{.levels = 128});
+          128);
     });
     track.pan.tickChanged([&](double value) {
       const auto [left, right] = stereoGains(static_cast<u8>(std::clamp(value, 0.0, 255.0)) | 0x10);

@@ -193,7 +193,7 @@ struct Playback : SequencePlayback<TrackState> {
 
   void volume(u8 value) {
     track.rawVolume = value;
-    out.level(decodedVolume(program.version, value) / 255.0, ValueQuantization{.levels = 256});
+    out.level(decodedVolume(program.version, value) / 255.0, 256);
   }
 
   void indexedVolume(u8 index) { volume(indexedVolumeValue(program.version, index)); }

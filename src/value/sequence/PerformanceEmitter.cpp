@@ -253,17 +253,17 @@ void PerformanceEmitter::restoreEnvelope(EnvelopeFields fields, VoiceEnvelopeSco
   updateEnvelope(EnvelopeUpdate::restore(fields), scope);
 }
 
-void PerformanceEmitter::level(double linearGain, ValueQuantization sourceQuantization) {
+void PerformanceEmitter::level(double linearGain, u32 sourceLevels) {
   append(LevelPerformanceEvent{
       .linearGain = linearGain,
-      .sourceQuantization = sourceQuantization,
+      .sourceLevels = sourceLevels,
   });
 }
 
-void PerformanceEmitter::expression(double linearGain, ValueQuantization sourceQuantization) {
+void PerformanceEmitter::expression(double linearGain, u32 sourceLevels) {
   append(ExpressionPerformanceEvent{
       .linearGain = linearGain,
-      .sourceQuantization = sourceQuantization,
+      .sourceLevels = sourceLevels,
   });
 }
 

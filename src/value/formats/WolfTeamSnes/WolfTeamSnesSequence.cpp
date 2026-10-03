@@ -520,12 +520,12 @@ struct Playback : SequencePlayback<TrackState> {
 
   [[nodiscard]] Effects level(u8 delay, u8 value) {
     const double gain = track.segmented() ? std::min<u8>(value, 0x7f) / 127.0 : value / 255.0;
-    out.level(gain, ValueQuantization{.levels = track.segmented() ? 128u : 256u});
+    out.level(gain, track.segmented() ? 128u : 256u);
     return Effects::wait(delay);
   }
 
   [[nodiscard]] Effects expression(u8 delay, u8 value) {
-    out.expression(value / 255.0, ValueQuantization{.levels = 256});
+    out.expression(value / 255.0, 256);
     return Effects::wait(delay);
   }
 

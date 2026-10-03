@@ -322,7 +322,7 @@ void SessionState::rebuildViews() {
     sourceMaps.push_back(chunk.sourceMap);
   }
 
-  auto assets = detail::SharedSequenceAccess::fromChunks(std::move(assetChunks));
+  SharedSequence<Asset> assets{std::move(assetChunks)};
   auto sourceMap = SourceMap::join(sourceMaps);
   assets_ = std::move(assets);
   sourceMap_ = std::move(sourceMap);

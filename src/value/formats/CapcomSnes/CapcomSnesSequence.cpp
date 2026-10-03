@@ -383,7 +383,7 @@ using CapcomCursor = CompilerCursor<Playback>;
       auto event = cursor.command("Volume", SequenceSemantic::Level);
       const auto raw = cursor.rawU8("raw");
       const double gain = cursor.resolvedValue("linear_gain", raw, math::volumeGain(version, raw.value));
-      return event.emitLevel(gain, ValueQuantization{.levels = 256});
+      return event.emitLevel(gain, 256);
     }
     case 0x08: {
       auto event = cursor.command("Instrument", SequenceSemantic::Instrument);

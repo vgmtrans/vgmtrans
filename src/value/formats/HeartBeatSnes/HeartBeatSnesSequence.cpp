@@ -349,7 +349,7 @@ struct Playback : SequencePlayback<TrackState> {
 
   void volume(u8 value) {
     track.volume.setCurrentAt(vm.tick(), value);
-    out.level(math::channelGain(value), ValueQuantization{.levels = 256});
+    out.level(math::channelGain(value), 256);
   }
 
   void volumeFade(u8 length, u8 target) {
@@ -453,8 +453,7 @@ struct Playback : SequencePlayback<TrackState> {
 
   void tick() {
     track.volume.tickRaw([&](s32 value) {
-      track.volume.output(out).level(math::channelGain(static_cast<u8>(std::clamp<s32>(value, 0, 0xff))),
-                                     ValueQuantization{.levels = 256});
+      track.volume.output(out).level(math::channelGain(static_cast<u8>(std::clamp<s32>(value, 0, 0xff))), 256);
     });
     track.pan.tickRaw([&](s32) { emitPan(track.pan.output(out)); });
     const auto vibratoTick = track.vibrato.depthState.tickFade();

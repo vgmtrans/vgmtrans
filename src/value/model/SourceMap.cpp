@@ -161,7 +161,7 @@ SourceMap::Storage::Storage(std::vector<std::shared_ptr<const Part>> partsValue)
   for (const auto& part : parts) {
     chunks.push_back(part->annotations);
   }
-  annotations = detail::SharedSequenceAccess::fromChunks(std::move(chunks));
+  annotations = SharedSequence<SourceAnnotation>{std::move(chunks)};
 }
 
 SourceMap::SourceMap() : storage_(emptyStorage()) {

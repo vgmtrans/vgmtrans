@@ -681,7 +681,7 @@ struct Playback : SequencePlayback<TrackState> {
   [[nodiscard]] Effects volume(const EventTiming& timing, u8 value) {
     const u32 delay = beginEvent(timing);
     track.volume = value;
-    out.level(byteGain(value), ValueQuantization{.levels = 256});
+    out.level(byteGain(value), 256);
     return Effects::wait(delay);
   }
 
@@ -794,7 +794,7 @@ struct Playback : SequencePlayback<TrackState> {
     // The SPC700 ADC is intentionally eight-bit; the legacy parser's
     // saturating/double-add behavior was not what the driver executes.
     track.volume = static_cast<u8>(track.volume + value);
-    out.level(byteGain(track.volume), ValueQuantization{.levels = 256});
+    out.level(byteGain(track.volume), 256);
     return Effects::wait(delay);
   }
 

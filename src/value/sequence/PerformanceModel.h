@@ -135,24 +135,20 @@ struct EnvelopePerformanceEvent {
   PerformanceLaneId lane{0};
 };
 
-struct ValueQuantization {
-  // Number of levels in the source value's native scale, not a destination bit width.
-  // Zero means the source is continuous or its quantization is unknown.
-  u32 levels = 0;
-};
-
 struct LevelPerformanceEvent {
   PerformanceEventHeader header;
   // Interpreted loudness as linear amplitude/gain, not a MIDI controller value.
   double linearGain = 1.0;
-  ValueQuantization sourceQuantization;
+  // Distinct source levels: 128 for codes 0-127; zero means continuous or unknown.
+  u32 sourceLevels = 0;
 };
 
 struct ExpressionPerformanceEvent {
   PerformanceEventHeader header;
   // Interpreted expression as linear amplitude/gain, not a MIDI controller value.
   double linearGain = 1.0;
-  ValueQuantization sourceQuantization;
+  // Distinct source levels: 128 for codes 0-127; zero means continuous or unknown.
+  u32 sourceLevels = 0;
 };
 
 struct PanPerformanceEvent {

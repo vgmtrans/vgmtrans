@@ -606,7 +606,7 @@ using Cursor = CompilerCursor<Playback>;
       auto event = cursor.command("Volume", SequenceSemantic::Level);
       const u8 delta = cursor.u8("delta");
       const u8 value = cursor.u8("volume");
-      return event.emitLevel(linearController(value), ValueQuantization{.levels = 128}).wait(delta);
+      return event.emitLevel(linearController(value), 128).wait(delta);
     }
     case 0x86: {
       auto event = cursor.command("Expression", SequenceSemantic::Level);

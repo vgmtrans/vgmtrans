@@ -294,7 +294,7 @@ struct Playback : SequencePlayback<TrackState> {
       return;
     }
     track.emittedMix = mix;
-    out.level(volume / 256.0, ValueQuantization{.levels = 256});
+    out.level(volume / 256.0, 256);
     const double left = (balance >> 4) / 16.0;
     const double right = (balance & 0x0f) / 16.0;
     if (layout().mono) {

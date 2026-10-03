@@ -205,8 +205,8 @@ public:
       });
     }
 
-    Event& emitLevel(double gain, ValueQuantization quantization = {}) {
-      return appendCallable([=](Playback& playback) { playback.out.level(gain, quantization); });
+    Event& emitLevel(double gain, u32 sourceLevels = 0) {
+      return appendCallable([=](Playback& playback) { playback.out.level(gain, sourceLevels); });
     }
 
     Event& emitExpression(double gain) {

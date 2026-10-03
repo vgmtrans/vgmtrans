@@ -277,7 +277,7 @@ struct Playback : SequencePlayback<TrackState> {
 
   [[nodiscard]] u8 physicalChannel() const { return track.physicalChannelFlags & 7; }
 
-  void emitLevel() { out.level(math::gain(track.volume), ValueQuantization{.levels = 256}); }
+  void emitLevel() { out.level(math::gain(track.volume), 256); }
 
   void emitPan() {
     const u8 pan = std::min<u8>(track.pan, 20);

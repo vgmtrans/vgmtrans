@@ -585,7 +585,7 @@ void finalizeSegSatPerformance(PerformanceSequence& performance, std::span<const
         event = LevelPerformanceEvent{
             .header = header,
             .linearGain = exportedChannelGain,
-            .sourceQuantization = ValueQuantization{.levels = 128},
+            .sourceLevels = 128,
         };
         continue;
       }

@@ -114,7 +114,7 @@ std::string performanceTrackSnapshot(const PerformanceTrack& track) {
           } else if constexpr (std::is_same_v<T, LevelPerformanceEvent>) {
             snapshot += "level@" + std::to_string(typedEvent.header.tick) + '=' +
                         snapshotNumber(typedEvent.linearGain) + "/q" +
-                        std::to_string(typedEvent.sourceQuantization.levels);
+                        std::to_string(typedEvent.sourceLevels);
           } else if constexpr (std::is_same_v<T, PanPerformanceEvent>) {
             snapshot += "pan@" + std::to_string(typedEvent.header.tick) + '=' +
                         snapshotNumber(typedEvent.stereoPosition) + ',' + snapshotNumber(typedEvent.linearGain);
@@ -498,7 +498,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
     return std::holds_alternative<LevelPerformanceEvent>(event);
   });
   expect(levelEvent != performance.tracks[0].events.end() &&
-             std::get<LevelPerformanceEvent>(*levelEvent).sourceQuantization.levels == 256,
+             std::get<LevelPerformanceEvent>(*levelEvent).sourceLevels == 256,
          "CapcomSnes volume should retain neutral source quantization rather than a MIDI bit width");
   const SequenceModulationProfile modulationProfile = analyzeSequenceModulation(performance);
   const MidiSequence midiSequence =

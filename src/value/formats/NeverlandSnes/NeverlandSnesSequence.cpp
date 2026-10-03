@@ -372,7 +372,7 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   [[nodiscard]] Effects volume(u8 wait, u8 value) {
-    out.level(math::gain(value), ValueQuantization{.levels = 128});
+    out.level(math::gain(value), 128);
     return Effects::wait(wait);
   }
 

@@ -96,8 +96,8 @@ void psxAdpcmCatalogBoundsStreamsAndKeepsSampleReferences() {
            "sample references should resolve relative source offsets after rejected streams are omitted");
     const auto built = std::move(samples).finish();
     const auto annotations = sourceMap.finish();
-    for (u32 index = 0; index < built.value.samples.size(); ++index) {
-      const auto& sample = built.value.samples[index];
+    for (u32 index = 0; index < built.samples.size(); ++index) {
+      const auto& sample = built.samples[index];
       expect(sample.name == "Sample " + std::to_string(index) && sample.codec == AudioCodec::PsxAdpcm &&
                  sample.sampleRate == kPs2SpuSampleRate && sample.channels == 1 &&
                  sample.loop == streams.at(index * 16).loop,

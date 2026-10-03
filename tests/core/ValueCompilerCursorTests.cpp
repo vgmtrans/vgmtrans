@@ -153,7 +153,7 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
           },
           {std::string_view(domain)});
       domain.assign(domain.size(), 'x');
-      return event.emitLevel(0.5).emitLevel(0.75, ValueQuantization{.levels = 64});
+      return event.emitLevel(0.5).emitLevel(0.75, 64);
     }
     case 0x2e:
       return cursor.command("Envelope Stages", SequenceSemantic::State)
@@ -364,8 +364,8 @@ void compilerCursorOwnsOutputValuesAfterDecoding() {
              boundInstrument.instrument == instrument.instrument &&
              boundInstrument.envelopeMode == instrument.envelopeMode,
          "direct output and bound arguments must own the source domain and preserve envelope policy");
-  expect(continuous.linearGain == 0.5 && continuous.sourceQuantization.levels == 0 && quantized.linearGain == 0.75 &&
-             quantized.sourceQuantization.levels == 64,
+  expect(continuous.linearGain == 0.5 && continuous.sourceLevels == 0 && quantized.linearGain == 0.75 &&
+             quantized.sourceLevels == 64,
          "compiled level output must distinguish unspecified quantization from a declared native scale");
 }
 

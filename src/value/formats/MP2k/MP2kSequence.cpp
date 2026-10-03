@@ -29,7 +29,7 @@ using namespace core;
 namespace {
 
 constexpr u32 kMaxTrackCommands = 262144;
-constexpr ValueQuantization kMp2kLevelQuantization{.levels = 128};
+constexpr u32 kMp2kSourceLevels = 128;
 constexpr std::array<u8, 49> kClockTable{
     0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
     28, 30, 32, 36, 40, 42, 44, 48, 52, 54, 56, 60, 64, 66, 68, 72, 76, 78, 80, 84, 88, 90, 92, 96,
@@ -159,7 +159,7 @@ struct Playback : SequencePlayback<TrackState> {
         tone.cgbType() == 0 ? track.volume / 127.0 : cgbSpeakerLevel(tone, cgbMix(127, voicePan, false).envelope);
     if (level != track.emittedLevel) {
       track.emittedLevel = level;
-      out.level(level, kMp2kLevelQuantization);
+      out.level(level, kMp2kSourceLevels);
     }
   }
 

@@ -8,7 +8,6 @@
 
 #include "value/export/CollectionStitch.h"
 #include "value/export/Export.h"
-#include "value/model/SessionSnapshotAccess.h"
 #include "value/scan/AssetCatalog.h"
 #include "value/scan/AssetResolution.h"
 #include "value/scan/FormatModule.h"
@@ -316,8 +315,8 @@ void Session::scanPendingSources() {
 
 SessionSnapshot Session::snapshot() const {
   if (!snapshotCache_) {
-    snapshotCache_.emplace(detail::SessionSnapshotAccess::create(
-        sources_.sourceFiles(), state_->assets(), state_->collections(), state_->sourceMap(), state_->diagnostics()));
+    snapshotCache_.emplace(
+        sources_.sourceFiles(), state_->assets(), state_->collections(), state_->sourceMap(), state_->diagnostics());
   }
   return *snapshotCache_;
 }

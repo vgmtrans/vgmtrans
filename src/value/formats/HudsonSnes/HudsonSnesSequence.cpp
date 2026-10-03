@@ -596,7 +596,7 @@ struct Playback : SequencePlayback<TrackState> {
 
   void emitLevel(PerformanceEmitter output) const {
     output.level(math::levelGain(track.version, effectiveVolume(), track.velocity),
-                 ValueQuantization{.levels = static_cast<u16>(math::maximumVolume(track.version) + 1)});
+                 static_cast<u16>(math::maximumVolume(track.version) + 1));
     if (track.version != Version::V2) {
       emitPan(output);
     }

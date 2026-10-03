@@ -369,7 +369,7 @@ void fadesUseTheDelayedCommandTime() {
     return value && value->header.sourceCommand.valid() && !value->header.automation;
   });
   expect(level != track.events.end() && performanceEventHeader(*level).tick == 8 &&
-             std::get<LevelPerformanceEvent>(*level).sourceQuantization.levels == 128,
+             std::get<LevelPerformanceEvent>(*level).sourceLevels == 128,
          "the immediate level command should retain its delta and source quantization");
 }
 

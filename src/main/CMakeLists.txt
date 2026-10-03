@@ -136,7 +136,6 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/model/SourceMap.cpp
     ${PROJECT_SOURCE_DIR}/src/value/model/SourceInspection.cpp
     ${PROJECT_SOURCE_DIR}/src/value/model/SessionSnapshot.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/model/SessionSnapshotAccess.h
     ${PROJECT_SOURCE_DIR}/src/value/session/SessionState.cpp
     ${PROJECT_SOURCE_DIR}/src/value/session/SessionState.h
     ${PROJECT_SOURCE_DIR}/src/value/session/Session.cpp

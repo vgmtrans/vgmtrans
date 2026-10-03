@@ -473,7 +473,7 @@ struct Playback : SequencePlayback<TrackState> {
   void volume(u8 value) {
     value &= 0x7f;
     track.volume.setCurrentAt(vm.tick(), value);
-    out.level(math::levelGain(value), ValueQuantization{.levels = 128});
+    out.level(math::levelGain(value), 128);
   }
 
   void volumeAdd(s8 delta) { volume(static_cast<u8>(track.volume.currentRaw() + delta)); }
@@ -607,8 +607,7 @@ struct Playback : SequencePlayback<TrackState> {
       }
     }
     track.volume.tickRaw([&](s32 value) {
-      track.volume.output(out).level(math::levelGain(static_cast<u8>(std::clamp<s32>(value, 0, 0x7f))),
-                                     ValueQuantization{.levels = 128});
+      track.volume.output(out).level(math::levelGain(static_cast<u8>(std::clamp<s32>(value, 0, 0x7f))), 128);
     });
     track.pan.tickRaw(
         [&](s32 value) { emitPan(track.pan.output(out), static_cast<u8>(std::clamp<s32>(value, 0, 0xff))); });

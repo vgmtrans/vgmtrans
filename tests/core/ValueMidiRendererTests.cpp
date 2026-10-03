@@ -462,8 +462,7 @@ void performanceMidiRendererKeepsPanGainOutOfExpression() {
   }
 
   PerformanceSequence precisePerformance = performance;
-  std::get<ExpressionPerformanceEvent>(precisePerformance.tracks[0].events[0]).sourceQuantization =
-      ValueQuantization{.levels = 256};
+  std::get<ExpressionPerformanceEvent>(precisePerformance.tracks[0].events[0]).sourceLevels = 256;
   const MidiSequence preciseMidi = renderTestMidi(precisePerformance);
   expect(
       std::count_if(preciseMidi.tracks[0].events.begin(), preciseMidi.tracks[0].events.end(),
@@ -582,12 +581,12 @@ void performanceMidiRendererHonorsMidiExportOptions() {
                                                   LevelPerformanceEvent{
                                                       .header = PerformanceEventHeader{.tick = 0},
                                                       .linearGain = 1.0,
-                                                      .sourceQuantization = ValueQuantization{.levels = 256},
+                                                      .sourceLevels = 256,
                                                   },
                                                   ExpressionPerformanceEvent{
                                                       .header = PerformanceEventHeader{.tick = 0},
                                                       .linearGain = 1.0,
-                                                      .sourceQuantization = ValueQuantization{.levels = 256},
+                                                      .sourceLevels = 256,
                                                   },
                                               },
                                       },

@@ -173,7 +173,7 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   void emitLevel(PerformanceEmitter output) const {
-    output.level(math::levelGain(track.volume, track.temporaryVolume), ValueQuantization{.levels = 256});
+    output.level(math::levelGain(track.volume, track.temporaryVolume), 256);
   }
 
   void emitPan(PerformanceEmitter output) const {

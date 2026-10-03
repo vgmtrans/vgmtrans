@@ -166,11 +166,11 @@ struct LoweredStereoBalance {
 }
 
 [[nodiscard]] MidiLevelResolution resolveLevelResolution(MidiLevelResolution requested,
-                                                         ValueQuantization quantization = {}) {
+                                                         u32 sourceLevels = 0) {
   if (requested != MidiLevelResolution::Auto) {
     return requested;
   }
-  if (quantization.levels > 128) {
+  if (sourceLevels > 128) {
     return MidiLevelResolution::FourteenBit;
   }
   return MidiLevelResolution::SevenBit;
@@ -565,9 +565,8 @@ void flushLfo(SimulatedLfoState& lfo, u64 upToTick, const PerformanceTempoMap& t
   }
 
   while (lfo.cursorTick < upToTick) {
-    ++lfo.cursorTick;
-    const u64 intervalTick = lfo.cursorTick == 0 ? 0 : lfo.cursorTick - 1;
-    const double tickSeconds = tempos.tickSeconds(intervalTick);
+    ++lfo.cursorTick;  // The strict upper bound prevents overflow.
+    const double tickSeconds = tempos.tickSeconds(lfo.cursorTick - 1);
     const double tickMilliseconds = tickSeconds * 1000.0;
     const bool inactive =
         lfo.cyclesPerTick.value_or(lfo.frequencyHz) <= 0.0 || (lfo.depth <= 0.0 && !lfo.phaseRunsAtZeroDepth);
@@ -706,7 +705,7 @@ private:
   std::vector<PitchSample> pitchSamples;
   bool pitchRequested = false;
   double sourceLevelGain = 1.0;
-  ValueQuantization sourceLevelQuantization;
+  u32 sourceVolumeLevels = 0;
   double panLevelGain = 1.0;
   double levelHeadroom = 1.0;
   // The channel has one value per controller, shared by all automations and
@@ -714,7 +713,7 @@ private:
   std::optional<MidiLevelState> lastVolume;
   std::optional<MidiLevelState> lastExpression;
   double sourceExpressionGain = 1.0;
-  ValueQuantization sourceExpressionQuantization;
+  u32 sourceExpressionLevels = 0;
   double simulatedTremoloGain = 1.0;
   enum class TremoloDepthUnit {
     LegacyUnipolar,
@@ -749,8 +748,8 @@ private:
   }
 
   void addLevelController(std::optional<MidiLevelState>& state, u64 tick, MidiController controller, double linearGain,
-                          MidiLevelResolution requestedResolution, ValueQuantization quantization, bool force) {
-    const MidiLevelResolution resolution = resolveLevelResolution(requestedResolution, quantization);
+                          MidiLevelResolution requestedResolution, u32 sourceLevels, bool force) {
+    const MidiLevelResolution resolution = resolveLevelResolution(requestedResolution, sourceLevels);
     const u16 value = resolution == MidiLevelResolution::FourteenBit ? LevelScale::midi14FromLinear(linearGain)
                                                                      : LevelScale::midi7FromLinear(linearGain);
     const MidiLevelState nextState{.resolution = resolution, .value = value};
@@ -918,7 +917,7 @@ private:
   // channel volume so source expression remains an independent control flow.
   void addCombinedLevel(u64 tick, bool force = true) {
     addLevelController(lastVolume, tick, MidiController::ChannelVolume, sourceLevelGain * panLevelGain * levelHeadroom,
-                       options.volumeResolution, sourceLevelQuantization, force);
+                       options.volumeResolution, sourceVolumeLevels, force);
   }
 
   // Source expression and simulated tremolo share the remaining MIDI expression
@@ -927,7 +926,7 @@ private:
     const bool simulatingTremolo = modulationConversion == ModulationConversionPolicy::SequenceEventSimulation;
     addLevelController(lastExpression, tick, MidiController::Expression, sourceExpressionGain * simulatedTremoloGain,
                        options.expressionResolution,
-                       simulatingTremolo ? ValueQuantization{} : sourceExpressionQuantization, force);
+                       simulatingTremolo ? 0 : sourceExpressionLevels, force);
   }
 
   [[nodiscard]] double tremoloGain(double lfoValue) const {
@@ -1102,11 +1101,11 @@ private:
             applyInstrumentSelection(typedEvent.header.tick, typedEvent.selection, true, typedEvent.forceBankSelect);
           } else if constexpr (std::is_same_v<TypedEvent, LevelPerformanceEvent>) {
             sourceLevelGain = typedEvent.linearGain;
-            sourceLevelQuantization = typedEvent.sourceQuantization;
+            sourceVolumeLevels = typedEvent.sourceLevels;
             addCombinedLevel(typedEvent.header.tick, forceControllers);
           } else if constexpr (std::is_same_v<TypedEvent, ExpressionPerformanceEvent>) {
             sourceExpressionGain = typedEvent.linearGain;
-            sourceExpressionQuantization = typedEvent.sourceQuantization;
+            sourceExpressionLevels = typedEvent.sourceLevels;
             addCombinedExpression(typedEvent.header.tick, modulationConversion, forceControllers);
           } else if constexpr (std::is_same_v<TypedEvent, PanPerformanceEvent>) {
             sourcePanPosition = typedEvent.stereoPosition;

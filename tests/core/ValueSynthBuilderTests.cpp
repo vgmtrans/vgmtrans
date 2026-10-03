@@ -242,10 +242,10 @@ void brrAliasesRetainLoopIdentityAndSeparateSourceRecords() {
              refs.findSrcn(1)->index() == 0 && refs.findSrcn(2)->index() == 1 && refs.findSrcn(3)->index() == 1 &&
              refs.findSrcn(3)->owner() == asset,
          "aliases must share a concrete reference only when both BRR data and loop position match");
-  expect(built.value.samples.size() == 3 && built.value.samples[0].loop.start == 0 &&
-             built.value.samples[0].loop.length == 32 && built.value.samples[1].loop.start == 16 &&
-             built.value.samples[1].loop.length == 16 && built.value.samples[2].loop.start == 16 &&
-             built.value.samples[2].loop.length == 16,
+  expect(built.samples.size() == 3 && built.samples[0].loop.start == 0 &&
+             built.samples[0].loop.length == 32 && built.samples[1].loop.start == 16 &&
+             built.samples[1].loop.length == 16 && built.samples[2].loop.start == 16 &&
+             built.samples[2].loop.length == 16,
          "aliased directory entries must retain their individual sample values");
   expect(annotations.annotations().front().range == reader.range(4, 12),
          "the directory annotation must cover every retained SRCN, including aliases");
@@ -265,6 +265,7 @@ void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
   SamplePoolBuilder samples(asset, &sourceMap, &diagnostics);
   const SourceRange directory{.source = source, .offset = 8, .size = 16};
   samples.include(directory);
+  samples.include(SourceRange{.source = SourceId{99}, .size = 1000});
   const auto root = samples.source(SourceRole::Table, "Sample Table", directory, "probe-sample-table");
 
   auto first = samples.add(7, Sample{
@@ -302,11 +303,17 @@ void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
              secondRef->index() == 1 && !samples.find(99),
          "sample lookup should resolve sparse keys to dense references and reject missing keys");
 
-  const auto built = std::move(samples).finish();
-  const auto& collection = built.value;
+  const Sample* firstValue = &first.value();
+  const auto collection = std::move(samples).finish();
   const SourceMap annotations = sourceMap.finish();
-  expect(built.range == directory, "finish should return the final sample collection range");
+  expect(samples.range() == directory, "finish should retain the final sample collection range");
   expect(collection.samples.size() == 2, "sample builder should finish ordinary sample values");
+  expect(firstValue == &collection.samples.front() && !first && !second && !samples.find(7),
+         "finish must transfer sample ownership and invalidate builder entries and sparse lookups");
+  expectThrows<std::logic_error>([&] { static_cast<void>(std::move(samples).finish()); },
+                                "sample builder finalization must still reject a second finish");
+  expectThrows<std::logic_error>([&] { static_cast<void>(samples.add(30, Sample{})); },
+                                "sample builder finalization must still reject adding values afterward");
   expect(firstRef && collection.samples[firstRef->index()].name == "First" && secondRef &&
              collection.samples[secondRef->index()].name == "Fallback",
          "concrete sample references should retain their meaning after finalization");
@@ -342,6 +349,7 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
   InstrumentSetBuilder instruments(instrumentsAsset, &sourceMap, &diagnostics);
   const SourceRange table{.source = source, .offset = 0, .size = 80};
   instruments.include(table);
+  instruments.include(SourceRange{.source = SourceId{99}, .size = 1000});
 
   auto kit = instruments.getOrAdd(
       700, Instrument{.explicitAddress = InstrumentAddress{.bank = 127, .program = 5}, .name = "Drum Kit"});
@@ -389,12 +397,18 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
   instruments.append(Instrument{.name = "Derived", .regions = {Region{}}});
 
   expect(instruments.range() == table, "an explicit instrument table should remain the asset's primary range");
-  const auto built = std::move(instruments).finish();
-  const auto& values = built.values;
+  const Instrument* firstValue = &kit.value();
+  const auto values = std::move(instruments).finish();
   const SourceMap annotations = sourceMap.finish();
-  expect(built.range == table, "finish should return the final instrument set range");
+  expect(instruments.range() == table, "finish should retain the final instrument set range");
   expect(values.size() == 3 && values[0].regions.size() == 2,
          "instrument builder should finish grouped, sparse, and appended ordinary values");
+  expect(firstValue == &values.front() && !kit && !sameKit && !firstRegion && !secondRegion,
+         "finish must transfer instrument ownership and invalidate instrument and region entry views");
+  expectThrows<std::logic_error>([&] { static_cast<void>(std::move(instruments).finish()); },
+                                "instrument builder finalization must still reject a second finish");
+  expectThrows<std::logic_error>([&] { static_cast<void>(instruments.append(Instrument{})); },
+                                "instrument builder finalization must still reject adding values afterward");
   expect(values[0].range == SourceRange{.source = source, .offset = 16, .size = 8},
          "instrument source records should supply a missing durable range");
   expect(values[0].regions[0].range == SourceRange{.source = source, .offset = 20, .size = 42},
@@ -678,16 +692,21 @@ void detachedBuildersUseTheSameAuthoringSurface() {
   instrument.region(concreteSample, Region{})
       .source("Detached Region", SourceRange{.source = source, .offset = 44, .size = 4});
 
+  const SourceRange sampleRange = samples.range();
+  const SourceRange instrumentRange = instruments.range();
+  samples.source(SourceRole::Table, "Foreign source", SourceRange{.source = SourceId{99}, .size = 1000});
+  instruments.source(SourceRole::Table, "Foreign source", SourceRange{.source = SourceId{99}, .size = 1000});
   const auto sampleValues = std::move(samples).finish();
   const auto instrumentValues = std::move(instruments).finish();
-  expect(sampleValues.range == SourceRange{.source = source, .offset = 20, .size = 89} &&
-             instrumentValues.range == SourceRange{.source = source, .offset = 40, .size = 8},
-         "source ranges must contribute to asset bounds even without an annotation sink");
-  expect(sampleValues.value.samples.size() == 1 && instrumentValues.values.size() == 1 &&
-             instrumentValues.values[0].regions.size() == 1,
+  expect(samples.range() == sampleRange && instruments.range() == instrumentRange &&
+             sampleRange == SourceRange{.source = source, .offset = 20, .size = 89} &&
+             instrumentRange == SourceRange{.source = source, .offset = 40, .size = 8},
+         "inferred ranges must remain inspectable after finish and ignore foreign sources without an annotation sink");
+  expect(sampleValues.samples.size() == 1 && instrumentValues.size() == 1 &&
+             instrumentValues[0].regions.size() == 1,
          "detached builders should finish ordinary values through the scan-time vocabulary");
-  expect(instrumentValues.values[0].range == SourceRange{.source = source, .offset = 40, .size = 4} &&
-             instrumentValues.values[0].regions[0].range == SourceRange{.source = source, .offset = 44, .size = 4},
+  expect(instrumentValues[0].range == SourceRange{.source = source, .offset = 40, .size = 4} &&
+             instrumentValues[0].regions[0].range == SourceRange{.source = source, .offset = 44, .size = 4},
          "detached source calls should still accumulate durable object ranges");
   expect(diagnostics.empty(), "valid detached construction should not report diagnostics");
 }

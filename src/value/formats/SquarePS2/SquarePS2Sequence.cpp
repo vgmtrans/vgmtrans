@@ -626,7 +626,7 @@ using Cursor = CompilerCursor<Playback>;
     case 0x22: {
       auto event = beginEvent(cursor, *source, "Level", SequenceSemantic::Level);
       const s8 level = cursor.s8("level");
-      return event.emitLevel(controller(level), ValueQuantization{.levels = 128});
+      return event.emitLevel(controller(level), 128);
     }
     case 0x23:
       return beginEvent(cursor, *source, "Level Fade", SequenceSemantic::Level)
@@ -635,7 +635,7 @@ using Cursor = CompilerCursor<Playback>;
       auto event = beginEvent(cursor, *source, "Expression", SequenceSemantic::Level);
       const s8 expression = cursor.s8("expression");
       return event.invoke([expression](Playback& playback) {
-        playback.out.expression(controller(expression), ValueQuantization{.levels = 128});
+        playback.out.expression(controller(expression), 128);
       });
     }
     case 0x25:

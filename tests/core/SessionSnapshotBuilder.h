@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "value/model/SessionSnapshotAccess.h"
+#include "value/model/SessionSnapshot.h"
 
 #include <utility>
 
@@ -23,8 +23,8 @@ public:
   std::vector<Diagnostic> diagnostics;
 
   [[nodiscard]] SessionSnapshot finish() {
-    return detail::SessionSnapshotAccess::create(std::move(sources), SharedSequence<Asset>{std::move(assets)},
-                                                 std::move(collections), std::move(sourceMap), std::move(diagnostics));
+    return SessionSnapshot{std::move(sources), SharedSequence<Asset>{std::move(assets)}, std::move(collections),
+                           std::move(sourceMap), std::move(diagnostics)};
   }
 };
 

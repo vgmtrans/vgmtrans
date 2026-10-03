@@ -228,18 +228,14 @@ std::optional<SampleRef> SamplePoolBuilder::find(u64 sourceKey) const {
   return SampleRef::resolved(asset_, found->second);
 }
 
-BuiltSamplePool SamplePoolBuilder::finish() && {
+SamplePool SamplePoolBuilder::finish() && {
   if (finished_) {
     throw std::logic_error("SamplePoolBuilder was finished more than once");
   }
   finishSources();
-  const SourceRange finalRange = range();
   indexes_.clear();
   finished_ = true;
-  return BuiltSamplePool{
-      .value = SamplePool{.samples = std::move(samples_)},
-      .range = finalRange,
-  };
+  return SamplePool{.samples = std::move(samples_)};
 }
 
 SamplePoolBuilder::Entry::Entry(SamplePoolBuilder& builder, u32 index) : builder_(&builder), index_(index) {
@@ -334,17 +330,13 @@ InstrumentSetBuilder::Entry InstrumentSetBuilder::getOrAdd(u64 groupingKey, Inst
   return add(groupingKey, std::move(initialValue));
 }
 
-BuiltInstrumentSet InstrumentSetBuilder::finish() && {
+std::vector<Instrument> InstrumentSetBuilder::finish() && {
   if (finished_) {
     throw std::logic_error("InstrumentSetBuilder was finished more than once");
   }
   finishSources();
-  const SourceRange finalRange = range();
   finished_ = true;
-  return BuiltInstrumentSet{
-      .values = std::move(instruments_),
-      .range = finalRange,
-  };
+  return std::move(instruments_);
 }
 
 InstrumentSetBuilder::Entry::Entry(InstrumentSetBuilder& builder, u32 index) : builder_(&builder), index_(index) {

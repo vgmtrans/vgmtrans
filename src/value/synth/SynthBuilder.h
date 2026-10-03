@@ -55,11 +55,6 @@ protected:
 
 }  // namespace detail
 
-struct BuiltSamplePool {
-  SamplePool value;
-  SourceRange range;
-};
-
 // Builds one sample pool while keeping sparse source keys, dense model
 // indexes, and source annotations synchronized.
 class SamplePoolBuilder : public detail::SynthBuilderSources {
@@ -80,7 +75,7 @@ public:
   [[nodiscard]] bool empty() const noexcept { return samples_.empty(); }
   [[nodiscard]] size_t size() const noexcept { return samples_.size(); }
 
-  [[nodiscard]] BuiltSamplePool finish() &&;
+  [[nodiscard]] SamplePool finish() &&;
 
   class Entry {
   public:
@@ -115,11 +110,6 @@ private:
   bool finished_ = false;
 };
 
-struct BuiltInstrumentSet {
-  std::vector<Instrument> values;
-  SourceRange range;
-};
-
 // Builds one bank's instruments while assigning durable dense identities to
 // instruments and regions and projecting their sample relationships.
 class InstrumentSetBuilder : public detail::SynthBuilderSources {
@@ -142,7 +132,7 @@ public:
   [[nodiscard]] bool empty() const noexcept { return instruments_.empty(); }
   [[nodiscard]] size_t size() const noexcept { return instruments_.size(); }
 
-  [[nodiscard]] BuiltInstrumentSet finish() &&;
+  [[nodiscard]] std::vector<Instrument> finish() &&;
 
   class Entry {
   public:

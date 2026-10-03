@@ -16,20 +16,8 @@
 
 namespace vgmtrans::core {
 
-template <typename T>
-class SharedSequence;
-
-namespace detail {
-
-class SharedSequenceAccess {
-public:
-  template <typename T>
-  [[nodiscard]] static SharedSequence<T> fromChunks(std::vector<std::shared_ptr<const std::vector<T>>> chunks) {
-    return SharedSequence<T>{std::move(chunks)};
-  }
-};
-
-}  // namespace detail
+class SessionState;
+class SourceMap;
 
 // An immutable logical sequence whose backing values may be shared in several
 // contiguous chunks. Chunk boundaries are deliberately absent from the public
@@ -112,7 +100,8 @@ public:
   [[nodiscard]] const_iterator end() const noexcept { return {storage_.get(), storage_->chunks.size(), 0}; }
 
 private:
-  friend class detail::SharedSequenceAccess;
+  friend class SessionState;
+  friend class SourceMap;
 
   struct Storage {
     explicit Storage(std::vector<std::shared_ptr<const std::vector<T>>> values) : chunks(std::move(values)) {

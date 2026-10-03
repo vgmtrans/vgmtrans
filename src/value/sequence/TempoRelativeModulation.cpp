@@ -44,16 +44,6 @@ struct EventRef {
   return static_cast<double>(ticks) * secondsPerTick * 1000.0;
 }
 
-[[nodiscard]] PerformanceEventHeader derivedHeader(const TempoPerformanceEvent& tempo,
-                                                   const PerformanceTrack& track) {
-  return PerformanceEventHeader{
-      .sourceAnnotation = tempo.header.sourceAnnotation,
-      .track = track.id,
-      .tick = tempo.header.tick,
-      .sequence = tempo.header.sequence,
-  };
-}
-
 void resolveContext(ModulationPerformanceEvent& event, double secondsPerTick) {
   if (event.context.cyclesPerTick) {
     event.context.frequencyHz = hertz(*event.context.cyclesPerTick, secondsPerTick);
@@ -69,11 +59,6 @@ void resolveContext(ModulationPerformanceEvent& event, double secondsPerTick) {
            (modulation->context.delay && modulation->context.delay->tempoRelative);
   }
   return false;
-}
-
-[[nodiscard]] bool belongsInTimeline(const PerformanceEvent& event) {
-  return std::holds_alternative<TempoPerformanceEvent>(event) ||
-         std::holds_alternative<ModulationPerformanceEvent>(event);
 }
 
 }  // namespace
@@ -98,7 +83,8 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
   for (size_t trackIndex = 0; trackIndex < performance.tracks.size(); ++trackIndex) {
     auto& track = performance.tracks[trackIndex];
     for (auto& event : track.events) {
-      if (belongsInTimeline(event)) {
+      if (std::holds_alternative<TempoPerformanceEvent>(event) ||
+          std::holds_alternative<ModulationPerformanceEvent>(event)) {
         timeline.push_back(EventRef{.event = &event, .trackIndex = trackIndex});
       }
     }
@@ -132,7 +118,12 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
         }
         for (const auto& [key, modulation] : states[trackIndex]) {
           auto update = *modulation;
-          update.header = derivedHeader(*tempo, track);
+          update.header = PerformanceEventHeader{
+              .sourceAnnotation = tempo->header.sourceAnnotation,
+              .track = track.id,
+              .tick = tempo->header.tick,
+              .sequence = tempo->header.sequence,
+          };
           update.tempoDerived = true;
           resolveContext(update, secondsPerTick);
           derived[trackIndex].emplace_back(std::move(update));

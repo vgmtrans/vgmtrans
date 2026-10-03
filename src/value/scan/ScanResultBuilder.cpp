@@ -194,20 +194,21 @@ ScanResult ScanResultBuilder::finish() {
           } else if constexpr (std::is_same_v<Pending, ScanSoundBankDraft::Pending>) {
             auto instruments = std::move(pending.instruments).finish();
             auto samples = std::move(pending.samples).finish();
-            const SourceRange primaryRange = instruments.range.valid() ? instruments.range : samples.range;
+            const SourceRange instrumentRange = pending.instruments.range();
+            const SourceRange primaryRange = instrumentRange.valid() ? instrumentRange : pending.samples.range();
             return SoundBankAsset{
                 .metadata = metadata(pending.id, std::move(pending.name), primaryRange),
-                .instruments = std::move(instruments.values),
-                .localSamples = std::move(samples.value),
+                .instruments = std::move(instruments),
+                .localSamples = std::move(samples),
                 .privateData = std::move(pending.privateData),
                 .recipe = std::move(pending.recipe),
                 .prepare = std::move(pending.prepare),
             };
           } else if constexpr (std::is_same_v<Pending, ScanSamplePoolDraft::Pending>) {
-            auto built = std::move(pending.samples).finish();
+            auto pool = std::move(pending.samples).finish();
             return SamplePoolAsset{
-                .metadata = metadata(pending.id, std::move(pending.name), built.range),
-                .pool = std::move(built.value),
+                .metadata = metadata(pending.id, std::move(pending.name), pending.samples.range()),
+                .pool = std::move(pool),
                 .privateData = std::move(pending.privateData),
             };
           } else {

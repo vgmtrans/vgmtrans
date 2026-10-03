@@ -178,8 +178,8 @@ struct Playback : SequencePlayback<PlaybackTrack> {
   Playback(SequencePlayback<TrackHandle> context, ProgramState& state)
       : SequencePlayback{state.tracks.at(context.track.index), context.out, context.vm}, program(state) {}
 
-  void emitLevel() { out.level(track.volume / 127.0, ValueQuantization{.levels = 128}); }
-  void emitExpression() { out.expression(track.expression / 127.0, ValueQuantization{.levels = 128}); }
+  void emitLevel() { out.level(track.volume / 127.0, 128); }
+  void emitExpression() { out.expression(track.expression / 127.0, 128); }
 
   void emitBalance() {
     const u8 pan = track.currentRegion && track.currentRegion->panOverride ? *track.currentRegion->panOverride
