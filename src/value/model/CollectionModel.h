@@ -22,16 +22,6 @@ struct CollectionMembers {
   std::vector<AssetId> miscAssets;
 };
 
-// Explains a problem to the user. Severity controls how it is shown; the
-// dependency's ResolutionStatus determines whether preparation can proceed.
-struct CollectionIssue {
-  Severity severity = Severity::Info;
-  std::string code;
-  std::string message;
-  std::optional<AssetId> asset;
-  SourceRange range;
-};
-
 // Listed from least to most serious; a collection reports the most serious
 // outcome among its dependencies. Incomplete or ambiguous selections may still
 // be usable, but Failed blocks preparation, regardless of diagnostic severity.
@@ -96,7 +86,9 @@ struct Collection {
   // banks and sample pools loaded from the same or separate sources.
   // Original choices: automatic collections retain only their root and inspection assets.
   CollectionMembers selection;
-  std::vector<CollectionIssue> issues;
+  // Messages may refer to missing assets. ResolutionStatus controls preparation;
+  // diagnostic severity controls presentation.
+  std::vector<Diagnostic> issues;
   CollectionInputs inputs;
 
   [[nodiscard]] CollectionMembers members() const { return collectionMembers(selection, inputs); }
@@ -106,10 +98,10 @@ struct Collection {
   [[nodiscard]] ResolutionStatus resolutionStatus() const noexcept { return inputs.status(); }
 };
 
-[[nodiscard]] CollectionIssue missingSequenceIssue(std::optional<AssetId> asset = std::nullopt);
-[[nodiscard]] CollectionIssue missingSoundBankIssue(std::optional<AssetId> asset = std::nullopt);
-[[nodiscard]] CollectionIssue missingSamplePoolIssue(std::optional<AssetId> asset = std::nullopt);
-[[nodiscard]] CollectionIssue ambiguousMatchIssue(std::string message = "Collection has ambiguous matches",
-                                                  std::optional<AssetId> asset = std::nullopt, SourceRange range = {});
+[[nodiscard]] Diagnostic missingSequenceIssue(std::optional<AssetId> asset = std::nullopt);
+[[nodiscard]] Diagnostic missingSoundBankIssue(std::optional<AssetId> asset = std::nullopt);
+[[nodiscard]] Diagnostic missingSamplePoolIssue(std::optional<AssetId> asset = std::nullopt);
+[[nodiscard]] Diagnostic ambiguousMatchIssue(std::string message = "Collection has ambiguous matches",
+                                            std::optional<AssetId> asset = std::nullopt, SourceRange range = {});
 
 }  // namespace vgmtrans::core

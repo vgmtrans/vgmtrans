@@ -195,7 +195,7 @@ void scanResultBuilderPublishesCollectionsByDefaultAndPreservesOptOut() {
              collections.front().name == "Song" && collections.front().members().soundBanks.empty(),
          "publishing a sequence must create a collection even without bank requests or explicit collection metadata");
   const auto& retained = std::get<SequenceProgramAsset>(result.assets.back());
-  expect(retained.metadata.id == loose.id() && retained.recipe.banks.size() == 2 &&
+  expect(retained.metadata.id == loose.id() && retained.bankRequests.size() == 2 &&
              retained.collection.miscAssets == std::vector{table.id()} && !retained.collection.enabled,
          "bank requests, naming, and supplemental assets must not undo an explicit collection opt-out");
 }

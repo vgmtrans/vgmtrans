@@ -23,11 +23,11 @@ public:
       if (const auto* sequence = assets_.asset<SequenceProgramAsset>(*result_.selection.sequence)) {
         if (mode_ == ResolutionMode::Manual) {
           // Manual choices replace all requests, including exact scanner links.
-          if (!sequence->recipe.banks.empty() || !selected<SoundBankAsset>().empty()) {
+          if (!sequence->bankRequests.empty() || !selected<SoundBankAsset>().empty()) {
             accept<SoundBankAsset>(sequence->metadata, banks, selectAll(selected<SoundBankAsset>()));
           }
         } else {
-          requests<SoundBankAsset>(sequence->metadata, banks, sequence->recipe.banks);
+          requests<SoundBankAsset>(sequence->metadata, banks, sequence->bankRequests);
         }
       } else {
         banks.status = ResolutionStatus::Failed;
@@ -42,7 +42,7 @@ public:
     for (const auto& target : banks.targets) {
       const auto& bank = *assets_.asset<SoundBankAsset>(target.asset);
       CollectionBank input{.bank = target.asset};
-      requests<SamplePoolAsset>(bank.metadata, input.samples, bank.recipe.samples);
+      requests<SamplePoolAsset>(bank.metadata, input.samples, bank.sampleRequests);
       concreteSamples(bank, input.samples);
       result_.inputs.banks.push_back(std::move(input));
     }
@@ -80,7 +80,7 @@ private:
   }
 
   // Scanners may already identify the pool supplying a region. Include those
-  // uses without requiring the format to repeat the same links in its recipe.
+  // uses without requiring the format to repeat the same links in its requests.
   void concreteSamples(const SoundBankAsset& bank, ResolvedInputs& resolved) {
     DependencySelection samples;
     for (const auto& instrument : bank.instruments) {
@@ -103,8 +103,8 @@ private:
   template <class Provider>
   void accept(const AssetMetadata& owner, ResolvedInputs& resolved, const DependencySelection& selection) {
     for (auto diagnostic : selection.issues()) {
-      if (!diagnostic.asset) {
-        diagnostic.asset = owner.id;
+      if (!diagnostic.object) {
+        diagnostic.object = ObjectRefs::asset(owner.id);
       }
       if (!diagnostic.range.valid()) {
         diagnostic.range = owner.range;
@@ -113,7 +113,7 @@ private:
     }
     if (selection.status() == ResolutionStatus::Incomplete && selection.issues().empty()) {
       auto missing = std::is_same_v<Provider, SoundBankAsset> ? missingSoundBankIssue() : missingSamplePoolIssue();
-      missing.asset = owner.id;
+      missing.object = ObjectRefs::asset(owner.id);
       missing.range = owner.range;
       result_.issues.push_back(std::move(missing));
     }
@@ -133,8 +133,8 @@ private:
                                   .message = !correctType
                                                  ? "Asset dependency refers to a missing or wrong-type provider"
                                                  : "Asset dependency selected a provider outside the manual collection",
-                                  .asset = owner.id,
-                                  .range = owner.range});
+                                  .range = owner.range,
+                                  .object = ObjectRefs::asset(owner.id)});
         continue;
       }
       // Banks are used once. Pools can be used at several distinct placements.

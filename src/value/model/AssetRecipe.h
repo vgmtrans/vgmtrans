@@ -33,7 +33,7 @@ public:
   }
   [[nodiscard]] const std::vector<DependencyTarget>& targets() const { return targets_; }
   [[nodiscard]] const std::vector<DependencyTarget>& alternatives() const { return alternatives_; }
-  [[nodiscard]] const std::vector<CollectionIssue>& issues() const { return issues_; }
+  [[nodiscard]] const std::vector<Diagnostic>& issues() const { return issues_; }
 
   // An empty selection is incomplete. Adding inputs resolves it unless the
   // request has already reported missing coverage, ambiguity, or failure.
@@ -73,7 +73,7 @@ private:
   ResolutionStatus status_ = ResolutionStatus::Resolved;
   std::vector<DependencyTarget> targets_;
   std::vector<DependencyTarget> alternatives_;
-  std::vector<CollectionIssue> issues_;
+  std::vector<Diagnostic> issues_;
 };
 
 using DependencySelector = std::function<DependencySelection(const DependencyContext&)>;
@@ -82,15 +82,5 @@ using BankPreparer = std::function<void(BankPreparationContext&)>;
 // Use an asset ID when scanning already found the input. Otherwise, a callback
 // chooses from the available assets when collections are rebuilt.
 using DependencyRequest = std::variant<DependencyTarget, DependencySelector>;
-
-// Recipes describe which inputs are needed. Preparation callbacks later use
-// those inputs to make the sequence or bank ready for playback and export.
-struct SequenceRecipe {
-  std::vector<DependencyRequest> banks;
-};
-
-struct BankRecipe {
-  std::vector<DependencyRequest> samples;
-};
 
 }  // namespace vgmtrans::core

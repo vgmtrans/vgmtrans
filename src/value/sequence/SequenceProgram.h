@@ -337,7 +337,7 @@ struct SequenceProgramAsset {
   SequenceProgram program;
   AssetPrivateData privateData;
   SequenceCollectionOptions collection;
-  SequenceRecipe recipe;
+  std::vector<DependencyRequest> bankRequests;
   SequencePreparer prepare;
 };
 

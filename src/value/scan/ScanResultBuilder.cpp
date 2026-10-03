@@ -27,7 +27,7 @@ ScanSequenceDraft& ScanSequenceDraft::program(SequenceProgram program) {
 }
 
 ScanSequenceDraft& ScanSequenceDraft::useBank(AssetId bank) {
-  pending_->recipe.banks.emplace_back(DependencyTarget{bank, {}});
+  pending_->bankRequests.emplace_back(DependencyTarget{bank, {}});
   return *this;
 }
 
@@ -39,7 +39,7 @@ ScanSequenceDraft& ScanSequenceDraft::useBanks(DependencySelector select) {
   if (!select) {
     throw std::invalid_argument("Bank request has no selector");
   }
-  pending_->recipe.banks.emplace_back(std::move(select));
+  pending_->bankRequests.emplace_back(std::move(select));
   return *this;
 }
 
@@ -49,7 +49,7 @@ ScanSequenceDraft& ScanSequenceDraft::prepare(SequencePreparer prepare) {
 }
 
 ScanSoundBankDraft& ScanSoundBankDraft::useSamples(AssetId samples) {
-  pending_->recipe.samples.emplace_back(DependencyTarget{samples, {}});
+  pending_->sampleRequests.emplace_back(DependencyTarget{samples, {}});
   return *this;
 }
 
@@ -61,7 +61,7 @@ ScanSoundBankDraft& ScanSoundBankDraft::useSamples(DependencySelector select) {
   if (!select) {
     throw std::invalid_argument("Sample request has no selector");
   }
-  pending_->recipe.samples.emplace_back(std::move(select));
+  pending_->sampleRequests.emplace_back(std::move(select));
   return *this;
 }
 
@@ -188,7 +188,7 @@ ScanResult ScanResultBuilder::finish() {
                 .program = std::move(*pending.program),
                 .privateData = std::move(pending.privateData),
                 .collection = std::move(pending.collection),
-                .recipe = std::move(pending.recipe),
+                .bankRequests = std::move(pending.bankRequests),
                 .prepare = std::move(pending.prepare),
             };
           } else if constexpr (std::is_same_v<Pending, ScanSoundBankDraft::Pending>) {
@@ -201,7 +201,7 @@ ScanResult ScanResultBuilder::finish() {
                 .instruments = std::move(instruments),
                 .localSamples = std::move(samples),
                 .privateData = std::move(pending.privateData),
-                .recipe = std::move(pending.recipe),
+                .sampleRequests = std::move(pending.sampleRequests),
                 .prepare = std::move(pending.prepare),
             };
           } else if constexpr (std::is_same_v<Pending, ScanSamplePoolDraft::Pending>) {

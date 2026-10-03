@@ -1,7 +1,7 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Seven validated batches remove 579 net production lines from
+`cb9e0b766`. Eight validated batches remove 615 net production lines from
 `src/value`. All 44 CTest suites pass; the latest real-file replay preserves
 all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
 records appear at the end of this document.
@@ -4393,3 +4393,55 @@ Validation:
 The next pass flattens dependency request wrappers and investigates using the
 ordinary diagnostic value for collection problems. Preserve missing owner
 references in the collection while exporting only live owner attribution.
+
+## Cleanup2 eighth batch: direct requests and ordinary collection diagnostics
+
+This batch removes another 36 net production C++ lines, bringing cleanup2 to
+615 removed. Focused attribution coverage adds 52 net test lines; dependency
+documentation grows by four lines. The format-facing scanner DSL is unchanged.
+
+- Sequence assets and drafts retain `bankRequests` directly; sound banks and
+  drafts retain `sampleRequests`. The single-vector `SequenceRecipe` and
+  `BankRecipe` wrappers disappear. Native format recipe types remain independent.
+- Collection and dependency messages use the ordinary `Diagnostic` value.
+  `CollectionIssue` and its field-by-field export projection disappear. Missing
+  and engaged-invalid asset references remain stored on immutable collections;
+  binding copies the messages and clears only attribution to absent assets.
+  Severity still controls presentation, while resolution status controls
+  whether preparation proceeds. Message fields and ordering remain unchanged.
+- `ObjectRefs` constructors live inline beside `ObjectRef` in `CoreTypes.h`.
+  Their exact aggregate construction and signatures are unchanged. Collection
+  diagnostics no longer need a source-annotation header for ordinary object IDs.
+- Collection binding uses its required reference directly, removing the
+  redundant pointer alias and repeated dereferences.
+
+Tradeoff: on the tested x86_64h/libc++ build, `CollectionIssue` occupied 88 bytes
+and `Diagnostic` occupies 112 bytes. The additional 24 bytes per uncommon
+collection message buy removal of a separate model and conversion path, and
+use the established source/object attribution vocabulary. No message strings
+or reference semantics are dropped to reduce this size.
+
+Validation:
+
+- The complete 377-step macOS Release build, including Qt, shell, and parity,
+  is warning-free. All 44 CTest suites pass.
+- The attribution fixture checks automatic and manual collections, distinct
+  ordered messages, live/missing/engaged-invalid/absent owners, exact diagnostic
+  fields, immutable original references, and preparation despite error severity
+  when dependencies are resolved.
+- Frozen before/after runners match all 252 trace lines across 14 dependency
+  scenarios: automatic/manual direct, all, ambiguous, missing, wrong-type,
+  exception, and empty requests. They compare statuses, membership, target
+  placements, alternatives, stored references, complete ordered binding
+  diagnostics, and prepared bank order.
+- The frozen eighth-batch executable matches all seventh-batch corpus results:
+  252 comparisons and 3,922 artifact hashes, with identical inventories,
+  diagnostics, and exit statuses.
+
+Further review found a reconstructible fixed linear LFO fade plan, redundant
+initial-tempo storage, and an idempotent repeat-counter guard. These are queued
+for the next batch with before/after timing and state comparisons. The MIDI
+planner's chronological output remains a tested contract; removing its sort
+would shift that responsibility onto consumers, so the proposed change was
+rejected. Adding merge machinery to its renderer would increase conceptual
+overhead and was also rejected.

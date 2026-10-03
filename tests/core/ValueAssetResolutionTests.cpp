@@ -13,6 +13,7 @@
 #include "SessionSnapshotBuilder.h"
 
 #include <array>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -90,6 +91,53 @@ void collectionStatusControlsPreparationIndependentlyOfDiagnostics() {
       expect(prepared == usable && bound.collection.has_value() == usable,
              "export must use the same typed outcome: failure blocks even without diagnostics; other outcomes may "
              "prepare despite error diagnostics");
+    }
+  }
+}
+
+void collectionMessagesRetainReferencesAndBindOnlyLiveOwners() {
+  SourceStore sources;
+  const auto source = sources.add(SourceFile{.name = "attribution.probe"}, std::vector<u8>(16));
+  const auto range = sources.reader(source).range(4, 2);
+  const AssetId sequenceId{1};
+  const AssetId bankId{2};
+  const std::vector<Asset> assets{
+      SequenceProgramAsset{.metadata = {.id = sequenceId, .range = range},
+                           .bankRequests = {DependencyTarget{bankId, {}}}},
+      SoundBankAsset{.metadata = {.id = bankId, .range = range}},
+  };
+  const AssetCatalog catalog{sources, SharedSequence<Asset>{assets}};
+  const std::array owners{std::optional{bankId}, std::optional{AssetId{99}}, std::optional{AssetId{}},
+                          std::optional<AssetId>{}};
+  for (const auto mode : {ResolutionMode::Automatic, ResolutionMode::Manual}) {
+    Collection collection{.id = CollectionId{1}, .selection = {.sequence = sequenceId, .soundBanks = {bankId}}};
+    resolveDependencies(catalog, collection, mode);
+    for (size_t index = 0; index < owners.size(); ++index) {
+      const auto owner = owners[index];
+      collection.issues.push_back({.severity = Severity::Error,
+                                   .code = "presentation-" + std::to_string(index),
+                                   .message = "Collection message " + std::to_string(index),
+                                   .range = range,
+                                   .object = owner ? std::optional{ObjectRefs::asset(*owner)} : std::nullopt});
+    }
+    test::SessionSnapshotBuilder builder;
+    builder.sources = sources.sourceFiles();
+    builder.assets = assets;
+    builder.collections = {collection};
+    const auto snapshot = builder.finish();
+    const auto bound = bindCollection(snapshot, collection.id);
+    expect(collection.resolutionStatus() == ResolutionStatus::Resolved && bound.collection &&
+               bound.diagnostics.size() == owners.size(),
+           "error messages must not block resolved automatic or manual preparation");
+    for (size_t index = 0; index < owners.size(); ++index) {
+      const auto& diagnostic = bound.diagnostics[index];
+      const auto expected = index == 0 ? std::optional{ObjectRefs::asset(bankId)} : std::nullopt;
+      expect(diagnostic.severity == Severity::Error && diagnostic.code == "presentation-" + std::to_string(index) &&
+                 diagnostic.message == "Collection message " + std::to_string(index) && diagnostic.range == range &&
+                 !diagnostic.annotation && diagnostic.object == expected,
+             "binding must preserve ordered message fields and attribute only live asset owners");
+      expect(snapshot.collections().front().issues[index].object == collection.issues[index].object,
+             "binding must preserve missing, invalid, and absent references in the immutable collection");
     }
   }
 }
@@ -177,13 +225,13 @@ void dependenciesPreserveSharingPlacementsAndPrivatePreparation() {
   const AssetId sequenceId{1}, firstBank{2}, secondBank{3}, poolId{4};
   SequenceProgramAsset sequence{
       .metadata = {.id = sequenceId, .format = "Sequence"},
-      .recipe = {.banks = {exact(firstBank), exact(secondBank)}},
+      .bankRequests = {exact(firstBank), exact(secondBank)},
   };
   auto bank = [&](AssetId id, u32 position) {
     return SoundBankAsset{
         .metadata = {.id = id, .format = "Bank"},
         .instruments = {Instrument{.regions = {Region{.sample = SampleRef::unbound(0)}}}},
-        .recipe = {.samples = {exact(poolId, position)}},
+        .sampleRequests = {exact(poolId, position)},
         .prepare =
             [](BankPreparationContext& context) {
               const auto input = context.sample<PoolData>();
@@ -215,8 +263,8 @@ void dependenciesPreserveSharingPlacementsAndPrivatePreparation() {
   const auto prepared = bindCollection(snapshot, CollectionId{1});
   expect(prepared.collection.has_value(), "cross-format banks should prepare through their own asset hooks");
   const auto& banks = prepared.collection->soundBanks();
-  expect(!banks[0].prepare && banks[0].recipe.samples.empty(),
-         "prepared banks should not retain discovery recipes or callbacks");
+  expect(!banks[0].prepare && banks[0].sampleRequests.empty(),
+         "prepared banks should not retain discovery requests or callbacks");
   expect(banks[0].instruments.front().regions.front().sample.index() == 2 &&
              banks[1].instruments.front().regions.front().sample.index() == 5 &&
              banks[1].instruments.front().explicitAddress->bank == 1,
@@ -259,13 +307,13 @@ void manualChoicesOverrideSequenceRequestsAndConstrainBankInputs() {
   SourceStore sources;
   SequenceProgramAsset sequence{
       .metadata = {.id = AssetId{1}},
-      .recipe = {.banks = {DependencyTarget{AssetId{99}, {}}}},
+      .bankRequests = {DependencyTarget{AssetId{99}, {}}},
   };
   SoundBankAsset bank{
       .metadata = {.id = AssetId{2}},
-      .recipe = {.samples = {[](const DependencyContext& context) {
-                   return selectAll(context.candidates<SamplePoolAsset, PoolData>());
-                 }}},
+      .sampleRequests = {[](const DependencyContext& context) {
+        return selectAll(context.candidates<SamplePoolAsset, PoolData>());
+      }},
   };
   std::vector<Asset> assets{sequence, bank};
   for (u32 id : {3, 4, 5}) {
@@ -283,14 +331,14 @@ void manualChoicesOverrideSequenceRequestsAndConstrainBankInputs() {
   expect(inputs.size() == 2 && inputs[0].asset == AssetId{5} && inputs[1].asset == AssetId{3},
          "manual sample candidates must preserve user precedence and exclude unselected assets");
 
-  auto& multipleRequests = std::get<SequenceProgramAsset>(assets.front()).recipe.banks;
+  auto& multipleRequests = std::get<SequenceProgramAsset>(assets.front()).bankRequests;
   multipleRequests.push_back(DependencyTarget{AssetId{98}, {}});
   Collection overridden{.selection = manual.selection};
   resolveDependencies(AssetCatalog{sources, SharedSequence<Asset>{assets}}, overridden, ResolutionMode::Manual);
   expect(overridden.inputs.banks.size() == 1,
          "manual choices should replace all requests for a role with one ordered selection");
 
-  std::get<SoundBankAsset>(assets[1]).recipe.samples.front() = exact(AssetId{4});
+  std::get<SoundBankAsset>(assets[1]).sampleRequests.front() = exact(AssetId{4});
   Collection escaped{.selection = manual.selection};
   resolveDependencies(AssetCatalog{sources, SharedSequence<Asset>{assets}}, escaped, ResolutionMode::Manual);
   expect(escaped.issues.size() == 1 && escaped.issues.front().code == "invalid-dependency",
@@ -302,10 +350,10 @@ void manualChoicesStaySeparateFromRepeatedSampleUses() {
   bool prepared = false;
   test::SessionSnapshotBuilder builder;
   builder.assets = {
-      SequenceProgramAsset{.metadata = {.id = AssetId{1}}, .recipe = {.banks = {DependencyTarget{AssetId{2}, {}}}}},
+      SequenceProgramAsset{.metadata = {.id = AssetId{1}}, .bankRequests = {DependencyTarget{AssetId{2}, {}}}},
       SoundBankAsset{
           .metadata = {.id = AssetId{2}},
-          .recipe = {.samples = {exact(AssetId{3}, 4), exact(AssetId{3}, 12)}},
+          .sampleRequests = {exact(AssetId{3}, 4), exact(AssetId{3}, 12)},
           .prepare = [&](BankPreparationContext& context) {
             const auto samples = context.samples<PoolData>();
             prepared = samples.size() == 2 && samples[0].asset.metadata.id == AssetId{3} &&
@@ -338,10 +386,12 @@ void manualChoicesStaySeparateFromRepeatedSampleUses() {
 
 void dependencyFailuresAreLocalAndAmbiguityRetainsAlternatives() {
   SourceStore sources;
-  SequenceProgramAsset sequence{.metadata = {.id = AssetId{1}},
-                                .recipe = {.banks = {[](const DependencyContext& context) {
-                                             return selectOne(context.candidates<SoundBankAsset>());
-                                           }}}};
+  SequenceProgramAsset sequence{
+      .metadata = {.id = AssetId{1}},
+      .bankRequests = {[](const DependencyContext& context) {
+        return selectOne(context.candidates<SoundBankAsset>());
+      }},
+  };
   SoundBankAsset first{.metadata = {.id = AssetId{2}}};
   SoundBankAsset second{.metadata = {.id = AssetId{3}}};
   auto resolve = [&](std::vector<Asset> assets) {
@@ -356,13 +406,13 @@ void dependencyFailuresAreLocalAndAmbiguityRetainsAlternatives() {
              choice.issues.front().severity == Severity::Warning,
          "an unresolved choice must retain candidates without claiming both providers");
 
-  sequence.recipe.banks.front() = exact(first.metadata.id);
-  first.recipe.samples.push_back(DependencyTarget{second.metadata.id, {}});
+  sequence.bankRequests.front() = exact(first.metadata.id);
+  first.sampleRequests.push_back(DependencyTarget{second.metadata.id, {}});
   const auto invalid = resolve({sequence, first, second});
   expect(invalid.front().inputs.banks.front().samples.status == ResolutionStatus::Failed &&
              invalid.front().issues.front().code == "invalid-dependency",
          "banks can only depend on sample pools; a bank-to-bank request must fail without traversal");
-  first.recipe.samples.front() = [](const DependencyContext&) -> DependencySelection { throw 7; };
+  first.sampleRequests.front() = [](const DependencyContext&) -> DependencySelection { throw 7; };
   const auto threw = resolve({sequence, first, second});
   expect(threw.front().issues.front().code == "dependency-resolution-failed",
          "nonstandard selector exceptions must also remain local to the affected collection");
@@ -376,9 +426,9 @@ void automaticCandidatesRespectContainerBoundaries() {
   const SourceId bankFile = sources.add(SourceFile{.name = "bank", .parent = second}, {0});
   SequenceProgramAsset sequence{
       .metadata = {.id = AssetId{1}, .range = sources.reader(sequenceFile).range(0, 1)},
-      .recipe = {.banks = {[](const DependencyContext& context) {
-                   return selectOne(context.candidates<SoundBankAsset>());
-                 }}},
+      .bankRequests = {[](const DependencyContext& context) {
+        return selectOne(context.candidates<SoundBankAsset>());
+      }},
   };
   SoundBankAsset bank{.metadata = {.id = AssetId{2}, .range = sources.reader(bankFile).range(0, 1)}};
   const AssetCatalog catalog(sources, SharedSequence<Asset>{std::vector<Asset>{sequence, bank}});
@@ -397,7 +447,7 @@ void resolutionStatusAndAlternativePlacementsSurvivePublication() {
                                                 {AssetId{2}, AssetPrivateData::make(u32{12})}};
   SoundBankAsset bank{
       .metadata = {.id = AssetId{1}},
-      .recipe = {.samples = {[positions](const DependencyContext&) { return selectOne(positions); }}},
+      .sampleRequests = {[positions](const DependencyContext&) { return selectOne(positions); }},
   };
   SamplePoolAsset samples{.metadata = {.id = AssetId{2}}};
   const AssetCatalog catalog{sources, SharedSequence<Asset>{std::vector<Asset>{bank, samples}}};
@@ -410,7 +460,7 @@ void resolutionStatusAndAlternativePlacementsSurvivePublication() {
              *selection.alternatives[1].placement.get<u32>() == 12,
          "ambiguity must preserve distinct placements within the same provider");
 
-  bank.recipe.samples = {exact(AssetId{2}, 4), exact(AssetId{2}, 12)};
+  bank.sampleRequests = {exact(AssetId{2}, 4), exact(AssetId{2}, 12)};
   bank.prepare = [](BankPreparationContext& context) {
     expect(context.inputs.size() == 2 && *context.inputs[0].placement.get<u32>() == 4 &&
                *context.inputs[1].placement.get<u32>() == 12,
@@ -421,7 +471,7 @@ void resolutionStatusAndAlternativePlacementsSurvivePublication() {
   expect(bindSoundBank(placed.finish(), bank.metadata.id).collection.has_value(),
          "a bank may use the same pool at several positions");
 
-  bank.recipe.samples.front() = [](const DependencyContext&) {
+  bank.sampleRequests.front() = [](const DependencyContext&) {
     return DependencySelection::failed("the native sample request failed");
   };
   desired = {.selection = {.soundBanks = {bank.metadata.id}}};
@@ -440,7 +490,7 @@ void resolutionStatusAndAlternativePlacementsSurvivePublication() {
   expect(!bindCollection(builder.finish(), CollectionId{1}).collection,
          "fatal resolution status must block preparation independently of diagnostic codes");
 
-  bank.recipe.samples = {[](const DependencyContext&) { return DependencySelection{}; }};
+  bank.sampleRequests = {[](const DependencyContext&) { return DependencySelection{}; }};
   desired = {.selection = {.soundBanks = {bank.metadata.id}}};
   resolveDependencies(AssetCatalog{sources, SharedSequence<Asset>{std::vector<Asset>{bank}}}, desired);
   expect(desired.inputs.banks.front().samples.status == ResolutionStatus::Incomplete &&
@@ -453,18 +503,19 @@ void combinedRequestsPreserveUnresolvedOutcomes() {
   for (const auto status : {ResolutionStatus::Incomplete, ResolutionStatus::Ambiguous, ResolutionStatus::Failed}) {
     SequenceProgramAsset sequence{
         .metadata = {.id = AssetId{1}},
-        .recipe = {.banks = {exact(AssetId{2}),
-                             [status](const DependencyContext&) {
-                               if (status == ResolutionStatus::Failed) {
-                                 return DependencySelection::failed("failed request");
-                               }
-                               DependencySelection selection;
-                               if (status == ResolutionStatus::Ambiguous) {
-                                 selection.ambiguous({{AssetId{3}, {}}}, "unresolved choice");
-                               }
-                               return selection;
-                             },
-                             exact(AssetId{2})}},
+        .bankRequests = {
+            exact(AssetId{2}),
+            [status](const DependencyContext&) {
+              if (status == ResolutionStatus::Failed) {
+                return DependencySelection::failed("failed request");
+              }
+              DependencySelection selection;
+              if (status == ResolutionStatus::Ambiguous) {
+                selection.ambiguous({{AssetId{3}, {}}}, "unresolved choice");
+              }
+              return selection;
+            },
+            exact(AssetId{2})},
     };
     const auto collections = dependencyCollections(AssetCatalog{
         sources, SharedSequence<Asset>{std::vector<Asset>{sequence, SoundBankAsset{.metadata = {.id = AssetId{2}}}}}});
@@ -541,7 +592,7 @@ void singleSampleInputRejectsInvalidSelections() {
     test::SessionSnapshotBuilder builder;
     builder.assets = {
         SoundBankAsset{.metadata = {.id = AssetId{1}, .range = bankRange},
-                       .recipe = {.samples = entry.inputs},
+                       .sampleRequests = entry.inputs,
                        .prepare =
                            [](BankPreparationContext& context) {
                              static_cast<void>(context.sample<PoolData>("expected one sample body"));
@@ -564,7 +615,7 @@ void sequencePreparationConfiguresPrivateBanksInOnePass() {
   auto makeSequence = [&](u32 id, u32 address) {
     return SequenceProgramAsset{
         .metadata = {.id = AssetId{id}, .format = "Sequence"},
-        .recipe = {.banks = {DependencyTarget{bankId, {}}, DependencyTarget{bankId, {}}}},
+        .bankRequests = {DependencyTarget{bankId, {}}, DependencyTarget{bankId, {}}},
         .prepare = [address](SequencePreparationContext& context) {
           const auto banks = context.banks<ProbeData>("Bank");
           expect(banks.size() == 1 && banks.front().data.value == 43,
@@ -650,6 +701,7 @@ void runValueAssetResolutionTests() {
   manualChoicesOverrideSequenceRequestsAndConstrainBankInputs();
   dependencyFailuresAreLocalAndAmbiguityRetainsAlternatives();
   collectionStatusControlsPreparationIndependentlyOfDiagnostics();
+  collectionMessagesRetainReferencesAndBindOnlyLiveOwners();
   matchingKeepsTiesAndRejectsIncompatibleCandidates();
   discoveryExposesTypedAssetDataAndSources();
 }

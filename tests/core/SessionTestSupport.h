@@ -152,11 +152,11 @@ struct ProbeBankData {
           },
       .program = probeSequenceProgram(),
       .privateData = AssetPrivateData::make(ProbeBankData{.bank = bank}),
-      .recipe = {.banks = {[bank](const DependencyContext& context) {
-                   auto banks = context.candidates<SoundBankAsset, ProbeBankData>();
-                   std::erase_if(banks, [bank](const auto& candidate) { return candidate.data->bank != bank; });
-                   return selectAll(banks);
-                 }}},
+      .bankRequests = {[bank](const DependencyContext& context) {
+        auto banks = context.candidates<SoundBankAsset, ProbeBankData>();
+        std::erase_if(banks, [bank](const auto& candidate) { return candidate.data->bank != bank; });
+        return selectAll(banks);
+      }},
   };
 
   ScanResult result;

@@ -70,6 +70,55 @@ struct ObjectRef {
   friend constexpr bool operator==(ObjectRef, ObjectRef) noexcept = default;
 };
 
+namespace ObjectRefs {
+
+[[nodiscard]] inline ObjectRef asset(AssetId asset) {
+  return ObjectRef{.kind = ObjectKind::Asset, .asset = asset};
+}
+
+[[nodiscard]] inline ObjectRef sequence(AssetId sequenceAsset) {
+  return ObjectRef{.kind = ObjectKind::Sequence, .asset = sequenceAsset};
+}
+
+[[nodiscard]] inline ObjectRef sequenceTrack(AssetId sequenceAsset, u32 trackIndex) {
+  return ObjectRef{.kind = ObjectKind::SequenceTrack, .asset = sequenceAsset, .index0 = trackIndex};
+}
+
+[[nodiscard]] inline ObjectRef instrument(AssetId soundBankAsset, u32 instrumentIndex) {
+  return ObjectRef{.kind = ObjectKind::Instrument, .asset = soundBankAsset, .index0 = instrumentIndex};
+}
+
+[[nodiscard]] inline ObjectRef region(AssetId soundBankAsset, u32 instrumentIndex, u32 regionIndex) {
+  return ObjectRef{
+      .kind = ObjectKind::Region,
+      .asset = soundBankAsset,
+      .index0 = instrumentIndex,
+      .index1 = regionIndex,
+  };
+}
+
+[[nodiscard]] inline ObjectRef instrumentIndex(u32 instrumentIndex) {
+  return ObjectRef{.kind = ObjectKind::InstrumentIndex, .index0 = instrumentIndex};
+}
+
+[[nodiscard]] inline ObjectRef instrumentProgram(u32 bank, u32 program) {
+  return ObjectRef{.kind = ObjectKind::InstrumentProgram, .index0 = bank, .index1 = program};
+}
+
+[[nodiscard]] inline ObjectRef sample(AssetId sampleSetAsset, u32 sampleIndex) {
+  return ObjectRef{.kind = ObjectKind::Sample, .asset = sampleSetAsset, .index0 = sampleIndex};
+}
+
+[[nodiscard]] inline ObjectRef sampleIndex(u32 sampleIndex) {
+  return ObjectRef{.kind = ObjectKind::SampleIndex, .index0 = sampleIndex};
+}
+
+[[nodiscard]] inline ObjectRef misc(AssetId miscAsset) {
+  return ObjectRef{.kind = ObjectKind::Misc, .asset = miscAsset};
+}
+
+}  // namespace ObjectRefs
+
 // A byte range inside a user-loaded or derived source. Parsed objects, diagnostics,
 // and UI items use this to point back to the bytes they came from.
 struct SourceRange {

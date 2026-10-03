@@ -181,7 +181,7 @@ struct SoundBankAsset {
   std::vector<Instrument> instruments;
   SamplePool localSamples;
   AssetPrivateData privateData;
-  BankRecipe recipe;
+  std::vector<DependencyRequest> sampleRequests;
   BankPreparer prepare;
 };
 

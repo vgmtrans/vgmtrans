@@ -301,12 +301,12 @@ void SessionState::validateMiscAssets(Collection& desired) {
     const bool missing = !containsAsset(id);
     addError("Collection '" + desired.name + "' references misc asset id " + std::to_string(id.value) +
              (missing ? " that does not exist" : " that is not a misc asset"));
-    desired.issues.push_back(CollectionIssue{
+    desired.issues.push_back(Diagnostic{
         .severity = Severity::Error,
         .code = missing ? "missing-misc" : "wrong-type-misc",
         .message = "Collection references " + std::string(missing ? "missing" : "wrong-type") + " misc asset " +
                    std::to_string(id.value),
-        .asset = id,
+        .object = ObjectRefs::asset(id),
     });
     return true;
   });

@@ -663,9 +663,9 @@ void scanResultBuilderDraftViewsRemainStableAsTheResultGrows() {
              retained->owner() == pool.id() && retained->index() == 0,
          "draft proxies and sparse lookups should survive growth of the result-owned draft list");
   expect(std::get<SoundBankAsset>(scan.assets[1]).metadata.id == bank.id() &&
-             std::get<DependencyTarget>(std::get<SoundBankAsset>(scan.assets[1]).recipe.samples.front()).asset == pool.id() &&
+             std::get<DependencyTarget>(std::get<SoundBankAsset>(scan.assets[1]).sampleRequests.front()).asset == pool.id() &&
              std::get<SequenceProgramAsset>(scan.assets[2]).metadata.id == sequence.id() &&
-             std::get<DependencyTarget>(std::get<SequenceProgramAsset>(scan.assets[2]).recipe.banks.front()).asset == bank.id() &&
+             std::get<DependencyTarget>(std::get<SequenceProgramAsset>(scan.assets[2]).bankRequests.front()).asset == bank.id() &&
              std::get<SequenceProgramAsset>(scan.assets[2]).collection.miscAssets == std::vector<AssetId>{misc.id()} &&
              std::get<MiscAsset>(scan.assets[3]).payload == std::vector<u8>{0xaa},
          "each typed draft should retain its values and links across result growth");

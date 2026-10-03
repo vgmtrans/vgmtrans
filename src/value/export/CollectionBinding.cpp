@@ -66,30 +66,23 @@ BoundCollection::BoundCollection(SessionSnapshot snapshot, CollectionId id, std:
 // Prepare the selected assets for playback or export using the choices made
 // during resolution. Check their references, prepare private bank copies, configure
 // the sequence, then validate the resulting instruments and sample references.
-CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const Collection& selected) {
-  const auto* collection = &selected;
-  std::vector<Diagnostic> diagnostics;
-  for (const auto& issue : collection->issues) {
-    diagnostics.push_back(Diagnostic{
-        .severity = issue.severity,
-        .code = issue.code,
-        .message = issue.message,
-        .range = issue.range,
-        .object = issue.asset && snapshot.asset(*issue.asset) != nullptr
-                      ? std::optional<ObjectRef>{ObjectRefs::asset(*issue.asset)}
-                      : std::nullopt,
-    });
+CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const Collection& collection) {
+  auto diagnostics = collection.issues;
+  for (auto& diagnostic : diagnostics) {
+    if (diagnostic.object && snapshot.asset(diagnostic.object->asset) == nullptr) {
+      diagnostic.object.reset();
+    }
   }
 
-  const auto members = collection->members();
-  const auto& inputs = collection->inputs.banks;
+  const auto members = collection.members();
+  const auto& inputs = collection.inputs.banks;
   std::string baseName =
-      collection->name.empty() ? "collection-" + std::to_string(collection->id.value) : collection->name;
+      collection.name.empty() ? "collection-" + std::to_string(collection.id.value) : collection.name;
   const SequenceProgramAsset* sequence = nullptr;
   SequenceRuntime sequenceRuntime;
   // Missing or ambiguous matches may still leave useful inputs. Only a Failed
   // outcome stops preparation here; diagnostic severity does not decide this.
-  bool failed = collection->resolutionStatus() == ResolutionStatus::Failed;
+  bool failed = collection.resolutionStatus() == ResolutionStatus::Failed;
   if (members.sequence) {
     sequence = snapshot.asset<SequenceProgramAsset>(*members.sequence);
     if (sequence == nullptr) {
@@ -100,7 +93,7 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
     }
   }
 
-  // Copy contents for this collection, leaving discovery recipes and callbacks
+  // Copy contents for this collection, leaving discovery requests and callbacks
   // on the scanned asset. External sample pools stay shared and read-only.
   std::vector<SoundBankAsset> soundBanks;
   soundBanks.reserve(inputs.size());
@@ -195,7 +188,7 @@ CollectionBindingResult prepareCollection(const SessionSnapshot& snapshot, const
     return CollectionBindingResult{.diagnostics = std::move(diagnostics)};
   }
   return CollectionBindingResult{
-      .collection = BoundCollection(snapshot, collection->id, std::move(baseName), sequence, std::move(sequenceRuntime),
+      .collection = BoundCollection(snapshot, collection.id, std::move(baseName), sequence, std::move(sequenceRuntime),
                                     std::move(soundBanks), std::move(samplePools)),
       .diagnostics = std::move(diagnostics),
   };

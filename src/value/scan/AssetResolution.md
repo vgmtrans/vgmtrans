@@ -2,8 +2,8 @@
 
 A format describes what each asset needs when it scans that asset. The core
 resolves sequences to banks, then banks to sample pools, and prepares private
-copies for playback or export. These two supported relationships are represented
-by separate `SequenceRecipe` and `BankRecipe` types. There is no general dependency
+copies for playback or export. Sequences store `bankRequests`; banks store
+`sampleRequests`. There is no general dependency
 graph, bank-to-bank traversal, or format-level collection callback.
 
 ## Writing a format
@@ -87,12 +87,16 @@ native policies through these operations.
 
 Each resolved relationship owns its status. `Collection::resolutionStatus()`
 derives the summary using the precedence `Failed > Ambiguous > Incomplete > Resolved`;
-export checks that same summary before preparation. `CollectionIssue` contains only
-diagnostic information: changing a message, code, or severity, or removing the
+export checks that same summary before preparation. `Collection::issues` contains
+ordinary diagnostics: changing a message, code, or severity, or removing the
 diagnostic, cannot change the outcome. A resolved collection can carry warnings;
 an incomplete or ambiguous collection may still have usable selected inputs.
 Resolution status describes matching, not whether later preparation or rendering
 will succeed.
+
+Collection messages can retain references to missing assets. Binding copies these
+messages and omits object attribution when the owner asset is absent from the
+snapshot; the collection keeps the original references for inspection.
 
 Selection examines immutable assets. It must not mutate format state, construct
 collections, or capture borrowed pointers in its result. Asset IDs and owned
@@ -120,7 +124,7 @@ placements in each bank's inputs.
 
 The typed `layout` argument comes from the scanned bank. It remains valid if the
 callback replaces `context.privateData` with prepared information for sequence
-preparation. Recipes and preparation callbacks remain on the scanned asset;
+preparation. Requests and preparation callbacks remain on the scanned asset;
 collection-local bank storage copies only metadata and contents.
 
 When a bank needs exactly one pool, `context.sample<SampleData>()` returns that
@@ -230,7 +234,7 @@ not automatically rematched when new files arrive. The resolver retains no mutab
 matching database and does not search globally for a combination of providers.
 Driver-specific choices stay in format requests.
 
-Standalone full-bank export uses the bank's own recipe. Exporting only instruments
+Standalone full-bank export uses the bank's own requests. Exporting only instruments
 used by a sequence requires one unambiguous collection; exporting a particular
 collection also applies its sequence-specific runtime and instrument behavior.
 

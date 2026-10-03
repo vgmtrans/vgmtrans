@@ -714,7 +714,7 @@ void sessionDependencyFailureKeepsSequenceCollections() {
     auto result = scanProbeSequence(input);
     for (auto& asset : result.assets) {
       auto& sequence = std::get<SequenceProgramAsset>(asset);
-      sequence.recipe.banks.push_back(
+      sequence.bankRequests.push_back(
           [](const DependencyContext&) -> DependencySelection { throw std::runtime_error("selector exploded"); });
     }
     return result;
@@ -1130,7 +1130,7 @@ void sessionReportsCollectionMissingAssetReferences() {
       for (auto& asset : result.assets) {
         auto& sequence = std::get<SequenceProgramAsset>(asset);
         const auto target = wrongType ? sequence.metadata.id : AssetId{99};
-        sequence.recipe.banks.push_back([target](const DependencyContext&) {
+        sequence.bankRequests.push_back([target](const DependencyContext&) {
           DependencySelection selected;
           selected.add(target);
           return selected;

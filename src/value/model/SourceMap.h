@@ -158,21 +158,6 @@ enum class SourceLinkRole : u8 {
   Related,
 };
 
-namespace ObjectRefs {
-
-[[nodiscard]] ObjectRef asset(AssetId asset);
-[[nodiscard]] ObjectRef sequence(AssetId sequenceAsset);
-[[nodiscard]] ObjectRef sequenceTrack(AssetId sequenceAsset, u32 trackIndex);
-[[nodiscard]] ObjectRef instrument(AssetId soundBankAsset, u32 instrumentIndex);
-[[nodiscard]] ObjectRef region(AssetId soundBankAsset, u32 instrumentIndex, u32 regionIndex);
-[[nodiscard]] ObjectRef instrumentIndex(u32 instrumentIndex);
-[[nodiscard]] ObjectRef instrumentProgram(u32 bank, u32 program);
-[[nodiscard]] ObjectRef sample(AssetId sampleSetAsset, u32 sampleIndex);
-[[nodiscard]] ObjectRef sampleIndex(u32 sampleIndex);
-[[nodiscard]] ObjectRef misc(AssetId miscAsset);
-
-}  // namespace ObjectRefs
-
 using SourceTarget = std::variant<SourceRange, SourceAnnotationId, ObjectRef>;
 
 struct SourceLink {

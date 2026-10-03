@@ -64,7 +64,7 @@ private:
     std::optional<SequenceProgram> program;
     AssetPrivateData privateData;
     SequenceCollectionOptions collection;
-    SequenceRecipe recipe;
+    std::vector<DependencyRequest> bankRequests;
     SequencePreparer prepare;
   };
 
@@ -101,7 +101,7 @@ private:
     InstrumentSetBuilder instruments;
     SamplePoolBuilder samples;
     AssetPrivateData privateData;
-    BankRecipe recipe;
+    std::vector<DependencyRequest> sampleRequests;
     BankPreparer prepare;
   };
 
