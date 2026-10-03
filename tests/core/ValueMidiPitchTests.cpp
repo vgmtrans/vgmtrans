@@ -431,9 +431,8 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
   };
   u64 rateSequence = 0;
   u32 rateNote = 0;
-  u32 rateAutomation = 0;
   PerformanceEmitter rateOut{
-      rateTrack, {rateTrack.id, CommandId{3}}, SourceAnnotationId{4}, 0, rateSequence, rateNote, rateAutomation};
+      rateTrack, {rateTrack.id, CommandId{3}}, SourceAnnotationId{4}, 0, rateSequence, rateNote};
   const PerformanceNoteId rateNoteId = rateOut.note(64, 1.0, 8);
   rateOut.pitchSlide(rateNoteId, 60, 64, PitchSlideTiming::fixedRate(4, 2.0));
 
@@ -444,9 +443,8 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
   };
   u64 fixedSequence = 0;
   u32 fixedNote = 0;
-  u32 fixedAutomation = 0;
   PerformanceEmitter fixedOut{
-      fixedTrack, {fixedTrack.id, CommandId{5}}, SourceAnnotationId{6}, 0, fixedSequence, fixedNote, fixedAutomation};
+      fixedTrack, {fixedTrack.id, CommandId{5}}, SourceAnnotationId{6}, 0, fixedSequence, fixedNote};
   const PerformanceNoteId fixedNoteId = fixedOut.note(64, 1.0, 8);
   fixedOut.pitchSlide(fixedNoteId, 60, 64, PitchSlideTiming::fixedDuration(4, 125.0));
 
@@ -888,8 +886,8 @@ void performanceMidiRendererPlansRangesAtPhysicalAttacks() {
 
   PerformanceTrack chord{.id = TrackId{0}, .endTick = 4};
   u64 order = 0;
-  u32 noteId = 0, automationId = 0;
-  PerformanceEmitter out{chord, {chord.id, CommandId{2}}, SourceAnnotationId{2}, 0, order, noteId, automationId};
+  u32 noteId = 0;
+  PerformanceEmitter out{chord, {chord.id, CommandId{2}}, SourceAnnotationId{2}, 0, order, noteId};
   out.note(60, 1.0, 4);
   out.pitchBend(-6.0);
   out.note(67, 1.0, 4);
@@ -1057,9 +1055,7 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
   };
   u64 nextSequence = 0;
   u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,         {track.id, CommandId{11}}, SourceAnnotationId{12}, 0, nextSequence, nextNote,
-                         nextAutomation};
+  PerformanceEmitter out{track, {track.id, CommandId{11}}, SourceAnnotationId{12}, 0, nextSequence, nextNote};
   out.pitchBendRange(12);
   const PerformanceNoteId first = out.note(60, 1.0, 4);
   out.at(4).pitchBend(0.25);
@@ -1092,9 +1088,7 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
       .endTick = 12,
   };
   PerformanceEmitter delayedTransitionOut{delayedTransitionTrack, {delayedTransitionTrack.id, CommandId{13}},
-                                          SourceAnnotationId{14}, 0,
-                                          nextSequence,           nextNote,
-                                          nextAutomation};
+                                          SourceAnnotationId{14}, 0, nextSequence, nextNote};
   delayedTransitionOut.pitchBendRange(2);
   delayedTransitionOut.note(60, 1.0, 4);
   constexpr PitchBendLayerId modulationLayer{1};
@@ -1135,8 +1129,7 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
       .endTick = 12,
   };
   PerformanceEmitter sameVoiceOut{
-      sameVoiceTrack, {sameVoiceTrack.id, CommandId{13}}, SourceAnnotationId{14}, 0, nextSequence, nextNote,
-      nextAutomation};
+      sameVoiceTrack, {sameVoiceTrack.id, CommandId{13}}, SourceAnnotationId{14}, 0, nextSequence, nextNote};
   const PerformanceNoteId sameVoiceNote = sameVoiceOut.note(64, 1.0, 8);
   sameVoiceOut.pitchBend(1.0);
   sameVoiceOut.at(4).pitchSlide(sameVoiceNote, 65, 67, 2);

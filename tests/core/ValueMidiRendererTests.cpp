@@ -788,9 +788,8 @@ void performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates() 
   PerformanceTrack track{.id = TrackId{0}, .endTick = 4};
   u64 nextSequence = 0;
   u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,    {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence,
-                         nextNote, nextAutomation,           PanLaw::EqualPower};
+  PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence, nextNote,
+                         PanLaw::EqualPower};
   const auto level = out.fade(PerformanceAutomationTarget::Level, 0.5, 1);
   level.output(out).level(0.5);
   level.at(out, 1).level(0.5);

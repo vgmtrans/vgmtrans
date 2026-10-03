@@ -18,13 +18,13 @@
 struct PerformanceTrackFixture {
   vgmtrans::core::PerformanceTrack track;
   u64 nextSequence = 0;
-  u32 nextNote = 0, nextAutomation = 0;
+  u32 nextNote = 0;
   vgmtrans::core::PerformanceEmitter out;
 
   explicit PerformanceTrackFixture(u64 endTick = 0)
       : track{.id = vgmtrans::core::TrackId{0}, .endTick = endTick},
         out{track, {track.id, vgmtrans::core::CommandId{1}}, vgmtrans::core::SourceAnnotationId{2},
-            0, nextSequence, nextNote, nextAutomation} {}
+            0, nextSequence, nextNote} {}
   PerformanceTrackFixture(const PerformanceTrackFixture&) = delete;
   PerformanceTrackFixture& operator=(const PerformanceTrackFixture&) = delete;
 };

@@ -101,9 +101,7 @@ void physicalModulationProfileDrivesMidiAndSynthFromOnePlan() {
   };
   u64 nextSequence = 0;
   u32 nextNote = 0;
-  u32 nextAutomation = 0;
-  PerformanceEmitter out{track,         {track.id, CommandId{0}}, SourceAnnotationId{0}, 0, nextSequence, nextNote,
-                         nextAutomation};
+  PerformanceEmitter out{track, {track.id, CommandId{0}}, SourceAnnotationId{0}, 0, nextSequence, nextNote};
 
   out.vibratoRate(2.0, LfoPerformanceContext{.shape = LfoShape{.waveform = LfoWaveform::SawtoothUp}});
   out.vibratoDepth(0.5);
@@ -349,10 +347,8 @@ void tempoRelativeModulationKeepsIndependentRatesAndDelayPolicies() {
   };
   u64 nextSequence = 0;
   u32 nextNote = 0;
-  u32 nextAutomation = 0;
   PerformanceEmitter out{
-      performance.tracks[0], {performance.tracks[0].id, CommandId{7}}, SourceAnnotationId{8}, 0, nextSequence, nextNote,
-      nextAutomation};
+      performance.tracks[0], {performance.tracks[0].id, CommandId{7}}, SourceAnnotationId{8}, 0, nextSequence, nextNote};
   out.vibratoRateCyclesPerTick(0.25, {}, PitchBendLayerId{2});
   out.vibratoRateCyclesPerTick(0.125, {}, PitchBendLayerId{0});
   out.panLfoRateCyclesPerTick(0.5);
@@ -362,10 +358,8 @@ void tempoRelativeModulationKeepsIndependentRatesAndDelayPolicies() {
   out.at(20).vibratoRate(7.0, {}, PitchBendLayerId{2});
   out.at(20).tremoloRate(9.0);
   out.at(20).vibratoDelay(LfoDelay{.milliseconds = 3.0});
-  PerformanceEmitter tempo{performance.tracks[1],  {performance.tracks[1].id, CommandId{9}},
-                           SourceAnnotationId{10}, 0,
-                           nextSequence,           nextNote,
-                           nextAutomation};
+  PerformanceEmitter tempo{performance.tracks[1], {performance.tracks[1].id, CommandId{9}}, SourceAnnotationId{10},
+                           0, nextSequence, nextNote};
   tempo.at(10).tempo(500'000);
   tempo.at(30).tempo(250'000);
 

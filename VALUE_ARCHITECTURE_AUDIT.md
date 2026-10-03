@@ -3976,3 +3976,73 @@ No corpus data or new permanent comparison harness was added to the repository.
 - Keep version opcode tables as direct byte-layout descriptions where the
   versions differ substantially. Factoring short repeated tails into extra
   dispatch rules would trade visible data for more decoding logic.
+
+## Cleanup2: direct ownership and fewer bookkeeping layers
+
+Starting revision: `cb9e0b766` on `core-rewrite`. Work continues on
+`core-rewrite-cleanup2`. The first batch removes 167 production lines from
+`src/value`; test changes add six lines overall. SequenceVM, compiled command
+bodies, typed format playback, immutable snapshots, and the neutral performance
+and synth models remain the architecture's boundaries.
+
+- Scanner drafts now point directly to stable pending values of their own kind.
+  The generic draft slot, repeated variant/index lookup, duplicate handle ID,
+  and unrelated recipe/preparer fields no longer sit between format code and
+  its draft. Validation still checks all required payloads before consuming
+  any draft. Existing growth coverage now exercises all four kinds and links.
+- Collection membership is queried directly from explicit choices and resolved
+  inputs. Snapshot association queries no longer allocate member vectors.
+  Source removal retains its set-lookup traversal rather than searching every
+  removed asset against every member. Session operations call their registry
+  and snapshot cache directly; private one-line forwarding methods are gone.
+- VM automation identities come from their append positions. A separate counter
+  and emitter constructor argument were redundant because automation history
+  remains intact throughout playback, including section changes. Trimming still
+  happens only after retained driver bindings finish their work.
+- Stream executors live directly in a reserved vector. Their channel buffers
+  retain the stable addresses used by driver bindings. The private loop-detector
+  wrapper is gone: command arrival and jump policy use the executor's visited
+  state map directly. Exact state, hinted loops ignoring repeat state, declared
+  loops, and finite branches keep their existing distinct rules.
+- MIDI rendering reads resolved instruments directly rather than projecting a
+  second selection structure. Simulated pitch layers share one advancing clock
+  per flush instead of rediscovering the next tick for every sample. Selection
+  warnings consume their pending flags rather than retaining another reported
+  flag; warning wording, attribution, and admission behavior are unchanged.
+- Sample tuning is the explicit `pitchCents` scalar rather than a one-field
+  `Tuning` wrapper. Synth range inclusion lives with the existing shared range
+  bookkeeping. The unused SNES directory-entry index is gone. SPC and RSN
+  extraction use the existing signature and byte readers instead of local copies.
+
+Validation of this combined batch:
+
+- Warning-free macOS Release build, including Qt and the shell; all 44 CTest
+  suites pass, including every format suite, Qt model tests, and the parity
+  harness self-test. A final incremental rebuild includes the settled edits.
+- A temporary renderer comparison covers 10,368 generated cases: three pitch
+  layers, staggered starts, all six waveforms, delays, phase resets, reversal,
+  stepped depth, zero/positive rate and depth, source/instrument sensitivity,
+  forced bank selection, and both modulation policies. MIDI bytes and diagnostic
+  counts match the original implementation in every case.
+- A temporary SPC extraction comparison covers 6,000 generated inputs, including
+  truncated snapshots and malformed extended title chunks. Extracted bytes,
+  source metadata, titles, and declined inputs match the starting implementation.
+- Before/after shell comparisons attempt 126 local game inputs under two
+  conversion settings: defaults, and simulated modulation with used-only banks,
+  pitch-bend transitions, and RPN tuning. They discover 856 sequences across
+  NinSnes, SculptSoftSnes, PrismSnes, KonamiSnes, MoriSnes, PandoraBoxSnes,
+  CapcomSnes, SonyPS1, and NDS. All 3,920 produced artifacts match byte for byte:
+  1,708 MIDI, 1,106 SF2, and 1,106 DLS. Source/asset/collection inventories,
+  diagnostics, and command exit statuses also match, including existing failures.
+  Only 54 inputs produce artifacts; unsupported inputs and partial exports are
+  not counted as successful conversions. These are value-before/value-after
+  comparisons, not a new claim of universal legacy parity.
+
+A global annotation-ID index remains worthwhile: replacing it with per-chunk
+searches would reduce lines but weaken large-session scaling. Collection binding
+and completed preparation also retain distinct responsibilities: removing their
+ownership would introduce partial-state and lifetime rules. Cursor emission
+helpers have actual format callers and save typed callback/capture boilerplate;
+removing them wholesale would make format code longer and less intuitive.
+Further passes will probe stable draft storage, invocation overloads, export
+filenames, and the remaining source/execution/preparation responsibilities.

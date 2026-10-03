@@ -61,8 +61,8 @@ private:
 class PerformanceEmitter {
 public:
   PerformanceEmitter(PerformanceTrack& track, SourceCommandRef sourceCommand, SourceAnnotationId sourceAnnotation,
-                     u64 tick, u64& nextSequence, u32& nextNote, u32& nextAutomation,
-                     PanLaw panLaw = PanLaw::Unspecified, detail::ActiveNoteState* activeNotes = nullptr,
+                     u64 tick, u64& nextSequence, u32& nextNote, PanLaw panLaw = PanLaw::Unspecified,
+                     detail::ActiveNoteState* activeNotes = nullptr,
                      std::vector<SourcePlaybackSpan>* sourceSpans = nullptr);
 
   [[nodiscard]] PerformanceEmitter at(u64 tick) const;
@@ -188,7 +188,9 @@ private:
   friend class PerformanceAutomationBinding;
   friend class PitchSlideBinding;
 
-  [[nodiscard]] PerformanceAutomationBinding beginAutomation(ScalarPerformanceAutomationIntent intent);
+  [[nodiscard]] PerformanceAutomationBinding beginAutomation(PerformanceAutomationTarget target,
+                                                            PerformanceAutomationMotion motion, double targetValue,
+                                                            u32 durationTicks, u32 delayTicks);
   [[nodiscard]] PerformanceEmitter withAutomation(const PerformanceAutomationBinding& automation) const;
   [[nodiscard]] PerformanceEventHeader header();
   void append(PerformanceEvent event);
@@ -203,7 +205,6 @@ private:
   u64 tick_ = 0;
   u64& nextSequence_;
   u32& nextNote_;
-  u32& nextAutomation_;
   PanLaw panLaw_ = PanLaw::Unspecified;
   detail::ActiveNoteState* activeNotes_ = nullptr;
   std::vector<SourcePlaybackSpan>* sourceSpans_ = nullptr;

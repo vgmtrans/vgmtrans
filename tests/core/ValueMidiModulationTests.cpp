@@ -366,9 +366,7 @@ void performanceMidiRendererRestartsVibratoDelayWithOrWithoutPhaseReset() {
       PerformanceTrack track{.id = TrackId{0}, .sourceTrackNumber = 0, .endTick = 8};
       u64 nextSequence = 0;
       u32 nextNote = 0;
-      u32 nextAutomation = 0;
-      PerformanceEmitter out{track,         {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence, nextNote,
-                             nextAutomation};
+      PerformanceEmitter out{track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence, nextNote};
       out.tempo(1'000'000);
       out.note(60, 1.0, 8);
       out.pitchBend(0.25);

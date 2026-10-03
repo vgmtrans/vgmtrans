@@ -50,28 +50,15 @@ void reviseNoteEnd(NotePerformanceEvent& note, u64 endTick) {
   return found;
 }
 
-[[nodiscard]] ScalarPerformanceAutomationIntent scalarAutomationIntent(PerformanceAutomationTarget target,
-                                                                       PerformanceAutomationMotion motion,
-                                                                       double targetValue, u32 durationTicks,
-                                                                       u32 delayTicks) {
-  return ScalarPerformanceAutomationIntent{
-      .target = target,
-      .motion = motion,
-      .targetValue = targetValue,
-      .durationTicks = durationTicks,
-      .delayTicks = delayTicks,
-  };
-}
-
 }  // namespace
 
 PerformanceEmitter::PerformanceEmitter(PerformanceTrack& track, SourceCommandRef sourceCommand,
                                        SourceAnnotationId sourceAnnotation, u64 tick, u64& nextSequence, u32& nextNote,
-                                       u32& nextAutomation, PanLaw panLaw, detail::ActiveNoteState* activeNotes,
+                                       PanLaw panLaw, detail::ActiveNoteState* activeNotes,
                                        std::vector<SourcePlaybackSpan>* sourceSpans)
     : track_(track), sourceCommand_(sourceCommand), sourceAnnotation_(sourceAnnotation), tick_(tick),
-      nextSequence_(nextSequence), nextNote_(nextNote), nextAutomation_(nextAutomation), panLaw_(panLaw),
-      activeNotes_(activeNotes), sourceSpans_(sourceSpans) {
+      nextSequence_(nextSequence), nextNote_(nextNote), panLaw_(panLaw), activeNotes_(activeNotes),
+      sourceSpans_(sourceSpans) {
 }
 
 PerformanceEmitter PerformanceEmitter::at(u64 tick) const {
@@ -557,9 +544,9 @@ PitchSlideBinding PerformanceEmitter::pitchSlide(PerformanceNoteId note, double 
     break;
   }
 
-  const PerformanceAutomationId id{nextAutomation_++};
+  const auto index = static_cast<u32>(track_.automations.size());
   track_.automations.push_back(PerformanceAutomation{
-      .id = id,
+      .id = PerformanceAutomationId{index},
       .header = header(),
       .intent =
           PitchTransitionIntent{
@@ -575,7 +562,7 @@ PitchSlideBinding PerformanceEmitter::pitchSlide(PerformanceNoteId note, double 
               .endTick = addTicks(start, durationTicks),
           },
   });
-  return PitchSlideBinding{track_, static_cast<u32>(track_.automations.size() - 1)};
+  return PitchSlideBinding{track_, index};
 }
 
 PitchSlideBinding PerformanceEmitter::retargetPitchSlide(PerformanceNoteId note, double fallbackStartKey,
@@ -595,17 +582,24 @@ std::optional<double> PerformanceEmitter::currentPitchTransitionKey(PerformanceN
   return pitchTransitionKeyAt(track_, note, lane, tick_);
 }
 
-PerformanceAutomationBinding PerformanceEmitter::beginAutomation(ScalarPerformanceAutomationIntent intent) {
+PerformanceAutomationBinding PerformanceEmitter::beginAutomation(PerformanceAutomationTarget target,
+                                                               PerformanceAutomationMotion motion,
+                                                               double targetValue, u32 durationTicks, u32 delayTicks) {
   const auto index = static_cast<u32>(track_.automations.size());
-  const PerformanceAutomationId id{nextAutomation_++};
-  const u64 startTick = addTicks(tick_, intent.delayTicks);
-  const u64 endTick = intent.motion == PerformanceAutomationMotion::TargetByStep || intent.durationTicks == 0
+  const u64 startTick = addTicks(tick_, delayTicks);
+  const u64 endTick = motion == PerformanceAutomationMotion::TargetByStep || durationTicks == 0
                           ? startTick
-                          : addTicks(startTick, intent.durationTicks);
+                          : addTicks(startTick, durationTicks);
   track_.automations.push_back(PerformanceAutomation{
-      .id = id,
+      .id = PerformanceAutomationId{index},
       .header = header(),
-      .intent = std::move(intent),
+      .intent = ScalarPerformanceAutomationIntent{
+          .target = target,
+          .motion = motion,
+          .targetValue = targetValue,
+          .durationTicks = durationTicks,
+          .delayTicks = delayTicks,
+      },
       .realization =
           PerformanceAutomationRealization{
               .startTick = startTick,
@@ -617,20 +611,17 @@ PerformanceAutomationBinding PerformanceEmitter::beginAutomation(ScalarPerforman
 
 PerformanceAutomationBinding PerformanceEmitter::fade(PerformanceAutomationTarget target, double targetValue,
                                                       u32 durationTicks, u32 delayTicks) {
-  return beginAutomation(scalarAutomationIntent(target, PerformanceAutomationMotion::TargetOverTicks, targetValue,
-                                                durationTicks, delayTicks));
+  return beginAutomation(target, PerformanceAutomationMotion::TargetOverTicks, targetValue, durationTicks, delayTicks);
 }
 
 PerformanceAutomationBinding PerformanceEmitter::step(PerformanceAutomationTarget target, double targetValue,
                                                       u32 durationTicks, u32 delayTicks) {
-  return beginAutomation(scalarAutomationIntent(target, PerformanceAutomationMotion::TargetByStep, targetValue,
-                                                durationTicks, delayTicks));
+  return beginAutomation(target, PerformanceAutomationMotion::TargetByStep, targetValue, durationTicks, delayTicks);
 }
 
 PerformanceAutomationBinding PerformanceEmitter::noteEnvelope(PerformanceAutomationTarget target, double targetValue,
                                                               u32 durationTicks, u32 delayTicks) {
-  return beginAutomation(scalarAutomationIntent(target, PerformanceAutomationMotion::NoteEnvelope, targetValue,
-                                                durationTicks, delayTicks));
+  return beginAutomation(target, PerformanceAutomationMotion::NoteEnvelope, targetValue, durationTicks, delayTicks);
 }
 
 PerformanceEmitter PerformanceEmitter::withAutomation(const PerformanceAutomationBinding& automation) const {
