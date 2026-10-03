@@ -10,6 +10,7 @@
 #include "value/export/midi/MidiExporter.h"
 
 #include <array>
+#include <limits>
 
 using namespace vgmtrans::core;
 
@@ -181,6 +182,36 @@ void midiExporterKeepsZeroDurationNotePairedAtSameTick() {
          "zero-duration notes should close before a following same-key attack");
 }
 
+void midiExporterClampsSignedPitchBendBeforeBias() {
+  const std::array<std::pair<s32, u16>, 11> cases{{
+      {std::numeric_limits<s32>::min(), 0},
+      {-8193, 0},
+      {-8192, 0},
+      {-1, 8191},
+      {0, 8192},
+      {8191, 16383},
+      {8192, 16383},
+      {std::numeric_limits<s32>::max() - 8193, 16383},
+      {std::numeric_limits<s32>::max() - 8192, 16383},
+      {std::numeric_limits<s32>::max() - 8191, 16383},
+      {std::numeric_limits<s32>::max(), 16383},
+  }};
+  for (const auto& [value, expected] : cases) {
+    const MidiSequence sequence{
+        .tracks = {MidiTrack{.events = {{.payload = MidiChannelMessage{
+                                            .kind = MidiChannelMessageKind::PitchBend,
+                                            .value = value,
+                                        }}}}}};
+    const auto bytes = encodeMidiFile(sequence);
+    const std::vector<u8> expectedMessages{
+        0x00, 0xe0, static_cast<u8>(expected & 0x7f), static_cast<u8>(expected >> 7),
+        0x00, 0xff, 0x2f, 0x00,
+    };
+    expect(std::vector<u8>(bytes.begin() + 22, bytes.end()) == expectedMessages,
+           "MIDI pitch bend should clip the signed offset before adding its unsigned 14-bit bias");
+  }
+}
+
 }  // namespace
 
 void runValueMidiEncodingTests() {
@@ -194,4 +225,5 @@ void runValueMidiEncodingTests() {
   midiExporterWritesTimeSignatureMetaEvent();
   midiExporterOrdersGeneratedNoteOffBeforeSameTickNoteOn();
   midiExporterKeepsZeroDurationNotePairedAtSameTick();
+  midiExporterClampsSignedPitchBendBeforeBias();
 }

@@ -82,7 +82,7 @@ void addChannelMessage(std::vector<MidiMessage>& messages, u64 tick, int priorit
       addMessage(messages, tick, priority, {static_cast<u8>(0xc0 | channel), data7(message.value)});
       return;
     case MidiChannelMessageKind::PitchBend: {
-      const s32 value = std::clamp<s32>(message.value + 0x2000, 0, 0x3fff);
+      const s32 value = std::clamp<s32>(message.value, -0x2000, 0x1fff) + 0x2000;
       addMessage(
           messages, tick, priority,
           {static_cast<u8>(0xe0 | channel), static_cast<u8>(value & 0x7f), static_cast<u8>((value >> 7) & 0x7f)});

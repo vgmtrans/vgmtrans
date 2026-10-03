@@ -1,7 +1,7 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Twenty-one validated batches remove 977 net production lines from
+`cb9e0b766`. Twenty-two validated batches remove 979 net production lines from
 `src/value`. All 44 CTest suites pass; the latest real-file replay preserves
 all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
 records appear at the end of this document.
@@ -5523,3 +5523,90 @@ second projection protocol for a four-line gain.
 Next: test consuming fresh ranged cursor operands instead of copying their returned
 strings, and correct a discovered MIDI signed-pitch clipping overflow before adding
 its wire-format bias. Continue probing actual ownership and failure boundaries.
+
+
+## Cleanup2 twenty-second batch: consume cursor reads and assemble DLS lists directly
+
+Four production files remove two net lines, bringing cleanup2 to 979 removed.
+The MIDI overflow regression fixture adds 32 lines; cumulative tests gain 452.
+Three changes are LOC-neutral but remove ownership or invalid-state concepts.
+
+- CompilerCursor's private decoded() consumes the fresh RangedValue returned by
+  RecordReader and moves its value into the caller. Source fields still receive
+  their independently owned values. This removes a second returned-string copy,
+  without changing RecordReader, adding a move-aware public API, or borrowing
+  from the reader. All ten callers pass freshly returned ranged values.
+- Session's private FormatScan requires a borrowed FormatModule reference instead
+  of a nullable pointer. Registry registration is sealed before scanning; entries
+  are appended, moved during vector growth, then read. No rebind or assignment is
+  needed. Remove dereference syntax and the impossible null default, retaining
+  module lifetime, concurrency, exception handling and ordered serial admission.
+- DLS builds the existing lrgn/lins LIST payloads directly, appending each completed
+  child with appendChunk(). Remove the two intermediate vector<Chunk> owners and
+  the subsequent complete serialization pass. The existing LIST type, child
+  ordering, padding and RIFF helpers remain; no new abstraction or callback is
+  introduced. Wave preparation and validation still precede both paths.
+- MIDI clips a signed pitch offset to [-8192,8191] before adding 8192. The previous
+  addition overflows for large positive s32 input even though pitchBend()'s
+  convenience API accepts s16: raw MidiChannelMessage accepts s32. UBSan reproduces
+  the preexisting INT_MAX overflow. Correct clipping produces 7f/7f and preserves
+  every previously defined result. Add eleven fixed wire-byte cases for signed
+  extrema, clipping endpoints, zero, and the previous overflow threshold. No
+  equivalence claim is made for undefined original inputs.
+
+Validation:
+
+- The full 102-step macOS Release build is warning-free; all 44 CTest suites pass.
+  Freeze matching headers, tests, core/formats/fmt and shell. All 252 input/policy
+  comparisons preserve 3,922 artifact hashes, inventories, diagnostics and exit
+  statuses against 21.
+- Reader/cursor probes preserve 15,372 cases/19,784,777 bytes and 175,616 cases/
+  36,193,594 bytes against frozen 21 under focused sanitizers. Another 1,458 targeted
+  cases preserve 218,785 bytes: empty, truncated and out-of-range reads, capture
+  modes, empty/embedded-NUL names, invalid source IDs, independent string mutation,
+  and returned values and annotation fields after reader/cursor/source destruction.
+  Complete cursor and VM fixtures pass; twelve configured cursor/runtime fixture
+  and HeartBeat PS1/Sony PS2 compile entries are Werror-clean. Of 32 allocation
+  cases, eighteen improve and none grow: 67 allocations becomes 49, and 2,407,960
+  requested bytes becomes 1,605,720. Scalar reads keep their existing semantics.
+- Full Registry, Session and SourceMap fixtures pass before/after with Session.cpp
+  and fixture/probe units instrumented. A 720-case scanner/admission matrix preserves
+  9,141 lines/744,259 bytes: 0/1/2/5/9 modules, known-format policies, empty/nonempty
+  sources, standard/empty-what/nonstandard throws, reused IDs, foreign ranges,
+  missing owners and missing runtimes. Configured Session compilation is Werror-clean.
+- MIDI preserves 216,759 captures/236,608,471 bytes in Release and focused sanitizers,
+  SHA256 c6d42b95418a564a49a09624af5a111b49deaaf4e47b4c8fcb35a2291b889477.
+  These include the prior 85,681 complete renderer/encoder captures, all 65,536 s16
+  offsets on channels 0 and 255, and six defined s32 edge cases. All ten existing
+  encoding fixtures and the new eleven-case fixture pass. INT_MAX is checked
+  separately: the original fails UBSan, the corrected writer clips it correctly.
+- DLS preserves 19 complete synth artifacts/ordered diagnostics, 972 articulation
+  edge captures, and 140 nested-list cases, 41,481,550 bytes in Release and focused
+  sanitizers, SHA256 8051496d271a928ab137ab42dd6ed3de2584d4685bac342f7bd7b733b914ebf8.
+  Nested cases vary 0–10 instruments and 0–1,000 regions, empty/odd/long names,
+  local stereo PCM, loop overrides/zero lengths, rich envelopes, global/region/
+  unsupported modulation and both bank styles. Of 140 allocation cases, 112 improve
+  and 28 empty-list cases remain equal. Ten instruments with 1,000 regions each
+  avoid eleven allocations/480,480 requested bytes: 36,627,233 becomes 36,146,753.
+- Physical modulation lowering bounds a production rgn2 payload to 550 bytes
+  (at most seven generators and eight modulators per scope, two scopes, and six
+  fixed articulation connections). Immediate lrgn append cannot introduce a new
+  oversized-child failure; its complete LIST receives the same parent size check.
+  lins may reject an oversized individual instrument before constructing later
+  pure children, but their only explicit failure is the identical RIFF-size error.
+  No source callbacks or retained spans cross that boundary. Huge allocations and
+  allocator-failure ordering are not claimed equivalent.
+- Changed/probe/fixture sanitizer instrumentation links matching unchanged Release
+  archives; it does not establish whole-archive instrumentation. Allocation totals
+  measure requested bytes rather than peak RSS.
+
+Further probes retain real boundaries. Bypassing decoded() for rawBytes() would
+lose source fields: CompilerCursor's RecordReader disables field capture, leaving
+add() as their sole owner. Value-role reads already add no semantic operand.
+Moving command-span assignment into noteOn() would require a new current-span
+protocol and change startup/tick-hook and immediate noteOn/noteOff associations.
+The current post-body event boundary handles these distinctions directly.
+
+Next: remove a newly identified unused sample-index object kind and ObjectRef hash,
+and test whether SF2's sole smpl child can be written into sdta without a second
+complete PCM buffer. Continue testing concrete improvements against frozen 22.

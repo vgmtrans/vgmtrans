@@ -60,7 +60,7 @@ void prepareDiagnosticRanges(std::vector<Diagnostic>& diagnostics, const SourceF
 }
 
 struct FormatScan {
-  const FormatModule* format = nullptr;
+  const FormatModule& format;
   ScanResult result;
 };
 
@@ -84,12 +84,12 @@ void runFormatScans(std::span<FormatScan> scans, const ScanInput& input) {
       const auto fail = [&](std::string message) {
         scan.result.diagnostics.push_back(Diagnostic{
             .severity = Severity::Error,
-            .message = scan.format->name + " scan failed: " + message,
+            .message = scan.format.name + " scan failed: " + message,
             .range = SourceRange{.source = input.source.id, .offset = 0, .size = input.source.size},
         });
       };
       try {
-        scan.result = scan.format->scan(input);
+        scan.result = scan.format.scan(input);
       } catch (const std::exception& ex) {
         fail(ex.what());
       } catch (...) {
@@ -458,7 +458,7 @@ void Session::scanOneSource(const SourceFile& source, std::vector<SourceId>& que
       continue;
     }
     acceptsKnownFormat = true;
-    scans.push_back(FormatScan{.format = &module});
+    scans.push_back(FormatScan{.format = module});
   }
 
   const ScanInput input{
@@ -472,7 +472,7 @@ void Session::scanOneSource(const SourceFile& source, std::vector<SourceId>& que
   // Admission stays serial and follows registry order. Scanner callbacks only
   // read the shared source bytes and build their private result values.
   for (auto& scan : scans) {
-    const FormatModule& module = *scan.format;
+    const FormatModule& module = scan.format;
     for (auto& asset : scan.result.assets) {
       if (auto* bank = std::get_if<SoundBankAsset>(&asset)) {
         bank->localSamples.preferredFilter = module.preferredSampleFilter;

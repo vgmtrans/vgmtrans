@@ -709,11 +709,11 @@ public:
 
 private:
   template <class T>
-  T decoded(const RangedValue<T>& field, std::string_view name, SourceValueDisplay display, SemanticOperandRole role) {
+  T decoded(RangedValue<T> field, std::string_view name, SourceValueDisplay display, SemanticOperandRole role) {
     if (field) {
       add(name, detail::semanticValue(field.value), field.range, display, role);
     }
-    return field.value;
+    return std::move(field.value);
   }
 
   void add(std::string_view name, SourceValue value, SourceRange range, SourceValueDisplay display,

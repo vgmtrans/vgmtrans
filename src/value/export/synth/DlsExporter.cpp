@@ -330,12 +330,11 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 }
 
 [[nodiscard]] Chunk lrgnList(const ResolvedSynthInstrument& instrument, std::span<const DecodedSynthSample> samples) {
-  std::vector<Chunk> regions;
-  regions.reserve(instrument.regions.size());
+  auto list = makeListChunk("lrgn", {});
   for (const auto& region : instrument.regions) {
-    regions.push_back(rgn2Chunk(instrument, region, samples));
+    appendChunk(list.payload, rgn2Chunk(instrument, region, samples));
   }
-  return makeListChunk("lrgn", regions);
+  return list;
 }
 
 [[nodiscard]] Chunk insList(const ResolvedSynthInstrument& instrument, std::span<const DecodedSynthSample> samples,
@@ -349,12 +348,11 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 
 [[nodiscard]] Chunk linsList(std::span<const ResolvedSynthInstrument> instruments,
                              std::span<const DecodedSynthSample> samples, MidiBankSelectStyle bankSelectStyle) {
-  std::vector<Chunk> instrumentChunks;
-  instrumentChunks.reserve(instruments.size());
+  auto list = makeListChunk("lins", {});
   for (const auto& instrument : instruments) {
-    instrumentChunks.push_back(insList(instrument, samples, bankSelectStyle));
+    appendChunk(list.payload, insList(instrument, samples, bankSelectStyle));
   }
-  return makeListChunk("lins", instrumentChunks);
+  return list;
 }
 
 [[nodiscard]] Chunk fmtChunk(const DecodedSynthSample& sample) {
