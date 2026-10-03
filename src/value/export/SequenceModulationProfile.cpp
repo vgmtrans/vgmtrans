@@ -11,38 +11,27 @@
 
 #include <algorithm>
 #include <cmath>
-#include <limits>
 
 namespace vgmtrans::core {
 
 namespace {
 
-struct ObservedRange {
-  double minimum = std::numeric_limits<double>::infinity();
-  double maximum = -std::numeric_limits<double>::infinity();
-
-  void observe(double value, bool includeZero = false) {
-    if (!std::isfinite(value) || value < 0.0 || (!includeZero && value == 0.0)) {
-      return;
-    }
-    minimum = std::min(minimum, value);
-    maximum = std::max(maximum, value);
+void observeRange(std::optional<ModulationRange>& range, double value, bool includeZero = false) {
+  if (!std::isfinite(value) || value < 0.0 || (!includeZero && value == 0.0)) {
+    return;
   }
-
-  [[nodiscard]] bool observed() const noexcept { return std::isfinite(minimum) && std::isfinite(maximum); }
-
-  [[nodiscard]] std::optional<ModulationRange> range(bool requirePositiveMaximum = false) const {
-    if (!observed() || (requirePositiveMaximum && maximum <= 0.0)) {
-      return std::nullopt;
-    }
-    return ModulationRange{.minimum = minimum, .maximum = maximum};
+  if (!range) {
+    range = ModulationRange{value, value};
+  } else {
+    range->minimum = std::min(range->minimum, value);
+    range->maximum = std::max(range->maximum, value);
   }
-};
+}
 
 struct LfoObservation {
   double maxDepth = 0.0;
-  ObservedRange rate;
-  ObservedRange delay;
+  std::optional<ModulationRange> rate;
+  std::optional<ModulationRange> delay;
   std::optional<LfoWaveform> waveform;
   bool hasConflictingWaveforms = false;
   TremoloGainMode gainMode = TremoloGainMode::BipolarAroundNominal;
@@ -106,7 +95,7 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
     case ModulationPerformanceTarget::VibratoRate:
       if (event.context.frequencyHz) {
         vibrato.observeWaveform(standardWaveform(event));
-        vibrato.rate.observe(*event.context.frequencyHz);
+        observeRange(vibrato.rate, *event.context.frequencyHz);
       }
       break;
     case ModulationPerformanceTarget::TremoloDepth:
@@ -128,14 +117,14 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
     case ModulationPerformanceTarget::TremoloRate:
       if (event.context.frequencyHz) {
         tremolo.observeWaveform(standardWaveform(event));
-        tremolo.rate.observe(*event.context.frequencyHz);
+        observeRange(tremolo.rate, *event.context.frequencyHz);
       }
       break;
     case ModulationPerformanceTarget::VibratoDelay:
     case ModulationPerformanceTarget::TremoloDelay:
       if (event.context.delay && event.context.delay->milliseconds) {
         auto& lfo = event.target == ModulationPerformanceTarget::VibratoDelay ? vibrato : tremolo;
-        lfo.delay.observe(*event.context.delay->milliseconds / 1000.0, true);
+        observeRange(lfo.delay, *event.context.delay->milliseconds / 1000.0, true);
       }
       break;
     case ModulationPerformanceTarget::PanDepth:
@@ -145,7 +134,7 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
       break;
     case ModulationPerformanceTarget::PanRate:
       if (event.context.frequencyHz) {
-        pan.rate.observe(*event.context.frequencyHz);
+        observeRange(pan.rate, *event.context.frequencyHz);
       }
       break;
   }
@@ -193,23 +182,23 @@ SequenceModulationProfile analyzeSequenceModulation(const PerformanceSequence& s
 
   SequenceModulationProfile profile{
       .maxPanDepth = pan.maxDepth,
-      .panRateHertz = pan.rate.range(),
+      .panRateHertz = pan.rate,
   };
-  if (vibrato.maxDepth > 0.0 && vibrato.rate.observed()) {
+  if (vibrato.maxDepth > 0.0 && vibrato.rate) {
     profile.instruments.vibrato = VibratoSpec{
         .maxDepthCents = vibrato.maxDepth,
-        .rateHertz = *vibrato.rate.range(),
+        .rateHertz = *vibrato.rate,
         .waveform = vibrato.waveform,
-        .delaySeconds = vibrato.delay.range(true),
+        .delaySeconds = vibrato.delay && vibrato.delay->maximum > 0.0 ? vibrato.delay : std::nullopt,
     };
   }
-  if (tremolo.maxDepth > 0.0 && tremolo.rate.observed()) {
+  if (tremolo.maxDepth > 0.0 && tremolo.rate) {
     profile.instruments.tremolo = TremoloSpec{
         .maxDepthDb = tremolo.maxDepth,
-        .rateHertz = *tremolo.rate.range(),
+        .rateHertz = *tremolo.rate,
         .waveform = tremolo.waveform,
         .gainMode = tremolo.gainMode,
-        .delaySeconds = tremolo.delay.range(true),
+        .delaySeconds = tremolo.delay && tremolo.delay->maximum > 0.0 ? tremolo.delay : std::nullopt,
     };
   }
   return profile;

@@ -250,11 +250,11 @@ private:
     explicit Part(std::vector<SourceAnnotation> annotations);
 
     std::shared_ptr<const std::vector<SourceAnnotation>> annotations;
-    std::unordered_map<u32, size_t> annotationsById;
-    std::unordered_map<u32, std::vector<SourceAnnotationId>> annotationsBySource;
-    std::unordered_map<u32, std::vector<SourceAnnotationId>> annotationsByParent;
+    std::unordered_map<SourceAnnotationId, size_t> annotationsById;
+    std::unordered_map<SourceId, std::vector<SourceAnnotationId>> annotationsBySource;
+    std::unordered_map<SourceAnnotationId, std::vector<SourceAnnotationId>> annotationsByParent;
     std::vector<std::optional<AssetId>> assetOwnerByAnnotation;
-    std::unordered_map<u32, std::vector<SourceAnnotationId>> annotationsByAsset;
+    std::unordered_map<AssetId, std::vector<SourceAnnotationId>> annotationsByAsset;
   };
 
   struct Storage {
@@ -359,7 +359,7 @@ private:
   std::function<SourceAnnotationId()> nextId_;
   u32 nextLocalId_ = 0;
   std::vector<SourceAnnotation> annotations_;
-  std::unordered_map<u32, size_t> annotationsById_;
+  std::unordered_map<SourceAnnotationId, size_t> annotationsById_;
 };
 
 [[nodiscard]] std::string sourceKindFromLabel(std::string_view label);

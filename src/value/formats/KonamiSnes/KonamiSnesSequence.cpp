@@ -925,7 +925,7 @@ private:
     if (track.currentNoteVolume == 0 && track.version >= KONAMISNES_V3) {
       return;
     }
-    output.level(LevelScale::linearFromLinear(mixedLevel(trackVolume)), 128);
+    output.level(LevelScale::clamp01(mixedLevel(trackVolume)), 128);
   }
 
   void loadInstrument(const KonamiSnesInstrumentInfo* instrument) {

@@ -1,7 +1,7 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Ten validated batches remove 661 net production lines from
+`cb9e0b766`. Eleven validated batches remove 692 net production lines from
 `src/value`. All 44 CTest suites pass; the latest real-file replay preserves
 all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
 records appear at the end of this document.
@@ -4576,3 +4576,99 @@ indexes and validation, retaining each owner's existing pointer/index lifetime
 contract. Investigate ordinary optional modulation ranges instead of infinity
 sentinels, and remove private renderer forwarding/state parameters whose
 callers always supply the renderer's own state.
+
+## Cleanup2 eleventh batch: typed indexes and simpler private configuration
+
+This batch removes another 31 net production C++ lines, bringing cleanup2 to
+692 removed. Two tests migrate to the existing asset lookup; no test behavior
+or public export policy changes.
+
+- Session, catalog, source-map, removal, and validation indexes use SourceId,
+  AssetId, and SourceAnnotationId directly. This removes 57 key unwrappings and
+  two rewrappings without changing validity filters, first-duplicate behavior,
+  ordering, or ownership. Copyable catalog source indexes remain vector indexes;
+  pointer indexes retain their existing stable owners. SessionState uses its
+  canonical asset lookup and existing ordered diagnostic append operation.
+- Playback construction contexts name their immutable decoded graph
+  `sourceTrack`, distinguishing it from mutable playback track state. The unused
+  VmApi::sequence() accessor disappears; it exposed an unfinished performance
+  whose tracks had not yet been assembled.
+- LevelScale's pure forwarding alias disappears at eight calls in seven formats.
+  The direct clamp names the actual operation. SNES loop validation reuses its
+  existing alignment predicate instead of repeating it.
+- The MIDI track renderer owns its fixed modulation conversion policy and pan
+  cache. Private methods stop forwarding these same values through every call.
+  Two single-use forwarding helpers become direct expressions. External
+  instrument reservations use the existing InstrumentAddress value directly.
+- Modulation analysis stores optional ranges instead of infinity sentinels plus
+  a private observation/query protocol. Filtering, signed-zero observations,
+  waveform conflicts, and positive-delay requirements remain explicit. The
+  temporary observation structure grows from 56 to 72 bytes: 48 additional
+  stack bytes across three observations, with no persistent model growth.
+
+Validation:
+
+- The complete 354-step macOS Release build, including Qt, shell, and parity,
+  is warning-free. All 44 CTest suites pass.
+- Frozen index/removal runners match 337 scenarios and two duplicate-map
+  rejections: 12,528 lines and 559,997 bytes. Coverage includes invalid and
+  duplicate IDs, high IDs, inherited/explicit/missing/cyclic parents, retained
+  invalid annotation entries, catalog copy/move ownership, ordered diagnostics,
+  cross-source links, removals, retained views, and repeated session scans.
+- Independent renderer runners match 75,043 renders and 144,890,623 bytes of
+  complete ordered events, encoded MIDI, and diagnostics. Instrument preparation
+  matches 3,729 cases and 47,055,798 bytes, including sparse/external addresses,
+  ordering, filtering, stitching, and maximum numeric bounds.
+- Modulation profiles and normalization match 43,911 cases and 37,728,599 bytes,
+  including negative/subnormal/signed-zero/maximum/nonfinite values, zero-only
+  delays, waveform conflicts, event order, and absent physical values. Focused
+  changed profile/address units and probes also pass ASan, UBSan, and
+  float-cast-overflow checks. Unchanged archive code is not sanitizer-instrumented.
+- The frozen eleventh-batch shell matches every tenth-batch corpus result:
+  252 input/policy comparisons and 3,922 artifact hashes, with identical
+  inventories, diagnostics, and exit statuses.
+
+### Further candidates evaluated and retained boundaries
+
+Moving enum/Address conversion into generic SourceValue conversion removes only
+one net line across four headers and adds generic dependencies. Forwarding the
+existing string branch adds a line. Allocation probes show no savings: the
+existing copied string is already moved into conversion. Both temporary drafts
+match 15,394 cases and 19,801,663 bytes under focused sanitizers; neither offers
+enough clarity improvement to adopt.
+
+Replacing bulk collection membership checks with repeated contains() calls
+saves a helper but scales poorly: measured removals of 256 IDs are approximately
+6.3–6.8 times slower, and 4,096 IDs approximately 101–127 times slower. Keep the
+single membership traversal and typed removal set.
+
+A narrower sounding-voice instrument variant saves 24 bytes per voice, but its
+working draft adds five lines, another selection vocabulary, an adapter back to
+the event identity, and fixture-specific comparisons. Keep the shared identity
+unless profiling establishes that voice memory warrants this complexity.
+
+Owning annotation vectors directly in SourceMap::Part and retaining them via an
+aliasing shared pointer saves one allocation and 40 bytes per part, with no line
+reduction. An annotation-only retained view would then retain all indexes too:
+the 4,096-row probe retains 246,136 additional bytes and 4,107 additional blocks.
+Keep the independently retained annotation vector.
+
+### Startup lifecycle edge under investigation
+
+The expanded startup probe found that beginSection executes before beginCommand
+checks a zero command budget. A temporary Hudson migration matches 46,080
+positive-budget cases and 158,401,515 bytes, including masks, versions, track
+orders, empty leading tracks, provenance, DSP, and MIDI; focused sanitizers are
+clean. It differs in 10,728 of 15,360 zero-budget cases by emitting initial
+reverb despite no executed command. Hudson therefore retains its flag for now.
+
+The same lifecycle distinction applies to the fourth batch's four startup-hook
+migrations. Their earlier comparisons omitted zero command budgets. Production
+format budgets are positive and the corpus remains exact, but this public VM
+edge needs a regression test and a lifecycle correction before those migrations
+can be considered behavior-preserving for zero-budget programs. A centralized
+entry-budget rule is being evaluated; no claim of completed repair is made here.
+
+Next: resolve this lifecycle edge and evaluate whether SourceMap's private owner
+cache can use AssetId's existing invalid sentinel instead of redundant optional
+presence, preserving the public optional query and cycle behavior.

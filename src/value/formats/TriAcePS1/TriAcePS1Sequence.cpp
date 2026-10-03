@@ -39,7 +39,7 @@ constexpr std::array<u8, 0x1f> kCommandSize{
 }
 
 [[nodiscard]] double linearController(u8 value) {
-  return LevelScale::linearFromLinear(value / 127.0);
+  return LevelScale::clamp01(value / 127.0);
 }
 
 [[nodiscard]] double panController(u8 value) {

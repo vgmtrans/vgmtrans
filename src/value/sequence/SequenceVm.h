@@ -348,7 +348,6 @@ public:
   [[nodiscard]] u64 tick() const noexcept;
   // Metadata for the executing command, including its track-specific decoding.
   [[nodiscard]] SourceRange sourceRange() const noexcept;
-  [[nodiscard]] const PerformanceSequence& sequence() const noexcept;
   void diagnostic(Diagnostic diagnostic);
 
 private:

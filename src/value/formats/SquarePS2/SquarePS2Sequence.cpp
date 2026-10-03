@@ -122,7 +122,7 @@ struct TrackLayout {
 }
 
 [[nodiscard]] double controller(s8 value) {
-  return value < 0 ? 0.0 : LevelScale::linearFromLinear((static_cast<u8>(value) + 1) / 128.0);
+  return value < 0 ? 0.0 : LevelScale::clamp01((static_cast<u8>(value) + 1) / 128.0);
 }
 
 [[nodiscard]] double panPosition(u8 value) {

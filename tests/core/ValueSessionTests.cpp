@@ -1328,7 +1328,7 @@ void sessionStateRebuildsLookupIndexAfterRemoval() {
 
   const std::array removedSources{SourceId{0}};
   state.removeSources(removedSources);
-  expect(!state.containsAsset(AssetId{0}) && !state.containsAsset(AssetId{1}),
+  expect(state.asset(AssetId{0}) == nullptr && state.asset(AssetId{1}) == nullptr,
          "session state should remove deleted asset ids from the lookup index");
   expect(state.assets().size() == 2 &&
              state.asset<SamplePoolAsset>(AssetId{2}) == std::get_if<SamplePoolAsset>(&state.assets()[0]),

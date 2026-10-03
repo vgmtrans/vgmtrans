@@ -508,13 +508,12 @@ u32 ResolvedPerformance::nextBank() const {
 
 void ResolvedPerformance::assignAddresses(const InstrumentPreparationOptions& options) {
   std::set<InstrumentHandle> needed;
-  std::set<std::pair<u32, u32>> external;
+  std::set<InstrumentAddress> external;
   const auto observe = [&](const InstrumentSelection& selection) {
     if (const auto* handle = std::get_if<InstrumentHandle>(&selection)) {
       needed.insert(*handle);
     } else {
-      const auto value = std::get<InstrumentAddress>(selection);
-      external.emplace(value.bank, value.program);
+      external.insert(std::get<InstrumentAddress>(selection));
     }
   };
   for (const auto& voice : voices_) observe(voice.instrument);
@@ -543,7 +542,7 @@ void ResolvedPerformance::assignAddresses(const InstrumentPreparationOptions& op
     for (const auto address : preferred) {
       if (address) sourceBanks.insert(address->bank);
     }
-    for (const auto& [bank, program] : external) sourceBanks.insert(bank);
+    for (const auto address : external) sourceBanks.insert(address.bank);
     if (firstBank > 128 || sourceBanks.size() > 128 - firstBank) {
       valid_ = false;
       performance_.diagnostics.push_back({.severity = Severity::Error, .code = "instrument-banks-exhausted",
@@ -557,9 +556,10 @@ void ResolvedPerformance::assignAddresses(const InstrumentPreparationOptions& op
     }
   }
   std::vector<InstrumentAddress> reserved;
-  for (const auto& [bank, rawProgram] : external) {
+  for (const auto address : external) {
     // Within the portable range, an MSB/LSB alias is the same or out of range.
-    reserved.push_back({options.firstBank ? banks_.at(bank) : bank & 127, std::min<u32>(rawProgram, 127)});
+    reserved.push_back({options.firstBank ? banks_.at(address.bank) : address.bank & 127,
+                        std::min<u32>(address.program, 127)});
   }
   const auto addresses = allocateInstrumentAddresses(preferred, reserved, firstBank);
   if (!addresses) {

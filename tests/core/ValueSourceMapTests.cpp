@@ -351,7 +351,7 @@ void sessionStateScrubsCrossSourceObjectLinks() {
   const std::array removedSources{firstSource};
   state.removeSources(removedSources);
 
-  expect(!state.containsAsset(AssetId{1}) && state.containsAsset(AssetId{2}),
+  expect(state.asset(AssetId{1}) == nullptr && state.asset(AssetId{2}) != nullptr,
          "source removal should retain assets owned by surviving sources");
   const SourceMap remaining = state.sourceMap();
   expect(remaining.annotations().size() == 1 && remaining.annotations().front().id == SourceAnnotationId{2} &&

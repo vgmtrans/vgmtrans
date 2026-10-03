@@ -79,7 +79,7 @@ private:
   std::vector<FormatModule> formats_;
   std::vector<SourceExtractor> extractors_;
   bool formatsSealed_ = false;
-  std::unordered_set<u32> scannedSources_;
+  std::unordered_set<SourceId> scannedSources_;
   // The public Session API is single-thread-confined; format scans fan out
   // internally. This immutable revision is populated on the first snapshot
   // read after a mutation.

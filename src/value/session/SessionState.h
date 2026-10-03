@@ -28,7 +28,6 @@ public:
   [[nodiscard]] const std::vector<Collection>& collections() const noexcept { return collections_; }
   [[nodiscard]] const std::vector<Diagnostic>& diagnostics() const noexcept { return diagnostics_; }
 
-  [[nodiscard]] bool containsAsset(AssetId id) const noexcept;
   [[nodiscard]] const Asset* asset(AssetId id) const noexcept;
 
   template <typename T>
@@ -59,7 +58,7 @@ private:
     [[nodiscard]] bool empty() const noexcept { return assets->empty() && sourceMap.empty(); }
   };
 
-  void removeDiscoveredData(const std::unordered_set<u32>& sourceIds, const std::unordered_set<u32>& assetIds);
+  void removeDiscoveredData(const std::unordered_set<SourceId>& sourceIds, const std::unordered_set<AssetId>& assetIds);
   void validateMiscAssets(Collection& desired);
   void rebuildViews();
   void rebuildIndexes();
@@ -72,8 +71,8 @@ private:
   std::vector<Collection> collections_;
   std::vector<Diagnostic> diagnostics_;
 
-  std::unordered_map<u32, const Asset*> assetsById_;
-  std::unordered_set<u32> annotationIds_;
+  std::unordered_map<AssetId, const Asset*> assetsById_;
+  std::unordered_set<SourceAnnotationId> annotationIds_;
 };
 
 }  // namespace vgmtrans::core

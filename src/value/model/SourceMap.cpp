@@ -26,7 +26,7 @@ namespace {
   return ids;
 }
 
-[[nodiscard]] std::vector<SourceAnnotationId> idsFromIndex(const auto& parts, auto index, u32 key) {
+[[nodiscard]] std::vector<SourceAnnotationId> idsFromIndex(const auto& parts, auto index, auto key) {
   std::vector<SourceAnnotationId> ids;
   for (const auto& part : parts) {
     const auto& entries = part.get()->*index;
@@ -46,16 +46,16 @@ SourceMap::Part::Part(std::vector<SourceAnnotation> annotationValues)
   for (size_t i = 0; i < values.size(); ++i) {
     const auto id = values[i].id;
     if (id.valid()) {
-      const auto [_, inserted] = annotationsById.emplace(id.value, i);
+      const auto [_, inserted] = annotationsById.emplace(id, i);
       if (!inserted) {
         throw std::logic_error("Duplicate SourceAnnotationId in SourceMap");
       }
     }
     if (values[i].range.source.valid()) {
-      annotationsBySource[values[i].range.source.value].push_back(id);
+      annotationsBySource[values[i].range.source].push_back(id);
     }
     if (values[i].parent && values[i].parent->valid()) {
-      annotationsByParent[values[i].parent->value].push_back(id);
+      annotationsByParent[*values[i].parent].push_back(id);
     }
   }
 
@@ -91,7 +91,7 @@ SourceMap::Part::Part(std::vector<SourceAnnotation> annotationValues)
       if (!annotation.parent || !annotation.parent->valid()) {
         break;
       }
-      const auto parent = annotationsById.find(annotation.parent->value);
+      const auto parent = annotationsById.find(*annotation.parent);
       if (parent == annotationsById.end()) {
         break;
       }
@@ -105,7 +105,7 @@ SourceMap::Part::Part(std::vector<SourceAnnotation> annotationValues)
 
   for (size_t i = 0; i < values.size(); ++i) {
     if (values[i].id.valid() && assetOwnerByAnnotation[i]) {
-      annotationsByAsset[assetOwnerByAnnotation[i]->value].push_back(values[i].id);
+      annotationsByAsset[*assetOwnerByAnnotation[i]].push_back(values[i].id);
     }
   }
 }
@@ -144,7 +144,7 @@ const SharedSequence<SourceAnnotation>& SourceMap::annotations() const noexcept 
 
 const SourceAnnotation* SourceMap::find(SourceAnnotationId id) const {
   for (const auto& part : storage_->parts) {
-    const auto found = part->annotationsById.find(id.value);
+    const auto found = part->annotationsById.find(id);
     if (found != part->annotationsById.end()) {
       return &(*part->annotations)[found->second];
     }
@@ -161,7 +161,7 @@ const SourceAnnotation& SourceMap::get(SourceAnnotationId id) const {
 }
 
 std::vector<SourceAnnotationId> SourceMap::annotationsForSource(SourceId source) const {
-  return idsFromIndex(storage_->parts, &Part::annotationsBySource, source.value);
+  return idsFromIndex(storage_->parts, &Part::annotationsBySource, source);
 }
 
 std::vector<SourceAnnotationId> SourceMap::intersecting(SourceRange range) const {
@@ -191,7 +191,7 @@ std::optional<AssetId> SourceMap::assetOwner(SourceAnnotationId id) const {
     return std::nullopt;
   }
   for (const auto& part : storage_->parts) {
-    const auto found = part->annotationsById.find(id.value);
+    const auto found = part->annotationsById.find(id);
     if (found != part->annotationsById.end()) {
       return part->assetOwnerByAnnotation[found->second];
     }
@@ -203,11 +203,11 @@ std::vector<SourceAnnotationId> SourceMap::annotationsForAsset(AssetId asset) co
   if (!asset.valid()) {
     return {};
   }
-  return idsFromIndex(storage_->parts, &Part::annotationsByAsset, asset.value);
+  return idsFromIndex(storage_->parts, &Part::annotationsByAsset, asset);
 }
 
 std::vector<SourceAnnotationId> SourceMap::childrenOf(SourceAnnotationId parent) const {
-  return idsFromIndex(storage_->parts, &Part::annotationsByParent, parent.value);
+  return idsFromIndex(storage_->parts, &Part::annotationsByParent, parent);
 }
 
 std::vector<SourceAnnotationId> SourceMap::withRole(SourceId source, SourceRole role) const {
@@ -356,7 +356,7 @@ AnnotationBuilder SourceMapBuilder::source(std::string_view label, SourceRange r
 
 AnnotationBuilder SourceMapBuilder::annotation(SourceRole role, std::string_view label, SourceRange range) {
   const auto id = nextId_ ? nextId_() : SourceAnnotationId{nextLocalId_++};
-  if (id.valid() && annotationsById_.contains(id.value)) {
+  if (id.valid() && annotationsById_.contains(id)) {
     throw std::logic_error("Duplicate SourceAnnotationId in SourceMapBuilder");
   }
   const auto index = annotations_.size();
@@ -368,7 +368,7 @@ AnnotationBuilder SourceMapBuilder::annotation(SourceRole role, std::string_view
       .kind = sourceKindFromLabel(label),
   });
   if (id.valid()) {
-    annotationsById_.emplace(id.value, index);
+    annotationsById_.emplace(id, index);
   }
   return AnnotationBuilder{*this, id};
 }
@@ -416,7 +416,7 @@ SourceMap SourceMapBuilder::finish() {
 }
 
 SourceAnnotation* SourceMapBuilder::annotation(SourceAnnotationId id) {
-  const auto found = annotationsById_.find(id.value);
+  const auto found = annotationsById_.find(id);
   if (found == annotationsById_.end() || found->second >= annotations_.size()) {
     return nullptr;
   }

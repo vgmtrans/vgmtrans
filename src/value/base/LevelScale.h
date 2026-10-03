@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "value/base/CoreTypes.h"
+#include "value/base/Types.h"
 
 #include <algorithm>
 #include <cmath>
@@ -15,10 +15,6 @@ namespace vgmtrans::core::LevelScale {
 
 [[nodiscard]] inline double clamp01(double value) {
   return std::clamp(value, 0.0, 1.0);
-}
-
-[[nodiscard]] inline double linearFromLinear(double value) {
-  return clamp01(value);
 }
 
 [[nodiscard]] inline double linearFromMidi7(u8 value) {

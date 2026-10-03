@@ -56,8 +56,7 @@ std::optional<SnesSampleDirectoryEntry> readSnesSampleDirectoryEntry(ByteReader 
   }
   if (result.stream->loops) {
     const u32 lastBlock = static_cast<u32>(result.stream->encodedData.endOffset()) - 9;
-    if (result.loopAddress < result.startAddress || result.loopAddress > lastBlock ||
-        ((result.loopAddress - result.startAddress) % 9) != 0) {
+    if (!result.loopAddressIsBlockAligned() || result.loopAddress > lastBlock) {
       return std::nullopt;
     }
   }

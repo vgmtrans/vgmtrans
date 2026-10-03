@@ -42,23 +42,19 @@ template <typename T, typename Predicate>
   return sharedVector(std::move(filtered));
 }
 
-[[nodiscard]] bool referencesAnyAsset(const CollectionMembers& members, const std::unordered_set<u32>& assetIds) {
-  const auto matches = [&](AssetId id) { return assetIds.contains(id.value); };
+[[nodiscard]] bool referencesAnyAsset(const CollectionMembers& members, const std::unordered_set<AssetId>& assetIds) {
+  const auto matches = [&](AssetId id) { return assetIds.contains(id); };
   return (members.sequence && matches(*members.sequence)) || std::ranges::any_of(members.soundBanks, matches) ||
          std::ranges::any_of(members.samplePools, matches) || std::ranges::any_of(members.miscAssets, matches);
 }
 
 }  // namespace
 
-bool SessionState::containsAsset(AssetId id) const noexcept {
-  return id.valid() && assetsById_.contains(id.value);
-}
-
 const Asset* SessionState::asset(AssetId id) const noexcept {
   if (!id.valid()) {
     return nullptr;
   }
-  const auto found = assetsById_.find(id.value);
+  const auto found = assetsById_.find(id);
   return found != assetsById_.end() ? found->second : nullptr;
 }
 
@@ -66,7 +62,7 @@ void SessionState::appendScan(ScanResult result) {
   // validateScanResult() has already admitted asset IDs. Annotation IDs need a
   // separate cross-scan check because validation does not see session annotations.
   for (const auto& annotation : result.sourceMap.annotations()) {
-    if (annotation.id.valid() && annotationIds_.contains(annotation.id.value)) {
+    if (annotation.id.valid() && annotationIds_.contains(annotation.id)) {
       throw std::invalid_argument("Source map reused existing annotation id " + std::to_string(annotation.id.value));
     }
   }
@@ -79,26 +75,25 @@ void SessionState::appendScan(ScanResult result) {
     const auto& chunk = scanChunks_.back();
 
     for (const auto& value : *chunk.assets) {
-      assetsById_.emplace(metadata(value).id.value, &value);
+      assetsById_.emplace(metadata(value).id, &value);
     }
     for (const auto& annotation : chunk.sourceMap.annotations()) {
       if (annotation.id.valid()) {
-        annotationIds_.insert(annotation.id.value);
+        annotationIds_.insert(annotation.id);
       }
     }
     rebuildViews();
   }
 
-  diagnostics_.insert(diagnostics_.end(), std::make_move_iterator(result.diagnostics.begin()),
-                      std::make_move_iterator(result.diagnostics.end()));
+  addDiagnostics(std::move(result.diagnostics));
 }
 
 void SessionState::removeAssets(std::span<const AssetId> assets) {
-  std::unordered_set<u32> removed;
+  std::unordered_set<AssetId> removed;
   removed.reserve(assets.size());
   for (const AssetId id : assets) {
-    if (containsAsset(id)) {
-      removed.insert(id.value);
+    if (asset(id) != nullptr) {
+      removed.insert(id);
     }
   }
   if (!removed.empty()) {
@@ -107,19 +102,19 @@ void SessionState::removeAssets(std::span<const AssetId> assets) {
 }
 
 void SessionState::removeSources(std::span<const SourceId> sources) {
-  std::unordered_set<u32> sourceIds;
+  std::unordered_set<SourceId> sourceIds;
   sourceIds.reserve(sources.size());
   for (const SourceId source : sources) {
     if (source.valid()) {
-      sourceIds.insert(source.value);
+      sourceIds.insert(source);
     }
   }
 
-  std::unordered_set<u32> removedAssets;
+  std::unordered_set<AssetId> removedAssets;
   for (const auto& value : assets_) {
     const auto& meta = metadata(value);
-    if (meta.id.valid() && meta.range.valid() && sourceIds.contains(meta.range.source.value)) {
-      removedAssets.insert(meta.id.value);
+    if (meta.id.valid() && meta.range.valid() && sourceIds.contains(meta.range.source)) {
+      removedAssets.insert(meta.id);
     }
   }
   removeDiscoveredData(sourceIds, removedAssets);
@@ -142,9 +137,9 @@ CollectionId SessionState::createUserCollection(Collection collection) {
   }
 
   const auto validate = [](const std::vector<AssetId>& values, auto expected, std::string_view role) {
-    std::unordered_set<u32> seen;
+    std::unordered_set<AssetId> seen;
     for (const AssetId id : values) {
-      if (!seen.insert(id.value).second) {
+      if (!seen.insert(id).second) {
         throw std::invalid_argument("The selected " + std::string(role) + " asset is duplicated");
       }
       if (expected(id) == nullptr) {
@@ -202,43 +197,43 @@ void SessionState::reconcileCollections(std::vector<Collection> desired) {
   });
 }
 
-void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds,
-                                        const std::unordered_set<u32>& assetIds) {
+void SessionState::removeDiscoveredData(const std::unordered_set<SourceId>& sourceIds,
+                                        const std::unordered_set<AssetId>& assetIds) {
   if (sourceIds.empty() && assetIds.empty()) {
     return;
   }
 
-  std::unordered_set<u32> removedAnnotations;
-  for (const u32 source : sourceIds) {
-    for (const SourceAnnotationId annotation : sourceMap_.annotationsForSource(SourceId{source})) {
-      removedAnnotations.insert(annotation.value);
+  std::unordered_set<SourceAnnotationId> removedAnnotations;
+  for (const SourceId source : sourceIds) {
+    for (const SourceAnnotationId annotation : sourceMap_.annotationsForSource(source)) {
+      removedAnnotations.insert(annotation);
     }
   }
-  for (const u32 asset : assetIds) {
-    for (const SourceAnnotationId annotation : sourceMap_.annotationsForAsset(AssetId{asset})) {
-      removedAnnotations.insert(annotation.value);
+  for (const AssetId asset : assetIds) {
+    for (const SourceAnnotationId annotation : sourceMap_.annotationsForAsset(asset)) {
+      removedAnnotations.insert(annotation);
     }
   }
 
   const auto removesAsset = [&](const Asset& value) {
     const AssetId id = metadata(value).id;
-    return id.valid() && assetIds.contains(id.value);
+    return id.valid() && assetIds.contains(id);
   };
   const auto removesLink = [&](const SourceLink& link) {
     if (const auto* target = std::get_if<SourceRange>(&link.target)) {
-      return target->valid() && sourceIds.contains(target->source.value);
+      return target->valid() && sourceIds.contains(target->source);
     }
     if (const auto* target = std::get_if<SourceAnnotationId>(&link.target)) {
-      return removedAnnotations.contains(target->value);
+      return removedAnnotations.contains(*target);
     }
     const auto* target = std::get_if<ObjectRef>(&link.target);
-    return target != nullptr && target->asset.valid() && assetIds.contains(target->asset.value);
+    return target != nullptr && target->asset.valid() && assetIds.contains(target->asset);
   };
   const auto removesDiagnostic = [&](const Diagnostic& diagnostic) {
-    const bool removedSource = diagnostic.range.valid() && sourceIds.contains(diagnostic.range.source.value);
+    const bool removedSource = diagnostic.range.valid() && sourceIds.contains(diagnostic.range.source);
     const bool removedObject =
-        diagnostic.object && diagnostic.object->asset.valid() && assetIds.contains(diagnostic.object->asset.value);
-    const bool removedAnnotation = diagnostic.annotation && removedAnnotations.contains(diagnostic.annotation->value);
+        diagnostic.object && diagnostic.object->asset.valid() && assetIds.contains(diagnostic.object->asset);
+    const bool removedAnnotation = diagnostic.annotation && removedAnnotations.contains(*diagnostic.annotation);
     return removedSource || removedObject || removedAnnotation;
   };
 
@@ -246,18 +241,18 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
     chunk.assets = without(chunk.assets, removesAsset);
 
     if (std::ranges::any_of(chunk.sourceMap.annotations(), [&](const SourceAnnotation& annotation) {
-          return removedAnnotations.contains(annotation.id.value) ||
-                 (annotation.parent && removedAnnotations.contains(annotation.parent->value)) ||
+          return removedAnnotations.contains(annotation.id) ||
+                 (annotation.parent && removedAnnotations.contains(*annotation.parent)) ||
                  std::ranges::any_of(annotation.links, removesLink);
         })) {
       std::vector<SourceAnnotation> annotations;
       annotations.reserve(chunk.sourceMap.annotations().size());
       for (const auto& value : chunk.sourceMap.annotations()) {
-        if (removedAnnotations.contains(value.id.value)) {
+        if (removedAnnotations.contains(value.id)) {
           continue;
         }
         auto annotation = value;
-        if (annotation.parent && removedAnnotations.contains(annotation.parent->value)) {
+        if (annotation.parent && removedAnnotations.contains(*annotation.parent)) {
           annotation.parent.reset();
         }
         std::erase_if(annotation.links, removesLink);
@@ -288,7 +283,7 @@ void SessionState::validateMiscAssets(Collection& desired) {
       return false;
     }
     desired.inputs.inspectionStatus = ResolutionStatus::Incomplete;
-    const bool missing = !containsAsset(id);
+    const bool missing = asset(id) == nullptr;
     addError("Collection '" + desired.name + "' references misc asset id " + std::to_string(id.value) +
              (missing ? " that does not exist" : " that is not a misc asset"));
     desired.issues.push_back(Diagnostic{
@@ -324,7 +319,7 @@ void SessionState::rebuildIndexes() {
   for (const auto& asset : assets_) {
     const AssetId id = metadata(asset).id;
     if (id.valid()) {
-      assetsById_.emplace(id.value, &asset);
+      assetsById_.emplace(id, &asset);
     }
   }
 
@@ -332,7 +327,7 @@ void SessionState::rebuildIndexes() {
   annotationIds_.reserve(sourceMap_.annotations().size());
   for (const auto& annotation : sourceMap_.annotations()) {
     if (annotation.id.valid()) {
-      annotationIds_.insert(annotation.id.value);
+      annotationIds_.insert(annotation.id);
     }
   }
 }

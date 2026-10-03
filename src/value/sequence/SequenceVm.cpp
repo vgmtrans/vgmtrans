@@ -818,10 +818,6 @@ SourceRange VmApi::sourceRange() const noexcept {
   return command_.range;
 }
 
-const PerformanceSequence& VmApi::sequence() const noexcept {
-  return executor_.targetSequence_;
-}
-
 void VmApi::diagnostic(Diagnostic diagnostic) {
   if (!diagnostic.range.valid() && command_.range.valid()) {
     diagnostic.range = command_.range;

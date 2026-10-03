@@ -225,7 +225,7 @@ void Session::removeSources(std::span<const SourceId> ids) {
 
 void Session::removeAssets(std::span<const AssetId> assets) {
   formatsSealed_ = true;
-  if (!std::ranges::any_of(assets, [&](AssetId id) { return state_->containsAsset(id); })) {
+  if (!std::ranges::any_of(assets, [&](AssetId id) { return state_->asset(id) != nullptr; })) {
     return;
   }
 
@@ -282,7 +282,7 @@ void Session::scanSource(SourceId id) {
     throw std::out_of_range("Cannot scan a SourceId that is not present in the Session");
   }
 
-  if (scannedSources_.contains(id.value)) {
+  if (scannedSources_.contains(id)) {
     return;
   }
 
@@ -297,7 +297,7 @@ void Session::scanPendingSources() {
   formatsSealed_ = true;
   bool scannedAny = false;
   for (const SourceId source : sources_.activeUserSources()) {
-    if (scannedSources_.contains(source.value)) {
+    if (scannedSources_.contains(source)) {
       continue;
     }
 
@@ -375,13 +375,13 @@ void Session::scanSourceAndDerived(SourceId id) {
 
   for (size_t index = 0; index < queue.size(); ++index) {
     const auto current = queue[index];
-    if (!scannedSources_.insert(current.value).second) {
+    if (!scannedSources_.insert(current).second) {
       continue;
     }
     try {
       const auto& source = sources_.source(current);
       const auto resolved = source.memberPath ? resolveSource(*source.memberPath, source.parent) : source;
-      if (resolved.id == current || scannedSources_.insert(resolved.id.value).second) {
+      if (resolved.id == current || scannedSources_.insert(resolved.id).second) {
         scanOneSource(resolved, queue);
       }
     } catch (const std::exception& ex) {
@@ -512,7 +512,7 @@ void Session::scanOneSource(const SourceFile& source, std::vector<SourceId>& que
 void Session::removeSourceFamily(SourceId source, std::vector<SourceId>& removedSources) {
   auto family = sources_.removeFamily(source);
   for (const SourceId removed : family) {
-    scannedSources_.erase(removed.value);
+    scannedSources_.erase(removed);
   }
   removedSources.insert(removedSources.end(), family.begin(), family.end());
 }

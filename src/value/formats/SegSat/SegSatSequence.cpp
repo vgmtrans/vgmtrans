@@ -633,7 +633,7 @@ void finalizeSegSatPerformance(PerformanceSequence& performance, std::span<const
       // already stores its own maximum level, so velocity only describes how
       // far the note is below that maximum.
       note->linearVelocity =
-          LevelScale::linearFromLinear(exportedChannelGain == 0.0 || region->referenceGain == 0.0
+          LevelScale::clamp01(exportedChannelGain == 0.0 || region->referenceGain == 0.0
                                            ? 0.0
                                            : exactGain / (region->referenceGain * exportedChannelGain));
     }

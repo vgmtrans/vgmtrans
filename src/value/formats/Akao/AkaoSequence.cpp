@@ -112,7 +112,7 @@ struct TrackState {
 
 // FF7's mixer multiplies channel volume and expression as linear gains.
 [[nodiscard]] double akaoLinearControllerGain(u8 value) {
-  return LevelScale::linearFromLinear(value / 127.0);
+  return LevelScale::clamp01(value / 127.0);
 }
 
 [[nodiscard]] double akaoTuningScale(s8 tuning) {

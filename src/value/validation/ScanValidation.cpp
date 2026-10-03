@@ -173,7 +173,7 @@ void validateAsset(ValidationReport& report, const SourceStore& sources, const A
 }
 
 void validateAssetIds(ValidationReport& report, const ScanResult& result,
-                      const std::unordered_set<u32>& existingAssetIds, std::unordered_set<u32>& batchAssetIds) {
+                      const std::unordered_set<AssetId>& existingAssetIds, std::unordered_set<AssetId>& batchAssetIds) {
   // IDs are stable references used by collections, so a scan
   // result must be internally unique and must not reuse IDs already in Session.
   batchAssetIds.reserve(result.assets.size());
@@ -183,20 +183,20 @@ void validateAssetIds(ValidationReport& report, const ScanResult& result,
       report.error("scan.asset.missing-id", "Scan result contained an asset without an id");
       continue;
     }
-    if (!batchAssetIds.insert(id.value).second) {
+    if (!batchAssetIds.insert(id).second) {
       report.error("scan.asset.duplicate-id", "Scan result contained duplicate asset id " + std::to_string(id.value));
     }
-    if (existingAssetIds.contains(id.value)) {
+    if (existingAssetIds.contains(id)) {
       report.error("scan.asset.reused-id", "Scan result reused existing asset id " + std::to_string(id.value));
     }
   }
 }
 
 void validateSourceMapOwnership(ValidationReport& report, const ScanResult& result,
-                                const std::unordered_set<u32>& batchAssetIds) {
+                                const std::unordered_set<AssetId>& batchAssetIds) {
   const SourceMap& sourceMap = result.sourceMap;
 
-  std::unordered_map<u32, SourceId> assetSources;
+  std::unordered_map<AssetId, SourceId> assetSources;
   assetSources.reserve(result.assets.size());
   for (const auto& asset : result.assets) {
     const AssetMetadata& meta = metadata(asset);
@@ -205,16 +205,16 @@ void validateSourceMapOwnership(ValidationReport& report, const ScanResult& resu
                                                    " without a primary source range");
       continue;
     }
-    assetSources.emplace(meta.id.value, meta.range.source);
+    assetSources.emplace(meta.id, meta.range.source);
   }
 
-  std::unordered_set<u32> assetsWithAnnotations;
+  std::unordered_set<AssetId> assetsWithAnnotations;
   assetsWithAnnotations.reserve(result.assets.size());
   for (const auto& annotation : sourceMap.annotations()) {
     const auto inheritedOwner = sourceMap.assetOwner(annotation.id);
     if (annotation.owner && annotation.owner->asset.valid()) {
       const AssetId explicitOwner = annotation.owner->asset;
-      if (!batchAssetIds.contains(explicitOwner.value)) {
+      if (!batchAssetIds.contains(explicitOwner)) {
         report.error("scan.source-annotation.unknown-owner",
                      "Scan result contained source annotation owned by asset id " +
                          std::to_string(explicitOwner.value) + " that was not produced by the scan",
@@ -239,11 +239,11 @@ void validateSourceMapOwnership(ValidationReport& report, const ScanResult& resu
     if (!inheritedOwner) {
       continue;
     }
-    const auto assetSource = assetSources.find(inheritedOwner->value);
+    const auto assetSource = assetSources.find(*inheritedOwner);
     if (assetSource == assetSources.end()) {
       continue;
     }
-    assetsWithAnnotations.insert(inheritedOwner->value);
+    assetsWithAnnotations.insert(*inheritedOwner);
     if (annotation.range.source != assetSource->second) {
       report.error(
           "scan.asset.multiple-sources",
@@ -254,7 +254,7 @@ void validateSourceMapOwnership(ValidationReport& report, const ScanResult& resu
 
   for (const auto& asset : result.assets) {
     const AssetMetadata& meta = metadata(asset);
-    if (meta.range.valid() && !assetsWithAnnotations.contains(meta.id.value)) {
+    if (meta.range.valid() && !assetsWithAnnotations.contains(meta.id)) {
       report.error("scan.asset.missing-source-annotations",
                    "Scan result contained asset id " + std::to_string(meta.id.value) +
                        " without an explicitly owned source annotation",
@@ -303,18 +303,18 @@ ValidationReport validateScanResult(SourceId source, const ScanResult& result, c
   validateSourceMapParentCycles(report, result.sourceMap);
   validateDiagnosticAnnotationReferences(report, result.diagnostics, result.sourceMap);
 
-  std::unordered_set<u32> existingAssetIds;
+  std::unordered_set<AssetId> existingAssetIds;
   if (!result.assets.empty()) {
     existingAssetIds.reserve(existingAssets.size());
     for (const auto& asset : existingAssets) {
       const AssetId id = metadata(asset).id;
       if (id.valid()) {
-        existingAssetIds.insert(id.value);
+        existingAssetIds.insert(id);
       }
     }
   }
 
-  std::unordered_set<u32> batchAssetIds;
+  std::unordered_set<AssetId> batchAssetIds;
   validateAssetIds(report, result, existingAssetIds, batchAssetIds);
   validateSourceMapOwnership(report, result, batchAssetIds);
 

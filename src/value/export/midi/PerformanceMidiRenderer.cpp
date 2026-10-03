@@ -176,10 +176,6 @@ struct LoweredStereoBalance {
   return MidiLevelResolution::SevenBit;
 }
 
-[[nodiscard]] bool writeBankSelectLsb(const MidiExportOptions& options) {
-  return options.bankSelectStyle == MidiBankSelectStyle::MsbAndLsb;
-}
-
 struct MidiLevelState {
   MidiLevelResolution resolution;
   u16 value;
@@ -650,26 +646,27 @@ void flushLfo(SimulatedLfoState& lfo, u64 upToTick, const PerformanceTempoMap& t
 class MidiTrackRenderer {
 public:
   MidiTrackRenderer(MidiTrack& track, u8 channel, const PerformanceTempoMap& tempos,
-                    const MidiExportOptions& options, double headroom)
-      : track(track), channel(channel), options(options), tempos(tempos), levelHeadroom(headroom) {}
+                    const MidiExportOptions& options, ModulationConversionPolicy modulationConversion,
+                    double headroom)
+      : track(track), channel(channel), options(options), tempos(tempos),
+        modulationConversion(modulationConversion), levelHeadroom(headroom) {}
 
   void render(const PerformanceTrack& source, const MidiTimeline& timeline,
               std::span<const GlobalTransposePerformanceEvent* const> globalTransposes,
-              ModulationConversionPolicy modulationConversion, const ResolvedPerformance& resolved,
-              const SequenceModulationProfile* modulationProfile) {
+              const ResolvedPerformance& resolved, const SequenceModulationProfile* modulationProfile) {
     pitchBendContext = PerformancePitchBendContext{resolved};
     recordPitch(0);
     for (auto event = timeline.begin(); event != timeline.end();) {
       const u64 tick = performanceEventHeader(**event).tick;
       // The periodic sample precedes this tick's commands. Commands retain
       // source order, and a reset replaces the sample at the same tick.
-      flushModulation(tick, modulationConversion);
+      flushModulation(tick);
       bool attack = false;
       do {
         if (const auto* note = std::get_if<MidiNoteBoundary>(*event)) {
           attack |= note->attack.has_value();
         }
-        addMidiEvent(**event, source.sourceTrackNumber, globalTransposes, modulationConversion, modulationProfile);
+        addMidiEvent(**event, source.sourceTrackNumber, globalTransposes, modulationProfile);
         ++event;
       } while (event != timeline.end() && performanceEventHeader(**event).tick == tick);
       recordPitch(tick, attack);
@@ -677,7 +674,7 @@ public:
     // Consuming a trailing source command must not shorten the modulation tail.
     const u64 endTick = source.events.empty() ? source.endTick
         : std::max(source.endTick, performanceEventHeader(source.events.back()).tick);
-    flushModulation(endTick, modulationConversion);
+    flushModulation(endTick);
     if (pitchRequested) {
       encodePitch(pitchSamples, track, channel);
     }
@@ -688,6 +685,7 @@ private:
   u8 channel;
   const MidiExportOptions& options;
   const PerformanceTempoMap& tempos;
+  const ModulationConversionPolicy modulationConversion;
   bool hasNote = false;
   // MIDI starts in bank/program zero.
   u16 midiBank = 0;
@@ -759,15 +757,13 @@ private:
     state = nextState;
   }
 
-  void addPan(std::optional<u8>& state, u64 tick, u8 value, bool force) {
-    if (!force && state == value) {
+  void addPan(u64 tick, u8 value, bool force) {
+    if (!force && lastPanValue == value) {
       return;
     }
     addController(tick, MidiController::Pan, value);
-    state = value;
+    lastPanValue = value;
   }
-
-  [[nodiscard]] double layeredPitchBendSemitones() const { return pitchBendLayers.semitones(pitchBendContext); }
 
   [[nodiscard]] SimulatedPitchLfoState& pitchLfo(PitchBendLayerId layer) { return pitchLfos[layer.value]; }
 
@@ -780,7 +776,8 @@ private:
   }
 
   void recordPitch(u64 tick, bool attack = false) {
-    const double semitones = tuningSemitones + layeredPitchBendSemitones() + simulatedPitchLfoSemitones();
+    const double semitones =
+        tuningSemitones + pitchBendLayers.semitones(pitchBendContext) + simulatedPitchLfoSemitones();
     const u16 sourceRange = std::min<u16>(pitchBendContext.rangeCents(), 12'700);
     pitchRequested |= semitones != 0.0 || sourceRange != 200;
     // A tick has one final pitch, including any note reset or later source write.
@@ -802,7 +799,8 @@ private:
         options.bankSelectStyle == MidiBankSelectStyle::MsbOnly ? static_cast<u16>(bank & 0x7f) : bank;
     const bool bankChanged = emittedBank != midiBank;
     if (bankChanged || forceBankSelect) {
-      track.events.push_back(midi::bankSelect(tick, channel, bank, writeBankSelectLsb(options)));
+      track.events.push_back(midi::bankSelect(
+          tick, channel, bank, options.bankSelectStyle == MidiBankSelectStyle::MsbAndLsb));
       midiBank = emittedBank;
     }
     const u8 program = static_cast<u8>(std::min<u32>(selection.address.program, 127));
@@ -815,10 +813,10 @@ private:
     }
   }
 
-  void flushModulation(u64 tick, ModulationConversionPolicy conversion) {
+  void flushModulation(u64 tick) {
     flushSimulatedVibrato(tick);
-    if (conversion == ModulationConversionPolicy::SequenceEventSimulation) {
-      flushSimulatedTremolo(tick, conversion);
+    if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
+      flushSimulatedTremolo(tick);
     }
     flushSimulatedPan(tick);
   }
@@ -916,7 +914,7 @@ private:
 
   // Source expression and simulated tremolo share the remaining MIDI expression
   // controller. Pan conversion deliberately does not participate in this product.
-  void addCombinedExpression(u64 tick, ModulationConversionPolicy modulationConversion, bool force = true) {
+  void addCombinedExpression(u64 tick, bool force = true) {
     const bool simulatingTremolo = modulationConversion == ModulationConversionPolicy::SequenceEventSimulation;
     addLevelController(lastExpression, tick, MidiController::Expression, sourceExpressionGain * simulatedTremoloGain,
                        options.expressionResolution,
@@ -940,10 +938,10 @@ private:
     return 1.0 - (depth * normalizedLfo);
   }
 
-  void flushSimulatedTremolo(u64 upToTick, ModulationConversionPolicy modulationConversion) {
+  void flushSimulatedTremolo(u64 upToTick) {
     flushLfo(tremolo, upToTick, tempos, [&](u64 tick, double value) {
       simulatedTremoloGain = tremoloGain(value);
-      addCombinedExpression(tick, modulationConversion);
+      addCombinedExpression(tick);
     });
   }
 
@@ -957,8 +955,7 @@ private:
   }
 
   void setSimulatedTremoloDepth(u64 tick, double depth, TremoloDepthUnit unit, TremoloGainMode gainMode,
-                                LfoZeroDepthBehavior zeroDepthBehavior,
-                                ModulationConversionPolicy modulationConversion) {
+                                LfoZeroDepthBehavior zeroDepthBehavior) {
     tremolo.depth = std::max(0.0, depth);
     tremoloDepthUnit = unit;
     tremoloGainMode = gainMode;
@@ -970,11 +967,11 @@ private:
     const double gain = tremoloGainAtCurrentPhase();
     if (gain != simulatedTremoloGain) {
       simulatedTremoloGain = gain;
-      addCombinedExpression(tick, modulationConversion);
+      addCombinedExpression(tick);
     }
   }
 
-  void restartSimulatedTremoloForNote(u64 tick, ModulationConversionPolicy modulationConversion) {
+  void restartSimulatedTremoloForNote(u64 tick) {
     const auto fallback = !tremolo.shape && tremoloDepthUnit == TremoloDepthUnit::LegacyUnipolar
                               ? LfoInitialPhaseFallback::UnipolarTremoloNominalGain
                               : LfoInitialPhaseFallback::Zero;
@@ -985,7 +982,7 @@ private:
     tremolo.producedSample = tremolo.canSampleImmediately();
     if (gain != simulatedTremoloGain) {
       simulatedTremoloGain = gain;
-      addCombinedExpression(tick, modulationConversion);
+      addCombinedExpression(tick);
     }
   }
 
@@ -999,7 +996,7 @@ private:
       value = lowered.pan;
       levelGain = lowered.gain * sourcePanLinearGain;
     }
-    addPan(lastPanValue, tick, value, force);
+    addPan(tick, value, force);
     if (levelGain != panLevelGain) {
       panLevelGain = levelGain;
       addCombinedLevel(tick, force);
@@ -1031,7 +1028,7 @@ private:
 
   void addMidiEvent(const MidiTrackEvent& event, u32 sourceTrackNumber,
                     std::span<const GlobalTransposePerformanceEvent* const> globalTransposes,
-                    ModulationConversionPolicy modulationConversion, const SequenceModulationProfile* modulationProfile) {
+                    const SequenceModulationProfile* modulationProfile) {
     const bool forceControllers = !performanceEventHeader(event).automation;
     std::visit(
         [&](const auto& typedEvent) {
@@ -1051,10 +1048,10 @@ private:
             }
             if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
               if (typedEvent.restartTremolo && tremolo.started) {
-                restartSimulatedTremoloForNote(typedEvent.header.tick, modulationConversion);
+                restartSimulatedTremoloForNote(typedEvent.header.tick);
               } else if (std::exchange(tremolo.outputHeldUntilNextNote, false) && simulatedTremoloGain != 1.0) {
                 simulatedTremoloGain = 1.0;
-                addCombinedExpression(typedEvent.header.tick, modulationConversion);
+                addCombinedExpression(typedEvent.header.tick);
               }
             }
             if (typedEvent.restartPan && panLfo.started) {
@@ -1085,7 +1082,7 @@ private:
           } else if constexpr (std::is_same_v<TypedEvent, ExpressionPerformanceEvent>) {
             sourceExpressionGain = typedEvent.linearGain;
             sourceExpressionLevels = typedEvent.sourceLevels;
-            addCombinedExpression(typedEvent.header.tick, modulationConversion, forceControllers);
+            addCombinedExpression(typedEvent.header.tick, forceControllers);
           } else if constexpr (std::is_same_v<TypedEvent, PanPerformanceEvent>) {
             sourcePanPosition = typedEvent.stereoPosition;
             sourcePanLinearGain = typedEvent.linearGain;
@@ -1100,7 +1097,7 @@ private:
             simulatedPanOffset = 0.0;
             panLfo = {};
             const u8 value = data7(std::clamp(typedEvent.position, 0.0, 1.0) * 127.0);
-            addPan(lastPanValue, typedEvent.header.tick, value, forceControllers);
+            addPan(typedEvent.header.tick, value, forceControllers);
             if (panLevelGain != 1.0) {
               panLevelGain = 1.0;
               addCombinedLevel(typedEvent.header.tick, forceControllers);
@@ -1113,7 +1110,7 @@ private:
             sourcePanPosition = sum == 0.0 ? 0.0 : (right - left) / sum;
             sourcePanLinearGain = sum;
             sourcePanLaw = PanLaw::Unspecified;
-            addPan(lastPanValue, typedEvent.header.tick, lowered.pan, forceControllers);
+            addPan(typedEvent.header.tick, lowered.pan, forceControllers);
             panLevelGain = lowered.gain;
             addCombinedLevel(typedEvent.header.tick, forceControllers);
           } else if constexpr (std::is_same_v<TypedEvent, MasterLevelPerformanceEvent>) {
@@ -1223,8 +1220,7 @@ private:
                                              ? *typedEvent.volumeDepthDecibels
                                              : (physicalLinearGain ? *typedEvent.volumeDepthLinearGain
                                                                    : std::clamp(typedEvent.amount, 0.0, 1.0) * 0.5),
-                                         unit, typedEvent.context.tremoloGainMode, typedEvent.context.zeroDepthBehavior,
-                                         modulationConversion);
+                                         unit, typedEvent.context.tremoloGainMode, typedEvent.context.zeroDepthBehavior);
               } else if (typedEvent.target == ModulationPerformanceTarget::TremoloRate) {
                 configureLfo(tremolo, typedEvent.header.tick, typedEvent,
                              typedEvent.context.shape ? LfoInitialPhaseFallback::Zero
@@ -1309,12 +1305,11 @@ MidiSequence renderMidiSequence(const ResolvedPerformance& resolved,
     };
     const auto assignment = midiChannelAssignment(trackIndex, options);
     MidiTrackRenderer renderer{midiTrack, assignment.channel,
-                               globalTempos, options, levelHeadroom};
+                               globalTempos, options, modulationConversion, levelHeadroom};
     if (options.writePortMetaEvents) {
       midiTrack.events.push_back(midi::meta(0, 0x21, {midiPortByte(assignment.port)}, -5));
     }
-    renderer.render(performanceTrack, timeline, globalTransposes, modulationConversion, resolved,
-                    modulationProfile);
+    renderer.render(performanceTrack, timeline, globalTransposes, resolved, modulationProfile);
     u64 endTick = performanceTrack.endTick;
     if (trackIndex == 0) {
       for (const auto& tempo : globalTempos.points()) {

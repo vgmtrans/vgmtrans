@@ -246,11 +246,11 @@ struct ProgramState {
 };
 
 struct TrackState {
-  TrackState(TrackStateContext sourceTrack, const DriverData& driver)
+  TrackState(TrackStateContext context, const DriverData& driver)
       : version(driver.version()), timebaseShift(driver.timebaseShift()), velocityEnabled(driver.noteVelocity()),
         volume(math::initialVolume(version)),
-        initialEcho((driver.initialEchoMask() & (1u << sourceTrack.sourceTrackNumber)) != 0),
-        voiceBit(static_cast<u8>(1u << sourceTrack.sourceTrackNumber)), loopPoint(sourceTrack.track.startAddress) {
+        initialEcho((driver.initialEchoMask() & (1u << context.sourceTrackNumber)) != 0),
+        voiceBit(static_cast<u8>(1u << context.sourceTrackNumber)), loopPoint(context.sourceTrack.startAddress) {
     if (const auto instrument = driver.instrument(0)) {
       envelope = *instrument;
     }

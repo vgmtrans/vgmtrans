@@ -877,8 +877,9 @@ struct PitchEnvelopeState {
 };
 
 struct TrackState {
-  TrackState(TrackStateContext track, const RuntimeConfig& config)
-      : sourceTrack(track.track), trackNumber(track.sourceTrackNumber), pan8Bit(akaoSnesUses8BitPan(config.profile)),
+  TrackState(TrackStateContext context, const RuntimeConfig& config)
+      : sourceTrack(context.sourceTrack), trackNumber(context.sourceTrackNumber),
+        pan8Bit(akaoSnesUses8BitPan(config.profile)),
         v1Envelope(config.v1VolumeEnvelopes ? &*config.v1VolumeEnvelopes : nullptr) {}
 
   [[nodiscard]] bool pitchBendAtRest() const {

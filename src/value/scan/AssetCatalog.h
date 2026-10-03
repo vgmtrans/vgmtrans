@@ -86,9 +86,9 @@ public:
 
 private:
   std::vector<SourceFile> sources_;
-  std::unordered_map<u32, size_t> sourcesById_;
+  std::unordered_map<SourceId, size_t> sourcesById_;
   SharedSequence<Asset> assets_;
-  std::unordered_map<u32, const Asset*> assetsById_;
+  std::unordered_map<AssetId, const Asset*> assetsById_;
 };
 
 }  // namespace vgmtrans::core

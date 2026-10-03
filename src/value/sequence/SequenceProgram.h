@@ -224,14 +224,14 @@ struct TrackProgram {
 // to any particular playback track or channel.
 struct StreamStateContext {
   const SequenceProgram& sequence;
-  const TrackProgram& track;
+  const TrackProgram& sourceTrack;
 };
 
 // Borrowed initialization data for one playback track (one musical channel in
 // an interleaved stream). The decoded source track stays alive during playback.
 struct TrackStateContext {
   const SequenceProgram& sequence;
-  const TrackProgram& track;
+  const TrackProgram& sourceTrack;
   u32 sourceTrackNumber;
 };
 

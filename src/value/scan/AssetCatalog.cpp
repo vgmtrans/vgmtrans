@@ -16,13 +16,13 @@ namespace vgmtrans::core {
 AssetCatalog::AssetCatalog(std::vector<SourceFile> sources, SharedSequence<Asset> assets)
     : sources_(std::move(sources)), assets_(std::move(assets)) {
   for (size_t index = 0; index < sources_.size(); ++index) {
-    sourcesById_.emplace(sources_[index].id.value, index);
+    sourcesById_.emplace(sources_[index].id, index);
   }
   assetsById_.reserve(assets_.size());
   for (const auto& asset : assets_) {
     const AssetId id = metadata(asset).id;
     if (id.valid()) {
-      assetsById_.emplace(id.value, &asset);
+      assetsById_.emplace(id, &asset);
     }
   }
 }
@@ -31,7 +31,7 @@ const Asset* AssetCatalog::asset(AssetId id) const noexcept {
   if (!id.valid()) {
     return nullptr;
   }
-  const auto found = assetsById_.find(id.value);
+  const auto found = assetsById_.find(id);
   return found != assetsById_.end() ? found->second : nullptr;
 }
 
@@ -39,7 +39,7 @@ SourceId AssetCatalog::sourceRoot(SourceId source) const noexcept {
   // Follow parents to the user-loaded source. Sessions prevent parent cycles;
   // the limit also avoids an endless loop in a malformed, hand-built snapshot.
   for (size_t depth = 0; depth < sources_.size(); ++depth) {
-    const auto found = sourcesById_.find(source.value);
+    const auto found = sourcesById_.find(source);
     if (found == sourcesById_.end() || !sources_[found->second].parent) {
       return source;
     }
@@ -49,7 +49,7 @@ SourceId AssetCatalog::sourceRoot(SourceId source) const noexcept {
 }
 
 const SourceFile* AssetCatalog::sourceFor(const AssetMetadata& metadata) const noexcept {
-  const auto found = sourcesById_.find(metadata.range.source.value);
+  const auto found = sourcesById_.find(metadata.range.source);
   return found != sourcesById_.end() ? &sources_[found->second] : nullptr;
 }
 
