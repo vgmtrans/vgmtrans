@@ -464,6 +464,15 @@ void compilerCursorCompilesControlFlow() {
   const auto rejected = bounds.decode(0, starts, overflowingContinuation);
   expect(rejected.commands.empty() && rejected.startAddress.value == starts.front().value,
          "an out-of-range entry point must retain its address without decoding wrapped source bytes");
+
+  SourceMapBuilder boundsSourceMap;
+  auto annotatedBounds = bounds;
+  annotatedBounds.sourceMap = &boundsSourceMap;
+  const auto annotated = annotatedBounds.decode(0, starts, overflowingContinuation);
+  const SourceMap boundsAnnotations = boundsSourceMap.finish();
+  expect(annotated.commands.empty() && annotated.startAddress.value == starts.front().value &&
+             boundsAnnotations.get(annotated.annotation).range == bounds.reader.range(starts.front().value, 0),
+         "an empty source track should retain its full entry address in its annotation range");
 }
 
 void compilerCursorCompilesRepeatsAndConditionalFields() {

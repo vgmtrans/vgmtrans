@@ -6,6 +6,7 @@
 
 #include "../PerformanceTestSupport.h"
 #include "../TestSupport.h"
+#include "ValueFormatTestSupport.h"
 
 #include "value/formats/GraphResSnes/GraphResSnes.h"
 #include "value/sequence/SequenceVm.h"
@@ -212,6 +213,9 @@ void startupShadowsMatchClearedDriverRam() {
 }  // namespace
 
 void runGraphResSnesModuleTests() {
+  DriverFixture retainedFixture;
+  retainedFixture.commands({0xfc, 0x02, 0x10, 0x04, 0xff});
+  expectScanSharesPlaybackSource(module(), retainedFixture.data());
   layoutAndModuleBuildASequenceAndSynth();
   dynamicDriverFeaturesRenderAtTheirTrueTiming();
   nestedRepeatsAndBreaksFollowDriverState();

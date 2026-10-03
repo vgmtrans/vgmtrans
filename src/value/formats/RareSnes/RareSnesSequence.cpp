@@ -17,6 +17,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -605,7 +606,7 @@ struct ProgramState {
   Profile selected;
   u8 initialTempo = 0;
   u8 initialTimer = 0;
-  std::vector<u8> srcns;
+  std::span<const u8> srcns;
   u8 tempo = 0;
   u8 timer = 0;
   s8 masterLeft = 0x7f;

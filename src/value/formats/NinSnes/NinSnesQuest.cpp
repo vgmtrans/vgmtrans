@@ -178,7 +178,8 @@ struct TrackState {
 };
 
 struct ProgramState {
-  explicit ProgramState(const Config& config) : config(config), instruments(config.instruments) {
+  explicit ProgramState(const Config& config)
+      : config(config), conditions(config.conditions), condition(config.condition), instruments(config.instruments) {
     for (u32 i = 0; i < programs.size(); ++i) {
       programs[i] = i;
     }
@@ -212,7 +213,9 @@ struct ProgramState {
     return id;
   }
 
-  Config config;
+  const Config& config;
+  std::array<u8, 2> conditions;
+  u8 condition;
   std::array<InstrumentBytes, 256> instruments;
   std::array<u32, 256> programs{};
   std::map<std::tuple<u8, InstrumentBytes, bool>, u32> versions;
@@ -654,7 +657,7 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   [[nodiscard]] Effects conditionalJump(Address destination) {
-    return program.config.condition == 0 ? vm.jump(destination) : Effects{};
+    return program.condition == 0 ? vm.jump(destination) : Effects{};
   }
 
   // E1 selects one of 21 positions. Tactics Ogre adds left/right phase inversion
@@ -1013,7 +1016,7 @@ using Cursor = CompilerCursor<Playback>;
       const u8 first = cursor.u8("pan_if_set");
       const u8 second = cursor.u8("pan_if_clear");
       return event.invokeFlow([first, second](Playback& p) {
-        p.pan(p.program.config.conditions[p.track.number / 4] ? first : second);
+        p.pan(p.program.conditions[p.track.number / 4] ? first : second);
         return Effects{};
       });
     }
@@ -1023,7 +1026,7 @@ using Cursor = CompilerCursor<Playback>;
       const Address second{
           cursor.u16le("pattern_if_clear", SourceValueDisplay::Address, SemanticOperandRole::CallTarget)};
       return event.invokeFlow([first, second](Playback& p) {
-        return p.call(1, p.program.config.conditions[p.track.number / 4] ? first : second);
+        return p.call(1, p.program.conditions[p.track.number / 4] ? first : second);
       }).call(first).discoverTarget(second);
     }
     case 0xfe: {
@@ -1032,7 +1035,7 @@ using Cursor = CompilerCursor<Playback>;
       const u8 value = cursor.u8("value", SourceValueDisplay::Hex);
       if (address == 0xa5 || address == 0xa6) {
         return event.invokeFlow([address, value](Playback& p) {
-          p.program.config.conditions[address - 0xa5] = value;
+          p.program.conditions[address - 0xa5] = value;
           return Effects{};
         });
       }
@@ -1262,7 +1265,7 @@ using Cursor = CompilerCursor<Playback>;
       const u8 value = cursor.u8("value", SourceValueDisplay::Hex);
       if (address == 0xdf) {
         return event.invokeFlow([value](Playback& p) {
-          p.program.config.condition = value;
+          p.program.condition = value;
           return Effects{};
         });
       }

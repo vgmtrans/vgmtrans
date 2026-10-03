@@ -9,6 +9,7 @@
 #include "value/base/Source.h"
 #include "value/sequence/SequenceProgram.h"
 
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -45,6 +46,11 @@ enum class SemanticOperandRole : u8 {
 struct SemanticOperand {
   std::optional<u64> value;
   SemanticOperandRole role = SemanticOperandRole::Value;
+
+  [[nodiscard]] std::optional<u32> unsigned32() const {
+    return value && *value <= std::numeric_limits<u32>::max() ? std::optional{static_cast<u32>(*value)}
+                                                           : std::nullopt;
+  }
 };
 
 // Temporary decoded form used for reachability, source annotation projection,

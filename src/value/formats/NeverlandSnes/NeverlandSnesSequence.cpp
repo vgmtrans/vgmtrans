@@ -193,7 +193,7 @@ struct TrackState {
         voiceBit(static_cast<u8>(1u << std::min<u32>(source.sourceTrackNumber, 7))) {}
 
   ByteReader reader;
-  Layout layout;
+  const Layout& layout;
   bool percussion = false;
   u8 voiceBit = 1;
   u16 playlistAddress = 0;

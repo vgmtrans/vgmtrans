@@ -15,6 +15,7 @@
 
 #include <array>
 #include <map>
+#include <span>
 #include <tuple>
 
 namespace vgmtrans::formats::nin_snes::sequence {
@@ -161,7 +162,7 @@ struct IntelligentState {
 
   u8 flags = 0;
   u8 conditionalMask = 0;
-  std::vector<u8> transposeTable;
+  std::span<const u8> transposeTable;
   std::vector<VoiceRecord> voiceTable;
   std::array<PercussionEntry, kIntelliDrumSlots> initialPercussionTable{};
   std::array<PercussionEntry, kIntelliDrumSlots> percussionTable{};
@@ -224,7 +225,7 @@ struct ProgramState {
   u8 percussionBase = 0;
   std::optional<u8> fixedPercussionBase;
   IntelligentState intelligent;
-  std::map<u32, EnvelopeRegisters> baseEnvelopes;
+  const std::map<u32, EnvelopeRegisters>& baseEnvelopes;
   std::map<u32, EnvelopeRegisters> instrumentEnvelopes;
   std::map<u8, DrumSlot> standardDrums;
   EchoState echo;

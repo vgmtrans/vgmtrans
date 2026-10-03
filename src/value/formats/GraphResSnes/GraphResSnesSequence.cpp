@@ -142,7 +142,7 @@ struct TrackState {
       : data(config.source.reader()), layout(config.layout), trackNumber(sourceTrack.sourceTrackNumber) {}
 
   ByteReader data;
-  Layout layout;
+  const Layout& layout;
   u32 trackNumber = 0;
   u8 volume = 0x0f;
   s8 pan = 0;

@@ -1,7 +1,7 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Twelve validated batches remove 705 net production lines from
+`cb9e0b766`. Thirteen validated batches remove 708 net production lines from
 `src/value`. All 44 CTest suites pass; the latest real-file replay preserves
 all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
 records appear at the end of this document.
@@ -4770,3 +4770,82 @@ GraphRes/Neverland/SoftCreat without a new adapter. Temporary layout/allocation
 measurements show substantive reductions while mutable working tables stay owned.
 Evaluate direct private playlist-command references, one bounded SemanticOperand
 query, and a decode-session start range instead of an unused borrowed byte reader.
+
+
+## Cleanup2 thirteenth batch: borrow immutable playback settings
+
+This batch removes three net production lines, bringing cleanup2 to 708 removed.
+The principal improvement is clearer ownership: playback state retains mutable
+working values and borrows read-only settings already owned by its runtime
+factory. Two regression extensions add 13 test lines.
+
+- Nin's baseline envelope map and Intelligent transpose table borrow immutable
+  configuration. Working envelopes, voice records, and percussion records remain
+  owned and reset independently. ProgramState shrinks from 2,696 to 2,672 bytes;
+  IntelligentState shrinks from 176 to 168. A 32-envelope/seven-transpose-entry
+  state needs 33 allocations instead of 66: the remaining map is actual working
+  state. Quest borrows Config and owns only the three condition bytes that its
+  commands modify, alongside its existing working instruments. Its state shrinks
+  from 10,600 to 2,872 bytes, and configuration-vector copies disappear.
+- GraphRes, Neverland, and SoftCreat track states borrow const Layout from the
+  same immutable runtime owner as their existing byte reader. State sizes fall
+  from 288 to 240, 416 to 128, and 776 to 272 bytes, respectively. GraphRes and
+  Neverland each avoid one layout-vector allocation per channel. GraphRes now
+  invokes the existing copied-program/source-release fixture; Neverland and
+  SoftCreat already had that lifetime coverage.
+- Rare borrows its SRCN table; WolfTeam borrows instrument pitches, its pitch
+  table, and per-track stream starts. Mutable playback state remains independent.
+  Rare state shrinks from 528 to 520 bytes; WolfTeam program state falls from
+  160 to 32 and track state from 136 to 128. Populated state factories each drop
+  from two allocations to one.
+- SemanticOperand owns its bounded unsigned32 query. Source-channel projection,
+  instrument links, and AKAO reference discovery use the same check, preserving
+  their distinct rules for absent/overflowing and repeated operands. Address
+  links continue to retain full 64-bit values.
+- TrackDecodeSession retains its initial SourceRange instead of a byte reader
+  that it never reads and a separate offset. It shrinks from 96 to 88 bytes.
+  Empty and out-of-bounds tracks preserve their full entry address in both
+  executable metadata and the source annotation; a regression assertion covers
+  the annotated entry above the 32-bit boundary.
+
+Validation:
+
+- The initial 116-step Release build stopped on an invalid Address equality
+  expression in the new fixture. Comparing its value fixes the fixture; the
+  following 55-step build is warning-free and all 44 CTest suites pass.
+- Nin's full fixtures and generated settings/conditions/envelope probes match
+  1,414 complete performance/MIDI captures and 6,745,680 bytes in Release and
+  before/after focused ASan, UBSan, and float-cast-overflow runs. Generated
+  configs test repeated rendering, independent analysis, copied runtime after
+  original input/layout/program release, and immutable-default/working-table
+  reset isolation. All three Nin implementation units and the VM are instrumented.
+- Rare's 912 generated cases and WolfTeam's 2,040 cases match 6,541,826 bytes,
+  including 4,354 VM captures and 13,062 MIDI exports across three pitch policies.
+  All existing suites pass in both sanitizer runners. Cases cover every native
+  profile/variant, populated/truncated/fallback tables, pitch and stream bounds,
+  duplicate streams, prepass/reset, repeated renders, and copied runtimes after
+  source/layout/original program release.
+- Focused GraphRes/Neverland/SoftCreat format suites pass ASan/UBSan, including
+  their copied-program/source-release checks. Probe builds use frozen twelfth-
+  batch headers and archives plus local format replacements, so the decode-
+  session layout change cannot cause an archive/header mismatch.
+- Operand projection/reference discovery matches all 29,044 cases and 5,148,914
+  bytes; decode sessions match 4,032 source/hierarchy/start/empty/command cases
+  and 467,034 bytes. Focused changed decode code and the complete compiler-cursor
+  fixture pass ASan, UBSan, and float-cast-overflow. Unchanged archives are not
+  fully instrumented; mixed libc++ container annotations are disabled consistently.
+- The frozen thirteenth-batch shell matches the twelfth batch for all 252
+  input/policy comparisons, 3,922 artifact hashes, inventories, diagnostics,
+  and exit statuses.
+
+Rejected: replacing playlist ordinals with pointers removes only three lines.
+Its 46,656-case sanitizer trace is exact (41,141,541 bytes), but repeat-map nodes
+increase from 40 to 48 bytes and a depth-12 repeat probe allocates 8,552,936 bytes
+instead of 7,406,048, with identical allocation counts. Keep compact ordinals.
+
+Next: remove the unused misc-asset byte payload and private data, including the
+ceremonial draft lifecycle that requires formats to fill them. Source ranges and
+annotations already provide inspection, and no production consumer reads either
+value. Preserve ordered publication and sequence-payload retry safety. Also
+investigate moving the VM's existing visit snapshots directly into its visited
+map and removing redundant per-format sequence-range inference.

@@ -1039,17 +1039,11 @@ SequenceRuntime akaoSequenceRuntime(AkaoRuntimeConfig config) {
 namespace {
 
 void collectReferences(const DecodedBytecodeCommand& command, AkaoSequenceReferences& references) {
-  const auto unsignedValue = [](const SemanticOperand& operand) -> std::optional<u32> {
-    return operand.value && *operand.value <= std::numeric_limits<u32>::max()
-               ? std::optional{static_cast<u32>(*operand.value)}
-               : std::nullopt;
-  };
-
   std::optional<u32> bank;
   std::optional<u32> instrumentTable;
   std::vector<u32> programs;
   for (const auto& operand : command.operands) {
-    const auto value = unsignedValue(operand);
+    const auto value = operand.unsigned32();
     if (!value) {
       continue;
     }

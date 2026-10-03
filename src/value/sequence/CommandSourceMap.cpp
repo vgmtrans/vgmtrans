@@ -10,20 +10,12 @@
 #include "value/sequence/SequenceProgramConfig.h"
 
 #include <algorithm>
-#include <limits>
 #include <optional>
 #include <string>
 
 namespace vgmtrans::core {
 
 namespace {
-
-[[nodiscard]] std::optional<u32> operandUnsigned32(const SemanticOperand& operand) {
-  if (!operand.value || *operand.value > std::numeric_limits<u32>::max()) {
-    return std::nullopt;
-  }
-  return static_cast<u32>(*operand.value);
-}
 
 [[nodiscard]] std::optional<SourceLinkRole> linkRole(SemanticOperandRole role) {
   switch (role) {
@@ -45,7 +37,7 @@ namespace {
 [[nodiscard]] std::optional<u32> sourceChannel(const DecodedBytecodeCommand& command) {
   const auto found = std::ranges::find_if(
       command.operands, [](const SemanticOperand& operand) { return operand.role == SemanticOperandRole::Channel; });
-  return found == command.operands.end() ? std::nullopt : operandUnsigned32(*found);
+  return found == command.operands.end() ? std::nullopt : found->unsigned32();
 }
 
 [[nodiscard]] SourceAnnotationId projectDecodedCommand(SourceMapBuilder* sourceMap,
@@ -76,11 +68,11 @@ namespace {
       }
     }
     if (operand.role == SemanticOperandRole::InstrumentBank) {
-      instrumentBank = operandUnsigned32(operand);
+      instrumentBank = operand.unsigned32();
     } else if (operand.role == SemanticOperandRole::InstrumentProgram) {
-      instrumentProgram = operandUnsigned32(operand);
+      instrumentProgram = operand.unsigned32();
     } else if (operand.role == SemanticOperandRole::Instrument) {
-      if (const auto instrument = operandUnsigned32(operand)) {
+      if (const auto instrument = operand.unsigned32()) {
         annotation.link(SourceLinkRole::UsesInstrument, SourceTarget{ObjectRefs::instrumentIndex(*instrument)},
                         "Instrument");
       }
@@ -97,7 +89,7 @@ namespace {
 }  // namespace
 
 TrackDecodeSession::TrackDecodeSession(const TrackDecodeScope& scope, u32 trackIndex, u64 startOffset)
-    : reader_(scope.reader), startOffset_(startOffset), sourceMap_(scope.sourceMap), trackIndex_(trackIndex) {
+    : startRange_(scope.reader.range(startOffset, 0)), sourceMap_(scope.sourceMap), trackIndex_(trackIndex) {
   if (!scope.sourceHasTracks) {
     commandParent_ = scope.parentAnnotation;
     if (!commandParent_) {
@@ -110,7 +102,7 @@ TrackDecodeSession::TrackDecodeSession(const TrackDecodeScope& scope, u32 trackI
   }
 
   auto track = sourceMap_->annotation(SourceRole::SequenceTrack, "Track " + std::to_string(trackIndex),
-                                      reader_.range(startOffset, 0))
+                                      startRange_)
                    .kind("track");
   if (scope.sequenceAsset) {
     track.owner(ObjectRefs::sequenceTrack(*scope.sequenceAsset, trackIndex));
@@ -129,7 +121,7 @@ const DecodedBytecodeCommand& TrackDecodeSession::findOrAppend(DecodedBytecodeCo
 TrackProgram TrackDecodeSession::finish() {
   TrackProgram track{
       .streams = {{.channels = {trackIndex_}}},
-      .startAddress = Address{startOffset_},
+      .startAddress = Address{startRange_.offset},
       .annotation = annotation_.value_or(SourceAnnotationId{}),
   };
   track.commands.reserve(commands_.size());
@@ -152,7 +144,7 @@ TrackProgram TrackDecodeSession::finish() {
     });
   }
   if (sourceMap_ != nullptr && annotation_) {
-    AnnotationBuilder{*sourceMap_, *annotation_}.range(span.valid() ? span : reader_.range(startOffset_, 0));
+    AnnotationBuilder{*sourceMap_, *annotation_}.range(span.valid() ? span : startRange_);
   }
   return track;
 }

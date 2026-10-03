@@ -39,8 +39,7 @@ private:
 
   TrackDecodeSession(const TrackDecodeScope& scope, u32 trackIndex, u64 startOffset);
 
-  ByteReader reader_;
-  u64 startOffset_ = 0;
+  SourceRange startRange_;
   SourceMapBuilder* sourceMap_ = nullptr;
   std::optional<SourceAnnotationId> annotation_;
   std::optional<SourceAnnotationId> commandParent_;

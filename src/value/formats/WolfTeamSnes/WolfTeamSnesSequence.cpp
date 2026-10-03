@@ -21,6 +21,7 @@
 #include <optional>
 #include <ranges>
 #include <set>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -235,8 +236,8 @@ struct ProgramState {
   Variant variant = Variant::LateFamily;
   u8 headerTempo = 0;
   u8 timerScale = 0x40;
-  std::array<s16, kInstrumentCount> instrumentPitch{};
-  std::vector<u16> pitchTable;
+  std::span<const s16, kInstrumentCount> instrumentPitch;
+  std::span<const u16> pitchTable;
 };
 
 struct ActiveNote {
@@ -281,7 +282,7 @@ struct TrackState {
   u16 lastVibratoBase = 0x1000;
   size_t savedStream = 0;
   size_t currentStream = 0;
-  std::vector<Address> streamStarts;
+  std::span<const Address> streamStarts;
   std::array<RuntimeLoopMarker, 2> loopMarkers{};
   std::vector<ActiveNote> activeNotes;
 };
