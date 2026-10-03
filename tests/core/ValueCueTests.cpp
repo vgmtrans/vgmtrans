@@ -217,7 +217,7 @@ void routesBinPathsAndScansDerivedSources() {
   fixture.cue("FILE disc.bin BINARY\n TRACK 01 MODE2/2352\n INDEX 01 00:00:00\n");
   Session registry;
   vgmtrans::formats::registerValueFormats(registry);
-  expect(std::ranges::any_of(registry.formats().extractors(), [](const SourceExtractor& extractor) {
+  expect(std::ranges::any_of(registry.extractors(), [](const SourceExtractor& extractor) {
     return extractor.name == "Cue";
   }), "normal format registration should include CUE support");
 

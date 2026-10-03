@@ -630,10 +630,10 @@ void diagnostics(Context& context, Args) {
 }
 
 void formats(Context& context, Args) {
-  for (const auto& module : context.session.formats().modules()) {
+  for (const auto& module : context.session.formats()) {
     context.out << "format: " << module.name << '\n';
   }
-  for (const auto& extractor : context.session.formats().extractors()) {
+  for (const auto& extractor : context.session.extractors()) {
     context.out << "extractor: " << extractor.name << '\n';
   }
 }

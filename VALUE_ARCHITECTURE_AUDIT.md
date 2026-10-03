@@ -4227,3 +4227,44 @@ The next pass removes the standalone registry layer owned only by Session and
 the unused catalog projection now superseded by dependency candidates. Keep
 the VM's separate delay/source-position, section-entry, and musical-state duties:
 collapsing them would obscure real scheduling and lifetime rules.
+
+## Cleanup2: registration belongs to the session
+
+The fifth batch removes another 91 production lines from `src/value`, bringing
+the branch to 458 net lines removed. Test changes add no lines overall.
+
+- Removed `FormatRegistry` and its two files. Session is its sole production
+  owner and already controls the registration/sealing lifecycle. It now owns
+  the two ordered vectors and sealing flag directly; readers use `formats()`
+  and `extractors()`. Registration retains the exact incomplete, duplicate,
+  accepted-source-format, and late-mutation checks and messages. All six sealing
+  sites remain. The module/extractor values themselves remain copyable.
+- Removed the unused `AssetCatalog::assetsWithData` projection. The discovery
+  fixture now exercises typed dependency candidates through the actual format
+  selection path, retaining missing-source IDs, private-data filtering, borrowed
+  pointer identity, temporary-list safety, and tie-order assertions.
+- A synchronized loop checkpoint's start tick is an ordinary value. Its existing
+  nonempty snapshot vector already establishes checkpoint presence; the second
+  optional presence state and its redundant condition disappear.
+- Invalid VM runtimes return at the entry boundary. Normal playback, prepass,
+  and finalization are no longer indented beneath the successful-runtime branch.
+  Warning values are constructed directly at their two actual emission sites.
+- Removed five stale includes from export assembly/scaling. Keep `<variant>`
+  where `std::get_if` is still used; dependency cleanup follows actual use.
+
+Validation:
+
+- Warning-free full macOS Release build (147 steps), including Qt, shell, and
+  parity harness; all 44 CTest suites pass. Existing registration mutation,
+  source extraction, format inventory, and parallel-scanner fixtures pass after
+  moving ownership. A repository-wide search finds no remaining removed API
+  references outside historical audit records and the old design visualization.
+- A temporary synchronized-loop comparison covers 64,802 programs: absent and
+  replacement checkpoints, zero-tick starts, all policies/repeat counts,
+  coordinator position among one to four streams, interleaved channels,
+  command delays/waits, active-note closure, playlists, silent prepass, and
+  empty/missing runtimes. Old/new traces match exactly (93,001,679 bytes).
+  Both VM and supporting units run clean under ASan, UBSan, and float-cast-overflow.
+
+Further work now probes the transient relationship value representation and
+linearizes instrument-variant preparation without changing attack/gate policy.

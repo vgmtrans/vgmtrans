@@ -6,8 +6,6 @@
 
 #include "value/formats/NinSnes/NinSnes.h"
 
-#include "value/scan/FormatRegistry.h"
-
 #include <algorithm>
 #include <string>
 

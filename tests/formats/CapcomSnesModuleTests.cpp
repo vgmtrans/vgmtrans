@@ -348,8 +348,8 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   Session session;
   vgmtrans::formats::registerValueFormats(session);
   const auto capcomModule = std::ranges::find_if(
-      session.formats().modules(), [](const FormatModule& module) { return module.name == "CapcomSnes"; });
-  expect(capcomModule != session.formats().modules().end(), "value format registration should include CapcomSnes");
+      session.formats(), [](const FormatModule& module) { return module.name == "CapcomSnes"; });
+  expect(capcomModule != session.formats().end(), "value format registration should include CapcomSnes");
   const SourceId source = session.addSource(SourceFile{.name = "Mega Man X.spc"}, makeCapcomSnesAram());
 
   session.scanPendingSources();

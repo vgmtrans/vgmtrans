@@ -112,7 +112,6 @@ add_library(vgmtransvaluecore STATIC)
 vgmtrans_enable_project_warnings(vgmtransvaluecore)
 target_sources(vgmtransvaluecore
   PRIVATE
-    ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/AssetCatalog.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/AssetResolution.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/AssetResolution.h
@@ -196,7 +195,6 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/scan/BytePattern.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/AssetCatalog.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatModule.h
-      ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.h
       ${PROJECT_SOURCE_DIR}/src/value/base/LevelScale.h
       ${PROJECT_SOURCE_DIR}/src/value/model/CollectionModel.h
       ${PROJECT_SOURCE_DIR}/src/value/model/EnvelopeModel.h

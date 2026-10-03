@@ -9,11 +9,9 @@
 #include "value/export/CollectionBinding.h"
 #include "value/export/ExportDiagnostics.h"
 #include "value/export/midi/MidiExporter.h"
-#include "value/export/midi/ModulationAnalysis.h"
 #include "value/export/synth/SynthExportData.h"
 #include "value/model/SessionSnapshot.h"
 #include "value/synth/SampleDecoder.h"
-#include "value/validation/SynthValidation.h"
 #include "value/base/Source.h"
 #include "value/export/synth/ModulationScaling.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
@@ -23,7 +21,6 @@
 #include <array>
 #include <cctype>
 #include <exception>
-#include <filesystem>
 #include <iterator>
 #include <optional>
 #include <span>

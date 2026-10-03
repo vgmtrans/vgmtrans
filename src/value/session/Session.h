@@ -10,7 +10,8 @@
 #include "value/export/Export.h"
 #include "value/model/SessionSnapshot.h"
 #include "value/model/SourceInspection.h"
-#include "value/scan/FormatRegistry.h"
+#include "value/scan/FormatModule.h"
+#include "value/scan/SourceExtractor.h"
 
 #include <filesystem>
 #include <memory>
@@ -25,8 +26,8 @@ class SessionState;
 struct CollectionStitchResult;
 
 // Session is the mutable state for one loaded workspace. It owns the source
-// bytes, the assets found inside them, their collections, and the format
-// registry.
+// bytes, the assets found inside them, their collections, and the registered
+// formats and extractors.
 // Call snapshot() when UI, tests, or export need a stable read-only view.
 class Session {
 public:
@@ -62,7 +63,8 @@ public:
                                                          const ExportRequest& request) const;
 
   [[nodiscard]] const SourceStore& sources() const noexcept { return sources_; }
-  [[nodiscard]] const FormatRegistry& formats() const noexcept { return formats_; }
+  [[nodiscard]] const std::vector<FormatModule>& formats() const noexcept { return formats_; }
+  [[nodiscard]] const std::vector<SourceExtractor>& extractors() const noexcept { return extractors_; }
 
 private:
   [[nodiscard]] SourceFile resolveSource(const std::filesystem::path& path,
@@ -74,7 +76,9 @@ private:
 
   SourceStore sources_;
   std::unique_ptr<SessionState> state_;
-  FormatRegistry formats_;
+  std::vector<FormatModule> formats_;
+  std::vector<SourceExtractor> extractors_;
+  bool formatsSealed_ = false;
   std::unordered_set<u32> scannedSources_;
   // The public Session API is single-thread-confined; format scans fan out
   // internally. This immutable revision is populated on the first snapshot

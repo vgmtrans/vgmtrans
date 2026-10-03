@@ -21,66 +21,65 @@ struct BuilderPrivateData {
   u32 value = 0;
 };
 
-void formatRegistryStoresCopyableModulesAtomically() {
-  FormatRegistry registry;
-  registry.add(probeSequenceModule());
-  registry.add(FormatModule{
+void sessionStoresCopyableModulesAtomically() {
+  Session session;
+  session.registerFormat(probeSequenceModule());
+  session.registerFormat(FormatModule{
       .name = std::string("DynamicProbe"),
       .preferredSampleFilter = SampleFilter::SnesDspLowPass,
       .scan = scanProbeSequence,
   });
-  registry.add(SourceExtractor{
+  session.registerExtractor(SourceExtractor{
       .name = "DynamicExtractor",
       .acceptedFormats = {"probe-container"},
       .extract = [](const ExtractionInput&) { return ExtractionResult{}; },
   });
 
-  const FormatRegistry copy = registry;
-  expect(copy.modules().size() == 2, "format registry should copy registered module values");
-  expect(copy.modules()[0].name == "ProbeSequence", "format registry should preserve copied module names");
-  expect(copy.modules()[1].name == "DynamicProbe", "format registry should own dynamically registered module names");
-  expect(copy.modules()[0].scan && copy.modules()[1].scan, "format registry should preserve copied module scanners");
-  expect(copy.modules()[0].preferredSampleFilter == SampleFilter::None,
+  const auto modules = session.formats();
+  const auto extractors = session.extractors();
+  expect(modules.size() == 2, "registered module values should remain copyable");
+  expect(modules[0].name == "ProbeSequence", "module copies should preserve registered names");
+  expect(modules[1].name == "DynamicProbe", "registered modules should own their dynamically supplied names");
+  expect(modules[0].scan && modules[1].scan, "module copies should preserve their scanners");
+  expect(modules[0].preferredSampleFilter == SampleFilter::None,
          "formats should prefer no sample filtering unless they opt into a filter");
-  expect(copy.findModule("DynamicProbe") != nullptr &&
-             copy.findModule("DynamicProbe")->preferredSampleFilter == SampleFilter::SnesDspLowPass,
-         "format registry should expose a format's preferred sample filter");
-  expect(copy.findModule("Missing") == nullptr, "format registry should report missing modules");
-  expect(copy.extractors().size() == 1 && copy.extractors().front().name == "DynamicExtractor",
-         "format registry should copy source extractor values");
-  expectThrows<std::invalid_argument>([&] { registry.add(FormatModule{.name = "Broken"}); },
-                                      "format registry should reject incomplete module values");
+  expect(modules[1].preferredSampleFilter == SampleFilter::SnesDspLowPass,
+         "registered formats should expose their preferred sample filter");
+  expect(extractors.size() == 1 && extractors.front().name == "DynamicExtractor",
+         "registered source extractor values should remain copyable");
+  expectThrows<std::invalid_argument>([&] { session.registerFormat(FormatModule{.name = "Broken"}); },
+                                      "session should reject incomplete module values");
 
   expectThrows<std::invalid_argument>(
       [&] {
-        registry.add(FormatModule{
+        session.registerFormat(FormatModule{
             .name = "DuplicateAcceptedFormat",
             .acceptedFormats = {"same", "same"},
             .scan = scanProbeSequence,
         });
       },
-      "format registry should reject duplicate accepted formats without partially registering a module");
-  expect(registry.modules().size() == 2, "failed registration must leave the module list unchanged");
+      "session should reject duplicate accepted formats without partially registering a module");
+  expect(session.formats().size() == 2, "failed registration must leave the module list unchanged");
 
   expectThrows<std::invalid_argument>(
       [&] {
-        registry.add(FormatModule{
+        session.registerFormat(FormatModule{
             .name = "ProbeSequence",
             .scan = scanProbeSequence,
         });
       },
-      "format registry should reject duplicate module names without partially registering a module");
-  expect(registry.modules().size() == 2, "failed registration must leave the module list unchanged");
+      "session should reject duplicate module names without partially registering a module");
+  expect(session.formats().size() == 2, "failed registration must leave the module list unchanged");
 
   expectThrows<std::invalid_argument>(
       [&] {
-        registry.add(SourceExtractor{
+        session.registerExtractor(SourceExtractor{
             .name = "DynamicExtractor",
             .extract = [](const ExtractionInput&) { return ExtractionResult{}; },
         });
       },
-      "format registry should reject duplicate extractor names without partially registering an extractor");
-  expect(registry.extractors().size() == 1, "failed registration must leave the extractor list unchanged");
+      "session should reject duplicate extractor names without partially registering an extractor");
+  expect(session.extractors().size() == 1, "failed registration must leave the extractor list unchanged");
 }
 
 void scanResultBuilderCoversCommonScannerPlumbing() {
@@ -325,7 +324,7 @@ void scanResultBuilderCursorReportsMalformedFields() {
 }  // namespace
 
 void runValueRegistryTests() {
-  formatRegistryStoresCopyableModulesAtomically();
+  sessionStoresCopyableModulesAtomically();
   scanResultBuilderCoversCommonScannerPlumbing();
   scanResultBuilderPublishesCollectionsByDefaultAndPreservesOptOut();
   scanResultBuilderNamesSequenceCollections();

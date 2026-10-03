@@ -5,7 +5,6 @@
  */
 
 #include "value/formats/KonamiSnes/KonamiSnes.h"
-#include "value/scan/FormatRegistry.h"
 #include "value/scan/ScanResultBuilder.h"
 
 #include <string>

@@ -21,7 +21,6 @@
 #include <memory>
 #include <numeric>
 #include <optional>
-#include <type_traits>
 #include <unordered_set>
 #include <utility>
 

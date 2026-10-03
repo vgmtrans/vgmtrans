@@ -137,20 +137,21 @@ void discoveryExposesTypedAssetDataAndSources() {
     assets.push_back(std::move(detached));
   }
 
-  const AssetCatalog context(sources, SharedSequence<Asset>{std::move(assets)});
-  const auto sequences = context.assetsWithData<SequenceProgramAsset, ProbeData>();
+  const AssetCatalog catalog(sources, SharedSequence<Asset>{std::move(assets)});
+  const DependencyContext context{catalog, *catalog.asset(sequenceId), ResolutionMode::Automatic};
+  const auto sequences = context.candidates<SequenceProgramAsset, ProbeData>();
   expect(sequences.size() == 3 && sequences[0].id() == sequenceId && sequences[0].data->value == 9 &&
              sequences[0].sourceId() == source && sequences[0].source != nullptr && sequences[0].source->id == source,
          "collection discovery should expose typed data and source metadata directly from an asset");
   expect(!sequences[1].sourceId().valid() && sequences[1].source == nullptr &&
              sequences[2].sourceId() == SourceId{99} && sequences[2].source == nullptr,
          "an unavailable source file should not erase a valid source ID");
-  expect(context.asset<SequenceProgramAsset>(sequenceId) == sequences[0].asset &&
-             context.asset<SamplePoolAsset>(samplesId) != nullptr &&
-             context.assetsWithData<SamplePoolAsset, ProbeData>().empty(),
+  expect(catalog.asset<SequenceProgramAsset>(sequenceId) == sequences[0].asset &&
+             catalog.asset<SamplePoolAsset>(samplesId) != nullptr &&
+             context.candidates<SamplePoolAsset, ProbeData>().empty(),
          "collection discovery should provide typed id lookup and omit assets without the requested private data");
 
-  const auto matches = bestMatches(context.assetsWithData<SequenceProgramAsset, ProbeData>(),
+  const auto matches = bestMatches(context.candidates<SequenceProgramAsset, ProbeData>(),
                                    [](const auto& candidate) { return candidate.data->value; });
   expect(
       std::ranges::equal(matches, sequences,

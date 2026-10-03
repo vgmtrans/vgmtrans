@@ -19,14 +19,6 @@ namespace vgmtrans::core {
 
 namespace detail {
 
-[[nodiscard]] Diagnostic vmWarning(std::string message, SourceRange range) {
-  return Diagnostic{
-      .severity = Severity::Warning,
-      .message = std::move(message),
-      .range = range,
-  };
-}
-
 [[nodiscard]] std::optional<u32> continuationIndex(const TrackProgram& track, CommandId command, Address continuation) {
   const size_t next = static_cast<size_t>(command.value) + 1;
   if (next < track.commands.size() && track.commands[next].address.value == continuation.value) {
@@ -686,7 +678,11 @@ private:
   }
 
   void warn(std::string message, SourceRange range) {
-    targetSequence_.diagnostics.push_back(vmWarning(std::move(message), range));
+    targetSequence_.diagnostics.push_back(Diagnostic{
+        .severity = Severity::Warning,
+        .message = std::move(message),
+        .range = range,
+    });
   }
 
   const TrackProgram& track_;
@@ -876,172 +872,175 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
       .sequenceLoops = options_.sequenceLoops,
   };
 
-  if (runtime.valid()) {
-    // Some formats must inspect the whole song before the first event can be
-    // exported. Keep one song-wide state object across an optional silent pass
-    // and the real render so collected information is retained.
-    std::any programState = runtime.createProgramState ? runtime.createProgramState(program) : std::any{};
-    const auto renderSemanticPass = [&](PerformanceSequence& target) {
-      u64 outputSequence = 0;
-      std::vector<detail::VmStreamExecutor> executors;
-      executors.reserve(program.streamCount());
-      u32 nextTrack = 0;
-      const bool hasSectionPlaylist = program.sectionPlaylist.has_value();
-      for (size_t trackIndex = 0; trackIndex < program.tracks.size(); ++trackIndex) {
-        const TrackProgram& track = program.tracks[trackIndex];
-        for (const auto& stream : track.streams) {
-          executors.emplace_back(
-              program, track, stream, runtime, TrackId{static_cast<u32>(trackIndex)}, nextTrack, options, target,
-              outputSequence, programState, !hasSectionPlaylist);
-        }
-      }
-      auto beginSection = [&](const std::vector<std::optional<Address>>& starts, u64 tick) {
-        for (size_t i = 0; i < executors.size(); ++i) {
-          executors[i].beginSection(i < starts.size() ? starts[i] : std::nullopt, tick);
-        }
-      };
-
-      std::optional<detail::SectionPlaylistRunner> playlist;
-      if (program.sectionPlaylist) {
-        playlist.emplace(*program.sectionPlaylist, options);
-        const detail::PlaylistAdvance first = playlist->advance(0);
-        if (first.streamStarts != nullptr) {
-          beginSection(*first.streamStarts, 0);
-        }
-      }
-
-      // Execute the earliest stream first; declaration order is the stable
-      // tie-break. A stream keeps control at the same tick while it consumes
-      // zero-time commands, matching how these drivers run until their next wait.
-      std::optional<u64> sequenceEndTick;
-      std::optional<u64> synchronizedLoopStartTick;
-      std::vector<detail::StreamPosition> synchronizedLoopSnapshot;
-      u32 synchronizedLoopRepeats = 0;
-      while (true) {
-        size_t selected = executors.size();
-        for (size_t i = 0; i < executors.size(); ++i) {
-          if (!executors[i].active()) {
-            continue;
-          }
-          if (selected == executors.size() || executors[i].nextActionTick() < executors[selected].nextActionTick()) {
-            selected = i;
-          }
-        }
-        if (selected == executors.size()) {
-          break;
-        }
-
-        const SequenceCoordinatorSignal signal = executors[selected].executeNext();
-        if (signal == SequenceCoordinatorSignal::SynchronizedLoopStart && !playlist) {
-          const u64 boundary = executors[selected].tick();
-          synchronizedLoopSnapshot.clear();
-          synchronizedLoopSnapshot.reserve(executors.size());
-          for (const auto& executor : executors) {
-            synchronizedLoopSnapshot.push_back(executor.synchronizedLoopSnapshot(boundary));
-          }
-          synchronizedLoopStartTick = boundary;
-          synchronizedLoopRepeats = 0;
-          continue;
-        }
-
-        if (signal == SequenceCoordinatorSignal::SynchronizedLoopEnd && !playlist) {
-          const u64 boundary = executors[selected].tick();
-          if (!synchronizedLoopSnapshot.empty()) {
-            if (options.loopPolicy == LoopPolicy::PlayOnce && synchronizedLoopRepeats < options.sequenceLoops) {
-              ++synchronizedLoopRepeats;
-              for (size_t i = 0; i < executors.size(); ++i) {
-                executors[i].restoreSynchronizedLoop(synchronizedLoopSnapshot[i], boundary);
-              }
-              continue;
-            }
-
-            if (options.loopPolicy == LoopPolicy::Preserve && synchronizedLoopStartTick) {
-              for (auto& executor : executors) {
-                executor.preserveLoop(*synchronizedLoopStartTick, boundary);
-              }
-            }
-            sequenceEndTick = boundary;
-            break;
-          }
-        }
-
-        if (signal == SequenceCoordinatorSignal::SectionEnd && playlist) {
-          if (program.sectionPlaylist->waitForAllTracks &&
-              std::ranges::any_of(executors, [](const auto& executor) { return executor.active(); })) {
-            continue;
-          }
-          const u64 boundary = executors[selected].tick();
-          // Streams are visited in stable source order, so keep same-tick work
-          // from streams processed before the boundary command.
-          for (size_t i = 0; i < executors.size(); ++i) {
-            executors[i].trimAt(boundary, i <= selected);
-          }
-          detail::endSourceSpansAt(target.sourceSpans, boundary);
-
-          const detail::PlaylistAdvance next = playlist->advance(boundary);
-          if (next.preservedLoopStart) {
-            for (auto& executor : executors) {
-              executor.preserveLoop(*next.preservedLoopStart, boundary);
-            }
-          }
-          if (next.streamStarts == nullptr) {
-            sequenceEndTick = boundary;
-            break;
-          }
-          beginSection(*next.streamStarts, boundary);
-          continue;
-        }
-
-        const bool hasLoopBoundary =
-            std::ranges::any_of(executors, [](const auto& executor) { return executor.loopStopTick().has_value(); });
-        if ((!playlist || program.sectionPlaylist->waitForAllTracks) &&
-            options.loopPolicy == LoopPolicy::PlayOnce && hasLoopBoundary &&
-            std::ranges::all_of(executors,
-                                [](const auto& executor) { return !executor.active() || executor.loopStopTick(); })) {
-          sequenceEndTick = 0;
-          for (const auto& executor : executors) {
-            *sequenceEndTick = std::max(*sequenceEndTick, executor.loopStopTick().value_or(executor.tick()));
-          }
-          break;
-        }
-      }
-
-      target.tracks.reserve(program.playbackTrackCount());
-      for (auto& executor : executors) {
-        executor.finish(sequenceEndTick);
-      }
-      if (sequenceEndTick) {
-        // Closing notes updates their source spans; trim only after all tracks finish.
-        detail::endSourceSpansAt(target.sourceSpans, *sequenceEndTick);
-      }
-    };
-
-    if (runtime.finishPrepass != nullptr || analyzedProgramState != nullptr) {
-      // Analysis and formats with a prepass execute the same silent pass in
-      // normal time order. Keep its song-wide state and discard its events.
-      PerformanceSequence prepass{
-          .timebase = program.timebase,
-          .initialTempoMicrosecondsPerQuarter = behavior.initialTempoMicrosecondsPerQuarter,
-      };
-      renderSemanticPass(prepass);
-      if (runtime.finishPrepass != nullptr) {
-        runtime.finishPrepass(programState);
-      }
-      if (analyzedProgramState != nullptr) {
-        // Analysis needs only this pass; its caller retains the state and diagnostics.
-        *analyzedProgramState = std::move(programState);
-        return prepass;
-      }
-    }
-    renderSemanticPass(sequence);
-    if (runtime.finalizePerformance != nullptr) {
-      runtime.finalizePerformance(programState, sequence);
-    }
-    resolveTempoRelativeModulation(sequence);
+  if (!runtime.valid()) {
+    sequence.diagnostics.push_back(Diagnostic{
+        .severity = Severity::Warning,
+        .message = "Sequence program has no runtime executor",
+    });
     return sequence;
   }
 
-  sequence.diagnostics.push_back(detail::vmWarning("Sequence program has no runtime executor", {}));
+  // Some formats must inspect the whole song before the first event can be
+  // exported. Keep one song-wide state object across an optional silent pass
+  // and the real render so collected information is retained.
+  std::any programState = runtime.createProgramState ? runtime.createProgramState(program) : std::any{};
+  const auto renderSemanticPass = [&](PerformanceSequence& target) {
+    u64 outputSequence = 0;
+    std::vector<detail::VmStreamExecutor> executors;
+    executors.reserve(program.streamCount());
+    u32 nextTrack = 0;
+    const bool hasSectionPlaylist = program.sectionPlaylist.has_value();
+    for (size_t trackIndex = 0; trackIndex < program.tracks.size(); ++trackIndex) {
+      const TrackProgram& track = program.tracks[trackIndex];
+      for (const auto& stream : track.streams) {
+        executors.emplace_back(
+            program, track, stream, runtime, TrackId{static_cast<u32>(trackIndex)}, nextTrack, options, target,
+            outputSequence, programState, !hasSectionPlaylist);
+      }
+    }
+    auto beginSection = [&](const std::vector<std::optional<Address>>& starts, u64 tick) {
+      for (size_t i = 0; i < executors.size(); ++i) {
+        executors[i].beginSection(i < starts.size() ? starts[i] : std::nullopt, tick);
+      }
+    };
+
+    std::optional<detail::SectionPlaylistRunner> playlist;
+    if (program.sectionPlaylist) {
+      playlist.emplace(*program.sectionPlaylist, options);
+      const detail::PlaylistAdvance first = playlist->advance(0);
+      if (first.streamStarts != nullptr) {
+        beginSection(*first.streamStarts, 0);
+      }
+    }
+
+    // Execute the earliest stream first; declaration order is the stable
+    // tie-break. A stream keeps control at the same tick while it consumes
+    // zero-time commands, matching how these drivers run until their next wait.
+    std::optional<u64> sequenceEndTick;
+    u64 synchronizedLoopStartTick = 0;
+    std::vector<detail::StreamPosition> synchronizedLoopSnapshot;
+    u32 synchronizedLoopRepeats = 0;
+    while (true) {
+      size_t selected = executors.size();
+      for (size_t i = 0; i < executors.size(); ++i) {
+        if (!executors[i].active()) {
+          continue;
+        }
+        if (selected == executors.size() || executors[i].nextActionTick() < executors[selected].nextActionTick()) {
+          selected = i;
+        }
+      }
+      if (selected == executors.size()) {
+        break;
+      }
+
+      const SequenceCoordinatorSignal signal = executors[selected].executeNext();
+      if (signal == SequenceCoordinatorSignal::SynchronizedLoopStart && !playlist) {
+        const u64 boundary = executors[selected].tick();
+        synchronizedLoopSnapshot.clear();
+        synchronizedLoopSnapshot.reserve(executors.size());
+        for (const auto& executor : executors) {
+          synchronizedLoopSnapshot.push_back(executor.synchronizedLoopSnapshot(boundary));
+        }
+        synchronizedLoopStartTick = boundary;
+        synchronizedLoopRepeats = 0;
+        continue;
+      }
+
+      if (signal == SequenceCoordinatorSignal::SynchronizedLoopEnd && !playlist) {
+        const u64 boundary = executors[selected].tick();
+        if (!synchronizedLoopSnapshot.empty()) {
+          if (options.loopPolicy == LoopPolicy::PlayOnce && synchronizedLoopRepeats < options.sequenceLoops) {
+            ++synchronizedLoopRepeats;
+            for (size_t i = 0; i < executors.size(); ++i) {
+              executors[i].restoreSynchronizedLoop(synchronizedLoopSnapshot[i], boundary);
+            }
+            continue;
+          }
+
+          if (options.loopPolicy == LoopPolicy::Preserve) {
+            for (auto& executor : executors) {
+              executor.preserveLoop(synchronizedLoopStartTick, boundary);
+            }
+          }
+          sequenceEndTick = boundary;
+          break;
+        }
+      }
+
+      if (signal == SequenceCoordinatorSignal::SectionEnd && playlist) {
+        if (program.sectionPlaylist->waitForAllTracks &&
+            std::ranges::any_of(executors, [](const auto& executor) { return executor.active(); })) {
+          continue;
+        }
+        const u64 boundary = executors[selected].tick();
+        // Streams are visited in stable source order, so keep same-tick work
+        // from streams processed before the boundary command.
+        for (size_t i = 0; i < executors.size(); ++i) {
+          executors[i].trimAt(boundary, i <= selected);
+        }
+        detail::endSourceSpansAt(target.sourceSpans, boundary);
+
+        const detail::PlaylistAdvance next = playlist->advance(boundary);
+        if (next.preservedLoopStart) {
+          for (auto& executor : executors) {
+            executor.preserveLoop(*next.preservedLoopStart, boundary);
+          }
+        }
+        if (next.streamStarts == nullptr) {
+          sequenceEndTick = boundary;
+          break;
+        }
+        beginSection(*next.streamStarts, boundary);
+        continue;
+      }
+
+      const bool hasLoopBoundary =
+          std::ranges::any_of(executors, [](const auto& executor) { return executor.loopStopTick().has_value(); });
+      if ((!playlist || program.sectionPlaylist->waitForAllTracks) &&
+          options.loopPolicy == LoopPolicy::PlayOnce && hasLoopBoundary &&
+          std::ranges::all_of(executors,
+                              [](const auto& executor) { return !executor.active() || executor.loopStopTick(); })) {
+        sequenceEndTick = 0;
+        for (const auto& executor : executors) {
+          *sequenceEndTick = std::max(*sequenceEndTick, executor.loopStopTick().value_or(executor.tick()));
+        }
+        break;
+      }
+    }
+
+    target.tracks.reserve(program.playbackTrackCount());
+    for (auto& executor : executors) {
+      executor.finish(sequenceEndTick);
+    }
+    if (sequenceEndTick) {
+      // Closing notes updates their source spans; trim only after all tracks finish.
+      detail::endSourceSpansAt(target.sourceSpans, *sequenceEndTick);
+    }
+  };
+
+  if (runtime.finishPrepass != nullptr || analyzedProgramState != nullptr) {
+    // Analysis and formats with a prepass execute the same silent pass in
+    // normal time order. Keep its song-wide state and discard its events.
+    PerformanceSequence prepass{
+        .timebase = program.timebase,
+        .initialTempoMicrosecondsPerQuarter = behavior.initialTempoMicrosecondsPerQuarter,
+    };
+    renderSemanticPass(prepass);
+    if (runtime.finishPrepass != nullptr) {
+      runtime.finishPrepass(programState);
+    }
+    if (analyzedProgramState != nullptr) {
+      // Analysis needs only this pass; its caller retains the state and diagnostics.
+      *analyzedProgramState = std::move(programState);
+      return prepass;
+    }
+  }
+  renderSemanticPass(sequence);
+  if (runtime.finalizePerformance != nullptr) {
+    runtime.finalizePerformance(programState, sequence);
+  }
+  resolveTempoRelativeModulation(sequence);
   return sequence;
 }
 

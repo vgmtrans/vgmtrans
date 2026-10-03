@@ -10,7 +10,6 @@
 #include <cmath>
 #include <limits>
 #include <optional>
-#include <type_traits>
 #include <variant>
 
 namespace vgmtrans::core {

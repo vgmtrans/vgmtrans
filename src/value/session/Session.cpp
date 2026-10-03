@@ -15,6 +15,8 @@
 #include "value/session/SessionState.h"
 #include "value/validation/ScanValidation.h"
 
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <atomic>
 #include <array>
@@ -23,13 +25,28 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <thread>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
 namespace vgmtrans::core {
 
 namespace {
+
+void validateAcceptedFormats(std::string_view processorName, const std::vector<std::string>& formats) {
+  std::unordered_set<std::string_view> provided;
+  provided.reserve(formats.size());
+  for (const auto& format : formats) {
+    if (format.empty()) {
+      throw std::invalid_argument("Cannot register an empty accepted source format");
+    }
+    if (!provided.insert(format).second) {
+      throw std::invalid_argument(fmt::format("Duplicate source format accepted by {}: {}", processorName, format));
+    }
+  }
+}
 
 void prepareDiagnosticRanges(std::vector<Diagnostic>& diagnostics, const SourceFile& source) {
   for (auto& diagnostic : diagnostics) {
@@ -103,11 +120,31 @@ Session::Session(Session&&) noexcept = default;
 Session& Session::operator=(Session&&) noexcept = default;
 
 void Session::registerFormat(FormatModule module) {
-  formats_.add(std::move(module));
+  if (formatsSealed_) {
+    throw std::logic_error("Cannot register value formats after session mutation has started");
+  }
+  if (module.name.empty() || !module.scan) {
+    throw std::invalid_argument("Cannot register an incomplete FormatModule");
+  }
+  if (std::ranges::find(formats_, module.name, &FormatModule::name) != formats_.end()) {
+    throw std::invalid_argument(fmt::format("Duplicate FormatModule name: {}", module.name));
+  }
+  validateAcceptedFormats(module.name, module.acceptedFormats);
+  formats_.push_back(std::move(module));
 }
 
 void Session::registerExtractor(SourceExtractor extractor) {
-  formats_.add(std::move(extractor));
+  if (formatsSealed_) {
+    throw std::logic_error("Cannot register source extractors after session mutation has started");
+  }
+  if (extractor.name.empty() || !extractor.extract) {
+    throw std::invalid_argument("Cannot register an incomplete SourceExtractor");
+  }
+  if (std::ranges::find(extractors_, extractor.name, &SourceExtractor::name) != extractors_.end()) {
+    throw std::invalid_argument(fmt::format("Duplicate SourceExtractor name: {}", extractor.name));
+  }
+  validateAcceptedFormats(extractor.name, extractor.acceptedFormats);
+  extractors_.push_back(std::move(extractor));
 }
 
 SourceId Session::addSource(SourceFile file, std::vector<u8> bytes) {
@@ -117,7 +154,7 @@ SourceId Session::addSource(SourceFile file, std::vector<u8> bytes) {
   if (const auto existing = sources_.findFile(file.path)) {
     return *existing;
   }
-  formats_.seal();
+  formatsSealed_ = true;
   snapshotCache_.reset();
   file.parent.reset();
   return sources_.add(std::move(file), std::move(bytes));
@@ -125,7 +162,7 @@ SourceId Session::addSource(SourceFile file, std::vector<u8> bytes) {
 
 SourceFile Session::resolveSource(const std::filesystem::path& path, std::optional<SourceId> parent) const {
   SourceFile source{.path = path};
-  for (const auto& extractor : formats_.extractors()) {
+  for (const auto& extractor : extractors_) {
     if (extractor.resolvePath) {
       if (auto resolved = extractor.resolvePath(path, [&](const auto& candidate) {
             return parent ? sources_.findFile(candidate, parent).has_value()
@@ -163,7 +200,7 @@ void Session::removeSource(SourceId id) {
 }
 
 void Session::removeSources(std::span<const SourceId> ids) {
-  formats_.seal();
+  formatsSealed_ = true;
   for (const SourceId id : ids) {
     if (!sources_.hasSlot(id)) {
       throw std::out_of_range("Cannot remove a SourceId that is not present in the Session");
@@ -188,7 +225,7 @@ void Session::removeSources(std::span<const SourceId> ids) {
 }
 
 void Session::removeAssets(std::span<const AssetId> assets) {
-  formats_.seal();
+  formatsSealed_ = true;
   if (!std::ranges::any_of(assets, [&](AssetId id) { return state_->containsAsset(id); })) {
     return;
   }
@@ -230,7 +267,7 @@ void Session::removeAssets(std::span<const AssetId> assets) {
 }
 
 CollectionId Session::createUserCollection(std::string name, CollectionMembers members) {
-  formats_.seal();
+  formatsSealed_ = true;
   Collection selection{.name = std::move(name), .selection = std::move(members)};
   resolveDependencies(AssetCatalog{sources_, state_->assets()}, selection, ResolutionMode::Manual);
   const CollectionId id = state_->createUserCollection(std::move(selection));
@@ -241,7 +278,7 @@ CollectionId Session::createUserCollection(std::string name, CollectionMembers m
 // Scan this source if it has not been scanned yet. Any files extracted from it are
 // added as derived sources and scanned before this call returns.
 void Session::scanSource(SourceId id) {
-  formats_.seal();
+  formatsSealed_ = true;
   if (!sources_.contains(id)) {
     throw std::out_of_range("Cannot scan a SourceId that is not present in the Session");
   }
@@ -258,7 +295,7 @@ void Session::scanSource(SourceId id) {
 // Scan every user-loaded source that is still pending. Derived sources are skipped
 // here because scanning their parent source already scans them.
 void Session::scanPendingSources() {
-  formats_.seal();
+  formatsSealed_ = true;
   bool scannedAny = false;
   for (const SourceId source : sources_.activeUserSources()) {
     if (scannedSources_.contains(source.value)) {
@@ -383,7 +420,7 @@ void Session::scanOneSource(const SourceFile& source, std::vector<SourceId>& que
 
   // Extraction is a distinct first stage. Producing valid children means the
   // extractor has consumed the input, so ordinary scanners only see the children.
-  for (const auto& extractor : formats_.extractors()) {
+  for (const auto& extractor : extractors_) {
     if (!accepts(source, extractor.acceptedFormats)) {
       continue;
     }
@@ -419,8 +456,8 @@ void Session::scanOneSource(const SourceFile& source, std::vector<SourceId>& que
   }
 
   std::vector<FormatScan> scans;
-  scans.reserve(formats_.modules().size());
-  for (const auto& module : formats_.modules()) {
+  scans.reserve(formats_.size());
+  for (const auto& module : formats_) {
     if (!accepts(source, module.acceptedFormats)) {
       continue;
     }

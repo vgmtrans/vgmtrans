@@ -84,21 +84,6 @@ public:
     return matches;
   }
 
-  template <class AssetT, class DataT>
-  [[nodiscard]] std::vector<AssetWithData<AssetT, DataT>> assetsWithData() const {
-    std::vector<AssetWithData<AssetT, DataT>> matches;
-    for (const AssetT* value : assets<AssetT>()) {
-      if (const auto* data = value->privateData.template get<DataT>()) {
-        matches.push_back(AssetWithData<AssetT, DataT>{
-            .asset = value,
-            .data = data,
-            .source = sourceFor(value->metadata),
-        });
-      }
-    }
-    return matches;
-  }
-
 private:
   std::vector<SourceFile> sources_;
   std::unordered_map<u32, size_t> sourcesById_;
