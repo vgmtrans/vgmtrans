@@ -1217,8 +1217,7 @@ using Cursor = CompilerCursor<Playback>;
           .invoke<&Playback::vibratoDelay>({cursor.u8("delay")});
     case 0xe4:
       return cursor.command("Echo Volume", SequenceSemantic::State)
-          .invoke<&Playback::echoVolume>({cursor.s8("left", SourceValueDisplay::SignedDecimal),
-                                          cursor.s8("right", SourceValueDisplay::SignedDecimal)});
+          .invoke<&Playback::echoVolume>({cursor.s8("left"), cursor.s8("right")});
     case 0xe5:
       return cursor.command("Echo Parameters", SequenceSemantic::State)
           .invoke<&Playback::echoParameters>({cursor.u8("delay"), cursor.s8("feedback"), cursor.u8("fir_filter")});

@@ -624,8 +624,8 @@ struct ProgramState {
 };
 
 struct TrackState {
-  TrackState(TrackStateContext track, const RuntimeConfig& config)
-      : profile(config.profile), trackNumber(track.sourceTrackNumber),
+  explicit TrackState(const RuntimeConfig& config)
+      : profile(config.profile),
         monoOutput(profile == Profile::BattletoadsDoubleDragon || config.monoOutput) {
     if (profile == Profile::WinningRun) {
       adsr1 = 0x8f;
@@ -640,7 +640,6 @@ struct TrackState {
   }
 
   Profile profile = Profile::Unknown;
-  u32 trackNumber = 0;
   bool monoOutput = false;
   u16 defaultDuration = 0;
   bool longDuration = false;
@@ -1024,7 +1023,7 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   void echoChannel(bool enabled) {
-    const u8 bit = track.trackNumber < 8 ? static_cast<u8>(1u << track.trackNumber) : 0;
+    const u8 bit = out.sourceTrackNumber() < 8 ? static_cast<u8>(1u << out.sourceTrackNumber()) : 0;
     if (enabled) {
       program.echoMask |= bit;
     } else {
@@ -1074,13 +1073,13 @@ struct Playback : SequencePlayback<TrackState> {
     PatchRecipe patch{
         .sourceProgram = slotOrSrcn,
         .srcn = srcn,
-        .tuning = track.trackNumber == 5 ? s8{0} : tuningOrBase,
+        .tuning = out.sourceTrackNumber() == 5 ? s8{0} : tuningOrBase,
         .adsr1 = adsr1,
         .adsr2 = adsr2,
         .gain = gain,
         .source = vm.sourceRange(),
     };
-    if (track.trackNumber == 5) {
+    if (out.sourceTrackNumber() == 5) {
       program.percussion[slotOrSrcn & 7] = BattlemaniacsPercussion{
           .patch = patch,
           .baseNote = tuningOrBase,
@@ -1146,7 +1145,7 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   void btmDspFlags(u8 slot, u8 flags) {
-    if (track.trackNumber == 5) {
+    if (out.sourceTrackNumber() == 5) {
       auto& percussion = program.percussion[slot & 7];
       if (percussion) {
         percussion->dspFlags = flags;
@@ -1262,15 +1261,13 @@ using Cursor = CompilerCursor<Playback>;
       if (selected == Kind::BtmVolume && trackNumber == 5) {
         return event.invoke<&Playback::btmPercussionVolume>(
             {cursor.u8("percussion_slot", SemanticOperandRole::InstrumentProgram),
-             cursor.s8("left", SourceValueDisplay::SignedDecimal),
-             cursor.s8("right", SourceValueDisplay::SignedDecimal)});
+             cursor.s8("left"), cursor.s8("right")});
       }
-      return event.invoke<&Playback::volume>({cursor.s8("left", SourceValueDisplay::SignedDecimal),
-                                              cursor.s8("right", SourceValueDisplay::SignedDecimal)});
+      return event.invoke<&Playback::volume>({cursor.s8("left"), cursor.s8("right")});
     }
     case Kind::CenterVolume:
       return cursor.command("Centered Volume", SequenceSemantic::Level)
-          .invoke<&Playback::centerVolume>({cursor.s8("volume", SourceValueDisplay::SignedDecimal)});
+          .invoke<&Playback::centerVolume>({cursor.s8("volume")});
     case Kind::Jump:
     case Kind::BtmJump:
       return cursor.command("Jump", SequenceSemantic::Jump)
@@ -1310,7 +1307,7 @@ using Cursor = CompilerCursor<Playback>;
       const u8 delay = cursor.u8("delay");
       const u8 interval = cursor.u8("interval");
       const u8 encodedSteps = cursor.u8(shortEnvelope ? "half_cycle_steps" : "steps");
-      const s8 delta = cursor.s8("delta", SourceValueDisplay::SignedDecimal);
+      const s8 delta = cursor.s8("delta");
       const u8 steps = shortEnvelope ? static_cast<u8>(encodedSteps * 2) : encodedSteps;
       const u8 invertedSteps = shortEnvelope ? encodedSteps : cursor.u8("inverted_steps");
       return event.invoke<&Playback::configurePitch>(
@@ -1328,7 +1325,7 @@ using Cursor = CompilerCursor<Playback>;
       auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
       const u8 period = cursor.u8("period");
       const u8 interval = cursor.u8("interval");
-      const s8 delta = cursor.s8("delta", SourceValueDisplay::SignedDecimal);
+      const s8 delta = cursor.s8("delta");
       const u8 delay = opcode == 0x0d || opcode == 0x08 ? 0 : cursor.u8("delay");
       const bool battlemaniacs = profile == Profile::Battlemaniacs;
       return event.invoke<&Playback::vibrato>({period, static_cast<u8>(battlemaniacs ? interval + 1 : interval), delta,
@@ -1343,8 +1340,7 @@ using Cursor = CompilerCursor<Playback>;
     case Kind::MasterVolumeStereo:
     case Kind::BtmMasterVolume:
       return cursor.command("Master Volume L/R", SequenceSemantic::Level)
-          .invoke<&Playback::masterStereo>({cursor.s8("left", SourceValueDisplay::SignedDecimal),
-                                            cursor.s8("right", SourceValueDisplay::SignedDecimal)});
+          .invoke<&Playback::masterStereo>({cursor.s8("left"), cursor.s8("right")});
     case Kind::MasterVolumeScalar:
       return cursor.command("Master Volume", SequenceSemantic::Level).emitMasterLevel(cursor.u8("percent") / 100.0);
     case Kind::Tuning: {
@@ -1354,19 +1350,19 @@ using Cursor = CompilerCursor<Playback>;
         return event;
       }
       return cursor.command("Fine Tuning", SequenceSemantic::Pitch)
-          .invoke<&Playback::tuning>({cursor.s8("tuning", SourceValueDisplay::SignedDecimal)});
+          .invoke<&Playback::tuning>({cursor.s8("tuning")});
     }
     case Kind::Transpose:
       return cursor.command("Transpose", SequenceSemantic::Pitch)
-          .set<&TrackState::transpose>(cursor.s8("semitones", SourceValueDisplay::SignedDecimal));
+          .set<&TrackState::transpose>(cursor.s8("semitones"));
     case Kind::TransposeAdd:
       return cursor.command("Relative Transpose", SequenceSemantic::Pitch)
-          .add<&TrackState::transpose>(cursor.s8("semitones", SourceValueDisplay::SignedDecimal));
+          .add<&TrackState::transpose>(cursor.s8("semitones"));
     case Kind::EchoParameters: {
       auto event = cursor.command("Echo Parameters", SequenceSemantic::State);
-      const s8 feedback = cursor.s8("feedback", SourceValueDisplay::SignedDecimal);
-      const s8 left = cursor.s8("left", SourceValueDisplay::SignedDecimal);
-      const s8 right = cursor.s8("right", SourceValueDisplay::SignedDecimal);
+      const s8 feedback = cursor.s8("feedback");
+      const s8 left = cursor.s8("left");
+      const s8 right = cursor.s8("right");
       return event.invoke([](Playback& playback, s8 fb, s8 l, s8 r) { playback.echoParameters(fb, l, r); },
                           {feedback, left, right});
     }
@@ -1402,8 +1398,7 @@ using Cursor = CompilerCursor<Playback>;
     case Kind::ProgramVolume:
       return cursor.command("Program And Volume", SequenceSemantic::Program)
           .invoke<&Playback::programVolume>({cursor.u8("program", SemanticOperandRole::InstrumentProgram),
-                                             cursor.s8("left", SourceValueDisplay::SignedDecimal),
-                                             cursor.s8("right", SourceValueDisplay::SignedDecimal)});
+                                             cursor.s8("left"), cursor.s8("right")});
     case Kind::FadeOut:
       return cursor.command("Fade Out", SequenceSemantic::Level).invoke<&Playback::fadeOut>({cursor.u8("step")});
     case Kind::Timer:
@@ -1414,8 +1409,8 @@ using Cursor = CompilerCursor<Playback>;
       const u8 base = selected == Kind::BtmSavePreset ? 0x2a : 0x1c;
       const u8 slot = static_cast<u8>(opcode - base);
       auto event = cursor.command("Save Volume/Envelope Preset", SequenceSemantic::State);
-      const s8 left = cursor.s8("left", SourceValueDisplay::SignedDecimal);
-      const s8 right = cursor.s8("right", SourceValueDisplay::SignedDecimal);
+      const s8 left = cursor.s8("left");
+      const s8 right = cursor.s8("right");
       const u8 adsr1 = cursor.u8("adsr1", SourceValueDisplay::Hex);
       const u8 adsr2 = cursor.u8("adsr2", SourceValueDisplay::Hex);
       const u8 keyoff = selected == Kind::BtmSavePreset ? cursor.u8("keyoff") : 0;
@@ -1455,8 +1450,8 @@ using Cursor = CompilerCursor<Playback>;
     }
     case Kind::Tremolo:
       return cursor.command("Tremolo", SequenceSemantic::Modulation)
-          .invoke<&Playback::tremolo>({cursor.u8("period"), cursor.u8("interval"),
-                                       cursor.s8("delta", SourceValueDisplay::SignedDecimal), cursor.u8("delay")});
+          .invoke<&Playback::tremolo>(
+              {cursor.u8("period"), cursor.u8("interval"), cursor.s8("delta"), cursor.u8("delay")});
     case Kind::TremoloOff:
       return cursor.command("Tremolo Off", SequenceSemantic::Modulation).set<&TrackState::tremolo>(Tremolo{});
     case Kind::AllLfoOff:
@@ -1467,15 +1462,11 @@ using Cursor = CompilerCursor<Playback>;
     case Kind::VoiceParametersShort:
       return cursor.command("Voice Parameters", SequenceSemantic::Program)
           .invoke<&Playback::voiceShort>({cursor.u8("program", SemanticOperandRole::InstrumentProgram),
-                                          cursor.s8("transpose", SourceValueDisplay::SignedDecimal),
-                                          cursor.s8("tuning", SourceValueDisplay::SignedDecimal)});
+                                          cursor.s8("transpose"), cursor.s8("tuning")});
     case Kind::VoiceParameters:
       return cursor.command("Voice Parameters", SequenceSemantic::Program)
           .invoke<&Playback::voice>({cursor.u8("program", SemanticOperandRole::InstrumentProgram),
-                                     cursor.s8("transpose", SourceValueDisplay::SignedDecimal),
-                                     cursor.s8("tuning", SourceValueDisplay::SignedDecimal),
-                                     cursor.s8("left", SourceValueDisplay::SignedDecimal),
-                                     cursor.s8("right", SourceValueDisplay::SignedDecimal),
+                                     cursor.s8("transpose"), cursor.s8("tuning"), cursor.s8("left"), cursor.s8("right"),
                                      cursor.u8("adsr1", SourceValueDisplay::Hex),
                                      cursor.u8("adsr2", SourceValueDisplay::Hex)});
     case Kind::EchoDelay:
@@ -1483,16 +1474,13 @@ using Cursor = CompilerCursor<Playback>;
           .invoke<&Playback::echoDelay>({cursor.u8("encoded_delay")});
     case Kind::VolumePresets:
       return cursor.command("Volume Presets", SequenceSemantic::State)
-          .invoke<&Playback::volumePresets>({cursor.s8("left_1", SourceValueDisplay::SignedDecimal),
-                                             cursor.s8("right_1", SourceValueDisplay::SignedDecimal),
-                                             cursor.s8("left_2", SourceValueDisplay::SignedDecimal),
-                                             cursor.s8("right_2", SourceValueDisplay::SignedDecimal)});
+          .invoke<&Playback::volumePresets>(
+              {cursor.s8("left_1"), cursor.s8("right_1"), cursor.s8("left_2"), cursor.s8("right_2")});
     case Kind::BoundedVolumeMotion:
       return cursor.command("Bounded Stereo Volume Motion", SequenceSemantic::Level)
           .invoke<&Playback::boundedVolumeMotion>({cursor.u8("direction_flags", SourceValueDisplay::Hex),
                                                    cursor.u8("interval"), cursor.u8("delta"), cursor.u8("delay"),
-                                                   cursor.s8("minimum", SourceValueDisplay::SignedDecimal),
-                                                   cursor.s8("maximum", SourceValueDisplay::SignedDecimal)});
+                                                   cursor.s8("minimum"), cursor.s8("maximum")});
     case Kind::Nop2: {
       auto event = cursor.noOp("NOP", "nop");
       cursor.rawBytes("reserved", 2);
@@ -1513,8 +1501,8 @@ using Cursor = CompilerCursor<Playback>;
         const u8 adsr1 = cursor.u8("adsr1", SourceValueDisplay::Hex);
         const u8 adsr2 = cursor.u8("adsr2", SourceValueDisplay::Hex);
         const u8 gain = cursor.u8("gain", SourceValueDisplay::Hex);
-        const s8 left = cursor.s8("left", SourceValueDisplay::SignedDecimal);
-        const s8 right = cursor.s8("right", SourceValueDisplay::SignedDecimal);
+        const s8 left = cursor.s8("left");
+        const s8 right = cursor.s8("right");
         const u8 flags = cursor.u8("dsp_flags", SourceValueDisplay::Hex);
         const u8 keyoff = cursor.u8("keyoff");
         const s8 base = cursor.s8("base_note", SourceValueDisplay::MidiNote);
@@ -1525,11 +1513,11 @@ using Cursor = CompilerCursor<Playback>;
       const u8 adsr1 = cursor.u8("adsr1", SourceValueDisplay::Hex);
       const u8 adsr2 = cursor.u8("adsr2", SourceValueDisplay::Hex);
       const u8 gain = cursor.u8("gain", SourceValueDisplay::Hex);
-      const s8 left = cursor.s8("left", SourceValueDisplay::SignedDecimal);
-      const s8 right = cursor.s8("right", SourceValueDisplay::SignedDecimal);
+      const s8 left = cursor.s8("left");
+      const s8 right = cursor.s8("right");
       const u8 flags = cursor.u8("dsp_flags", SourceValueDisplay::Hex);
       const u8 keyoff = cursor.u8("keyoff");
-      const s8 tuningValue = cursor.s8("tuning", SourceValueDisplay::SignedDecimal);
+      const s8 tuningValue = cursor.s8("tuning");
       return event.invoke<&Playback::btmInstrument>(
           {srcn, srcn, adsr1, adsr2, gain, left, right, flags, keyoff, tuningValue});
     }
@@ -1538,7 +1526,7 @@ using Cursor = CompilerCursor<Playback>;
       const u8 delay = cursor.u8("delay");
       const u8 interval = static_cast<u8>(cursor.u8("interval") + 1);
       const u8 encodedSteps = cursor.u8("steps");
-      const s8 delta = cursor.s8("delta", SourceValueDisplay::SignedDecimal);
+      const s8 delta = cursor.s8("delta");
       const bool pingPong = opcode == 0x18 || opcode == 0x19;
       const u8 steps = pingPong ? static_cast<u8>(encodedSteps & 0xfe) : encodedSteps;
       const u8 invertedSteps = pingPong ? static_cast<u8>(encodedSteps / 2) : cursor.u8("inverted_steps");
@@ -1563,7 +1551,7 @@ using Cursor = CompilerCursor<Playback>;
     }
     case Kind::BtmGlobalTranspose:
       return cursor.command("Global Transpose", SequenceSemantic::Pitch)
-          .invoke<&Playback::globalTranspose>({cursor.s8("semitones", SourceValueDisplay::SignedDecimal)});
+          .invoke<&Playback::globalTranspose>({cursor.s8("semitones")});
     case Kind::BtmGainKeyoff: {
       auto event = cursor.command("GAIN / Key-Off", SequenceSemantic::State);
       if (trackNumber == 5) {
@@ -1576,9 +1564,9 @@ using Cursor = CompilerCursor<Playback>;
     case Kind::BtmEchoParameters: {
       auto event = cursor.command("Echo Parameters", SequenceSemantic::State);
       const u8 delay = cursor.u8("delay");
-      const s8 feedback = cursor.s8("feedback", SourceValueDisplay::SignedDecimal);
-      const s8 left = cursor.s8("left", SourceValueDisplay::SignedDecimal);
-      const s8 right = cursor.s8("right", SourceValueDisplay::SignedDecimal);
+      const s8 feedback = cursor.s8("feedback");
+      const s8 left = cursor.s8("left");
+      const s8 right = cursor.s8("right");
       return event.invoke([](Playback& playback, s8 fb, s8 l, s8 r, u8 d) { playback.echoParameters(fb, l, r, d); },
                           {feedback, left, right, delay});
     }
@@ -1587,9 +1575,8 @@ using Cursor = CompilerCursor<Playback>;
           .invoke<&Playback::fixedPan>({static_cast<u8>(opcode - 0x23)});
     case Kind::BtmMasterFade:
       return cursor.command("Master Volume Fade", SequenceSemantic::Level)
-          .invoke<&Playback::btmMasterFade>({cursor.s8("left_step", SourceValueDisplay::SignedDecimal),
-                                             cursor.s8("right_step", SourceValueDisplay::SignedDecimal),
-                                             cursor.u8("interval"), cursor.u8("steps")});
+          .invoke<&Playback::btmMasterFade>({cursor.s8("left_step"), cursor.s8("right_step"),
+                                            cursor.u8("interval"), cursor.u8("steps")});
     case Kind::BtmDspFlags: {
       auto event = cursor.command("PMON/NON/EON Flags", SequenceSemantic::State);
       u8 slot = 0;

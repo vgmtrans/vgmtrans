@@ -455,7 +455,7 @@ void ProgramState::finishPrepass() {
   resetRuntime();
 }
 
-TrackState::TrackState(TrackStateContext track, const RuntimeConfig& config) : trackNumber(track.sourceTrackNumber) {
+TrackState::TrackState(const RuntimeConfig& config) {
   if (const auto initial = config.instrumentEnvelopes.find(0); initial != config.instrumentEnvelopes.end()) {
     envelope = initial->second;
   }
@@ -879,7 +879,7 @@ void Playback::tempoFade(u8 length, u8 value) {
       out, PerformanceAutomationTarget::Tempo,
       static_cast<double>(math::tempoMicrosecondsPerQuarter(driverTempo, program.tempoTimerTarget)),
       program.tempoState.toRawTarget(driverTempo, length));
-  program.tempoAutomationTrack = track.trackNumber;
+  program.tempoAutomationTrack = out.sourceTrackNumber();
   advanceTempoFade();
 }
 
@@ -925,7 +925,7 @@ void Playback::masterVolumeFade(u8 length, u8 value) {
   program.masterVolumeState.reset(program.masterVolume);
   program.masterVolumeState.begin(out, PerformanceAutomationTarget::MasterLevel, masterGain(value),
                                   program.masterVolumeState.toRawTarget(value, length));
-  program.masterVolumeAutomationTrack = track.trackNumber;
+  program.masterVolumeAutomationTrack = out.sourceTrackNumber();
 }
 
 void Playback::advanceTempoFade() {
@@ -973,10 +973,10 @@ void Playback::tick() {
   advancePanFade();
   advanceVibratoFade();
   advancePitchMotion();
-  if (program.tempoAutomationTrack == track.trackNumber) {
+  if (program.tempoAutomationTrack == out.sourceTrackNumber()) {
     advanceTempoFade();
   }
-  if (program.masterVolumeAutomationTrack == track.trackNumber) {
+  if (program.masterVolumeAutomationTrack == out.sourceTrackNumber()) {
     advanceMasterFade();
   }
   if (program.echo.advanceFade(vm.tick())) {
@@ -995,7 +995,7 @@ void Playback::echo(u8 channels, u8 volumeLeft, u8 volumeRight) {
 }
 
 void Playback::channelEcho(bool enabled) {
-  program.echo.channel(static_cast<u8>(1u << track.trackNumber), enabled);
+  program.echo.channel(static_cast<u8>(1u << out.sourceTrackNumber()), enabled);
   out.reverb(program.echo.current());
 }
 
@@ -1216,10 +1216,10 @@ void Playback::adsr(u8 adsr1, u8 adsr2) {
           .invoke<&Playback::tempoFade>({cursor.u8("length"), cursor.u8("tempo")});
     case EventType::GlobalTranspose:
       return cursor.command("Global Transpose", SequenceSemantic::Pitch)
-          .invoke<&Playback::globalTranspose>({cursor.s8("semitones", SourceValueDisplay::SignedDecimal)});
+          .invoke<&Playback::globalTranspose>({cursor.s8("semitones")});
     case EventType::Transpose:
       return cursor.command("Transpose", SequenceSemantic::Pitch)
-          .set<&TrackState::transpose>(cursor.s8("semitones", SourceValueDisplay::SignedDecimal));
+          .set<&TrackState::transpose>(cursor.s8("semitones"));
     case EventType::TremoloOn:
       return cursor.command("Tremolo On", SequenceSemantic::Modulation)
           .invoke<&Playback::tremoloOn>({cursor.u8("delay"), cursor.u8("rate"), cursor.u8("depth")});
@@ -1239,7 +1239,7 @@ void Playback::adsr(u8 adsr1, u8 adsr2) {
                                   SequenceSemantic::Pitch);
       const u8 delay = cursor.u8("delay");
       const u8 length = cursor.u8("length");
-      const s8 semitones = cursor.s8("semitones", SourceValueDisplay::SignedDecimal);
+      const s8 semitones = cursor.s8("semitones");
       return event.invoke<&Playback::pitchEnvelope>(
           {type == EventType::PitchEnvelopeTo ? PitchEnvelope::Mode::To : PitchEnvelope::Mode::From, delay, length,
            semitones});
@@ -1260,8 +1260,7 @@ void Playback::adsr(u8 adsr1, u8 adsr2) {
       return cursor.command("Echo Off", SequenceSemantic::State).invoke<&Playback::echoOff>();
     case EventType::EchoParameter:
       return cursor.command("Echo Parameters", SequenceSemantic::State)
-          .invoke<&Playback::echoParameters>(
-              {cursor.u8("delay"), cursor.s8("feedback", SourceValueDisplay::SignedDecimal), cursor.u8("fir")});
+          .invoke<&Playback::echoParameters>({cursor.u8("delay"), cursor.s8("feedback"), cursor.u8("fir")});
     case EventType::EchoVolumeFade:
       return cursor.command("Echo Volume Fade", SequenceSemantic::State)
           .invoke<&Playback::echoVolumeFade>(
@@ -1284,8 +1283,8 @@ void Playback::adsr(u8 adsr1, u8 adsr2) {
     case EventType::KonamiLoopEnd: {
       auto event = cursor.command("Loop End", SequenceSemantic::Repeat);
       const u8 times = cursor.u8("times");
-      const s8 volumeDelta = cursor.s8("volume_delta", SourceValueDisplay::SignedDecimal);
-      const s8 pitchDelta = cursor.s8("pitch_delta", SourceValueDisplay::SignedDecimal);
+      const s8 volumeDelta = cursor.s8("volume_delta");
+      const s8 pitchDelta = cursor.s8("pitch_delta");
       event.invokeFlow([times, volumeDelta, pitchDelta](Playback& playback) {
         return playback.konamiLoop(times, volumeDelta, pitchDelta, playback.track.konamiLoop.start);
       });

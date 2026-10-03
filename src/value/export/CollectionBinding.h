@@ -28,7 +28,6 @@ class PreparedCollection;
 // Playback and export can use it without changing the scanned assets.
 class BoundCollection {
 public:
-  [[nodiscard]] const std::string& baseName() const noexcept { return baseName_; }
   [[nodiscard]] bool hasSequence() const noexcept { return sequence_ != nullptr; }
   [[nodiscard]] const std::vector<SoundBankAsset>& soundBanks() const noexcept { return soundBanks_; }
   [[nodiscard]] const std::vector<const SamplePoolAsset*>& samplePools() const noexcept { return samplePools_; }

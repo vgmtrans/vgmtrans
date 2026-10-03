@@ -1144,9 +1144,9 @@ using KonamiCursor = CompilerCursor<Playback>;
   // read and annotated so source inspection remains complete.
   if (slide.kind == PitchSlideKind::V2 && slide.length != 0) {
     cursor.u8("reserved", SourceValueDisplay::Hex);
-    cursor.s16le("delta", SourceValueDisplay::SignedDecimal);
+    cursor.s16le("delta");
   } else if (slide.kind == PitchSlideKind::V3) {
-    cursor.s16le("delta", SourceValueDisplay::SignedDecimal);
+    cursor.s16le("delta");
   }
   return slide;
 }
@@ -1357,8 +1357,8 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       auto event = cursor.command(opcode == 0xe7 ? "Loop End" : "Loop End #2", SequenceSemantic::Repeat);
       const u8 slot = cursor.derived("slot", static_cast<u8>(opcode == 0xe7 ? 0 : 1));
       const u8 times = cursor.u8("times");
-      const s8 volumeDelta = cursor.s8("volume_delta", SourceValueDisplay::SignedDecimal);
-      const s8 pitchDelta = cursor.s8("pitch_delta", SourceValueDisplay::SignedDecimal);
+      const s8 volumeDelta = cursor.s8("volume_delta");
+      const s8 pitchDelta = cursor.s8("pitch_delta");
       return event.invokeFlow<&Playback::loopEnd>({slot, times, volumeDelta, pitchDelta});
     }
     case 0xe8: {
@@ -1394,7 +1394,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     }
     case 0xec:
       return cursor.command("Transpose", SequenceSemantic::Pitch)
-          .set<&TrackState::transpose>(cursor.s8("semitones", SourceValueDisplay::SignedDecimal));
+          .set<&TrackState::transpose>(cursor.s8("semitones"));
     case 0xed:
       if (isLateVersion(version)) {
         return cursor.command("ADSR(1)", SequenceSemantic::Envelope)
@@ -1411,10 +1411,10 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       const u8 delay = cursor.u8("delay");
       if (isLateVersion(version)) {
         const u8 length = cursor.u8("length");
-        const s8 offset = cursor.s8("offset", SourceValueDisplay::SignedDecimal);
+        const s8 offset = cursor.s8("offset");
         // This shapes the exact late curve; fixed-duration playback currently
         // retains its endpoints and timing while that curve remains deferred.
-        cursor.s16le("delta", SourceValueDisplay::SignedDecimal);
+        cursor.s16le("delta");
         return event.invoke<&Playback::configurePitchEnvelope>({delay, length, static_cast<s16>(offset)});
       }
       const u8 speed = cursor.u8("speed");
@@ -1423,7 +1423,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     }
     case 0xf2:
       return cursor.command("Tuning", SequenceSemantic::Pitch)
-          .invoke<&Playback::tuning>({cursor.s8("tuning", SourceValueDisplay::SignedDecimal)});
+          .invoke<&Playback::tuning>({cursor.s8("tuning")});
     case 0xf3: {
       auto event = cursor.command("Pitch Slide", SequenceSemantic::Pitch);
       appendPitchSlide(event, readPitchSlide(cursor, version));
@@ -1478,7 +1478,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       if (version == KONAMISNES_V4) {
         auto event = cursor.sourceOnly("Linear Pitch Envelope");
         cursor.u8("delta_fraction");
-        cursor.s8("delta_integer", SourceValueDisplay::SignedDecimal);
+        cursor.s8("delta_integer");
         return event;
       } else {
         auto event = cursor.sourceOnly("Pitch Modulation");
@@ -1498,7 +1498,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       if (version >= KONAMISNES_V2 && version <= KONAMISNES_V4) {
         auto event = cursor.sourceOnly("Linear Pitch Envelope");
         cursor.u8("delta_fraction");
-        cursor.s8("delta_integer", SourceValueDisplay::SignedDecimal);
+        cursor.s8("delta_integer");
         return event;
       }
       if (version >= KONAMISNES_V5) {

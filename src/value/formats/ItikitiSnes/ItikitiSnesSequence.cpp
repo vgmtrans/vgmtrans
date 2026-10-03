@@ -158,10 +158,8 @@ struct ProgramState {
 
 struct TrackState {
   TrackState(TrackStateContext sourceTrack)
-      : trackNumber(sourceTrack.sourceTrackNumber),
-        voiceBit(static_cast<u8>(1u << std::min<u32>(sourceTrack.sourceTrackNumber, 7))) {}
+      : voiceBit(static_cast<u8>(1u << std::min<u32>(sourceTrack.sourceTrackNumber, 7))) {}
 
-  u32 trackNumber = 0;
   u8 voiceBit = 1;
   std::array<u8, 7> lengths = kDefaultLengths;
   u8 noteBase = 0;
@@ -360,7 +358,7 @@ struct Playback : SequencePlayback<TrackState> {
     }
     program.tempo.begin(out, PerformanceAutomationTarget::Tempo, math::tempoMicrosecondsPerQuarter(target),
                         program.tempo.toRawTarget(target, length));
-    program.tempoTrack = track.trackNumber;
+    program.tempoTrack = out.sourceTrackNumber();
   }
 
   void volume(u8 value) {
@@ -540,7 +538,7 @@ struct Playback : SequencePlayback<TrackState> {
   void tick() {
     track.volume.tickRaw([&](s32) { emitLevel(track.volume.output(out)); });
     track.pan.tickRaw([&](s32) { emitPan(track.pan.output(out)); });
-    if (program.tempoTrack == track.trackNumber) {
+    if (program.tempoTrack == out.sourceTrackNumber()) {
       program.tempo.tickRaw([&](s32 value) {
         program.tempo.output(out).tempo(
             math::tempoMicrosecondsPerQuarter(static_cast<u8>(std::clamp<s32>(value, 0, 0xff))));
@@ -641,8 +639,7 @@ using Cursor = CompilerCursor<Playback>;
       auto event = cursor.command("Program Change", SequenceSemantic::Program);
       const u8 raw = cursor.u8("program", SemanticOperandRole::InstrumentProgram);
       const u8 program = instrumentProgram(raw, groupIndex);
-      cursor.derived("effective_program", static_cast<u64>(program), SourceValueDisplay::Default,
-                     SemanticOperandRole::InstrumentProgram);
+      cursor.derived("effective_program", static_cast<u64>(program), SemanticOperandRole::InstrumentProgram);
       if (references != nullptr) {
         references->programs.insert(program);
       }

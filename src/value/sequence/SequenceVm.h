@@ -64,6 +64,9 @@ public:
                      detail::ActiveNoteState* activeNotes = nullptr,
                      std::vector<SourcePlaybackSpan>* sourceSpans = nullptr);
 
+  // Source channel number, independent of the rendered track ID.
+  [[nodiscard]] u32 sourceTrackNumber() const noexcept { return track_.sourceTrackNumber; }
+
   [[nodiscard]] PerformanceEmitter at(u64 tick) const;
   // Emits relative to this emitter, saturating at the last tick without advancing the VM.
   [[nodiscard]] PerformanceEmitter after(u32 ticks) const;

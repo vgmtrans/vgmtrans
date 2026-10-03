@@ -291,11 +291,10 @@ struct TrackState {
     u8 duration = 0;
   };
 
-  explicit TrackState(TrackStateContext trackProgram) : trackNumber(trackProgram.sourceTrackNumber) {
+  TrackState() {
     volume.setRounding(SequenceFixedPointRounding::Nearest);
   }
 
-  u32 trackNumber = 0;
   u16 noteLength = 1;
   u8 durationRate = 0xcc;
   u8 channelMaster = 0x60;
@@ -324,8 +323,8 @@ struct Playback : SequencePlayback<TrackState> {
   void beforeCommand() {
     if (track.durationScript != 0xff) {
       advanceDurationScript();
-    } else if (track.syncLength && track.trackNumber != 0 && track.trackNumber < kTrackCount) {
-      const auto& timeline = program.durationTimeline[track.trackNumber - 1];
+    } else if (track.syncLength && out.sourceTrackNumber() != 0 && out.sourceTrackNumber() < kTrackCount) {
+      const auto& timeline = program.durationTimeline[out.sourceTrackNumber() - 1];
       auto found = std::ranges::upper_bound(timeline, vm.tick(), {}, &ProgramState::DurationState::tick);
       if (found != timeline.begin()) {
         --found;
@@ -337,8 +336,8 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   void rememberLength() {
-    if (track.trackNumber < kTrackCount) {
-      auto& timeline = program.durationTimeline[track.trackNumber];
+    if (out.sourceTrackNumber() < kTrackCount) {
+      auto& timeline = program.durationTimeline[out.sourceTrackNumber()];
       const ProgramState::DurationState state{
           .tick = vm.tick(),
           .length = track.noteLength,
@@ -581,7 +580,7 @@ struct Playback : SequencePlayback<TrackState> {
     track.lastKey = target;
   }
 
-  void echo(bool enabled) { emitEcho(static_cast<u8>(1u << std::min(track.trackNumber, 7u)), enabled ? 1.0 : 0.0); }
+  void echo(bool enabled) { emitEcho(static_cast<u8>(1u << std::min(out.sourceTrackNumber(), 7u)), enabled ? 1.0 : 0.0); }
 
   void emitEcho(u8 mask, double send) {
     out.reverb(ReverbPerformanceEvent{

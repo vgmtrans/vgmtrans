@@ -172,11 +172,10 @@ struct TrackState {
     KonamiArcadeVersion version = KonamiArcadeVersion::MysticWarrior;
   };
 
-  TrackState(TrackStateContext track, const RuntimeConfig& config)
-      : version(config.version), sourceTrackNumber(track.sourceTrackNumber) {}
+  explicit TrackState(const RuntimeConfig& config)
+      : version(config.version) {}
 
   KonamiArcadeVersion version = KonamiArcadeVersion::MysticWarrior;
-  u32 sourceTrackNumber = 0;
   bool percussionFlag1 = false;
   bool percussionFlag2 = false;
   u8 previousDelta = 0;
@@ -231,7 +230,7 @@ struct Playback : SequencePlayback<TrackState> {
   [[nodiscard]] bool isGx() const { return track.version == KonamiArcadeVersion::Gx; }
   [[nodiscard]] bool percussion() const { return track.percussionFlag1 || track.percussionFlag2; }
   [[nodiscard]] double driverMilliseconds(u8 ticks) const {
-    return portamentoMilliseconds(ticks, track.nmiRateHertz, sequence.channelTempos[track.sourceTrackNumber]);
+    return portamentoMilliseconds(ticks, track.nmiRateHertz, sequence.channelTempos[out.sourceTrackNumber()]);
   }
   [[nodiscard]] PitchSlideTiming slideTiming(u8 ticks) const {
     return PitchSlideTiming::fixedDuration(ticks, driverMilliseconds(ticks));
@@ -390,7 +389,7 @@ struct Playback : SequencePlayback<TrackState> {
     }
     track.zeroReleaseVoiceActive = false;
     out.updateEnvelope(
-        Envelope{.releaseSeconds = releaseSeconds(rate, nmiRateHertz, sequence.channelTempos[track.sourceTrackNumber])},
+        Envelope{.releaseSeconds = releaseSeconds(rate, nmiRateHertz, sequence.channelTempos[out.sourceTrackNumber()])},
         EnvelopeFields::Release, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
 
@@ -611,7 +610,7 @@ struct Playback : SequencePlayback<TrackState> {
   void tempo(u8 raw, double nmiRate) {
     track.nmiRateHertz = nmiRate;
     sequence.tempo.setCurrentAt(vm.tick(), raw);
-    sequence.channelTempos[track.sourceTrackNumber] = raw;
+    sequence.channelTempos[out.sourceTrackNumber()] = raw;
     sequence.tempoSlideLastTick.reset();
     out.tempo(tempoMicrosecondsPerQuarter(nmiRate, raw));
   }
@@ -619,7 +618,7 @@ struct Playback : SequencePlayback<TrackState> {
   void beginSlide(u8 kind, u8 duration, u8 target, double nmiRate) {
     if (kind == 0) {
       track.nmiRateHertz = nmiRate;
-      sequence.tempo.setCurrentAt(vm.tick(), sequence.channelTempos[track.sourceTrackNumber]);
+      sequence.tempo.setCurrentAt(vm.tick(), sequence.channelTempos[out.sourceTrackNumber()]);
       sequence.tempoSlideLastTick = vm.tick();
       sequence.nmiRateHertz = nmiRate;
       sequence.tempo.begin(out, PerformanceAutomationTarget::Tempo, tempoMicrosecondsPerQuarter(nmiRate, target),
@@ -977,11 +976,11 @@ using KonamiArcadeCursor = CompilerCursor<Playback>;
       auto event = cursor.command(opcode == 0xe7 ? "Loop End" : "Loop End #2", SequenceSemantic::Repeat);
       const u8 slot = cursor.derived("slot", static_cast<u8>(opcode == 0xe7 ? 0 : 1));
       const u8 count = cursor.u8("count");
-      const s8 loudnessDelta = cursor.s8("loudness_delta", SourceValueDisplay::SignedDecimal);
+      const s8 loudnessDelta = cursor.s8("loudness_delta");
       // The driver adds this signed byte to loudness. Convert it to the
       // attenuation-domain state used by the performance model.
       const s16 attenuation = -static_cast<s16>(loudnessDelta);
-      const s8 transpose = cursor.s8("transpose_delta", SourceValueDisplay::SignedDecimal);
+      const s8 transpose = cursor.s8("transpose_delta");
       if (discoveredLoops[slot].value != 0) {
         cursor.derived("destination", discoveredLoops[slot], SourceValueDisplay::Address,
                        SemanticOperandRole::RepeatTarget);
@@ -1009,7 +1008,7 @@ using KonamiArcadeCursor = CompilerCursor<Playback>;
     }
     case 0xec:
       return cursor.command("Transpose", SequenceSemantic::Pitch)
-          .set<&TrackState::transpose>(cursor.s8("semitones", SourceValueDisplay::SignedDecimal));
+          .set<&TrackState::transpose>(cursor.s8("semitones"));
     case 0xed: {
       auto event = cursor.command("Tremolo", SequenceSemantic::Modulation);
       const u8 rawDelay = cursor.u8("delay");
@@ -1030,11 +1029,10 @@ using KonamiArcadeCursor = CompilerCursor<Playback>;
           .invoke<&Playback::portamento>({cursor.u8("time")});
     case 0xf1:
       return cursor.command("Slide Mode", SequenceSemantic::Portamento)
-          .invoke<&Playback::slideMode>(
-              {cursor.u8("delay"), cursor.u8("duration"), cursor.s8("depth", SourceValueDisplay::SignedDecimal)});
+          .invoke<&Playback::slideMode>({cursor.u8("delay"), cursor.u8("duration"), cursor.s8("depth")});
     case 0xf2:
       return cursor.command("Pitch Bend", SequenceSemantic::Pitch)
-          .invoke<&Playback::pitchBend>({cursor.s8("bend", SourceValueDisplay::SignedDecimal)});
+          .invoke<&Playback::pitchBend>({cursor.s8("bend")});
     case 0xf3:
       return cursor.command("Pitch Slide", SequenceSemantic::Portamento)
           .invoke<&Playback::pitchSlide>({cursor.u8("delay"), cursor.u8("duration"),

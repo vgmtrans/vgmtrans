@@ -1,7 +1,7 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Twenty-four validated batches remove 990 net production lines from
+`cb9e0b766`. Twenty-five validated batches remove 1,014 net production lines from
 `src/value`. All 44 CTest suites pass; the latest real-file replay preserves
 all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
 records appear at the end of this document.
@@ -5799,3 +5799,122 @@ selection vector requires assignment during filtering.
 Next: remove the full PerformanceEvent variant from the private buffer that only
 ever holds derived ModulationPerformanceEvent values; continue probing ownership
 and state boundaries rather than introducing another general framework.
+
+## Cleanup2 twenty-fifth batch: canonical channel identity and complete export inputs
+
+Twenty-three production files remove 24 net lines, bringing cleanup2 to 1,014
+removed. Tests remain at 519 net added lines. This pass removes redundant authoring
+arguments and retained state; the export ownership changes add six lines.
+
+- PerformanceEmitter exposes the source channel number already owned by its
+  PerformanceTrack. Delete eleven numeric identity copies across AkaoSnes,
+  ChunSnes, GraphResSnes, HeartBeatSnes, ItikitiSnes, KonamiArcade, MoriSnes,
+  NinSnes (ordinary and Quest), RareSnes and SoftCreatSnes. Playback reads the
+  canonical number through out.sourceTrackNumber(), rather than retaining it
+  in mutable format state. Constructors become default/config-only when context
+  did nothing else. Keep Chun's rounding setup; Akao's borrowed decoded track;
+  Itikiti's derived hardware voiceBit; Mori SFX's script lookup; and all unrelated
+  source-state setup. Namco's state-local selection, HOSA handles, Sony encoded
+  identity and mutable/derived voice assignments remain distinct responsibilities.
+  The new accessor adds no state or forwarding layer on SequencePlayback.
+- Drop 73 repeated SignedDecimal arguments from signed CompilerCursor reads in
+  ten format files. The existing reader defaults supply exactly that display
+  and Value role. Naturally reflow the affected argument lists; do not introduce
+  another reading convention. Preserve raw/annotation display settings and
+  role-bearing signed reads. Separately use the existing role-only derived()
+  overload for Itikiti's effective instrument program, removing one repeated
+  Default argument while retaining InstrumentProgram attribution.
+- TempoRelativeModulation's private derived buffer stores concrete
+  ModulationPerformanceEvent values. Its sole producer always creates that
+  type; the final move-iterator insertion constructs the durable PerformanceEvent
+  variant as before. Remove the unnecessary temporary discriminator without
+  changing public types, chronological ordering or recomputation.
+- Export orchestration retains an optional complete SynthExportInput, matching
+  its optional lowered MIDI value. Keep bank selection local to preparation;
+  engagement now means the actual writer input exists, rather than consulting
+  a moved-from optional vector's flag. MIDI/WAV-only and blocked synth paths
+  avoid constructing a useless synth input/name. An empty successful selection
+  remains engaged. Preserve rendering/error gates, selected-bank filtering and
+  diagnostic order.
+- Append collection WAV artifacts directly into the final Artifact vector.
+  Delete the temporary artifact-vector owner and its bulk-move insertion.
+  Record the per-request origin for sample filename numbering, preserving zero
+  after earlier exports and on repeated WAV requests. Count the known samples
+  across banks/pools and reserve once before appending. These two plain count
+  loops avoid capacity regressions while keeping one output owner; no generic
+  traversal or new public API is introduced. Retain the empty-sample artifact.
+- Delete unused BoundCollection::baseName(). Whole repository and generated-build
+  searches find no caller or member-pointer use. Its private name still transfers
+  directly into PreparedCollection's live public baseName.
+
+Validation:
+
+- The full 165-step macOS Release build is warning-free; all 44 CTest suites pass.
+  Freeze matching headers, tests, core/formats/fmt/Qt value archives and shell.
+  The twenty-fifth shell preserves all 252 input/policy comparisons and 3,922
+  artifact hashes, inventories, diagnostics and exit statuses against 24.
+- Channel identity preserves ten complete format suites: 270 captured renders/
+  2,152,184 bytes including complete neutral events, automations, source spans,
+  diagnostics and three MIDI pitch policies. Another 2,016 program cases and
+  four direct-emitter cases preserve 3,360 factory calls/32,010,924 bytes, SHA256
+  bee61eaf93ba7b286054a1c3b01a15cbbcd08c1bf0d28b87c3a041c18f69f95c.
+  Cover independent/shared streams, large native channel numbers, zero/small
+  budgets, startup delays/polling/hooks, section state survival and copied/config-
+  bound runtimes after the original settings die. at()/after()/automation/pitch
+  outputs retain source identity; cross-track bindings reject in both versions.
+  This also establishes Akao's bound tempo emitter has the same owner as out.
+  Nineteen configured units are Werror-clean. Five state sizes shrink by eight
+  bytes: Mori 144->136, Rare 288->280, KonamiArcade 344->336, SoftCreat 272->264
+  and Akao 592->584. Six other states retain padding; Mori SFX remains 48.
+- Signed defaults preserve nine complete format suites and exact source/performance/
+  MIDI captures: 31,822 lines/1,962,320 bytes, SHA256
+  963ab6f07303515debb50d253b274ffa9bd66576d8e374ea4304e91d410072d7.
+  Cover 46 source maps, 1,341 annotations, 18,678 fields, 1,075 links, 285 renders
+  and 855 MIDI policy encodings. Twenty before/after production syntax checks
+  are Werror-clean. The Itikiti role-only overload is included in its refreshed
+  paired fixture capture.
+- Typed derived storage preserves 8,640 programs across first resolution,
+  recomputation and edited-tempo resolution: 25,920 exact comparisons/
+  134,901,240 bytes. Include all modulation targets/layers, missing/fixed/source
+  clocks, nonfinite/extreme values, waveform tables, same-tick ordering, expired
+  tracks and removal of old derived copies. Complete model/VM/modulation/MIDI-
+  modulation fixtures pass against frozen 24. Temporary elements shrink from
+  352 to 344 bytes. Across 384 allocation cases, allocations remain 30,496;
+  requested bytes decrease from 84,744,064 to 83,961,472, with no growing case.
+  All three configured resolver syntax entries are Werror-clean.
+- Export ownership preserves 19,044 public calls/723,958 artifacts:
+  299,894,512 bytes, SHA256
+  06e78b9e5141a333ece55207affe1a30df3f8aa01e561804c4c1fd08d6a8e807.
+  Release comparisons cover both isolated changes and their combination; focused
+  sanitizer comparisons cover the baseline/final combination. Include complete
+  Collection/Session fixtures and 18,240 repeated generated policy exports:
+  normal/error/empty/exhaustion/multi-bank states, reordered/duplicate/invalid
+  requests, selected banks, source/codec/rate/stereo failures, preparation warnings/
+  exceptions and ordered attributed diagnostics. All three configured export
+  syntax entries are Werror-clean.
+- Of 404 allocation cases (up to 16,384 samples, 16 banks/pools and 4,096-character
+  names), combined ownership improves 398 and preserves six; none grow in count
+  or requested bytes. Aggregate savings are 3,270 allocations/152,652,960 requested
+  bytes. The largest repeated-WAV case improves from 245,866 to 245,835 allocations
+  and 46,807,483 to 37,370,427 requested bytes. The initial unreserved direct-WAV
+  draft regressed requested bytes in 101 cases; a leading MIDI artifact before
+  16,384 samples requested an extra 1,572,672 bytes. Reject that draft and reserve
+  the full known group once. Native bad_alloc can occur earlier with reserve;
+  huge physical allocations and allocation failure timing are not parity claims.
+- Focused ASan/UBSan/float-cast-overflow runs rebuild changed units, probes and
+  fixtures with matching unchanged Release archives. The channel lifecycle probe
+  additionally rebuilds frozen VM/emitter units consistently to avoid mixed
+  libc++ container-annotation false positives. Requested-byte sums are not peak RSS.
+
+Reject reusing synthAmountFromSeconds() for SF2 envelope conversion just to remove
+three lines. Keep its positive-infinity policy and lround calculation: the other
+helper uses round. Of 377,384 cases in each floating-point rounding mode, ordinary
+nearest rounding matches, but downward/upward/toward-zero differ in 816/881/3,415
+boundary values. All 208 public envelope exports with default rounding match;
+that narrower evidence does not justify changing the other defined results.
+The prematurely applied source change was immediately reverted and is absent
+from this commit.
+
+Next: inspect the remaining copied channel identities, SourceStore's unused count
+query, and the MIDI writer's aggregate-only message forwarding helper. Probe SF2
+attenuation clipping before rounding while preserving its existing lround policy.

@@ -460,7 +460,7 @@ using Cursor = CompilerCursor<Playback>;
       auto event = cursor.command("Vibrato Parameters", SequenceSemantic::Modulation);
       const u8 delay = cursor.u8("delay");
       const u8 interval = cursor.u8("step_interval");
-      const s16 step = cursor.s16le("pitch_step", SourceValueDisplay::SignedDecimal);
+      const s16 step = cursor.s16le("pitch_step");
       const u8 period = cursor.u8("direction_period");
       cursor.derived("steady_cycle_ticks", 2u * counter(interval) * counter(period));
       if (period == 1) {

@@ -1039,7 +1039,7 @@ struct DurationValue {
       return cursor.command("Tempo", SequenceSemantic::Tempo).invoke<&Playback::tempo>({cursor.u8("tempo")});
     case 0x97: {
       auto event = cursor.command("Tuning Add", SequenceSemantic::Pitch);
-      const s16 value = layout.early() ? cursor.s8("delta") : cursor.s16le("delta", SourceValueDisplay::SignedDecimal);
+      const s16 value = layout.early() ? cursor.s8("delta") : cursor.s16le("delta");
       return event.invoke<&Playback::tuning>({value});
     }
     case 0x98:

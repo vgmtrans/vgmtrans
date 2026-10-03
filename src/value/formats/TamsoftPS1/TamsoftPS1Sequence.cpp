@@ -297,7 +297,7 @@ using Cursor = CompilerCursor<Playback>;
     }
     case 0xf8: {
       auto event = cursor.command("Jump", SequenceSemantic::Loop);
-      const s16 relative = cursor.s16le("relative", SourceValueDisplay::SignedDecimal);
+      const s16 relative = cursor.s16le("relative");
       const auto target = relativeTarget(reader, offset, relative);
       if (!target) {
         cursor.warning("Tamsoft jump target is outside the TSQ file");
@@ -309,7 +309,7 @@ using Cursor = CompilerCursor<Playback>;
     case 0xf9: {
       auto event = cursor.command("External Channel", SequenceSemantic::State,
                                   CommandPlaybackStatus::AffectsControlFlow);
-      const s16 relative = cursor.s16le("relative", SourceValueDisplay::SignedDecimal);
+      const s16 relative = cursor.s16le("relative");
       const auto target = relativeTarget(reader, offset, relative);
       if (!target) {
         cursor.warning("Tamsoft external-channel target is outside the TSQ file");

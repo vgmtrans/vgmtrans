@@ -407,10 +407,9 @@ struct RepeatFrame {
 };
 
 struct TrackState : DriverConfig {
-  TrackState(TrackStateContext source, const RuntimeConfig& config)
-      : DriverConfig(config.driver()), trackNumber(source.sourceTrackNumber) {}
+  explicit TrackState(const RuntimeConfig& config)
+      : DriverConfig(config.driver()) {}
 
-  u32 trackNumber = 0;
   u8 delta = 0;
   u8 duration = 1;
   u8 velocity = 1;
@@ -510,7 +509,7 @@ struct Playback : SequencePlayback<TrackState> {
                                                           ? std::optional{now + gateClocks * track.traits.timerMilliseconds()}
                                                           : std::nullopt;
 
-    if (ProgramState::HardwareVoice* tied = program.tiedVoice(track.trackNumber, sourceKey, nowTick, now)) {
+    if (ProgramState::HardwareVoice* tied = program.tiedVoice(out.sourceTrackNumber(), sourceKey, nowTick, now)) {
       if (track.duration != 0) {
         tied->tieEligible = false;
         const u32 tiedClocks = physicalDuration + tied->releaseDelay;
@@ -537,7 +536,7 @@ struct Playback : SequencePlayback<TrackState> {
       return Effects::wait(delay);
     }
 
-    ProgramState::HardwareVoice* voice = program.allocateVoice(track.trackNumber, track.priority, nowTick, now);
+    ProgramState::HardwareVoice* voice = program.allocateVoice(out.sourceTrackNumber(), track.priority, nowTick, now);
     if (voice == nullptr) {
       return Effects::wait(delay);
     }
@@ -611,7 +610,7 @@ struct Playback : SequencePlayback<TrackState> {
     voice->ownerActive = true;
     voice->tieEligible = track.duration == 0;
     voice->fixedClock = fixedClock;
-    voice->ownerTrack = track.trackNumber;
+    voice->ownerTrack = out.sourceTrackNumber();
     voice->key = sourceKey;
     voice->priority = track.priority;
     voice->releaseDelay = limits.releaseDelay.value_or(0);

@@ -260,9 +260,8 @@ struct KonamiLoopState {
 };
 
 struct TrackState {
-  TrackState(TrackStateContext track, const RuntimeConfig& config);
+  explicit TrackState(const RuntimeConfig& config);
 
-  u32 trackNumber = 0;
   u8 noteLength = 1;
   u8 durationRate = 0xfc;
   u8 velocity = 0xfc;

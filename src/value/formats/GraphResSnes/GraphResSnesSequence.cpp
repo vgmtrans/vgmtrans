@@ -138,12 +138,11 @@ struct RepeatFrame {
 };
 
 struct TrackState {
-  TrackState(TrackStateContext sourceTrack, const RuntimeConfig& config)
-      : data(config.source.reader()), layout(config.layout), trackNumber(sourceTrack.sourceTrackNumber) {}
+  explicit TrackState(const RuntimeConfig& config)
+      : data(config.source.reader()), layout(config.layout) {}
 
   ByteReader data;
   const Layout& layout;
-  u32 trackNumber = 0;
   u8 volume = 0x0f;
   s8 pan = 0;
   u8 octave = 4;
@@ -497,7 +496,7 @@ struct Playback : SequencePlayback<TrackState> {
       emitEcho();
     }
 
-    if (static_cast<u32>(reg >> 4) != track.trackNumber) {
+    if (static_cast<u32>(reg >> 4) != out.sourceTrackNumber()) {
       return;
     }
     switch (reg & 0x0f) {

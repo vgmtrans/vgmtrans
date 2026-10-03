@@ -96,7 +96,7 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
   // and pitch layer; their storage stays stable until derived events are appended.
   using ActiveModulation = std::map<std::pair<ModulationPerformanceTarget, u32>, const ModulationPerformanceEvent*>;
   std::vector<ActiveModulation> states(performance.tracks.size());
-  std::vector<std::vector<PerformanceEvent>> derived(performance.tracks.size());
+  std::vector<std::vector<ModulationPerformanceEvent>> derived(performance.tracks.size());
   u32 currentTempo = performance.initialTempoMicrosecondsPerQuarter;
   double secondsPerTick = tickSeconds(performance, currentTempo);
 

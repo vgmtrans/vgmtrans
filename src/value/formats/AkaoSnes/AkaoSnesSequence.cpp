@@ -878,7 +878,7 @@ struct PitchEnvelopeState {
 
 struct TrackState {
   TrackState(TrackStateContext context, const RuntimeConfig& config)
-      : sourceTrack(context.sourceTrack), trackNumber(context.sourceTrackNumber),
+      : sourceTrack(context.sourceTrack),
         pan8Bit(akaoSnesUses8BitPan(config.profile)),
         v1Envelope(config.v1VolumeEnvelopes ? &*config.v1VolumeEnvelopes : nullptr) {}
 
@@ -970,7 +970,6 @@ struct TrackState {
   }
 
   const TrackProgram& sourceTrack;
-  u32 trackNumber = 0;
   u8 octave = 6;
   s8 transpose = 0;
   u8 onetimeDuration = 0;
@@ -1358,8 +1357,8 @@ struct Playback : SequencePlayback<TrackState> {
     lfo.depthState.interruptFadeAutomationAt(vm.tick());
     lfo.configure(delay, rate, depth);
     const auto initialTempo = program.initialTempo();
-    const bool beforeInitialTempoTrack = initialTempo && track.trackNumber < initialTempo->sourceTrackNumber;
-    const bool afterInitialTempoTrack = initialTempo && track.trackNumber > initialTempo->sourceTrackNumber;
+    const bool beforeInitialTempoTrack = initialTempo && out.sourceTrackNumber() < initialTempo->sourceTrackNumber;
+    const bool afterInitialTempoTrack = initialTempo && out.sourceTrackNumber() > initialTempo->sourceTrackNumber;
     if (initialTempo && !track.sharedTempoApplied && afterInitialTempoTrack) {
       track.tempo = initialTempo->tempo;
       track.sharedTempoApplied = true;
@@ -1456,7 +1455,7 @@ struct Playback : SequencePlayback<TrackState> {
 
   void applyTempo(PerformanceEmitter output, u8 tempo) {
     track.tempo = tempo;
-    program.observeTempo(track.trackNumber, vm.tick(), tempo);
+    program.observeTempo(out.sourceTrackNumber(), vm.tick(), tempo);
     if (const auto initial = program.initialTempo(); initial && tempo == initial->tempo) {
       track.sharedTempoApplied = true;
     }

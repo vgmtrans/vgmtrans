@@ -317,7 +317,7 @@ void Playback::fe3Flags(u8 param) {
 }
 
 Effects Playback::intelliConditionalJump(Address destination) {
-  const u8 channel = static_cast<u8>(1u << track.trackNumber);
+  const u8 channel = static_cast<u8>(1u << out.sourceTrackNumber());
   return (program.intelligent.conditionalMask & channel) == 0 ? vm.jump(destination) : Effects{};
 }
 
@@ -413,7 +413,7 @@ std::optional<DecodedBytecodeCommand> decodeIntelligentCommand(Cursor& cursor, c
     }
     case EventType::IntelliDefineVoice: {
       auto event = cursor.command("Voice Parameter Definition", SequenceSemantic::Program);
-      const s8 parameter = cursor.s8("count_or_instrument", SourceValueDisplay::SignedDecimal);
+      const s8 parameter = cursor.s8("count_or_instrument");
       if (parameter >= 0 || !context.layout.intelliInstrumentOverwrite) {
         const u8 count = static_cast<u8>(parameter) & 0x3f;
         event.invoke<&Playback::defineVoiceTable>({count});

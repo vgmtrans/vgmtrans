@@ -736,7 +736,7 @@ struct DecodeState {
         return ignored(cursor, "Unused");
       }
       return cursor.command("Tick Interval Add", SequenceSemantic::Tempo)
-          .invoke<&Playback::addTempoInterval>({cursor.s8("delta", SourceValueDisplay::SignedDecimal)});
+          .invoke<&Playback::addTempoInterval>({cursor.s8("delta")});
     }
     case 0xe7: {
       if (vendetta) {

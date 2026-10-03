@@ -146,9 +146,6 @@ struct ProgramState {
 };
 
 struct TrackState {
-  explicit TrackState(TrackStateContext sourceTrack) : trackNumber(sourceTrack.sourceTrackNumber) {}
-
-  u32 trackNumber;
   u8 noteLength = 0x10;
   u8 durationRate = 0xaf;
   u8 velocity = 0xff;
@@ -378,7 +375,7 @@ struct Playback : SequencePlayback<TrackState> {
     }
     program.masterVolume.begin(out, PerformanceAutomationTarget::MasterLevel, masterRelativeGain(target),
                                program.masterVolume.toRawTarget(target, length));
-    program.masterVolumeTrack = track.trackNumber;
+    program.masterVolumeTrack = out.sourceTrackNumber();
   }
 
   void pitchEnvelope(PitchEnvelopeKind kind, u8 delay, u8 duration, s8 depth) {
@@ -416,7 +413,7 @@ struct Playback : SequencePlayback<TrackState> {
 
   void echoEnabled(bool enabled) {
     const u8 mask = program.echo.voiceMask.value_or(0);
-    const u8 voice = static_cast<u8>(1u << std::min(track.trackNumber, u32{7}));
+    const u8 voice = static_cast<u8>(1u << std::min(out.sourceTrackNumber(), u32{7}));
     program.echo.voiceMask = enabled ? static_cast<u8>(mask | voice) : static_cast<u8>(mask & ~voice);
     out.reverb(program.echo);
   }
@@ -460,7 +457,7 @@ struct Playback : SequencePlayback<TrackState> {
     if (vibratoTick.changed) {
       emitVibratoDepth(track.vibrato.depthState.currentDepth(), track.vibrato.depthState.fadeOutput(out));
     }
-    if (program.masterVolumeTrack == track.trackNumber) {
+    if (program.masterVolumeTrack == out.sourceTrackNumber()) {
       program.masterVolume.tickRaw([&](s32 value) {
         const auto volume = static_cast<u8>(std::clamp<s32>(value, 0, 0xff));
         program.masterVolume.output(out).masterLevel(masterRelativeGain(volume));

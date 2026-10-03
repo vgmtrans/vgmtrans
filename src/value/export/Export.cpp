@@ -71,9 +71,9 @@ namespace {
 }
 
 void appendWavArtifacts(std::vector<Artifact>& artifacts, std::string_view baseName, const SamplePool& pool,
-                        const SourceStore& sources) {
+                        const SourceStore& sources, size_t firstArtifact = 0) {
   for (const auto& sample : pool.samples) {
-    const auto sampleIndex = static_cast<u32>(artifacts.size());
+    const auto sampleIndex = static_cast<u32>(artifacts.size() - firstArtifact);
     Artifact artifact{
         .filename = sampleArtifactName(baseName, sample, sampleIndex),
         .mediaType = "audio/wav",
@@ -96,24 +96,31 @@ void appendWavArtifacts(std::vector<Artifact>& artifacts, std::string_view baseN
   }
 }
 
-[[nodiscard]] std::vector<Artifact> exportWav(const PreparedCollection& collection, const SourceStore& sources) {
-  std::vector<Artifact> artifacts;
+void appendCollectionWavArtifacts(std::vector<Artifact>& artifacts, const PreparedCollection& collection,
+                                  const SourceStore& sources) {
+  const auto firstArtifact = artifacts.size();
+  auto artifactCount = firstArtifact;
   for (const auto& bank : collection.soundBanks()) {
-    appendWavArtifacts(artifacts, collection.baseName, bank.localSamples, sources);
+    artifactCount += bank.localSamples.samples.size();
   }
   for (const auto* samplePool : collection.samplePools) {
-    appendWavArtifacts(artifacts, collection.baseName, samplePool->pool, sources);
+    artifactCount += samplePool->pool.samples.size();
+  }
+  artifacts.reserve(artifactCount);
+  for (const auto& bank : collection.soundBanks()) {
+    appendWavArtifacts(artifacts, collection.baseName, bank.localSamples, sources, firstArtifact);
+  }
+  for (const auto* samplePool : collection.samplePools) {
+    appendWavArtifacts(artifacts, collection.baseName, samplePool->pool, sources, firstArtifact);
   }
 
-  if (artifacts.empty()) {
+  if (artifacts.size() == firstArtifact) {
     artifacts.push_back(Artifact{
         .filename = filenamePart(collection.baseName) + "-samples.wav",
         .mediaType = "audio/wav",
         .diagnostics = {exportError("Collection sound banks and sample pools did not contain samples")},
     });
   }
-
-  return artifacts;
 }
 
 [[nodiscard]] Artifact synthArtifact(std::string_view name, SynthExportFormat format, SynthExportResult result) {
@@ -421,37 +428,39 @@ std::vector<Artifact> exportCollectionImpl(const SessionSnapshot& snapshot, cons
                                     request.modulationConversion, &rendering.modulation);
     applyMidiModulationScaling(*loweredMidi, prepared.modulationUsage, request.modulationScaling);
   }
-  std::optional<std::vector<SynthBankSelection>> synthBanks;
+  std::optional<SynthExportInput> synthInput;
   if (exportsSynth && (performance ? performance->valid() : !synthRequiresPerformance)) {
-    synthBanks = performance ? std::optional{selectSynthBanks(*performance)}
-                            : prepareSynthBanks(prepared.soundBankView(), binding.diagnostics);
-  }
-  SynthExportInput synthInput{
-      .name = prepared.baseName,
-      .soundBanks = synthBanks ? std::move(*synthBanks) : std::vector<SynthBankSelection>{},
-      .samplePools = prepared.samplePools,
-      .filterSamplesToReferencedInstruments = request.exportOnlyUsedInstruments || selectedSoundBank.has_value(),
-      .midiModulationUsage = &prepared.modulationUsage,
-      .modulationScaling = request.modulationScaling,
-      .modulationConversion = synthConversion,
-      .sampleFiltering = request.sampleFiltering,
-      .bankSelectStyle = request.sequence.midi.bankSelectStyle,
-  };
-  if (selectedSoundBank) {
-    std::erase_if(synthInput.soundBanks, [&](const SynthBankSelection& selected) {
-      return selected.bank->metadata.id != *selectedSoundBank;
-    });
+    auto synthBanks = performance ? std::optional{selectSynthBanks(*performance)}
+                                 : prepareSynthBanks(prepared.soundBankView(), binding.diagnostics);
+    if (synthBanks) {
+      synthInput = SynthExportInput{
+          .name = prepared.baseName,
+          .soundBanks = std::move(*synthBanks),
+          .samplePools = prepared.samplePools,
+          .filterSamplesToReferencedInstruments = request.exportOnlyUsedInstruments || selectedSoundBank.has_value(),
+          .midiModulationUsage = &prepared.modulationUsage,
+          .modulationScaling = request.modulationScaling,
+          .modulationConversion = synthConversion,
+          .sampleFiltering = request.sampleFiltering,
+          .bankSelectStyle = request.sequence.midi.bankSelectStyle,
+      };
+      if (selectedSoundBank) {
+        std::erase_if(synthInput->soundBanks, [&](const SynthBankSelection& selected) {
+          return selected.bank->metadata.id != *selectedSoundBank;
+        });
+      }
+    }
   }
 
   const auto writeSynth = [&](SynthExportFormat format) {
     if (synthRequiresPerformance && !performance) {
       return synthArtifact(prepared.baseName, format, SynthExportResult{.diagnostics = rendering.diagnostics});
     }
-    if (!synthBanks) {
+    if (!synthInput) {
       return synthArtifact(prepared.baseName, format, SynthExportResult{});
     }
 
-    auto artifact = exportSynth(synthInput, format, sources);
+    auto artifact = exportSynth(*synthInput, format, sources);
     const auto& diagnostics = performance ? performance->performance().diagnostics : rendering.diagnostics;
     artifact.diagnostics.insert(artifact.diagnostics.begin(), diagnostics.begin(), diagnostics.end());
     return artifact;
@@ -464,12 +473,9 @@ std::vector<Artifact> exportCollectionImpl(const SessionSnapshot& snapshot, cons
       case ExportKind::Midi:
         artifacts.push_back(exportMidi(prepared.baseName, rendering, loweredMidi));
         break;
-      case ExportKind::Wav: {
-        auto wavArtifacts = exportWav(prepared, sources);
-        artifacts.insert(artifacts.end(), std::make_move_iterator(wavArtifacts.begin()),
-                         std::make_move_iterator(wavArtifacts.end()));
+      case ExportKind::Wav:
+        appendCollectionWavArtifacts(artifacts, prepared, sources);
         break;
-      }
       case ExportKind::SoundFont2:
         artifacts.push_back(writeSynth(SynthExportFormat::SoundFont2));
         break;

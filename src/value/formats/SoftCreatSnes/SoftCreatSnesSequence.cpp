@@ -147,12 +147,11 @@ struct VibratoState {
 }
 
 struct TrackState {
-  TrackState(TrackStateContext sourceTrack, const RuntimeConfig& config)
-      : data(config.source.reader()), layout(config.layout), trackNumber(sourceTrack.sourceTrackNumber) {}
+  explicit TrackState(const RuntimeConfig& config)
+      : data(config.source.reader()), layout(config.layout) {}
 
   ByteReader data;
   const Layout& layout;
-  u32 trackNumber = 0;
   u8 srcn = 0;
   s8 transpose = 0;
   u8 left = 0;
@@ -214,7 +213,7 @@ struct TrackState {
 struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
-  [[nodiscard]] u8 voiceBit() const { return static_cast<u8>(1u << std::min<u32>(track.trackNumber, 7)); }
+  [[nodiscard]] u8 voiceBit() const { return static_cast<u8>(1u << std::min<u32>(out.sourceTrackNumber(), 7)); }
 
   void beforeCommand() {
     if (!program.initialized) {

@@ -122,9 +122,6 @@ struct CallFrame {
 };
 
 struct TrackState {
-  explicit TrackState(TrackStateContext track) : number(track.sourceTrackNumber) {}
-
-  u32 number = 0;
   u16 length = 1;
   u8 gate = 0;
   u8 velocity = 0;
@@ -723,7 +720,7 @@ struct Playback : SequencePlayback<TrackState> {
   // F8/FC edit the shared DSP voice mask. F5 changes signed echo output levels
   // without changing that mask; instrument changes preserve both.
   void channelEcho(bool enabled) {
-    const u8 bit = static_cast<u8>(1u << track.number);
+    const u8 bit = static_cast<u8>(1u << out.sourceTrackNumber());
     const u8 mask = program.reverb.voiceMask.value_or(0);
     program.reverb.voiceMask = enabled ? mask | bit : mask & ~bit;
     out.reverb(program.reverb);
@@ -1016,7 +1013,7 @@ using Cursor = CompilerCursor<Playback>;
       const u8 first = cursor.u8("pan_if_set");
       const u8 second = cursor.u8("pan_if_clear");
       return event.invokeFlow([first, second](Playback& p) {
-        p.pan(p.program.conditions[p.track.number / 4] ? first : second);
+        p.pan(p.program.conditions[p.out.sourceTrackNumber() / 4] ? first : second);
         return Effects{};
       });
     }
@@ -1026,7 +1023,7 @@ using Cursor = CompilerCursor<Playback>;
       const Address second{
           cursor.u16le("pattern_if_clear", SourceValueDisplay::Address, SemanticOperandRole::CallTarget)};
       return event.invokeFlow([first, second](Playback& p) {
-        return p.call(1, p.program.conditions[p.track.number / 4] ? first : second);
+        return p.call(1, p.program.conditions[p.out.sourceTrackNumber() / 4] ? first : second);
       }).call(first).discoverTarget(second);
     }
     case 0xfe: {
@@ -1084,7 +1081,7 @@ using Cursor = CompilerCursor<Playback>;
       const auto body = nested.execution.body;
       nested.execution.body = [target, body](void* state) {
         auto& playback = *static_cast<Playback*>(state);
-        return target == playback.track.number && body ? body(state) : playback.vm.fallthrough();
+        return target == playback.out.sourceTrackNumber() && body ? body(state) : playback.vm.fallthrough();
       };
       return nested;
     }
