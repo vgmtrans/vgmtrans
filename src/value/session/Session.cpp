@@ -46,7 +46,6 @@ void prepareDiagnosticRanges(std::vector<Diagnostic>& diagnostics, const SourceF
 struct FormatScan {
   const FormatModule* format = nullptr;
   ScanResult result;
-  std::exception_ptr failure;
 };
 
 void runFormatScans(std::span<FormatScan> scans, const ScanInput& input) {
@@ -66,10 +65,19 @@ void runFormatScans(std::span<FormatScan> scans, const ScanInput& input) {
         return;
       }
       auto& scan = scans[index];
+      const auto fail = [&](std::string message) {
+        scan.result.diagnostics.push_back(Diagnostic{
+            .severity = Severity::Error,
+            .message = scan.format->name + " scan failed: " + message,
+            .range = SourceRange{.source = input.source.id, .offset = 0, .size = input.source.size},
+        });
+      };
       try {
         scan.result = scan.format->scan(input);
+      } catch (const std::exception& ex) {
+        fail(ex.what());
       } catch (...) {
-        scan.failure = std::current_exception();
+        fail("Unknown exception");
       }
     }
   };
@@ -426,16 +434,6 @@ void Session::scanOneSource(const SourceFile& source, std::vector<SourceId>& que
   // read the shared source bytes and build their private result values.
   for (auto& scan : scans) {
     const FormatModule& module = *scan.format;
-    if (scan.failure) {
-      try {
-        std::rethrow_exception(scan.failure);
-      } catch (const std::exception& ex) {
-        state_->addError(std::string(module.name) + " scan failed: " + ex.what(),
-                         SourceRange{.source = source.id, .offset = 0, .size = source.size});
-        continue;
-      }
-    }
-
     for (auto& asset : scan.result.assets) {
       if (auto* bank = std::get_if<SoundBankAsset>(&asset)) {
         bank->localSamples.preferredFilter = module.preferredSampleFilter;

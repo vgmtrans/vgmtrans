@@ -116,7 +116,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/scan/AssetCatalog.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/AssetResolution.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/AssetResolution.h
-    ${PROJECT_SOURCE_DIR}/src/value/export/AssetPreparation.h
+    ${PROJECT_SOURCE_DIR}/src/value/model/AssetPreparation.h
     ${PROJECT_SOURCE_DIR}/src/value/model/AssetRecipe.h
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.h

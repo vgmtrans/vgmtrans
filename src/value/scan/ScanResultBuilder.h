@@ -9,10 +9,9 @@
 #include "value/scan/ScanTypes.h"
 #include "value/model/SourceMap.h"
 #include "value/synth/SynthBuilder.h"
-#include "value/export/AssetPreparation.h"
+#include "value/model/AssetPreparation.h"
 
-#include <cstddef>
-#include <memory>
+#include <deque>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -163,7 +162,7 @@ private:
 class ScanResultBuilder {
 public:
   ScanResultBuilder(ScanInput input, std::string format);
-  ~ScanResultBuilder();
+  ~ScanResultBuilder() = default;
 
   [[nodiscard]] SourceId source() const noexcept { return input_.source.id; }
   [[nodiscard]] const SourceFile& sourceFile() const noexcept { return input_.source; }
@@ -204,8 +203,9 @@ private:
 
   using PendingAsset = std::variant<ScanSequenceDraft::Pending, ScanSoundBankDraft::Pending,
                                     ScanSamplePoolDraft::Pending, ScanMiscDraft::Pending>;
-  // Drafts and domain-builder entries point directly into these stable values.
-  std::vector<std::unique_ptr<PendingAsset>> drafts_;
+  // Appending to the deque preserves the values referenced by drafts and
+  // domain-builder entries.
+  std::deque<PendingAsset> drafts_;
 };
 
 template <class Data, class Prepare>

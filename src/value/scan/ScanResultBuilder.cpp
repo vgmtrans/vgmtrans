@@ -121,8 +121,6 @@ ScanResultBuilder::ScanResultBuilder(ScanInput input, std::string format)
       sourceMap_([this]() { return input_.ids.nextSourceAnnotationId(); }) {
 }
 
-ScanResultBuilder::~ScanResultBuilder() = default;
-
 std::string ScanResultBuilder::sourceDisplayName() const {
   if (input_.source.title && !input_.source.title->empty()) {
     return *input_.source.title;
@@ -138,41 +136,39 @@ std::string ScanResultBuilder::sourceDisplayName() const {
 
 ScanSequenceDraft ScanResultBuilder::sequence(std::string name, SourceRange range) {
   const AssetId id = input_.ids.nextAssetId();
-  drafts_.push_back(std::make_unique<PendingAsset>(
-      ScanSequenceDraft::Pending{.id = id, .name = std::move(name), .range = range}));
-  return ScanSequenceDraft{std::get<ScanSequenceDraft::Pending>(*drafts_.back())};
+  drafts_.emplace_back(ScanSequenceDraft::Pending{.id = id, .name = std::move(name), .range = range});
+  return ScanSequenceDraft{std::get<ScanSequenceDraft::Pending>(drafts_.back())};
 }
 
 ScanSoundBankDraft ScanResultBuilder::soundBank(std::string name, SourceRange range) {
   const AssetId id = input_.ids.nextAssetId();
-  drafts_.push_back(std::make_unique<PendingAsset>(ScanSoundBankDraft::Pending{
+  drafts_.emplace_back(ScanSoundBankDraft::Pending{
       .id = id,
       .name = std::move(name),
       .instruments = InstrumentSetBuilder{id, &sourceMap_, &result_.diagnostics},
       .samples = SamplePoolBuilder{id, &sourceMap_, &result_.diagnostics},
-  }));
-  ScanSoundBankDraft draft{std::get<ScanSoundBankDraft::Pending>(*drafts_.back())};
+  });
+  ScanSoundBankDraft draft{std::get<ScanSoundBankDraft::Pending>(drafts_.back())};
   draft.instruments().include(range);
   return draft;
 }
 
 ScanSamplePoolDraft ScanResultBuilder::samplePool(std::string name, SourceRange range) {
   const AssetId id = input_.ids.nextAssetId();
-  drafts_.push_back(std::make_unique<PendingAsset>(ScanSamplePoolDraft::Pending{
+  drafts_.emplace_back(ScanSamplePoolDraft::Pending{
       .id = id,
       .name = std::move(name),
       .samples = SamplePoolBuilder{id, &sourceMap_, &result_.diagnostics},
-  }));
-  ScanSamplePoolDraft draft{std::get<ScanSamplePoolDraft::Pending>(*drafts_.back())};
+  });
+  ScanSamplePoolDraft draft{std::get<ScanSamplePoolDraft::Pending>(drafts_.back())};
   draft.samples().include(range);
   return draft;
 }
 
 ScanMiscDraft ScanResultBuilder::misc(std::string name, SourceRange range) {
   const AssetId id = input_.ids.nextAssetId();
-  drafts_.push_back(std::make_unique<PendingAsset>(
-      ScanMiscDraft::Pending{.id = id, .name = std::move(name), .range = range}));
-  return ScanMiscDraft{std::get<ScanMiscDraft::Pending>(*drafts_.back())};
+  drafts_.emplace_back(ScanMiscDraft::Pending{.id = id, .name = std::move(name), .range = range});
+  return ScanMiscDraft{std::get<ScanMiscDraft::Pending>(drafts_.back())};
 }
 
 void ScanResultBuilder::diagnostic(Diagnostic diagnostic) {
@@ -188,17 +184,17 @@ void ScanResultBuilder::error(std::string message, SourceRange range) {
 }
 
 ScanResult ScanResultBuilder::finish() {
-  for (const auto& slot : drafts_) {
-    if (const auto* sequence = std::get_if<ScanSequenceDraft::Pending>(slot.get()); sequence && !sequence->program) {
+  for (const auto& draft : drafts_) {
+    if (const auto* sequence = std::get_if<ScanSequenceDraft::Pending>(&draft); sequence && !sequence->program) {
       throw std::logic_error("ScanResultBuilder sequence draft was never given a program");
     }
-    if (const auto* misc = std::get_if<ScanMiscDraft::Pending>(slot.get()); misc && !misc->payload) {
+    if (const auto* misc = std::get_if<ScanMiscDraft::Pending>(&draft); misc && !misc->payload) {
       throw std::logic_error("ScanResultBuilder misc draft was never given a payload");
     }
   }
 
   result_.assets.reserve(result_.assets.size() + drafts_.size());
-  for (auto& slot : drafts_) {
+  for (auto& draft : drafts_) {
     Asset asset = std::visit(
         [this](auto& pending) -> Asset {
           using Pending = std::decay_t<decltype(pending)>;
@@ -238,7 +234,7 @@ ScanResult ScanResultBuilder::finish() {
             };
           }
         },
-        *slot);
+        draft);
     result_.assets.push_back(std::move(asset));
   }
 

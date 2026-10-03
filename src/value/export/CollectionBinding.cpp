@@ -7,7 +7,7 @@
 #include "value/export/CollectionBinding.h"
 
 #include "value/export/ExportDiagnostics.h"
-#include "value/export/AssetPreparation.h"
+#include "value/model/AssetPreparation.h"
 #include "value/scan/AssetResolution.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/validation/SynthValidation.h"

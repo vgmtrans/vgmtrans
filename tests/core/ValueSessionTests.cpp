@@ -245,6 +245,15 @@ void sessionScansApplicableFormatsConcurrently() {
   };
 
   session.registerFormat(module("First", 1));
+  session.registerFormat(FormatModule{
+      .name = "Throwing",
+      .scan = [](const ScanInput&) -> ScanResult { throw std::runtime_error("scanner exploded"); }});
+  session.registerFormat(FormatModule{
+      .name = "EmptyFailure",
+      .scan = [](const ScanInput&) -> ScanResult { throw std::runtime_error(""); }});
+  session.registerFormat(FormatModule{
+      .name = "UnknownFailure",
+      .scan = [](const ScanInput&) -> ScanResult { throw 42; }});
   session.registerFormat(module("Second", 2));
   session.addSource(SourceFile{.name = "parallel.bin"}, {0xaa});
   session.scanPendingSources();
@@ -256,6 +265,17 @@ void sessionScansApplicableFormatsConcurrently() {
   expect(snapshot.assets().size() == 2, "parallel scanning should admit every applicable format result");
   expect(metadata(snapshot.assets()[0]).format == "First" && metadata(snapshot.assets()[1]).format == "Second",
          "parallel scan admission should preserve format registry order");
+  expect(snapshot.diagnostics().size() == 3,
+         "one failed scanner should not prevent other results or failures from being admitted");
+  const SourceRange range{.source = SourceId{0}, .offset = 0, .size = 1};
+  const std::array messages{"Throwing scan failed: scanner exploded", "EmptyFailure scan failed: ",
+                            "UnknownFailure scan failed: Unknown exception"};
+  for (size_t i = 0; i < messages.size(); ++i) {
+    const auto& diagnostic = snapshot.diagnostics()[i];
+    expect(diagnostic.message == messages[i] && diagnostic.range == range && diagnostic.severity == Severity::Error &&
+               diagnostic.code.empty() && !diagnostic.object && !diagnostic.annotation,
+           "failed scanners should preserve error attribution and registry order, including empty exception text");
+  }
   expect(metadata(snapshot.assets()[0]).id != metadata(snapshot.assets()[1]).id,
          "parallel scanners should receive unique asset ids");
 }

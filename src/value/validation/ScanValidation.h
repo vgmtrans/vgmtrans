@@ -14,8 +14,8 @@ namespace vgmtrans::core {
 
 class SourceStore;
 
-// Admission check for one scanner result after IDs and item trees are normalized.
-// Session calls this before accepting assets, collections, diagnostics, or derived sources.
+// Admission check for one scanner result whose IDs were allocated during scanning.
+// Session calls this before accepting its assets, source annotations, and diagnostics.
 [[nodiscard]] ValidationReport validateScanResult(SourceId source, const ScanResult& result, const SourceStore& sources,
                                                   const SharedSequence<Asset>& existingAssets);
 

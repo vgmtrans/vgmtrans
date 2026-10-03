@@ -50,9 +50,6 @@ SourceInspection::SourceInspection(AssetMetadata metadata, SourceRange range, Sh
 }
 
 std::span<const u8> SourceInspection::bytes() const noexcept {
-  if (sourceBytes_ == nullptr) {
-    return {};
-  }
   return std::span<const u8>{*sourceBytes_}.subspan(static_cast<size_t>(range_.offset),
                                                     static_cast<size_t>(range_.size));
 }

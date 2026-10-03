@@ -8,7 +8,7 @@
 
 #include "value/scan/AssetResolution.h"
 
-#include "value/export/AssetPreparation.h"
+#include "value/model/AssetPreparation.h"
 #include "value/export/CollectionBinding.h"
 #include "SessionSnapshotBuilder.h"
 
