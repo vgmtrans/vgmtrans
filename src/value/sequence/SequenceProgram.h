@@ -320,7 +320,6 @@ struct SequenceProgram {
 };
 
 [[nodiscard]] bool trackUsesSemantic(const TrackProgram& track, SequenceSemantic semantic);
-[[nodiscard]] bool sequenceUsesSemantic(const SequenceProgram& program, SequenceSemantic semantic);
 [[nodiscard]] SourceRange sequenceSourceRange(ByteReader reader, SourceRange baseRange, const SequenceProgram& program);
 
 struct SequenceProgramAsset {

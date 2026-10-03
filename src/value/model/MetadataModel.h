@@ -17,7 +17,7 @@
 
 namespace vgmtrans::core {
 
-// One immutable, format-owned value retained with a scanned asset. The core
+// One immutable, format-owned value retained with an asset. The core
 // deliberately cannot inspect or serialize it; typed format code uses it to
 // carry source meaning needed after collection matching without reparsing.
 class AssetPrivateData {

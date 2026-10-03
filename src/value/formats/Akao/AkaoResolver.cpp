@@ -168,20 +168,19 @@ void prepareAkaoBank(BankPreparationContext& context, const AkaoSoundBankData& d
     context.warning(std::move(message));
   }
 
-  auto preparedData = data;
-  preparedData.runtime.articulationEnvelopes.clear();
+  AkaoRuntimeConfig config;
   for (const auto& [id, articulation] : articulations) {
-    preparedData.runtime.articulationEnvelopes.emplace(id, AkaoAdsr{articulation.get().adsr1, articulation.get().adsr2});
+    config.articulationEnvelopes.emplace(id, AkaoAdsr{articulation.get().adsr1, articulation.get().adsr2});
   }
-  context.privateData = AssetPrivateData::make(std::move(preparedData));
+  context.privateData = AssetPrivateData::make(std::move(config));
 }
 
 // Configure SequenceVm with articulation ADSR defaults from the prepared banks.
 // FF7 ADSR commands edit or reset these values during sequence conversion.
 SequenceRuntime prepareAkaoSequence(SequencePreparationContext& context) {
   AkaoRuntimeConfig config;
-  for (const auto& bank : context.banks<AkaoSoundBankData>(kAkaoFormatName)) {
-    for (const auto& [id, envelope] : bank.data.runtime.articulationEnvelopes) {
+  for (const auto& bank : context.banks<AkaoRuntimeConfig>(kAkaoFormatName)) {
+    for (const auto& [id, envelope] : bank.data.articulationEnvelopes) {
       config.articulationEnvelopes[id] = envelope;
     }
   }

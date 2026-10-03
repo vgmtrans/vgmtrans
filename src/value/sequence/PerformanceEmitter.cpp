@@ -636,13 +636,14 @@ PerformanceEmitter PerformanceAutomationBinding::output(const PerformanceEmitter
   return output;
 }
 
-void PerformanceEmitter::append(PerformanceEvent event) {
-  std::visit([&](auto& typedEvent) { typedEvent.header = header(); }, event);
+template <class Event>
+void PerformanceEmitter::append(Event&& event) {
+  event.header = header();
   if (automation_) {
     auto& automation = track_.automations[*automation_];
     automation.realization.endTick = std::max(automation.realization.endTick, tick_);
   }
-  track_.events.emplace_back(std::move(event));
+  track_.events.push_back(std::forward<Event>(event));
 }
 
 void PerformanceAutomationBinding::stop(const PerformanceEmitter& out) const {

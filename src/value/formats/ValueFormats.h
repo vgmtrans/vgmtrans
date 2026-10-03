@@ -23,7 +23,6 @@ struct ValueFormatOptions {
   std::optional<std::filesystem::path> mameRomDatabase;
 };
 
-void registerValueFormats(core::Session& session);
-void registerValueFormats(core::Session& session, const ValueFormatOptions& options);
+void registerValueFormats(core::Session& session, const ValueFormatOptions& options = {});
 
 }  // namespace vgmtrans::formats

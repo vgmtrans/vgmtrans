@@ -1,13 +1,13 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Twenty-nine validated batches remove 1,048 net production lines
+`cb9e0b766`. Thirty validated batches remove 1,060 net production lines
 from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 28; 72 raw
-inventories match and one differs only in proven pre-existing concurrent asset-ID
-allocation order. The cleanup2 records appear at the end of this document.
+cover 37 of 38 registered families. All export records and raw inventories match
+batch 29 exactly. Earlier concurrent asset-ID scheduling evidence remains recorded
+below. The cleanup2 records appear at the end of this document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
 
@@ -6520,3 +6520,138 @@ No such policy change is included here; evidence stays in
 Next: separate Akao's prepared runtime from its scanned instrument binding recipe,
 and probe direct typed emitter appends without enlarging every variant vector
 growth path. Keep the already demonstrated concurrency/ownership boundaries.
+
+
+## Cleanup2 thirtieth batch: retain prepared meaning and stamp typed events
+
+This batch removes 12 net production lines across nine files, bringing cleanup2
+to 1,060 removed: 958 architecture lines and 102 format lines. The physical diff
+is 14 additions/26 deletions. Cumulatively, production C++/headers are 1,769
+additions/2,829 deletions across 154 paths; architecture is 1,453/2,411 across 88,
+and formats are 316/418 across 66. The Hudson corpus fixture moves its sole query
+into the test, adding two net test lines; cumulative tests gain 559 lines. Keep
+SequenceVM, target-independent source events, and all current format families.
+
+- AkaoSoundBankData retains only its scanned version and instrument binding
+  recipe. Bank preparation stores the already existing AkaoRuntimeConfig directly;
+  sequence preparation reads that prepared config. The completed bank no longer
+  copies and retains an unused scan recipe alongside its owned ADSR map. Source
+  snapshot data stays immutable, selected articulation references stay temporary,
+  and the runtime still owns its copied native defaults. Remove three lines.
+  Correct the common private-data comment to cover prepared as well as scanned
+  assets; no common ownership implementation changes.
+- PerformanceEmitter's private append receives the concrete event, stamps its
+  header directly, and push_back performs the existing conversion into the event
+  variant. Remove the explicit visitor/erased-input step while retaining the
+  shared vector growth path. All 23 private calls pass concrete rvalues, and all
+  22 native alternatives have nothrow move constructors. This adds two lines;
+  public payload ownership, the neutral variant and event representation stay
+  unchanged. Do not claim fewer payload moves or heap requests.
+- Remove sequenceUsesSemantic from the production declaration and implementation.
+  Its only caller was the optional Hudson native corpus fixture, which now applies
+  any_of to tracks and keeps the live trackUsesSemantic query used by NDS. Remove
+  six production lines. The unused sequence-wide function symbol/API disappears;
+  no repository production caller relies on it.
+- Sequence range accumulation delegates invalid-range rejection to SourceRange's
+  existing include policy. Retain source equality before inclusion: an invalid
+  base must not adopt a command from a foreign source. This expression change is
+  LOC-neutral; anchors, unsigned endpoint behavior and reader attribution stay.
+- Format registration has one options declaration with a default empty argument.
+  Remove the empty-options forwarding overload and four-line body, saving five
+  lines. Existing omitted/explicit-options calls and the two-argument function
+  type/symbol remain. The unused one-argument function-pointer overload and binary
+  symbol disappear. Repository/generated/Qt adapter callers use direct calls;
+  this is not a claim of compatibility with an external binary SDK.
+
+Validation:
+
+- The complete 363-step macOS Release build, including Qt/shell/parity, finishes
+  without warnings. All 44 CTest suites pass. Freeze all value headers/sources,
+  tests, core/formats/fmt/Qt archives and the shell before independent replays.
+  The shell SHA256 is
+  6a8abc1e13c5a646c0862f8e765b5920264f81580c525fb0ec6af149ef474ed4.
+- Original corpus comparison against frozen 29 preserves 252 input/policy records
+  and 3,922 artifacts exactly. Expanded `/Volumes/emu/vgm` replay preserves all
+  73 raw inventories, 894 export records, 858 artifact names/sizes/hashes and
+  218,240,549 bytes per binary. All 852 successful exports and 42 pre-existing
+  failures match; the five unsupported DSF inventory failures also match.
+  No inventory normalization or repeat is necessary in this pair. All previous
+  concurrent-ID variability evidence stays intact. Combined inputs cover 37/38
+  registered families; KonamiTMNT2 still has synthetic coverage only.
+- Akao compares 8,640 generated/lifetime/multi-bank cases: 17,186,372 exact bytes,
+  SHA256 7a11cbd3bc18b1d8ccd314dc67a20d9158389c9da110c7149bd2d68303237ccf.
+  Cover 0/1/2/3/8 banks, reverse order, overlapping IDs/last-bank ADSR precedence,
+  different versions/recipes and destruction of pool/snapshot/prepared bank data
+  before native event/MIDI observations. Another 72 invalid/type/kind/duplicate/
+  missing-pool cases preserve error precedence, order and full attribution:
+  10,284 bytes, SHA256
+  abf7686a57c0e494899d452f54eb90a3c17854d4e7b5aba8aa275818ecd3757f.
+  All six Akao units and six complete fixtures rebuild independently on both
+  sides and pass focused sanitizers; seven configured Release Werror checks pass.
+- Akao bank preparation's scoped allocation matrix covers 10,368 preparations:
+  391,200->358,944 requests and 75,345,280->73,907,584 requested bytes. All 4,608
+  improvements save both requests and bytes; no measured case grows. Scanned
+  bank private payload is 88->64 bytes and prepared payload is 88->24. This is
+  neither peak-RSS nor allocator-failure timing equivalence.
+- Typed append preserves 3,762 captures, including 528 allocation-failure patterns
+  and 66 nonfinite cases: 6,009,794 bytes, SHA256
+  b937f108879e8a7a5af0922b304d6c8b4def694ec621122357e28fc716a708d5.
+  The 90 actual bad_alloc results retain partial events, counters and automation
+  end times. Both sides allocate 2,244 requests/2,313,168 bytes. Six full core
+  fixtures preserve 67 captured renders/82,438 bytes, SHA256
+  b382d6bb2309509e5c43f18d0858290a48d9e0da14c36044627455fc86613430.
+  Rebuild matching VM/emitter/timing for Release and clean focused sanitizer runs;
+  the changed unit is configured Release-Werror-clean.
+- Typed append's 96 shuffled public benchmark samples emit 25,165,824 events in
+  bounded 8,192-event blocks. Ordinary, payload and all-22-type mixed patterns
+  cover reserved and growing vectors. Complete captured first-block outputs match.
+  Median paired ratios range .957..998; distributions overlap 1, so no robust
+  speedup claim. No material throughput regression is observed in these cases.
+- The accepted push_back emitter object grows 31,475->34,465 text bytes (+2,990,
+  9.5%); sections grow 49,216->52,728 (+7.1%). The linked standalone benchmark
+  text grows 72,893->75,873 (+2,980). Accept that small code-size cost for removing
+  explicit variant visitation. Reject direct typed emplace_back: it instantiates
+  every native vector growth path, growing object text to 48,337 (+53.6%). The
+  standalone executable's smaller LINKEDIT is not a whole-app saving.
+- Sequence range/query changes preserve complete SequenceModel/Hudson fixtures,
+  with the actual optional Super Bomberman 2 corpus enabled. Another 11,520 cases
+  cover valid/invalid reader/base/command IDs, foreign first commands, zero-size
+  anchors and unsigned endpoint extremes: 244,896 bytes, SHA256
+  40faa9c58bebe41a93202e54d62f3d93c9a7916e273507affde0c10afcc0a0a6.
+  Release and focused sanitizer traces match. Six configured Werror checks pass
+  across Debug/Release/RelWithDebInfo production and corpus fixture sources.
+- Registration preserves 79 complete ordered registry/error-state captures:
+  130,060 bytes, SHA256
+  c24e93dcf95933d4b89f1dba04dce68cb30d4e954d8b3e572ec25152af1f64a0.
+  Cover omitted/lvalue/temporary/two-argument-pointer options, strict valid/
+  missing/malformed/directory databases, all default search locations, skipped
+  directories, invalid-first no-fallback, cwd failure, duplicate/sealed registries
+  and partial state. Full existing CUE/KonamiArcade fixtures pass all four runs;
+  54 configured Werror checks cover 18 implementation/Qt/shell/parity/fixture
+  caller units across three configurations.
+- Focused sanitizers instrument matching changed units/probes/full fixtures;
+  other frozen archives remain Release, with libc++ container annotations disabled
+  consistently where needed. Do not claim whole-program instrumentation.
+
+Intentional format-private phase tightening: a manually unprepared Akao bank with
+AkaoSoundBankData and no bank callback previously supplied empty defaults. It now
+fails with one ordinary missing-retained-data sequence error at source 77,
+offset 20, size 48. AkaoModule always installs the required typed bank preparer,
+and binding stops before sequence preparation after any bank error. No repository
+consumer depends on bypassing that phase; no second accepted retained-data type
+or fallback protocol is introduced.
+
+Evidence: `sequence-query-policy30`, `typed-event-assembly30`,
+`akao-prepared-runtime29`, `pass30-baseline`, `comparison-pass30.json` and
+`volume-coverage27/pass29-vs-pass30-{summary.json,report.md,classification.json}`
+under `/tmp/vgmtrans-cleanup2`; registration evidence stays in
+`/tmp/vgmtrans-registration-default30`.
+
+Read-only findings: retain physical modulation profiles versus normalized export
+usage, and immutable snapshots versus mutable session bookkeeping. Retain
+AssetPrivateData.empty(): ScanResultBuilder::setPrivateData uses it to reject a
+second payload even though typed preparation reads data through get<T>().
+
+Next: probe the duplicate standalone MIDI lookup/helper boundary, inactive motion
+target writes, and MIDI rendering's separately owned pointer timeline. Measure
+full-event sorting cost before accepting that larger owner deletion.

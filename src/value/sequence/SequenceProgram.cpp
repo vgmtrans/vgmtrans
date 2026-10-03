@@ -35,16 +35,11 @@ bool trackUsesSemantic(const TrackProgram& track, SequenceSemantic semantic) {
                              [semantic](const SourceCommand& command) { return command.semantic == semantic; });
 }
 
-bool sequenceUsesSemantic(const SequenceProgram& program, SequenceSemantic semantic) {
-  return std::ranges::any_of(program.tracks,
-                             [semantic](const TrackProgram& track) { return trackUsesSemantic(track, semantic); });
-}
-
 SourceRange sequenceSourceRange(ByteReader reader, SourceRange baseRange, const SequenceProgram& program) {
   const SourceId source = baseRange.valid() ? baseRange.source : reader.source();
   for (const TrackProgram& track : program.tracks) {
     for (const SourceCommand& command : track.commands) {
-      if (command.range.valid() && command.range.source == source) {
+      if (command.range.source == source) {
         baseRange.include(command.range);
       }
     }

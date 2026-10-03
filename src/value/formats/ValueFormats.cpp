@@ -90,10 +90,6 @@ namespace {
 
 }  // namespace
 
-void registerValueFormats(core::Session& session) {
-  registerValueFormats(session, ValueFormatOptions{});
-}
-
 void registerValueFormats(core::Session& session, const ValueFormatOptions& options) {
   session.registerExtractor(cue::cueExtractor());
   const auto mameDatabasePath = options.mameRomDatabase ? options.mameRomDatabase : defaultMameRomDatabasePath();

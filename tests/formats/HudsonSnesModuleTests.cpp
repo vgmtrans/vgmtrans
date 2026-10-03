@@ -467,7 +467,9 @@ void optionalRealCorpusSmokeTest() {
       const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
       rendered += !performance.tracks.empty();
       clean += diagnostics.empty() && performance.diagnostics.empty();
-      unsupported += sequenceUsesSemantic(parsed.program, SequenceSemantic::Unsupported);
+      unsupported += std::ranges::any_of(parsed.program.tracks, [](const TrackProgram& track) {
+        return trackUsesSemantic(track, SequenceSemantic::Unsupported);
+      });
       Session session;
       session.registerFormat(module());
       session.addSource(SourceFile{.name = entry.path().filename().string()}, aram);

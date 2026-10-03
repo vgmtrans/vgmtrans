@@ -195,7 +195,8 @@ private:
                                                             PerformanceAutomationMotion motion, double targetValue,
                                                             u32 durationTicks, u32 delayTicks);
   [[nodiscard]] PerformanceEventHeader header();
-  void append(PerformanceEvent event);
+  template <class Event>
+  void append(Event&& event);
   PerformanceNoteId emitNote(NotePerformanceEvent event, const NotePerformanceEvent* previous);
   void interruptPitchSlidesForNewNote(PerformanceLaneId lane);
   [[nodiscard]] detail::ActiveNoteState& activeNotes() const;

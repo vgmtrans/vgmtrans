@@ -161,8 +161,6 @@ struct AkaoRuntimeConfig {
 struct AkaoSoundBankData {
   AkaoPs1Version version = AkaoPs1Version::Unknown;
   AkaoInstrumentSetBindingData binding;
-  // Filled on the prepared bank after its sample pools have been selected.
-  AkaoRuntimeConfig runtime;
 };
 
 // An articulation is Akao's complete description of one playable sample:
