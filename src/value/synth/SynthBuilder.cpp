@@ -113,15 +113,12 @@ void annotateSynthValue(AnnotationBuilder annotation, const Instrument& instrume
   if (instrument.pitchBendRangeCents) {
     annotation.derived("pitch_bend_range_cents", *instrument.pitchBendRangeCents);
   }
-  if (instrument.synthVoice) {
-    std::visit(
-        [&](const Ym2151Voice& voice) {
-          annotation.derived("synth", "YM2151", SourceValueDisplay::Enum)
-              .derived("algorithm", voice.algorithm)
-              .derived("feedback", voice.feedback)
-              .derived("operator_mask", voice.operatorMask, SourceValueDisplay::Hex);
-        },
-        *instrument.synthVoice);
+  if (instrument.ym2151) {
+    const auto& voice = *instrument.ym2151;
+    annotation.derived("synth", "YM2151", SourceValueDisplay::Enum)
+        .derived("algorithm", voice.algorithm)
+        .derived("feedback", voice.feedback)
+        .derived("operator_mask", voice.operatorMask, SourceValueDisplay::Hex);
   }
 }
 

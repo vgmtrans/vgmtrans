@@ -344,7 +344,7 @@ Cps1SynthDrafts addCps1Synth(ScanResultBuilder& builder, CpsLayout& layout) {
                             .reverb = 0.0,
                             .name = name,
                             .range = range,
-                            .synthVoice = cps1Voice(reader, offset, layout.version, layout.masterVolume),
+                            .ym2151 = cps1Voice(reader, offset, layout.version, layout.masterVolume),
                         });
       instrument.source(name, range, "cps1-ym2151-patch").derived("transpose", transpose);
     }

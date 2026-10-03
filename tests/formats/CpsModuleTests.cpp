@@ -616,9 +616,8 @@ void cps1ModuleRetainsYm2151AndOkiDomains() {
              fieldMatches(sequencePointer, "encoded_pointer", 0x106, 2, 0x500) && pointsTo(sequencePointer, 0x500),
          "CPS1 misc sequence table should annotate its big-endian pointer and resolved target");
 
-  const auto* voice =
-      ym->instruments[0].synthVoice ? std::get_if<Ym2151Voice>(&*ym->instruments[0].synthVoice) : nullptr;
-  expect(voice != nullptr && voice->algorithm == 6 && voice->feedback == 2 && voice->operatorMask == 0x0f &&
+  const auto& voice = ym->instruments[0].ym2151;
+  expect(voice && voice->algorithm == 6 && voice->feedback == 2 && voice->operatorMask == 0x0f &&
              voice->lfoEnabled && voice->resetLfoOnSelect && voice->lfo.waveform == Ym2151LfoWaveform::Triangle &&
              voice->operators[0].attackRate == 31,
          "CPS1 patch bytes should become a typed canonical YM2151 voice");

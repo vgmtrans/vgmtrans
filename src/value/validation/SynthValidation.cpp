@@ -142,9 +142,8 @@ ValidationReport validateSoundBank(const SoundBankAsset& soundBank) {
       report.error("synth.instrument.reverb", "Synth instrument reverb send was not finite and nonnegative",
                    instrument.range);
     }
-    if (instrument.synthVoice) {
-      std::visit([&](const Ym2151Voice& voice) { validateYm2151Voice(report, voice, instrument.range); },
-                 *instrument.synthVoice);
+    if (instrument.ym2151) {
+      validateYm2151Voice(report, *instrument.ym2151, instrument.range);
     }
 
     for (const auto& region : instrument.regions) {

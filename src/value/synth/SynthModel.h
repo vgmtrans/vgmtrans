@@ -18,7 +18,6 @@
 #include <functional>
 #include <optional>
 #include <string>
-#include <variant>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -129,10 +128,8 @@ struct Instrument {
   double reverb = kDefaultInstrumentReverbSend;
   std::string name;
   SourceRange range;
-  // Hardware-synth voices are retained in their native, exporter-neutral form.
-  // An instrument may also have sampled regions for layered hardware designs.
-  using SynthVoice = std::variant<Ym2151Voice>;
-  std::optional<SynthVoice> synthVoice;
+  // Native hardware settings remain available independently of sampled regions.
+  std::optional<Ym2151Voice> ym2151;
   std::vector<Region> regions;
   InstrumentModulation modulation;
 };
