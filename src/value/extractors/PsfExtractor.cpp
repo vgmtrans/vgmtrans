@@ -190,14 +190,14 @@ void unpackPsf2Directory(std::span<const u8> bytes, size_t tableOffset, u32 coun
       if (compressedOffset > bytes.size() || compressedSize > bytes.size() - compressedOffset) {
         throw std::runtime_error("PSF2 compressed block is truncated");
       }
-      uLongf decodedSize = std::min<u32>(blockSize, fileSize - static_cast<u32>(output.size()));
-      std::vector<u8> decoded(decodedSize);
-      const int status = uncompress(reinterpret_cast<Bytef*>(decoded.data()), &decodedSize,
+      const size_t blockOffset = output.size();
+      uLongf decodedSize = std::min<u32>(blockSize, fileSize - static_cast<u32>(blockOffset));
+      output.resize(blockOffset + decodedSize);
+      const int status = uncompress(reinterpret_cast<Bytef*>(output.data() + blockOffset), &decodedSize,
                                     reinterpret_cast<const Bytef*>(bytes.data() + compressedOffset), compressedSize);
-      if (status != Z_OK || decodedSize != decoded.size()) {
+      if (status != Z_OK || decodedSize != output.size() - blockOffset) {
         throw std::runtime_error("PSF2 compressed block could not be decompressed");
       }
-      output.insert(output.end(), decoded.begin(), decoded.end());
       compressedOffset += compressedSize;
     }
     filesystem.insert_or_assign(psf2PathKey(path), Psf2Member{.path = path, .bytes = std::move(output)});

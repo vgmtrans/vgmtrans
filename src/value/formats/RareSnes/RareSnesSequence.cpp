@@ -586,16 +586,16 @@ struct ProgramState {
              recipe.tuning == candidate.tuning && recipe.adsr1 == candidate.adsr1 && recipe.adsr2 == candidate.adsr2 &&
              recipe.gain == candidate.gain;
     };
-    const auto found = std::ranges::find_if(recipes.patches, samePatch);
-    if (found != recipes.patches.end()) {
+    const auto found = std::ranges::find_if(patches, samePatch);
+    if (found != patches.end()) {
       return found->key;
     }
     if (!collecting) {
       return 0;
     }
-    candidate.key = static_cast<u32>(recipes.patches.size());
-    recipes.patches.push_back(std::move(candidate));
-    return recipes.patches.back().key;
+    candidate.key = static_cast<u32>(patches.size());
+    patches.push_back(std::move(candidate));
+    return patches.back().key;
   }
 
   void finishPrepass() {
@@ -619,7 +619,7 @@ struct ProgramState {
   s8 echoFeedback = 0;
   u8 echoDelay = 0;
   std::array<std::optional<BattlemaniacsPercussion>, 8> percussion;
-  SequenceRecipes recipes;
+  std::vector<PatchRecipe> patches;
   bool collecting = true;
 };
 
@@ -1786,11 +1786,11 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   }
   SequenceProgram program = sequence.finish(makeCompiledRuntime<Playback, ProgramState>(std::move(runtime)));
 
-  const SequenceRecipes recipes = analyzeCompiledProgram<ProgramState>(
-      program, &ProgramState::recipes, diagnostics, SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce});
+  auto patches = analyzeCompiledProgram<ProgramState>(
+      program, &ProgramState::patches, diagnostics, SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce});
   return SequenceParse{
       .program = std::move(program),
-      .recipes = recipes,
+      .patches = std::move(patches),
   };
 }
 

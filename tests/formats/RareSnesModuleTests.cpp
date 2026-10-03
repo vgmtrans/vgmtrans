@@ -164,9 +164,9 @@ void rareSnesProfilesDecodeTheirDistinctOpcodeTails() {
                                             .initialTempo = 0x80,
                                             .initialTimer = 0x64},
                                      AssetId{1});
-  expect(shared.recipes.patches.size() == 2 &&
-             shared.recipes.patches[0].source == SourceRange{SourceId{90}, 0x100, 10} &&
-             shared.recipes.patches[1].source == SourceRange{SourceId{90}, 0x100, 11},
+  expect(shared.patches.size() == 2 &&
+             shared.patches[0].source == SourceRange{SourceId{90}, 0x100, 10} &&
+             shared.patches[1].source == SourceRange{SourceId{90}, 0x100, 11},
          "Battlemaniacs patch sources should retain each track's interpretation of shared command bytes");
 
   const std::vector<u8> battlemaniacsBytes{

@@ -1,13 +1,13 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Twenty-seven validated batches remove 1,034 net production lines from
-`src/value`, plus 12 unused UI presentation lines in the latest batch. All 44
-CTest suites pass. The original corpus preserves all 3,922 artifacts; an expanded
-archive replay preserves another 714 artifacts across 32 detected families, with
-exact inventories, diagnostics, filenames, and exit statuses against batch 26.
-The cleanup2
-records appear at the end of this document.
+`cb9e0b766`. Twenty-eight validated batches remove 1,045 net production lines
+from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
+The original corpus preserves all 3,922 artifacts; the expanded archive replay
+preserves another 858 artifacts across 73 input closures. Together the real inputs
+cover 37 of 38 registered families. All export records match batch 27; 72 raw
+inventories match and one differs only in proven pre-existing concurrent asset-ID
+allocation order. The cleanup2 records appear at the end of this document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
 
@@ -6193,7 +6193,7 @@ Proof sources, manifests, raw records and summaries remain under
 `/tmp/vgmtrans-cleanup2/volume-coverage27`. Preserve full names/sizes/SHA256 and
 raw diagnostics; prune equal successful artifact bytes after comparison while
 retaining failed/mismatched bytes. Earlier corpus generations had accumulated
-roughly 38 GB of identical artifacts. Verify each duplicate against its recorded
+35.3 GB of identical artifacts. Verify each duplicate against its recorded
 hash before deleting it; retain all records, manifests and frozen executables.
 
 Next: inspect direct PSF2 decompression into its final member buffer, remaining
@@ -6201,3 +6201,133 @@ fixed-channel stream assignments, RareSnes' one-vector recipe wrapper/result cop
 and the stitcher's single-use optional channel visitor. Preserve named ID types
 only where they fit the actual comparison contract; changing a private ordered
 variant key to equality-only AssetId would require extra comparison machinery.
+
+
+## Cleanup2 twenty-eighth batch: remove intermediate wrappers and buffers
+
+Nine value production files remove 11 net lines. Cleanup2 now removes 1,045 net
+value production lines: 954 architecture lines and 91 format lines. The existing
+RareSnes fixture changes three field accesses; no new permanent test machinery
+is needed. The cumulative production diff is 1,708 added/2,753 removed lines
+across 142 value C++ source/header paths, including renamed paths.
+
+Accepted changes:
+
+- Remove RareSnes' SequenceRecipes wrapper around a single patch vector. The
+  collected program state, sequence result and synth reader use that vector
+  directly. Move the completed vector into the returned sequence result after
+  analysis finishes; keep analysis before moving the program. Patch identity,
+  discovery order and per-track source interpretation remain format-local.
+- Initialize SonyPS1, SonyPS2 MIDI and SegSat's channel lists in the stream already
+  created by track decoding. Delete outer one-stream initializer-list assignment,
+  which copied each 16-channel buffer. Empty and truncated tracks still have the
+  required stream. Keep SonyPS2 SE's distinct collected-voice behavior.
+- Decompress each PSF2 block into its final member buffer. The buffer already
+  reserves the declared file size. Resize only the current block, then pass its
+  offset and expected size to uncompress; keep the same exact-size/status checks
+  and failure messages. Delete the temporary decoded block and append copy.
+  Partial output remains private and is discarded when extraction throws.
+- Let the stitcher's existing variant visitor collect channels directly into
+  its ordered set. Delete the single-use optional-returning channel helper and
+  its second conditional. Meta/SysEx events still contribute no channel; actual
+  channel-bearing event alternatives keep their existing attribution.
+
+Validation:
+
+- The full 59-step Release build is warning-free; all 44 CTest suites pass.
+  Freeze the complete matching value headers/sources, tests, core/formats/fmt/Qt
+  archives and shell as pass28. All 252 original input/policy comparisons preserve
+  all 3,922 artifact hashes, inventories, diagnostics and exit statuses against
+  batch 27.
+- RareSnes' complete fixtures and 480 generated lifecycle cases preserve 501
+  performance captures/58,665,892 bytes, SHA256
+  d143713eedfd63934102cc5c6030421688dd03f839876f6afc0c92e1def0bfbe.
+  Compare complete patch fields/source ranges, IR, automations, diagnostics,
+  source annotations, three MIDI policies, instrument regions and decoded BRR
+  PCM. Cover melodic/percussion profiles, stereo signs, track/patch counts,
+  direct/table SRCNs and truncated tails. Four paired format units and all three
+  final affected C++ units pass configured Release Werror checks. Actual decode
+  allocations improve 394,792->394,528 and requested bytes
+  304,268,032->304,108,032: each of 264 nonempty results avoids one 40-byte-per-
+  patch buffer copy. Empty results do not regress; object sizes do not change.
+- Fixed-channel decoding preserves all three full format suites and 576 generated
+  cases: 527 performance renders/8,490,833 bytes. Capture complete source graphs,
+  command/IR/automation/diagnostic data and MIDI, including empty/truncated input,
+  native channel routing and startup before the first delay. Sixteen matching
+  format units per side pass configured Release Werror checks. The isolated
+  assignment improves two allocations/128 requested bytes to one/64, retaining
+  outer stream storage and the identical ordered 16-channel list.
+- PSF2 extraction preserves 2,468 captures/2,961,628 bytes, SHA256
+  3452ba5125ea6c97da39de0e5d901cce6a665730248c6e0f7645536bccb2ffc8.
+  Compare 2,464 generated filesystem/public extraction cases and four real PSF2
+  inputs from Sony, Square, Onimusha and Growlanser, with complete member paths,
+  bytes, metadata, segments and failures. Cover zero/truncated/oversized directory
+  and block tables, invalid offsets, corrupt compression and short/long declared
+  lengths; run the full SquarePS2 fixture. Three configured production Werror
+  checks pass. Of 176 allocation cases through 32,768 output bytes and varied
+  block sizes, 160 improve and 16 remain equal; none grow. Save 134,742 allocation
+  requests/617,504 requested bytes in aggregate.
+- Stitching preserves 68,003 captures/3,866,597 bytes, SHA256
+  0809dfd1d3d34b9f919a42eec15d97e6bdf44ef56fcfe7feba272da4c11d8bcc.
+  Include 67,329 channel-set cases and 674 complete public stitches: all five
+  MIDI alternatives, all 256 channel values, all 65,536 channel pairs, duplicate/
+  reversed/random events, complete fixtures and generated retiming/initial-state
+  cases. Preserve reserved channel 10 handling, ports, bank selection, modulation
+  policies, used-only selection and early failure paths. All three configured
+  production Werror checks pass.
+- Focused paired ASan/UBSan/float-cast-overflow probes pass. Changed units and full
+  fixtures use matching frozen headers and unchanged Release archives; matching
+  VM/emitter units are rebuilt for sequence lifecycle probes. Mixed libc++
+  container annotations are disabled where needed. This is focused instrumentation,
+  not a whole-program sanitizer claim. Requested allocation totals are not peak
+  RSS. Removing copies can change native bad_alloc staging; no rollback promise
+  is added.
+
+### Extend real-input coverage and classify scanner scheduling variability
+
+Add 14 compact closures from the supplied archive: six Akao FF7/8/9 PSF groups,
+three TriAcePS1 Star Ocean 2/Valkyrie groups, two AsciiShuichiSnes archives and
+three WolfTeamSnes archives. Actual detected asset records confirm four previously
+missing families. Original core-rewrite versus batch 27 preserves all 14 raw
+inventories, 144 independent export records and 144 artifacts/26,608,695 bytes
+per binary. All succeed. Combined with the previous corpus, real inputs cover
+37 of 38 registered families. The volume has no relevant KonamiTMNT2 arcade
+archive; its synthetic fixture coverage remains, without a real-input claim.
+
+Replay all 73 expanded closures against the fully integrated pass28 binary.
+All 894 independent export records match pass27 exactly: complete normalized
+stdout/stderr, filenames, statuses, sizes and SHA256. There are 852 successes
+and the same 42 previously documented failures, producing 858 exact artifacts/
+218,240,549 bytes per binary. No timeout occurs. Together with the original
+corpus, all 4,780 exported artifact payloads remain exact.
+
+Seventy-two complete raw inventories match. Growlanser II Hoot Hoot.psf2 swaps
+only the AssetIds allocated by concurrent SonyPS1/SonyPS2 sample-pool scans;
+the collection member still identifies the correct SonyPS2 pool and all six
+exports match. Keep this raw difference. Sixteen repeated invocations of each
+unchanged executable reproduce both orders: original core-rewrite 15/1, pass27
+15/1 and pass28 14/2. All 48 inventories match after renumbering only declarations
+and their collection member references using unchanged ordered asset metadata.
+Source/collection IDs, labels, ranges, diagnostics, status and every other byte
+remain exact. This is demonstrated pre-existing scheduling variability, not
+raw inventory equality or a newly introduced regression.
+
+Evidence is retained under `/tmp/vgmtrans-cleanup2/volume-coverage27`, including
+`gaps`, `references/pass28.json`, `pass27-vs-pass28-summary.json` and the
+`volume-36/classification.json` and `scheduling-repeats` records. The expanded
+replay retains failures and raw variability rather than normalizing unproven IDs.
+Earlier verified duplicate-artifact pruning removed 86,282 files/35,294,939,704
+bytes while retaining every recorded hash and frozen executable; correct the
+prior batch's rough storage estimate to 35.3 GB.
+
+Read-only decisions: keep the private synth owner key's existing u32 alternative.
+Replacing it with equality-only AssetId would require ordering machinery for its
+ordered variant map and add a new contract for two value-access deletions. Keep
+DLS and SF2's distinct loop policies and completed-object ownership. A smaller
+private helper is useful only when it represents an actual shared policy.
+
+Next: analyze whether serial format scanning removes scheduling overhead and
+nondeterministic IDs without sacrificing throughput; measure before changing the
+explicit concurrency test. Probe transferring owned analyzed member results
+without changing generic projector dispatch, borrowing immutable Akao articulation
+records only within preparation, and eliminating the redundant SF2 loop wrapper.

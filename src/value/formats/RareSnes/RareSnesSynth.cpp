@@ -28,13 +28,13 @@ namespace {
 }  // namespace
 
 std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
-                                           const SequenceRecipes& recipes, std::string_view displayName) {
+                                           const std::vector<PatchRecipe>& patches, std::string_view displayName) {
   if (!layout.spcDirAddress) {
     return std::nullopt;
   }
 
   const ByteReader reader = builder.reader();
-  const auto catalog = readSnesBrrCatalog(reader, *layout.spcDirAddress, recipes.patches, &PatchRecipe::srcn);
+  const auto catalog = readSnesBrrCatalog(reader, *layout.spcDirAddress, patches, &PatchRecipe::srcn);
   if (catalog.empty()) {
     return std::nullopt;
   }
@@ -43,7 +43,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   auto& instruments = bank.instruments();
   const SnesBrrSampleRefs samples = addSnesBrrSamples(bank.localSamples(), reader, catalog);
 
-  for (const PatchRecipe& patch : recipes.patches) {
+  for (const PatchRecipe& patch : patches) {
     const auto sample = samples.findSrcn(patch.srcn);
     if (!sample) {
       continue;

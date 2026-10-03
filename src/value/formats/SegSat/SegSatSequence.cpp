@@ -718,7 +718,7 @@ SegSatSequenceParse parseSegSatSequence(ByteReader reader, AssetId id, const Seg
   std::ranges::sort(controllerChanges, {}, &SegSatControllerChange::command);
   const auto duplicate = std::ranges::unique(controllerChanges, {}, &SegSatControllerChange::command);
   controllerChanges.erase(duplicate.begin(), duplicate.end());
-  normal.streams = {{.channels = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}}};
+  normal.streams.front().channels = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
   program.tracks.push_back(std::move(normal));
   program.runtime = makeCompiledRuntime<Playback, ProgramState>();
 

@@ -1051,7 +1051,7 @@ SequenceProgram parseMidiSequence(ByteReader reader, AssetId id, const MidiBlock
     }
     return decodeMidiEvent(reader, layout.dataEnd, *found->second, diagnostics);
   });
-  track.streams = {{.channels = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}}};
+  track.streams.front().channels = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
   program.tracks.push_back(std::move(track));
   return program;
 }

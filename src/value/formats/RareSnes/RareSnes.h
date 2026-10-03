@@ -61,13 +61,9 @@ struct PatchRecipe {
   friend bool operator==(const PatchRecipe&, const PatchRecipe&) = default;
 };
 
-struct SequenceRecipes {
-  std::vector<PatchRecipe> patches;
-};
-
 struct SequenceParse {
   core::SequenceProgram program;
-  SequenceRecipes recipes;
+  std::vector<PatchRecipe> patches;
 };
 
 [[nodiscard]] const char* profileName(Profile profile);
@@ -82,7 +78,7 @@ struct SequenceParse {
 [[nodiscard]] core::SequenceRuntime sequenceRuntime(Profile profile, u8 initialTempo, u8 initialTimer,
                                                     bool monoOutput = false);
 [[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
-                                                               const SequenceRecipes& recipes,
+                                                               const std::vector<PatchRecipe>& patches,
                                                                std::string_view displayName);
 [[nodiscard]] core::FormatModule module();
 

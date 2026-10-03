@@ -348,7 +348,7 @@ SequenceProgram parseSonyPs1Sequence(ByteReader reader, AssetId id, const SonyPs
     }
     return decoded;
   });
-  track.streams = {{.channels = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}}};
+  track.streams.front().channels = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
   sequence.addTrack(std::move(track));
   return sequence.finish(std::move(runtime));
 }

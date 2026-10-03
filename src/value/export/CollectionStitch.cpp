@@ -91,17 +91,6 @@ void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulation
   return prepared;
 }
 
-[[nodiscard]] std::optional<u8> eventChannel(const MidiEvent& event) {
-  return std::visit(
-      [](const auto& typed) -> std::optional<u8> {
-        if constexpr (requires { typed.channel; }) {
-          return typed.channel;
-        }
-        return std::nullopt;
-      },
-      event.payload);
-}
-
 void appendInitialChannelState(MidiTrack& track, u64 tick, u8 channel, u16 bank, bool writeBankLsb) {
   constexpr u16 defaultVolume = 100u << 7;
   constexpr u16 defaultExpression = 127u << 7;
@@ -204,9 +193,13 @@ void appendInitialChannelState(MidiTrack& track, u64 tick, u8 channel, u16 bank,
         // retiming so controller values that happen to use ticks stay unscaled.
         std::set<u8> channels;
         for (const auto& event : track.events) {
-          if (const auto channel = eventChannel(event)) {
-            channels.insert(*channel);
-          }
+          std::visit(
+              [&channels](const auto& typed) {
+                if constexpr (requires { typed.channel; }) {
+                  channels.insert(typed.channel);
+                }
+              },
+              event.payload);
         }
         MidiTrack initialState;
         initialState.events.reserve(channels.size() * 32);
