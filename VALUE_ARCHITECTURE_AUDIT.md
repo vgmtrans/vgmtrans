@@ -1,9 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Twenty-six validated batches remove 1,031 net production lines from
-`src/value`. All 44 CTest suites pass; the latest real-file replay preserves
-all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
+`cb9e0b766`. Twenty-seven validated batches remove 1,034 net production lines from
+`src/value`, plus 12 unused UI presentation lines in the latest batch. All 44
+CTest suites pass. The original corpus preserves all 3,922 artifacts; an expanded
+archive replay preserves another 714 artifacts across 32 detected families, with
+exact inventories, diagnostics, filenames, and exit statuses against batch 26.
+The cleanup2
 records appear at the end of this document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
@@ -6059,3 +6062,142 @@ modulation lowering stays exporter-side.
 Next: probe merging validation's remaining batch-ID index with its source facts,
 transferring channel buffers into decode-owned streams directly, and removing
 source-role categories left behind by field projection when no producer uses them.
+
+
+## Cleanup2 twenty-seventh batch: consolidate validation facts and initialize owned results
+
+Five production files in `src/value` remove three net lines; the Qt presentation
+file removes another 12. Cleanup2 removes 1,034 net value production lines,
+including 947 architecture lines and 87 format lines. No new public abstraction
+or permanent test machinery is needed for these ownership changes.
+
+Accepted changes:
+
+- Use the same private asset-source map for batch ID membership and source-map
+  ownership validation. Delete the remaining second keyed batch-ID set. Identity
+  diagnostics still run before ownership diagnostics; the first valid metadata
+  range remains authoritative for duplicate IDs. Entries without a valid source
+  remain distinguishable from absent IDs. This adds four lines while removing
+  a container and its duplicate keys; invalid-ID annotation behavior is preserved.
+- SonyPS2 SE decoding moves its collected voice vector into the already-created
+  stream. Initializer-list assignment copied the channel buffer despite
+  `std::move(voices)`. The track decoder always creates one stream, including
+  malformed/empty command cases; absent voices return before this assignment.
+  The previous outer one-stream vector reused capacity, so the demonstrated
+  saving is the channel buffer copy, not an outer stream allocation.
+- CompilerCursor initializes the durable qualified command kind directly from
+  its category or derived label. Remove the intermediate owned category string;
+  prefixes, labels, categories and completed command presentation still own
+  the strings they need. Keep the expression wrapped for readability; this is
+  line-count neutral.
+- GBA DirectSound initializes its source PCM from the compressed decoder or an
+  uncompressed zero-filled buffer. Delete the zero-filled buffer allocated and
+  then discarded on the compressed path. Retain truncated-data zero padding,
+  reverse handling, loop metadata, mixer-rate checks and resampling order.
+- Delete SourceRole::Padding/Opcode/Operand, SourceValueDisplay::Ascii and
+  SourceLinkRole::DerivedFrom. They have no producers or relationship consumers.
+  Remove their remaining Qt display/color branches. Real opcode fields and the
+  live field role remain. All other presentation categories have actual users.
+
+Validation:
+
+- The full 355-step macOS Release build is warning-free; all 44 CTest suites pass.
+  Freeze matching headers/tests, core/formats/fmt/Qt value archives and shell.
+  All 252 original input/policy comparisons preserve 3,922 artifact hashes,
+  complete inventories, diagnostics and exit statuses against batch 26.
+- Validation preserves the same 16,496 cases/687,778 trace lines/95,930,807 bytes
+  from batch 26, SHA256
+  fa419a7700d1be14957b79928bb54605df824f4827a574268e413e56373511e3.
+  Full Session/Registry/SourceMap/SynthBuilder fixtures and both configured Werror
+  checks pass. Of 144 allocation cases, 128 improve count and 92 improve bytes;
+  none grow. Save 84,552 allocations/4,049,024 requested bytes in aggregate.
+  Fully owned 16,384-asset case improves 49,155->32,770 allocations and
+  1,703,936->1,179,648 bytes. Keep the separate ordered diagnostic passes.
+- SonyPS2 preserves 480 generated parse cases, 388 performances and the complete
+  format/Session fixtures: 4,811,627 bytes, SHA256
+  a9ab19ce0944bea7b9bd9d3fb4e3fb48e32a1fac6a0ddac8977c23d682d202a2.
+  Capture complete source graphs, commands, IR, automations, diagnostics and MIDI.
+  Cover 0/1/2/8/17 voices, duplicates, truncated commands, source-map on/off,
+  note families and budgets 0/1/3/100. Six configured format Werror checks pass.
+  Eleven channel-vector sizes improve nine allocations/1,317,000 requested bytes
+  to zero; all 11 preserve the original voices buffer instead of copying it.
+- Cursor preserves 24,192 paired command cases and full fixtures: 10,448,906
+  bytes. Overwrite the original prefix/label/category after construction to
+  verify completed command ownership. All three configured fixture Werror checks
+  pass. O2 allocation count improves 105,576->98,664 and requested bytes
+  9,089,280->8,481,024; 6,912 cases improve and none grow.
+- PCM preserves 68,663 decoded results/20,488,565 bytes, SHA256
+  7678834c30c8eecd1769fcf9b44b799ddd72a15f84a04f7aea9a94137b97a8f4.
+  Include complete ValueSample/MP2k fixtures and 67,200 generated GBA combinations
+  of compression, 0..115 encoded bytes, offsets, truncation, loop starts/lengths,
+  reverse/enabled state, sample/mixer rates and step sizes. Full PCM, rates,
+  channels and loop metadata are exact. All three configured decoder Werror
+  checks pass. Of 176 allocation cases through 65,536 source samples, 80 improve
+  and none grow: save 80 allocations/1,385,536 requested bytes in aggregate.
+- Presentation preserves 4,958 captures/1,322,338 bytes, SHA256
+  5c4a8e91e4a21b65b23c6a12b12de548c5052c5776f5ede2dd1298663e91e474.
+  Include 3,192 field displays, 1,728 role/semantic/field presentations and 38
+  source-map/command captures, eight retained link roles with all three target
+  alternatives, deduplication, ownership and lookup order. Rebuild matching enum,
+  SourceMap, Qt presentation and utility units together; do not mix new ordinal
+  headers with old enum-producing archives. Six configured Werror checks pass.
+  Layouts stay 200/88/64 bytes for annotation/field/link and one byte per enum.
+  Remaining enum ordinals change internally: DataBlock/Command 12/13->11/12,
+  SoundBank..Sample 16..20->13..17, Enum 12->11 and Related 8->7. Repository-wide
+  use/serialization/reflection/generated-source searches find no persisted numeric
+  contract. The rebuilt local HexView cache still has 432 distinct style keys
+  and identical displayed styles. Do not claim stable external enum ordinals.
+- Focused ASan/UBSan/float-cast-overflow comparisons are clean. Decoder and fixture
+  units use matching unchanged Release archives with libc++ container annotations
+  disabled; Sony lifecycle probes rebuild involved VM/emitter units consistently.
+  Presentation rebuilds its involved units without core/archive mixing; system
+  Qt frameworks remain unsanitized. This is focused instrumentation, not a
+  whole-program sanitizer claim. Allocation sums are not peak RSS; removing
+  temporary allocations does not preserve native bad_alloc timing.
+
+### Expanded archive regression coverage
+
+Use the user's `/Volumes/emu/vgm` archive read-only. The broad inventory contains
+24,935 files. Select 59 compact closures from the curated test suite, PSF2 and
+SSF archives, plus unsupported DSF containers and three natural Tamsoft TSQ/TVB
+pairs. Preserve library and companion paths; load each group together. Compare
+complete inventories, then independently export first/middle/last collection IDs
+(up to three) as MIDI, SF2 and DLS under default/events policies with `--loops 1`.
+Four workers and a 90-second per-invocation bound keep the replay finite.
+
+The original `core-rewrite` executable versus batch 26 preserves all 59 source/
+asset/collection inventories, diagnostics and exit statuses. Of 750 independent
+export pairs, 708 succeed and 42 fail in both; all 714 artifact payloads match
+(191,631,854 bytes per binary). The only result-record differences are two NinSnes
+Star Fox MIDI filenames: quoted `"Come in, Corneria!".mid` becomes
+`_Come in, Corneria!_.mid`, as intended by title sanitation in commit `9ae12e699`.
+The payloads remain identical. No unclassified differences or timeouts.
+
+Batch 26 versus 27 then preserves all 59 inventories and all 750 export records
+exactly, including complete stdout/stderr, filenames, statuses and all 714
+artifact sizes/hashes. Combined with the original corpus, real inputs now cover
+33 of 38 registered families; the new replay itself detects 32, adding 24 beyond
+the original nine. Directory labels are not recognition evidence: FFT inputs
+actually detect SuzukiPS1, and Megaman8 detects SonyPS1. Remaining successful
+real-input gaps are Akao, AsciiShuichiSnes, KonamiTMNT2, TriAcePS1 and WolfTeamSnes.
+
+Keep matching pre-existing failures visible: six MP2k invalid sample-reference
+exports; 24 standalone Tamsoft missing-bank SF2/DLS exports; six SegSat library-
+only collection exports without a retained bank; and six selected Tamsoft paired
+exports without decodable samples. BGM_02.TSQ+BGM.TVB succeeds in all six exports.
+Five DSF version-0x12 inputs remain unsupported by both original and cleanup
+container extraction. One PSF2 input publishes banks without collections. These
+cases are capability boundaries, not cleanup regressions or successful coverage.
+
+Proof sources, manifests, raw records and summaries remain under
+`/tmp/vgmtrans-cleanup2/volume-coverage27`. Preserve full names/sizes/SHA256 and
+raw diagnostics; prune equal successful artifact bytes after comparison while
+retaining failed/mismatched bytes. Earlier corpus generations had accumulated
+roughly 38 GB of identical artifacts. Verify each duplicate against its recorded
+hash before deleting it; retain all records, manifests and frozen executables.
+
+Next: inspect direct PSF2 decompression into its final member buffer, remaining
+fixed-channel stream assignments, RareSnes' one-vector recipe wrapper/result copy,
+and the stitcher's single-use optional channel visitor. Preserve named ID types
+only where they fit the actual comparison contract; changing a private ordered
+variant key to equality-only AssetId would require extra comparison machinery.

@@ -1283,7 +1283,7 @@ std::optional<SequenceProgram> parseSeSequence(ByteReader reader, AssetId id, co
     }
     return decodeSeEvent(reader, layout.dataEnd, *found->second, diagnostics);
   });
-  decoded.streams = {{.channels = std::move(voices)}};
+  decoded.streams.front().channels = std::move(voices);
   program.tracks.push_back(std::move(decoded));
   return program;
 }

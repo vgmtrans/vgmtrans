@@ -95,13 +95,6 @@ QString valueText(const SourceField& field) {
               return midiNoteText(static_cast<qint64>(value));
             case SourceValueDisplay::BeatsPerMinute:
               return tempoText(static_cast<double>(value));
-            case SourceValueDisplay::Ascii: {
-              const auto character = static_cast<qulonglong>(value);
-              if (character >= 0x20 && character <= 0x7e) {
-                return QStringLiteral("'%1' (%2)").arg(QChar(static_cast<char16_t>(character))).arg(character);
-              }
-              return QString::number(character);
-            }
             default:
               if constexpr (std::is_signed_v<T>) {
                 return QString::number(static_cast<qlonglong>(value));
@@ -251,13 +244,8 @@ QColor color(const SourceAnnotation& annotation) {
   switch (annotation.role) {
     case SourceRole::Pointer:
       return EventColors::CLR_LIGHT_RED;
-    case SourceRole::Opcode:
-      return EventColors::CLR_PERIWINKLE;
-    case SourceRole::Operand:
     case SourceRole::Field:
       return EventColors::CLR_LIGHTER_GREEN;
-    case SourceRole::Padding:
-      return EventColors::CLR_DARK_GRAY;
     case SourceRole::Payload:
     case SourceRole::DataBlock:
     case SourceRole::Sample:

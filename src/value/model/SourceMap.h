@@ -38,11 +38,8 @@ enum class SourceRole : u8 {
   Field,
   Pointer,
   Payload,
-  Padding,
   DataBlock,
   Command,
-  Opcode,
-  Operand,
   SoundBank,
   Instrument,
   Region,
@@ -134,7 +131,6 @@ enum class SourceValueDisplay : u8 {
   Decibels,
   MidiNote,
   BeatsPerMinute,
-  Ascii,
   Enum,
 };
 
@@ -161,7 +157,6 @@ enum class SourceLinkRole : u8 {
   RepeatTarget,
   UsesInstrument,
   UsesSample,
-  DerivedFrom,
   Related,
 };
 

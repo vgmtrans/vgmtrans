@@ -673,10 +673,10 @@ public:
   [[nodiscard]] Event command(std::string_view label, SequenceSemantic semantic,
                               CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback,
                               std::string_view category = {}) {
-    const std::string kind = category.empty() ? sourceKindFromLabel(label) : std::string(category);
     return Event{*this, DecodedCommandPresentation{
                             .label = std::string(label),
-                            .kind = qualifiedKind(kind),
+                            .kind =
+                                category.empty() ? qualifiedKind(sourceKindFromLabel(label)) : qualifiedKind(category),
                             .semantic = semantic,
                             .playback = playback,
                         }};

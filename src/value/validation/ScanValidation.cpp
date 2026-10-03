@@ -20,6 +20,12 @@ namespace vgmtrans::core {
 
 namespace {
 
+struct AssetSource {
+  // The first valid metadata range establishes the source after ID validation.
+  SourceId source;
+  bool hasAnnotations = false;
+};
+
 // SourceRange is the shared link from parsed values back to SourceStore bytes.
 // Invalid ranges are allowed when a value genuinely has no source bytes, but a
 // valid range must point at active bytes that fit in the source.
@@ -173,17 +179,18 @@ void validateAsset(ValidationReport& report, const SourceStore& sources, const A
 }
 
 void validateAssetIds(ValidationReport& report, const ScanResult& result,
-                      const std::unordered_set<AssetId>& existingAssetIds, std::unordered_set<AssetId>& batchAssetIds) {
+                      const std::unordered_set<AssetId>& existingAssetIds,
+                      std::unordered_map<AssetId, AssetSource>& assetSources) {
   // IDs are stable references used by collections, so a scan
   // result must be internally unique and must not reuse IDs already in Session.
-  batchAssetIds.reserve(result.assets.size());
+  assetSources.reserve(result.assets.size());
   for (const auto& asset : result.assets) {
     const auto id = metadata(asset).id;
     if (!id.valid()) {
       report.error("scan.asset.missing-id", "Scan result contained an asset without an id");
       continue;
     }
-    if (!batchAssetIds.insert(id).second) {
+    if (!assetSources.try_emplace(id).second) {
       report.error("scan.asset.duplicate-id", "Scan result contained duplicate asset id " + std::to_string(id.value));
     }
     if (existingAssetIds.contains(id)) {
@@ -193,15 +200,9 @@ void validateAssetIds(ValidationReport& report, const ScanResult& result,
 }
 
 void validateSourceMapOwnership(ValidationReport& report, const ScanResult& result,
-                                const std::unordered_set<AssetId>& batchAssetIds) {
+                                std::unordered_map<AssetId, AssetSource>& assetSources) {
   const SourceMap& sourceMap = result.sourceMap;
 
-  struct AssetSource {
-    SourceId source;
-    bool hasAnnotations = false;
-  };
-  std::unordered_map<AssetId, AssetSource> assetSources;
-  assetSources.reserve(result.assets.size());
   for (const auto& asset : result.assets) {
     const AssetMetadata& meta = metadata(asset);
     if (!meta.range.valid()) {
@@ -209,14 +210,17 @@ void validateSourceMapOwnership(ValidationReport& report, const ScanResult& resu
                                                    " without a primary source range");
       continue;
     }
-    assetSources.emplace(meta.id, AssetSource{meta.range.source});
+    auto& source = assetSources[meta.id].source;
+    if (!source.valid()) {
+      source = meta.range.source;
+    }
   }
 
   for (const auto& annotation : sourceMap.annotations()) {
     const auto inheritedOwner = sourceMap.assetOwner(annotation.id);
     if (annotation.owner && annotation.owner->asset.valid()) {
       const AssetId explicitOwner = annotation.owner->asset;
-      if (!batchAssetIds.contains(explicitOwner)) {
+      if (!assetSources.contains(explicitOwner)) {
         report.error("scan.source-annotation.unknown-owner",
                      "Scan result contained source annotation owned by asset id " +
                          std::to_string(explicitOwner.value) + " that was not produced by the scan",
@@ -242,7 +246,7 @@ void validateSourceMapOwnership(ValidationReport& report, const ScanResult& resu
       continue;
     }
     const auto assetSource = assetSources.find(*inheritedOwner);
-    if (assetSource == assetSources.end()) {
+    if (assetSource == assetSources.end() || !assetSource->second.source.valid()) {
       continue;
     }
     assetSource->second.hasAnnotations = true;
@@ -316,9 +320,9 @@ ValidationReport validateScanResult(SourceId source, const ScanResult& result, c
     }
   }
 
-  std::unordered_set<AssetId> batchAssetIds;
-  validateAssetIds(report, result, existingAssetIds, batchAssetIds);
-  validateSourceMapOwnership(report, result, batchAssetIds);
+  std::unordered_map<AssetId, AssetSource> assetSources;
+  validateAssetIds(report, result, existingAssetIds, assetSources);
+  validateSourceMapOwnership(report, result, assetSources);
 
   return report;
 }

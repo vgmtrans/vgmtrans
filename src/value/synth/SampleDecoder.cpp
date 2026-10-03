@@ -468,10 +468,8 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   const u32 sampleCount = static_cast<u32>(totalSamples);
 
   const auto body = header.subspan(16);
-  std::vector<s16> source(sampleCount);
-  if (compressed) {
-    source = decodeGbaBdpcm(body, sampleCount);
-  } else {
+  std::vector<s16> source = compressed ? decodeGbaBdpcm(body, sampleCount) : std::vector<s16>(sampleCount);
+  if (!compressed) {
     std::ranges::transform(body.first(std::min<size_t>(body.size(), sampleCount)), source.begin(),
                            [](u8 value) { return static_cast<s16>(static_cast<s8>(value)) << 8; });
   }
