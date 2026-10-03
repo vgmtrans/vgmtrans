@@ -67,7 +67,7 @@ public:
     }
     fade_.reset(initialDepth);
     fade_.begin(SequenceMotionPlan<s32>::targetOverTicksWithStep(
-        targetDepth_, targetDepth_ / static_cast<s32>(fadeTicks_), fadeTicks_, delayTicks));
+        targetDepth_, targetDepth_ / fadeTicks_, fadeTicks_, delayTicks));
     return true;
   }
 

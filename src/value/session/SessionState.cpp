@@ -112,7 +112,7 @@ void SessionState::removeSources(std::span<const SourceId> sources) {
   std::unordered_set<AssetId> removedAssets;
   for (const auto& value : assets_) {
     const auto& meta = metadata(value);
-    if (meta.id.valid() && meta.range.valid() && sourceIds.contains(meta.range.source)) {
+    if (meta.id.valid() && sourceIds.contains(meta.range.source)) {
       removedAssets.insert(meta.id);
     }
   }
@@ -198,6 +198,7 @@ void SessionState::reconcileCollections(std::vector<Collection> desired) {
 
 void SessionState::removeDiscoveredData(const std::unordered_set<SourceId>& sourceIds,
                                         const std::unordered_set<AssetId>& assetIds) {
+  // Callers have already filtered both removal sets to valid IDs.
   if (sourceIds.empty() && assetIds.empty()) {
     return;
   }
@@ -215,23 +216,21 @@ void SessionState::removeDiscoveredData(const std::unordered_set<SourceId>& sour
   }
 
   const auto removesAsset = [&](const Asset& value) {
-    const AssetId id = metadata(value).id;
-    return id.valid() && assetIds.contains(id);
+    return assetIds.contains(metadata(value).id);
   };
   const auto removesLink = [&](const SourceLink& link) {
     if (const auto* target = std::get_if<SourceRange>(&link.target)) {
-      return target->valid() && sourceIds.contains(target->source);
+      return sourceIds.contains(target->source);
     }
     if (const auto* target = std::get_if<SourceAnnotationId>(&link.target)) {
       return removedAnnotations.contains(*target);
     }
     const auto* target = std::get_if<ObjectRef>(&link.target);
-    return target != nullptr && target->asset.valid() && assetIds.contains(target->asset);
+    return target != nullptr && assetIds.contains(target->asset);
   };
   const auto removesDiagnostic = [&](const Diagnostic& diagnostic) {
-    const bool removedSource = diagnostic.range.valid() && sourceIds.contains(diagnostic.range.source);
-    const bool removedObject =
-        diagnostic.object && diagnostic.object->asset.valid() && assetIds.contains(diagnostic.object->asset);
+    const bool removedSource = sourceIds.contains(diagnostic.range.source);
+    const bool removedObject = diagnostic.object && assetIds.contains(diagnostic.object->asset);
     const bool removedAnnotation = diagnostic.annotation && removedAnnotations.contains(*diagnostic.annotation);
     return removedSource || removedObject || removedAnnotation;
   };

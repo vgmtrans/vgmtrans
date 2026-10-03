@@ -513,8 +513,6 @@ void scanValidationChecksMemoizedInheritedOwnersIndependentOfAnnotationOrder() {
 void objectSelectorsHaveDistinctKinds() {
   expect(ObjectRefs::instrumentIndex(2) != ObjectRefs::instrumentProgram(2, 0),
          "an instrument table index should not collide with a bank/program selector");
-  expect(ObjectRefs::sampleIndex(3) != ObjectRefs::sample(AssetId{0}, 3),
-         "an unresolved sample index should not collide with a concrete sample object");
 }
 
 void diagnosticsCanReferenceSourceAnnotationsAndObjects() {

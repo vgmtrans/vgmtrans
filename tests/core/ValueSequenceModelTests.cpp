@@ -8,6 +8,7 @@
 
 #include "value/base/LevelScale.h"
 #include "value/base/Source.h"
+#include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/sequence/TempoRelativeModulation.h"
@@ -184,6 +185,31 @@ void sequenceMotionPreservesDelayAndTargetCompletion() {
   expect(motion.begin(SequenceMotionPlan<s32>::targetByStep(2, 0, 5)).status == SequenceMotionStatus::Finished &&
              motion.current() == 2 && !motion.active(),
          "zero-step motion must finish immediately instead of remaining active forever");
+}
+
+void lfoDepthFadeKeepsItsUnsignedDuration() {
+  SequenceLfoDepthFadeState fade;
+  const s32 maximumDepth = std::numeric_limits<s32>::max();
+  for (const u32 ticks : {static_cast<u32>(maximumDepth), static_cast<u32>(maximumDepth) + 1,
+                          std::numeric_limits<u32>::max()}) {
+    fade.resetDepth(maximumDepth);
+    fade.configureLinearFade(ticks);
+    expect(fade.restartFade(1, 7), "a nonzero duration must configure the restarted LFO fade");
+    const auto delayed = fade.tickFade();
+    expect(delayed.status == SequenceMotionStatus::Delayed && delayed.current == 7,
+           "an LFO fade must preserve its initial depth throughout the delay");
+    const auto running = fade.tickFade();
+    expect(running.status == SequenceMotionStatus::Running &&
+               running.current == 7 + static_cast<s32>(maximumDepth / ticks),
+           "large positive LFO fade durations must not become negative arithmetic steps");
+  }
+  fade.configureLinearFade(1);
+  expect(fade.restartFade(0, 7) && fade.tickFade().current == maximumDepth,
+         "the largest LFO depth must still reach its target in a single tick");
+  fade.resetDepth(16);
+  fade.configureLinearFade(std::numeric_limits<u32>::max());
+  expect(fade.restartFade(0, -7) && fade.tickFade().current == -7 && fade.currentDepth() == 0,
+         "a zero LFO fade step must retain the source initial depth and its physical clamp");
 }
 
 void fixedPointMotionRetargetsFromTheRoundedSourceValue() {
@@ -574,6 +600,7 @@ void runValueSequenceModelTests() {
   performanceEmitterBindsScalarAutomationWithoutExposingStorage();
   sequenceMotionPreservesDelayAndTargetCompletion();
   fixedPointMotionRetargetsFromTheRoundedSourceValue();
+  lfoDepthFadeKeepsItsUnsignedDuration();
   performanceBoundValueOwnsReplacementLifecycle();
   performanceEmitterResolvesDeclaredPanLawIntoEvents();
   pitchTransitionApiPreservesSamplesAndRealizedLifecycle();

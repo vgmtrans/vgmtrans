@@ -28,9 +28,6 @@ AssetCatalog::AssetCatalog(std::vector<SourceFile> sources, SharedSequence<Asset
 }
 
 const Asset* AssetCatalog::asset(AssetId id) const noexcept {
-  if (!id.valid()) {
-    return nullptr;
-  }
   const auto found = assetsById_.find(id);
   return found != assetsById_.end() ? found->second : nullptr;
 }

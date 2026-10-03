@@ -57,7 +57,6 @@ enum class ObjectKind : u8 {
   Sample,
   InstrumentIndex,
   InstrumentProgram,
-  SampleIndex,
   Misc,
 };
 
@@ -107,10 +106,6 @@ namespace ObjectRefs {
 
 [[nodiscard]] inline ObjectRef sample(AssetId sampleSetAsset, u32 sampleIndex) {
   return ObjectRef{.kind = ObjectKind::Sample, .asset = sampleSetAsset, .index0 = sampleIndex};
-}
-
-[[nodiscard]] inline ObjectRef sampleIndex(u32 sampleIndex) {
-  return ObjectRef{.kind = ObjectKind::SampleIndex, .index0 = sampleIndex};
 }
 
 [[nodiscard]] inline ObjectRef misc(AssetId miscAsset) {
@@ -195,17 +190,6 @@ template <class Tag>
 struct hash<vgmtrans::core::Id<Tag>> {
   std::size_t operator()(vgmtrans::core::Id<Tag> id) const noexcept {
     return std::hash<::u32>{}(id.value);
-  }
-};
-
-template <>
-struct hash<vgmtrans::core::ObjectRef> {
-  std::size_t operator()(const vgmtrans::core::ObjectRef& ref) const noexcept {
-    size_t seed = std::hash<int>{}(static_cast<int>(ref.kind));
-    seed ^= std::hash<::u32>{}(ref.asset.value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-    seed ^= std::hash<::u32>{}(ref.index0) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-    seed ^= std::hash<::u32>{}(ref.index1) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-    return seed;
   }
 };
 

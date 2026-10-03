@@ -337,17 +337,28 @@ struct SfLayout {
   };
 }
 
-[[nodiscard]] Chunk smplChunk(std::span<const DecodedSynthSample> samples) {
+[[nodiscard]] Chunk sdtaChunk(std::span<const DecodedSynthSample> samples) {
+  u64 frameCount = 0;
+  for (const auto& sample : samples) {
+    frameCount += sample.decoded.pcm.size() + kSf2SamplePaddingFrames;
+    if (frameCount > std::numeric_limits<u32>::max() / 2) {
+      throw std::overflow_error("RIFF chunk is too large");
+    }
+  }
+
+  const auto dataBytes = static_cast<u32>(frameCount * 2);
   std::vector<u8> payload;
+  payload.reserve(size_t{12} + dataBytes);
+  writeAscii(payload, "sdta");
+  writeAscii(payload, "smpl");
+  writeLe32(payload, dataBytes);
   for (const auto& sample : samples) {
     for (const s16 value : sample.decoded.pcm) {
       writeLeS16(payload, value);
     }
-    for (u32 i = 0; i < kSf2SamplePaddingFrames; ++i) {
-      writeLeS16(payload, 0);
-    }
+    payload.insert(payload.end(), 2 * kSf2SamplePaddingFrames, 0);
   }
-  return Chunk{"smpl", std::move(payload)};
+  return Chunk{"LIST", std::move(payload)};
 }
 
 void writeRangeGen(std::vector<u8>& bytes, u16 generator, u8 low, u8 high) {
@@ -579,7 +590,7 @@ SynthExportResult buildSoundFont2(const SynthExportInput& input, const SourceSto
       .bytes = makeRiff("sfbk",
                         std::array{
                             makeListChunk("INFO", infoChunks(sf2Name(input.name, "VGMTrans"))),
-                            makeListChunk("sdta", std::array{smplChunk(samples)}),
+                            sdtaChunk(samples),
                             makeListChunk("pdta", pdtaChunks(layout, samples)),
                         }),
       .diagnostics = std::move(diagnostics),

@@ -1,7 +1,7 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Twenty-two validated batches remove 979 net production lines from
+`cb9e0b766`. Twenty-three validated batches remove 988 net production lines from
 `src/value`. All 44 CTest suites pass; the latest real-file replay preserves
 all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
 records appear at the end of this document.
@@ -5610,3 +5610,107 @@ The current post-body event boundary handles these distinctions directly.
 Next: remove a newly identified unused sample-index object kind and ObjectRef hash,
 and test whether SF2's sole smpl child can be written into sdta without a second
 complete PCM buffer. Continue testing concrete improvements against frozen 22.
+
+
+## Cleanup2 twenty-third batch: remove unused selectors and duplicate PCM ownership
+
+Five production files remove nine net lines, bringing cleanup2 to 988 removed.
+The LFO regression adds 27 test lines and an obsolete selector mirror drops two;
+cumulative tests gain 477 lines. The SF2 writer grows eleven lines to remove a
+large serialized owner, while the other simplifications reduce the overall code.
+
+- Delete ObjectKind::SampleIndex and ObjectRefs::sampleIndex: no format or model
+  creates this speculative selector, and its sole test mirrors the distinction
+  from an actual owned sample. Keep live InstrumentIndex/InstrumentProgram and
+  ObjectRefs::sample, which have real source producers. Delete the unused
+  std::hash<ObjectRef> specialization; no hashed ObjectRef container or hash call
+  exists. Id hashing remains. ObjectKind::Misc shifts from 9 to 8; this internal
+  enum has no serialized ordinal or raw-numeric consumer. Compare its semantic
+  identity rather than claiming unchanged underlying numbers.
+- SF2's private sdtaChunk writes the LIST type, smpl header, PCM and required
+  padding directly into one payload. Delete the complete encoded-smpl owner and
+  its copy into sdta. Declare/check the cumulative PCM-plus-padding frame count,
+  reserve the known twelve-byte prefix plus data size, and use existing header/
+  PCM writers. Fill the fixed 46-frame zero padding with one vector insert rather
+  than a counter loop. Retain INFO/SDTA/PDTA outer child preparation: streaming the
+  whole RIFF could reorder SDTA-size and PDTA table-index errors.
+- AssetCatalog's constructor is its sole asset-index insertion path and always
+  excludes invalid IDs. Remove asset()'s duplicate invalid-ID gate and use the
+  same filtered-index lookup as SessionSnapshot. Keep SessionState::asset()'s
+  gate: direct low-level callers can append malformed, invalid-ID assets even
+  though production admission rejects them. Do not change insertion semantics
+  just to move that guard to another place.
+- SessionState removal callers already build valid-only source/asset sets.
+  Remove six repeated validity conjuncts before membership probes; keep the
+  actual source-input and asset-ID filtering. A comment records that private
+  boundary. Preserve optional object/annotation presence, ObjectRef variant
+  checks, and all annotation membership: malformed visible annotation rows can
+  contribute invalid IDs to removedAnnotations, unlike the two removal sets.
+- SequenceLfoDepthFadeState divides its nonnegative target magnitude by the
+  actual u32 duration. Delete the s32 narrowing cast that turns durations above
+  INT_MAX into negative divisors. The unsigned quotient always fits the target's
+  s32 range. This corrects large configured durations while retaining native
+  source widths, delay, restart, initial-depth and physical-clamp behavior. Add
+  a fixed first-tick/delay regression covering INT_MAX, INT_MAX+1 and UINT_MAX,
+  largest-depth one-tick completion and negative initial depth. No new motion
+  policy or state is introduced.
+
+Validation:
+
+- The full 373-step macOS Release build is warning-free and all 44 CTest suites
+  pass. Freeze matching headers, tests, core/formats/fmt/Qt value archives and
+  shell. The twenty-third shell preserves all 252 input/policy comparisons and
+  3,922 artifact hashes, inventories, diagnostics and exit statuses against 22.
+- Object-reference removal passes complete Registry, Session, SourceMap and
+  SynthBuilder fixtures plus the Qt UI fixture under focused sanitizers. Rebuild
+  five graph/session/synth units, both Qt value implementation units and moc.
+  Another 720 tagged-owner/link/admission/inspection cases preserve 16,599 lines/
+  924,757 bytes using semantic ObjectKind names, SHA256
+  e9989f3762347c6295e1ca30558731c3db8b01efc8a6ec0331840165afa79c37.
+  Strict graph/session/synth compilation is Werror-clean. Qt's existing locale/
+  missing embedded-icon notices are identical and both fixtures pass.
+- SF2 preserves all 19 complete synth artifacts/ordered diagnostics plus 203
+  private PCM/header/padding/capacity cases, 22,091,734 bytes in Release and focused
+  sanitizers, SHA256 9ada803f202d6be77897fdc4cc2818b5ebc3e045f7585b859a9d85001ceb688f.
+  Existing explicit overflow assertions pass and input PCM/name values remain
+  unchanged. All 203 allocation cases improve. For 128 samples of 16,384 frames,
+  28 allocations becomes one and 20,999,591 requested bytes becomes 4,222,348.
+  The empty table improves from three allocations/28 bytes to one/12 bytes.
+  The subsequent padding-insert comparison preserves all these bytes and counts.
+- Eighty numeric size edges confirm rejection exactly when twice the cumulative
+  frame count exceeds u32. Maximum even child size is 4,294,967,294; the twelve-
+  byte LIST/child prefix is added in size_t. The existing outer parent check still
+  runs after PDTA creation. The child-size check moves only before pure PCM writes,
+  crossing no source callbacks or distinct explicit error. Native allocation
+  failure ordering/huge physical allocations are not claimed equivalent.
+- Catalog/removal guard proof preserves 2,385 cases/108,152 lines/3,621,847 bytes,
+  SHA256 0b4a0cfd162b59d69cf69a993512c1b0d1aa2b1a50eb7d48d3642eeb1cab80db.
+  These are the prior 337 typed-ID/index scenarios plus 2,048 malformed removal
+  combinations: duplicate/invalid/highest IDs, invalid source ranges and annotation
+  rows, every source/annotation/object link kind, diagnostic references, repeated
+  removal, lookup and retained snapshot ownership. Complete Registry, Session,
+  SourceMap and SynthBuilder fixtures pass before/after with changed Catalog/State,
+  graph/session, fixture and probe units instrumented. Strict compilation is
+  Werror-clean. The only addition after proof is the explanatory private-set comment.
+- LFO preserves 1,572,864 native-duration cases/66,983,771 bytes (every u16 duration,
+  clamped/s32-max targets, delay and signed initial depth) and 5,040 lifecycle/binding
+  cases/2,429,465 bytes under focused sanitizers. These cover reconfiguration,
+  clear/reset, restarts, physical suppression and automation attribution. Of 267
+  defined large-duration boundary cases, 69 intentionally correct the old negative
+  divisor; they are not parity claims. A separate old max-target/negative-initial/
+  UINT_MAX combination reproduces signed overflow; the candidate is clean. The
+  permanent regression fails the old implementation and passes the new one.
+  Eighteen configured format/model syntax entries are warning-free.
+- Focused instrumentation links matching unchanged Release archives; it does not
+  establish complete-archive instrumentation. Allocation counts measure cumulative
+  requests, not peak RSS. An existing unused synth-fixture helper warning remains
+  limited to the temporary fixture probe; the complete application build is clean.
+
+A proposed direct BytePattern slice was rejected before implementation. slice()
+throws on invalid bounds, while matchesBytePattern() promises false; its has()
+gate is necessary even though MaskedBytePattern also checks candidate length.
+Keep that failure boundary rather than deleting a guard on an incorrect premise.
+
+Next: probe SourceMap's similarly filtered query indexes, shared linear-motion
+narrowed duration division, and DLS's one-use encoded PCM child owner against
+frozen 23. Keep positive/negative arithmetic and exporter failure order explicit.
