@@ -97,11 +97,10 @@ public:
                 ? static_cast<ValueType>((plan.target - current_) / static_cast<ValueType>(plan.ticks))
                 : plan.step;
     if (!plan.usesTicks() && (current_ == target_ || step_ == ValueType{})) {
-      if (current_ == target_) {
-        clear();
-      } else {
-        reset(plan.target);
+      if (current_ != target_) {
+        current_ = target_;
       }
+      clear();
       return {SequenceMotionStatus::Finished, current_, current_ != previous};
     }
 

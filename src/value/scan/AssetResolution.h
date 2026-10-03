@@ -88,12 +88,11 @@ public:
 
   template <class AssetT, class Data>
   [[nodiscard]] std::vector<AssetWithData<AssetT, Data>> candidates() const {
-    auto values = assets_.assetsWithData<AssetT, Data>();
-    std::erase_if(values, [&](const auto& value) { return !allowed(value.id()); });
-    if (manual()) {
-      std::ranges::stable_sort(values, [&](const auto& left, const auto& right) {
-        return std::ranges::find(candidates_, dependencyId(left)) < std::ranges::find(candidates_, dependencyId(right));
-      });
+    std::vector<AssetWithData<AssetT, Data>> values;
+    for (const auto* value : candidates<AssetT>()) {
+      if (const auto* data = value->privateData.template get<Data>()) {
+        values.push_back({.asset = value, .data = data, .source = assets_.sourceFor(value->metadata)});
+      }
     }
     return values;
   }

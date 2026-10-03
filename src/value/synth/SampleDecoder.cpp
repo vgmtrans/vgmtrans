@@ -13,7 +13,6 @@
 #include <array>
 #include <cmath>
 #include <complex>
-#include <iterator>
 #include <limits>
 #include <numeric>
 #include <optional>
@@ -186,25 +185,21 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
     return samples;
   }
 
-  std::vector<double> coefficients = {dutyCycle - 0.5};
-  int harmonic = 1;
   // A pulse contains increasingly high multiples of its base pitch. Keep only
   // those below half the sample rate; faster ones would become false tones.
   const u32 maxHarmonics = static_cast<u32>(sampleRate / (baseFrequencyHz * 2.0));
-  std::generate_n(std::back_inserter(coefficients), maxHarmonics, [dutyCycle, &harmonic]() {
-    const double value = std::sin(harmonic * dutyCycle * kPi) * 2.0 / (harmonic * kPi);
-    ++harmonic;
-    return value;
-  });
+  std::vector<double> coefficients(maxHarmonics + 1);
+  coefficients[0] = dutyCycle - 0.5;
+  for (u32 harmonic = 1; harmonic <= maxHarmonics; ++harmonic) {
+    coefficients[harmonic] = std::sin(harmonic * dutyCycle * kPi) * 2.0 / (harmonic * kPi);
+  }
 
   const double scale = baseFrequencyHz * kPi * 2.0 / static_cast<double>(sampleRate);
   for (u32 i = 0; i < sampleCount; ++i) {
-    int counter = 0;
-    const double value = std::accumulate(coefficients.begin(), coefficients.end(), 0.0,
-                                         [i, scale, &counter](double sum, double coefficient) {
-                                           sum += coefficient * std::cos(counter++ * scale * i);
-                                           return sum;
-                                         });
+    double value = 0.0;
+    for (size_t harmonic = 0; harmonic < coefficients.size(); ++harmonic) {
+      value += coefficients[harmonic] * std::cos(harmonic * scale * i);
+    }
     samples[i] = static_cast<s16>(std::clamp(std::round(value * 0x7fff * 2.0), -32768.0, 32767.0));
   }
   return samples;

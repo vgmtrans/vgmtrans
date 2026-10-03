@@ -15,7 +15,7 @@ SourceInspection::SourceInspection(AssetMetadata metadata, SourceMap sourceMap, 
       sourceMap_(std::move(sourceMap)) {
   for (const auto& annotation : sourceMap_.annotations()) {
     range_.include(annotation.range);
-    if (!annotation.parent || sourceMap_.find(*annotation.parent) == nullptr) {
+    if (!annotation.parent) {
       roots_.push_back(annotation.id);
     }
   }
@@ -87,12 +87,8 @@ std::optional<SourceInspectionItem> SourceInspection::itemAt(u64 offset) const {
     size_t depth = 0;
     auto parent = candidate.parent;
     while (parent) {
-      const auto* ancestor = sourceMap_.find(*parent);
-      if (ancestor == nullptr) {
-        break;
-      }
       ++depth;
-      parent = ancestor->parent;
+      parent = sourceMap_.get(*parent).parent;
     }
 
     consider(SourceInspectionItem::forAnnotation(candidate.id), candidate.range, depth);
@@ -109,16 +105,13 @@ std::optional<SourceInspectionItem> SourceInspection::itemAt(u64 offset) const {
 
 void SourceInspection::sortBySourceOrder(std::vector<SourceAnnotationId>& annotations) const {
   std::ranges::sort(annotations, [this](SourceAnnotationId lhs, SourceAnnotationId rhs) {
-    const auto* left = annotation(lhs);
-    const auto* right = annotation(rhs);
-    if (left == nullptr || right == nullptr) {
-      return lhs.value < rhs.value;
+    const auto& left = sourceMap_.get(lhs);
+    const auto& right = sourceMap_.get(rhs);
+    if (left.range.offset != right.range.offset) {
+      return left.range.offset < right.range.offset;
     }
-    if (left->range.offset != right->range.offset) {
-      return left->range.offset < right->range.offset;
-    }
-    if (left->range.size != right->range.size) {
-      return left->range.size > right->range.size;
+    if (left.range.size != right.range.size) {
+      return left.range.size > right.range.size;
     }
     return lhs.value < rhs.value;
   });

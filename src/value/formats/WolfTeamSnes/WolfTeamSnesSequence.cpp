@@ -269,7 +269,6 @@ struct TrackState {
 
   Variant variant = Variant::LateFamily;
   LateTraits lateTraits;
-  bool initialized = false;
   u8 rawProgram = 0;
   u8 activeProgram = 0;
   s16 instrumentPitch = 0;
@@ -297,11 +296,10 @@ struct NotePitch {
 struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
-  void beforeCommand() {
-    if (track.initialized) {
+  void beginSection(bool first) {
+    if (!first) {
       return;
     }
-    track.initialized = true;
     selectInstrument(0);
   }
 

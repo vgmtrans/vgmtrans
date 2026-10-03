@@ -350,6 +350,8 @@ void Session::scanSourceAndDerived(SourceId id) {
       }
     } catch (const std::exception& ex) {
       state_->addError(ex.what(), sources_.reader(current).range(0, sources_.source(current).size));
+    } catch (...) {
+      state_->addError("Unknown exception", sources_.reader(current).range(0, sources_.source(current).size));
     }
   }
 
@@ -409,6 +411,9 @@ void Session::scanOneSource(const SourceFile& source, std::vector<SourceId>& que
       }
     } catch (const std::exception& ex) {
       state_->addError(std::string(extractor.name) + " extraction failed: " + ex.what(),
+                       SourceRange{.source = source.id, .offset = 0, .size = source.size});
+    } catch (...) {
+      state_->addError(extractor.name + " extraction failed: Unknown exception",
                        SourceRange{.source = source.id, .offset = 0, .size = source.size});
     }
   }

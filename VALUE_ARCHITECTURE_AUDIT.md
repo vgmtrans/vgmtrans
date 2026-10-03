@@ -4168,3 +4168,62 @@ Validation:
 
 The next pass probes initialization hooks and private inspection traversal,
 while keeping actual per-command behavior and delayed initialization explicit.
+
+## Cleanup2: initialize once and express ordinary work directly
+
+The fourth batch removes another 31 production lines from `src/value`, bringing
+the branch to 367 net production lines removed. The added 50 test lines cover
+independent extractor/member failures that previously escaped the scan boundary.
+
+- SuzukiPS1, WolfTeamSnes, CompileSnes, and TriAcePS1 initialize through
+  `beginSection(first)` instead of checking a private flag before every command.
+  Their initialization flags disappear. These formats have no initial command
+  delay or section playlist; initialization still occurs lazily when each
+  stream first runs, with the same command context and event ordering. Keep
+  KonamiPS1 and TamsoftPS1's delayed initialization and actual per-command hooks.
+- Linear LFO fades construct their reusable plan directly, removing an unused
+  custom-step configuration method. Motion completion has one clearing path;
+  equal signed-zero values retain the original current value's sign.
+- Typed dependency candidates project private data from the ordinary candidate
+  path. Manual order and container eligibility have one implementation.
+  Private inspection roots, ancestor walks, and sorting use the admitted graph
+  directly; public missing-ID queries retain their existing behavior.
+- Non-standard extractor and queued archive-member path exceptions produce
+  source-attributed errors and let later independent work continue, matching
+  existing standard-exception isolation. Direct file-loading callbacks retain
+  their existing propagation contract. The new fixture verifies exact failure
+  order, messages, severity, source ranges, and a later member's successful scan.
+- SF2 and DLS call their existing scalar/string operations directly instead of
+  three private forwarding helpers. SF2 envelope length derives from its actual
+  generator array. Target-specific envelope, tuning, and loop rules remain explicit.
+- Pulse synthesis uses indexed harmonic loops. Two mutable counters and their
+  callbacks disappear; coefficient and PCM arithmetic retain their original order.
+
+Validation:
+
+- Warning-free macOS Release build (173 steps), including shell, Qt, and parity
+  harness; all 44 CTest suites pass.
+- Four-format startup captures match exactly: 30 VM renders, 90 MIDI outputs
+  across all three pitch-transition policies, and complete event-header and
+  source-span traces (33,423 bytes).
+- Motion/LFO probes match 100,080 cases and 1,993,920 state observations,
+  including signed zero, infinities, and NaNs. Their 55,803,565-byte traces are
+  identical; both versions run clean under ASan, UBSan, and float-cast-overflow.
+- All existing synth-export fixtures pass in independently linked old/new
+  writer captures. Nineteen successful SF2/DLS artifacts and ordered diagnostics
+  match in a 14,307,486-byte trace; expected overflow failures also pass.
+- Pulse synthesis preserves exact PCM and metadata across 7,068 generated PSG
+  cases: harmonic-count boundaries, zero/default sample rates, duty masking,
+  short/full loops, and channel defaults. The 1,711,044-byte outputs match, and
+  ASan, UBSan, and float-cast-overflow checks are clean.
+- The real-file corpus was replayed against committed revision `691f68f04`
+  during this batch: all 252 input/policy comparisons preserve every existing
+  artifact (1,708 MIDI, 1,106 SF2, 1,106 DLS). The only differences recover the
+  two MIDI files for the slash-containing title `Autumn Sky / Womanheart`,
+  changing its two command statuses from failure to success. No existing file
+  disappears or changes bytes, and no unrelated inventory/diagnostic changes occur.
+
+The next pass removes the standalone registry layer owned only by Session and
+the unused catalog projection now superseded by dependency candidates. Keep
+the VM's separate delay/source-position, section-entry, and musical-state duties:
+collapsing them would obscure real scheduling and lifetime rules.

@@ -21,7 +21,7 @@ namespace vgmtrans::core {
 //
 // Some drivers install a fade once and restart it on every note. Keeping its
 // motion plan separate from the active motion preserves that behavior while
-// allowing each format to choose the step, initial depth, and delay. The
+// allowing each format to choose the initial depth and delay. The
 // automation binding follows the live motion because each note may attach its
 // restarted fade to a different performance note.
 //
@@ -55,15 +55,14 @@ public:
 
   // Installs the plan used by subsequent restart calls. A zero duration
   // removes the reusable plan without interrupting a fade already in progress.
-  void configureFade(u32 ticks, s32 step) {
+  void configureLinearFade(u32 ticks) {
     if (ticks == 0) {
       fadePlan_.reset();
       return;
     }
-    fadePlan_ = SequenceMotionPlan<s32>::targetOverTicksWithStep(targetDepth_, step, ticks);
+    fadePlan_ = SequenceMotionPlan<s32>::targetOverTicksWithStep(
+        targetDepth_, targetDepth_ / static_cast<s32>(ticks), ticks);
   }
-
-  void configureLinearFade(u32 ticks) { configureFade(ticks, ticks == 0 ? 0 : targetDepth_ / static_cast<s32>(ticks)); }
 
   [[nodiscard]] bool fadeConfigured() const { return fadePlan_.has_value(); }
   [[nodiscard]] u32 fadeDurationTicks() const { return fadePlan_ ? fadePlan_->ticks : 0; }

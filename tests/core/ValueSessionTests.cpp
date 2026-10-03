@@ -797,6 +797,55 @@ void sessionRejectsExtractedSourcesWithMissingParents() {
       SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
 }
 
+void sessionIsolatesExtractionAndMemberPathFailures() {
+  Session session;
+  session.registerExtractor(SourceExtractor{
+      .name = "Throwing", .acceptedFormats = {"FaultContainer"},
+      .extract = [](const ExtractionInput&) -> ExtractionResult { throw std::runtime_error("extractor exploded"); },
+  });
+  session.registerExtractor(SourceExtractor{
+      .name = "UnknownFailure", .acceptedFormats = {"FaultContainer"},
+      .extract = [](const ExtractionInput&) -> ExtractionResult { throw 42; },
+  });
+  session.registerExtractor(SourceExtractor{
+      .name = "Container", .acceptedFormats = {"FaultContainer"},
+      .extract = [](const ExtractionInput&) {
+        return ExtractionResult{.sources = {
+            {.file = {.name = "Bad", .knownFormat = "FaultMember", .memberPath = "bad"}, .bytes = {0xaa}},
+            {.file = {.name = "Good", .knownFormat = "FaultMember", .memberPath = "good"}, .bytes = {0xaa}},
+        }};
+      },
+      .resolvePath = [](const std::filesystem::path& path,
+                        const SourceExtractor::FileExists&) -> std::optional<SourceFile> {
+        if (path == "bad") {
+          throw 42;
+        }
+        return std::nullopt;
+      },
+  });
+  auto module = probeSequenceModule();
+  module.acceptedFormats = {"FaultMember"};
+  session.registerFormat(std::move(module));
+  const auto source = session.addSource(SourceFile{.name = "Container", .knownFormat = "FaultContainer"}, {0xaa});
+  session.scanSource(source);
+  const auto snapshot = session.snapshot();
+  expect(snapshot.assets().size() == 1 && metadata(snapshot.assets().front()).name == "Good" &&
+             snapshot.sources().size() == 3 && snapshot.diagnostics().size() == 4,
+         "extractor and member-path failures should leave later extractors and queued members available to scan");
+  const std::array messages{"Throwing extraction failed: extractor exploded",
+                            "UnknownFailure extraction failed: Unknown exception", "Unknown exception"};
+  for (size_t index = 0; index < messages.size(); ++index) {
+    const auto& diagnostic = snapshot.diagnostics()[index];
+    expect(diagnostic.severity == Severity::Error && diagnostic.message == messages[index] && diagnostic.code.empty() &&
+               !diagnostic.object && !diagnostic.annotation &&
+               diagnostic.range == SourceRange{.source = index == 2 ? SourceId{1} : source, .size = 1},
+           "callback failure diagnostics should preserve registration order and the failing source's range");
+  }
+  expect(snapshot.diagnostics().back().message == "probe sequence scanned" &&
+             snapshot.diagnostics().back().range.source == SourceId{2},
+         "a later member's scanner diagnostics should follow the isolated callback failures");
+}
+
 void extractionValidationRejectsEmptyKnownFormats() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "empty-format.probe"}, {0xaa});
@@ -1511,6 +1560,7 @@ void runValueSessionTests() {
   sessionRejectsLateRegistryMutation();
   sessionRejectsInvalidAssetIdsAtAdmission();
   sessionRejectsExtractedSourcesWithMissingParents();
+  sessionIsolatesExtractionAndMemberPathFailures();
   extractionValidationRejectsEmptyKnownFormats();
   scanValidationReportsMultipleAdmissionErrors();
   scanValidationRejectsOutOfBoundsScanResultRanges();

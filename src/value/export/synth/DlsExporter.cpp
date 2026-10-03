@@ -69,11 +69,6 @@ struct DlsConnection {
   s32 scale = 0;
 };
 
-void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
-  writeAscii(bytes, text);
-  bytes.push_back(0);
-}
-
 [[nodiscard]] u8 clampU7(s32 value) {
   return static_cast<u8>(std::clamp<s32>(value, 0, 127));
 }
@@ -89,10 +84,6 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
 [[nodiscard]] s32 dls16Dot16Scale(s32 value) {
   // DLS articulation scales are signed 16.16 fixed-point values.
   return clampS32(static_cast<s64>(value) * 65536);
-}
-
-[[nodiscard]] s32 dlsPitchScale(s32 cents) {
-  return dls16Dot16Scale(cents);
 }
 
 [[nodiscard]] s32 dlsAttenuation(const Region& region, const DecodedSynthSample& sample) {
@@ -111,10 +102,10 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
       return DlsConnection{
           .source = kDlsConnSrcVibrato,
           .destination = kDlsConnDstPitch,
-          .scale = dlsPitchScale(generator.amount),
+          .scale = dls16Dot16Scale(generator.amount),
       };
     case SynthDestination::VibratoRate:
-      return DlsConnection{.destination = kDlsConnDstVibFrequency, .scale = dlsPitchScale(generator.amount)};
+      return DlsConnection{.destination = kDlsConnDstVibFrequency, .scale = dls16Dot16Scale(generator.amount)};
     case SynthDestination::VibratoDelay:
       return DlsConnection{.destination = kDlsConnDstVibStartDelay, .scale = dls16Dot16Scale(generator.amount)};
     case SynthDestination::TremoloDepth:
@@ -124,7 +115,7 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
           .scale = dls16Dot16Scale(generator.amount),
       };
     case SynthDestination::TremoloRate:
-      return DlsConnection{.destination = kDlsConnDstLfoFrequency, .scale = dlsPitchScale(generator.amount)};
+      return DlsConnection{.destination = kDlsConnDstLfoFrequency, .scale = dls16Dot16Scale(generator.amount)};
     case SynthDestination::TremoloDelay:
       return DlsConnection{.destination = kDlsConnDstLfoStartDelay, .scale = dls16Dot16Scale(generator.amount)};
     case SynthDestination::Unknown:
@@ -212,7 +203,8 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
 
 [[nodiscard]] Chunk infoList(std::string_view name, std::string_view fallback) {
   std::vector<u8> inam;
-  writeFixedString(inam, name.empty() ? fallback : name);
+  writeAscii(inam, name.empty() ? fallback : name);
+  inam.push_back(0);
   return makeListChunk("INFO", std::array{Chunk{"INAM", std::move(inam)}});
 }
 

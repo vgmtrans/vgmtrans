@@ -154,7 +154,6 @@ struct TrackState {
   u8 octave = 3;
   u16 bank = 0;
   u8 program = 0;
-  bool initialized = false;
   bool hasEnvelope = false;
   u16 adsr1 = 0;
   u16 adsr2 = 0;
@@ -168,11 +167,10 @@ struct TrackState {
 struct Playback : SequencePlayback<TrackState> {
   const RuntimeConfig& config;
 
-  void beforeCommand() {
-    if (track.initialized) {
+  void beginSection(bool first) {
+    if (!first) {
       return;
     }
-    track.initialized = true;
     loadEnvelope();
     emitInstrument();
   }

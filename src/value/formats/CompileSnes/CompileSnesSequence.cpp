@@ -379,7 +379,6 @@ struct TrackState {
   CurveState vibrato;
   CurveState gainEnvelope;
   PerformanceNoteId lastNote;
-  bool initialized = false;
 
   // Volume target/sweep uses an 8-bit fractional accumulator exactly like the driver.
   bool volumeSweepActive = false;
@@ -400,11 +399,10 @@ struct Playback : SequencePlayback<TrackState> {
 
   [[nodiscard]] const DriverData& data() const { return *programState.data; }
 
-  void beforeCommand() {
-    if (track.initialized) {
+  void beginSection(bool first) {
+    if (!first) {
       return;
     }
-    track.initialized = true;
     out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = track.program},
                    InstrumentEnvelopeMode::PreserveDynamicOverride);
     setAdsr(track.adsr);

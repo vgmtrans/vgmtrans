@@ -253,7 +253,6 @@ struct TrackState {
   u32 slot = 0;
   std::vector<Address> patterns;
   u32 patternIndex = 0;
-  bool initialized = false;
   u8 bank = 0;
   u8 program = 0;
   u8 bendRange = 12;
@@ -272,11 +271,10 @@ struct TrackState {
 struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
-  void beforeCommand() {
-    if (track.initialized) {
+  void beginSection(bool first) {
+    if (!first) {
       return;
     }
-    track.initialized = true;
     selectInstrument(track.program, track.bank, false);
     if (track.slot == 0 && program.timeSignatureNumerator != 0 &&
         program.timeSignatureDenominator != 0) {

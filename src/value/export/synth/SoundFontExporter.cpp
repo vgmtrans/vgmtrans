@@ -59,8 +59,7 @@ constexpr double kSoundFontVolumeEnvelopeRangeDb = 100.0;
 
 constexpr u32 kSf2SamplePaddingFrames = 46;
 constexpr u8 kDefaultRootKey = 60;
-constexpr u32 kEnvelopeInstrumentRegionGenerators = 5;
-constexpr std::array<u16, kEnvelopeInstrumentRegionGenerators> kSfEnvelopeGenerators{
+constexpr std::array kSfEnvelopeGenerators{
     kSfGenAttackVolEnv, kSfGenHoldVolEnv, kSfGenDecayVolEnv, kSfGenSustainVolEnv, kSfGenReleaseVolEnv,
 };
 
@@ -83,7 +82,7 @@ struct SfModulatorRecord {
   s16 amount = 0;
 };
 
-using SfEnvelope = std::array<s16, kEnvelopeInstrumentRegionGenerators>;
+using SfEnvelope = std::array<s16, kSfEnvelopeGenerators.size()>;
 
 struct SfPreset {
   const ResolvedSynthInstrument* source = nullptr;
@@ -185,10 +184,6 @@ struct SfLayout {
   }
 
   return std::nullopt;
-}
-
-[[nodiscard]] s16 sf2GeneratorAmount(const SynthGenerator& generator) {
-  return clampS16(generator.amount);
 }
 
 [[nodiscard]] std::optional<u16> sf2DefaultSourceForDestination(SynthDestination destination) {
@@ -440,7 +435,7 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
   const auto writeModulation = [&](const LoweredSynthModulation& modulation) {
     for (const auto& generator : modulation.generators) {
       if (const auto destination = sf2GeneratorForDestination(generator.destination)) {
-        writeAmountGen(generators, *destination, sf2GeneratorAmount(generator));
+        writeAmountGen(generators, *destination, clampS16(generator.amount));
       }
     }
     for (const auto& modulator : modulation.modulators) {
