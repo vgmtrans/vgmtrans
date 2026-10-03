@@ -24,7 +24,6 @@ namespace vgmtrans::core {
 class ScanResultBuilder;
 class ScanSoundBankDraft;
 class ScanSamplePoolDraft;
-class ScanMiscDraft;
 
 // Drafts are lightweight views into result-owned pending assets. Creating a
 // draft is the publication decision: ScanResultBuilder::finish() materializes
@@ -38,7 +37,6 @@ public:
   ScanSequenceDraft& collectionName(std::string name);
   ScanSequenceDraft& withoutCollection();
   ScanSequenceDraft& includeMisc(AssetId asset);
-  ScanSequenceDraft& includeMisc(const ScanMiscDraft& asset);
   // Record a bank that scanning already identified.
   ScanSequenceDraft& useBank(AssetId bank);
   ScanSequenceDraft& useBank(const ScanSoundBankDraft& bank);
@@ -133,29 +131,6 @@ private:
   Pending* pending_;
 };
 
-class ScanMiscDraft {
-public:
-  [[nodiscard]] AssetId id() const noexcept { return pending_->id; }
-  ScanMiscDraft& payload(std::vector<u8> payload);
-
-  template <typename T>
-  ScanMiscDraft& data(T value);
-
-private:
-  friend class ScanResultBuilder;
-
-  struct Pending {
-    AssetId id;
-    std::string name;
-    SourceRange range;
-    std::optional<std::vector<u8>> payload;
-    AssetPrivateData privateData;
-  };
-
-  explicit ScanMiscDraft(Pending& pending) : pending_(&pending) {}
-  Pending* pending_;
-};
-
 // Convenience wrapper for the normal scanner path. It still produces ordinary
 // ScanResult values, but keeps format modules away from repetitive ID allocation,
 // asset metadata setup, and diagnostics.
@@ -178,7 +153,7 @@ public:
   [[nodiscard]] ScanSequenceDraft sequence(std::string name, SourceRange range = {});
   [[nodiscard]] ScanSoundBankDraft soundBank(std::string name, SourceRange range = {});
   [[nodiscard]] ScanSamplePoolDraft samplePool(std::string name, SourceRange range = {});
-  [[nodiscard]] ScanMiscDraft misc(std::string name, SourceRange range);
+  [[nodiscard]] AssetId misc(std::string name, SourceRange range);
 
   void diagnostic(Diagnostic diagnostic);
   void warning(std::string message, SourceRange range);
@@ -190,7 +165,6 @@ private:
   friend class ScanSequenceDraft;
   friend class ScanSoundBankDraft;
   friend class ScanSamplePoolDraft;
-  friend class ScanMiscDraft;
 
   [[nodiscard]] AssetMetadata metadata(AssetId id, std::string name, SourceRange range) const;
 
@@ -202,7 +176,7 @@ private:
   SourceMapBuilder sourceMap_;
 
   using PendingAsset = std::variant<ScanSequenceDraft::Pending, ScanSoundBankDraft::Pending,
-                                    ScanSamplePoolDraft::Pending, ScanMiscDraft::Pending>;
+                                    ScanSamplePoolDraft::Pending, MiscAsset>;
   // Appending to the deque preserves the values referenced by drafts and
   // domain-builder entries.
   std::deque<PendingAsset> drafts_;
@@ -245,12 +219,6 @@ ScanSoundBankDraft& ScanSoundBankDraft::data(T value) {
 
 template <typename T>
 ScanSamplePoolDraft& ScanSamplePoolDraft::data(T value) {
-  ScanResultBuilder::setPrivateData(pending_->privateData, AssetPrivateData::make(std::move(value)));
-  return *this;
-}
-
-template <typename T>
-ScanMiscDraft& ScanMiscDraft::data(T value) {
   ScanResultBuilder::setPrivateData(pending_->privateData, AssetPrivateData::make(std::move(value)));
   return *this;
 }

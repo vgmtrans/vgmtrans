@@ -17,10 +17,6 @@ void writeAscii(std::vector<u8>& bytes, std::string_view text) {
   bytes.insert(bytes.end(), text.begin(), text.end());
 }
 
-void writeU8(std::vector<u8>& bytes, u8 value) {
-  bytes.push_back(value);
-}
-
 void writeLe16(std::vector<u8>& bytes, u16 value) {
   bytes.push_back(static_cast<u8>(value));
   bytes.push_back(static_cast<u8>(value >> 8));

@@ -116,11 +116,10 @@ void annotateArticulationTable(SourceMapBuilder& sourceMap, ByteReader reader, c
       return std::nullopt;
     }
     const SourceRange range = input.reader.range(offset, size);
-    const auto bytes = input.reader.slice(offset, size);
-    const auto misc = result.misc(name, range).payload(std::vector<u8>(bytes.begin(), bytes.end()));
+    const auto misc = result.misc(name, range);
     const SourceAnnotationId table =
-        result.sourceMap().table(name, range).owner(ObjectRefs::misc(misc.id())).kind(kind).id();
-    miscAssets.push_back(misc.id());
+        result.sourceMap().table(name, range).owner(ObjectRefs::misc(misc)).kind(kind).id();
+    miscAssets.push_back(misc);
     return table;
   };
 

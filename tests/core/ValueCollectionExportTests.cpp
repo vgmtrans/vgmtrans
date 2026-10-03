@@ -646,8 +646,6 @@ void collectionBindingProducesAnImmutableInstrumentView() {
   };
   const MiscAsset manifest{
       .metadata = AssetMetadata{.id = AssetId{3}, .format = "Prepared Probe", .name = "Manifest"},
-      .payload = {0x2a},
-      .privateData = AssetPrivateData::make(u32{42}),
   };
 
   test::SessionSnapshotBuilder builder;
@@ -680,7 +678,7 @@ void collectionBindingProducesAnImmutableInstrumentView() {
          "collection binding should preserve selected asset identity without mutating durable assets");
 
   expect(snapshot.collection(CollectionId{0})->selection.miscAssets == std::vector{manifest.metadata.id} &&
-             *snapshot.asset<MiscAsset>(manifest.metadata.id)->privateData.get<u32>() == 42,
+             snapshot.asset<MiscAsset>(manifest.metadata.id)->metadata.name == "Manifest",
          "supplemental assets should remain available for collection inspection");
   auto missingMiscBuilder = builder;
   missingMiscBuilder.collections.front().selection.miscAssets = {AssetId{99}};

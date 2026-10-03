@@ -174,7 +174,7 @@ struct EchoState {
 };
 
 struct ProgramState {
-  ProgramState(const SequenceProgram&, const RuntimeConfig& config) : tempoTarget(config.layout.initialTempo) {
+  explicit ProgramState(const RuntimeConfig& config) : tempoTarget(config.layout.initialTempo) {
     echo.delay = config.layout.initialEchoDelay;
     echo.left = echo.right = math::echoGain(config.layout.version, config.layout.initialEchoVolume,
                                             config.layout.initialMasterVolume);

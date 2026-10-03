@@ -164,8 +164,8 @@ void sessionRoutesKnownFormatsAndConsumesExtractedParents() {
         }
         ScanResultBuilder out(input, "Target");
         const auto range = input.reader.range(0, 1);
-        const auto asset = out.misc("Target Asset", range).payload({0xe1});
-        out.sourceMap().annotation(SourceRole::Payload, "Target Asset", range).owner(ObjectRefs::misc(asset.id()));
+        const auto asset = out.misc("Target Asset", range);
+        out.sourceMap().annotation(SourceRole::Payload, "Target Asset", range).owner(ObjectRefs::misc(asset));
         return out.finish();
       },
   });
@@ -219,11 +219,11 @@ void sessionScansApplicableFormatsConcurrently() {
   bool scannersOverlapped = false;
   std::atomic<u32> completed{0};
 
-  const auto module = [&](std::string name, u8 payload) {
+  const auto module = [&](std::string name) {
     return FormatModule{
         .name = name,
         .scan =
-            [&, name = std::move(name), payload](const ScanInput& input) {
+            [&, name = std::move(name)](const ScanInput& input) {
               if (parallelExecutionAvailable) {
                 std::unique_lock lock(scannerMutex);
                 ++activeScanners;
@@ -237,15 +237,15 @@ void sessionScansApplicableFormatsConcurrently() {
               }
               ScanResultBuilder out(input, name);
               const SourceRange range = input.reader.range(0, 1);
-              const auto asset = out.misc(name, range).payload({payload});
-              out.sourceMap().annotation(SourceRole::Payload, name, range).owner(ObjectRefs::misc(asset.id()));
+              const auto asset = out.misc(name, range);
+              out.sourceMap().annotation(SourceRole::Payload, name, range).owner(ObjectRefs::misc(asset));
               completed.fetch_add(1, std::memory_order_relaxed);
               return out.finish();
             },
     };
   };
 
-  session.registerFormat(module("First", 1));
+  session.registerFormat(module("First"));
   session.registerFormat(FormatModule{
       .name = "Throwing",
       .scan = [](const ScanInput&) -> ScanResult { throw std::runtime_error("scanner exploded"); }});
@@ -255,7 +255,7 @@ void sessionScansApplicableFormatsConcurrently() {
   session.registerFormat(FormatModule{
       .name = "UnknownFailure",
       .scan = [](const ScanInput&) -> ScanResult { throw 42; }});
-  session.registerFormat(module("Second", 2));
+  session.registerFormat(module("Second"));
   session.addSource(SourceFile{.name = "parallel.bin"}, {0xaa});
   session.scanPendingSources();
 
@@ -639,6 +639,12 @@ void sessionRemovesSourceFamilyWithItsLastAsset() {
          "asset removal fixture should publish two routed child assets");
   const AssetId sequence = metadata(project.assets()[0]).id;
   const AssetId misc = metadata(project.assets()[1]).id;
+  auto inspection = session.inspect(misc);
+  const std::weak_ptr<const std::vector<u8>> lifetime =
+      session.sources().sharedBytes(metadata(project.assets()[1]).range.source);
+  expect(inspection && inspection->metadata().id == misc && inspection->annotations().size() == 1 &&
+             std::ranges::equal(inspection->bytes(), std::array<u8, 2>{0xbb, 0x01}),
+         "miscellaneous assets should inspect their original source bytes and owned annotations");
 
   const std::array firstRemoval{sequence};
   session.removeAssets(firstRemoval);
@@ -657,6 +663,10 @@ void sessionRemovesSourceFamilyWithItsLastAsset() {
          "closing the empty source family should remove its discovered data");
 
   session.removeAssets(lastRemoval);
+  expect(!lifetime.expired() && std::ranges::equal(inspection->bytes(), std::array<u8, 2>{0xbb, 0x01}),
+         "an open miscellaneous inspection should retain its source after the asset and source family are removed");
+  inspection.reset();
+  expect(lifetime.expired(), "closing the last inspection should release its removed source bytes");
 
   project = session.snapshot();
   expect(project.sources().empty() && project.assets().empty(),
@@ -1159,13 +1169,13 @@ void sessionKeepsSequenceCollectionsWhenSupplementalAssetsDisappear() {
         .name = "Supplemental", .scan = [wrongType](const ScanInput& input) {
           ScanResultBuilder out(input, "Supplemental");
           auto sequence = out.sequence("Song").program(probeSequenceProgram());
-          auto misc = out.misc("Table", input.reader.range(0, 1)).payload({0});
+          const auto misc = out.misc("Table", input.reader.range(0, 1));
           sequence.includeMisc(misc);
           if (wrongType) {
             sequence.includeMisc(sequence.id());
           }
           out.sourceMap().header("Sequence", input.reader.range(0, 1)).owner(ObjectRefs::sequence(sequence.id()));
-          out.sourceMap().header("Table", input.reader.range(0, 1)).owner(ObjectRefs::misc(misc.id()));
+          out.sourceMap().header("Table", input.reader.range(0, 1)).owner(ObjectRefs::misc(misc));
           return out.finish();
         }});
     session.addSource(SourceFile{.name = "supplemental.bin"}, {0});

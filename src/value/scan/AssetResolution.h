@@ -67,7 +67,14 @@ public:
 
   template <class Data>
   [[nodiscard]] const Data& data() const {
-    const auto* value = std::visit([](const auto& asset) { return asset.privateData.template get<Data>(); }, owner_);
+    const auto* value = std::visit(
+        [](const auto& asset) -> const Data* {
+          if constexpr (requires { asset.privateData; }) {
+            return asset.privateData.template get<Data>();
+          }
+          return nullptr;
+        },
+        owner_);
     if (value == nullptr) {
       throw std::logic_error("Asset is missing its dependency data");
     }

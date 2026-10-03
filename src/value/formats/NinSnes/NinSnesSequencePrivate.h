@@ -164,7 +164,7 @@ struct IntelligentState {
   u8 conditionalMask = 0;
   std::span<const u8> transposeTable;
   std::vector<VoiceRecord> voiceTable;
-  std::array<PercussionEntry, kIntelliDrumSlots> initialPercussionTable{};
+  const std::array<PercussionEntry, kIntelliDrumSlots>& initialPercussionTable;
   std::array<PercussionEntry, kIntelliDrumSlots> percussionTable{};
   std::map<std::tuple<u8, u8, u8, u8, u8, u8, u8>, u32> instrumentOverrides;
 };

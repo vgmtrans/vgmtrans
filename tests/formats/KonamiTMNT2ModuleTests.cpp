@@ -348,7 +348,7 @@ void konamiTmnt2AliasesMiscSamplesAndTrackLabels() {
   const auto* bank = firstAsset<SoundBankAsset>(result);
   expect(result.diagnostics.empty() && resolvedScanCollections(result).size() == 2 && misc != nullptr &&
              misc->metadata.name == "Sequence Table" && misc->metadata.range.offset == 0x200 &&
-             misc->metadata.range.endOffset() == 0x273 && misc->payload.size() == 0x73,
+             misc->metadata.range.endOffset() == 0x273,
          "the complete pointer/track-table span should be published once as a shared Sequence Table misc asset");
   expect(std::ranges::all_of(
              resolvedScanCollections(result),

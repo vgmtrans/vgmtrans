@@ -1,7 +1,7 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Thirteen validated batches remove 708 net production lines from
+`cb9e0b766`. Fourteen validated batches remove 780 net production lines from
 `src/value`. All 44 CTest suites pass; the latest real-file replay preserves
 all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
 records appear at the end of this document.
@@ -4849,3 +4849,86 @@ annotations already provide inspection, and no production consumer reads either
 value. Preserve ordered publication and sequence-payload retry safety. Also
 investigate moving the VM's existing visit snapshots directly into its visited
 map and removing redundant per-format sequence-range inference.
+
+
+## Cleanup2 fourteenth batch: misc assets are source markers
+
+This batch removes 72 net production lines, bringing cleanup2 to 780 removed.
+Fixtures add ten net lines. The main change removes a format-authoring concept
+rather than replacing it with another helper.
+
+- MiscAsset is a name, identity, and source range for supplemental inspection.
+  Its byte payload and private data have no production readers or semantic
+  writers. Original bytes and annotations already belong to SourceStore and
+  SourceMap. Removing those values eliminates the entire ScanMiscDraft class,
+  required-payload presence/duplicate checks, data setter, and includeMisc(draft)
+  projection. Formats call misc(name, range) and receive AssetId directly.
+- Ordinary MiscAsset values remain queued with audio drafts, preserving asset
+  order and ID allocation. Required sequence programs are still checked in a
+  complete first pass before consuming any draft; repair/retry remains safe.
+  A dependency-data query on misc now returns the same missing-data exception,
+  while actual sequence/bank/sample private-data protocols remain intact.
+- CPS, KonamiTMNT2, and Namco stop copying source-table bytes; SonyPS2 drops its
+  ceremonial empty-payload calls. Owned annotations and collection membership
+  are unchanged. MiscAsset shrinks from 136 to 80 bytes, but Asset remains
+  720 bytes: this is not a claim of per-variant storage reduction. The discarded
+  raw byte buffers are actual removed allocations.
+- Rare and Namco use the builder's existing owned-annotation/command range
+  inference instead of repeating it privately. SoftCreat keeps its explicit
+  range because the owned Selected Song annotation legitimately lies outside
+  its chosen sequence bounds.
+- VM visit snapshots are inserted directly into visited_ instead of copied
+  from an extra local. An inferred loop copies the canonical stored key into
+  handleLoop's owned optional before clearing the map, then moves it back when
+  needed. The visit tick and loop behavior remain unchanged. executeNext drops
+  an inactive early-return whose wait block and command loop already skip the
+  same state before the existing final return.
+- Nin's immutable initial percussion array borrows the same Config owner as
+  its other defaults; its mutable working array and reset assignment stay owned.
+  ProgramState shrinks from 2,672 to 2,632 bytes and IntelligentState from 168
+  to 128. Prism/Neverland/Itikiti constructors request only their actual Config,
+  dropping an unused SequenceProgram argument through the existing factory path.
+- SoundFont writes six individual bytes with vector::push_back. The writeU8
+  pure-forwarding API disappears; signed/endian encoding helpers remain.
+
+Validation:
+
+- The full 321-step macOS Release build is warning-free; all 44 CTest suites pass.
+- Misc before/after observable traces match across eight mixed/session scenarios:
+  1,229 lines and 80,994 bytes, with ASan/UBSan clean on both sides. Coverage
+  includes ordered publication and sequence retry, collection deduplication,
+  owner/field/annotation graphs, diagnostics, hit tests, original inspection
+  bytes, asset-only/source-family removal, retained views and final byte release.
+  Before/after runners use fully consistent thirteenth/fourteenth headers and
+  archives, without mixing the changed public MiscAsset layout.
+- Focused registry/synth-builder/session/source-map fixtures pass ASan/UBSan with
+  changed ScanResultBuilder.cpp and test units instrumented. The initial combined
+  run encountered libc++ container-overflow across an instrumented std::function
+  clone and Release SessionState vector copy. Frozen13 reproduces the same write
+  and stack. Both revisions pass with container annotations disabled;14 also
+  passes with _LIBCPP_HAS_NO_ASAN compiled consistently. Ordinary heap/lifetime
+  and UB checks remain active. Remaining archives are Release, so this is not
+  whole-core sanitizer coverage.
+- Seventy-seven frozen sanitizer range cases preserve Rare/Namco explicit versus
+  inferred bounds: every Rare profile and Namco version, header-only/zero-track,
+  pointer/truncation, backward/forward/unreachable commands, multi-track, and
+  zero-size anchors. SoftCreat's distinct bounds remain explicit.
+- The exact final VM matches 171,938 cases and 206,284,725 trace bytes under
+  ASan, UBSan, and float-cast-overflow: budgets, calls/repeat maps, jump kinds,
+  leading delays/readiness, hooks, playlists, synchronized checkpoints/prepass,
+  and nested large state. A 48-case allocation probe drops from 5,590 to 3,585
+  allocations and 247,936 to 177,128 requested bytes; no case grows. An eight-call-
+  frame/sixteen-repeat-slot example drops 344 to 217 allocations.
+- Nin's full/nonzero-default/reset-isolation probes preserve 1,414 complete
+  performance/MIDI captures and 6,745,680 bytes with focused sanitizers. Complete
+  Prism/Neverland/Itikiti suites also pass with changed constructor units under
+  ASan, UBSan, and float-cast-overflow using frozen13 public headers/archives.
+- The frozen fourteenth-batch shell preserves all 252 input/policy comparisons,
+  3,922 artifact hashes, inventories, diagnostics, and exit statuses against13.
+
+Next: remove internal diagnostic factories whose only callers can construct their
+complete Diagnostic directly; remove the cursor's duplicate absent/default flow
+representation while preserving explicit runtime fallthrough; evaluate three
+single-field runtime configuration wrappers and narrow hardware/export header
+requirements. These candidates have concrete callers and temporary differential
+proofs; public format APIs and mutable working values remain the boundary.

@@ -352,8 +352,8 @@ struct SfLayout {
 
 void writeRangeGen(std::vector<u8>& bytes, u16 generator, u8 low, u8 high) {
   writeLe16(bytes, generator);
-  writeU8(bytes, low);
-  writeU8(bytes, high);
+  bytes.push_back(low);
+  bytes.push_back(high);
 }
 
 void writeAmountGen(std::vector<u8>& bytes, u16 generator, s16 value) {
@@ -525,8 +525,8 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
     writeLe32(payload, loopStart);
     writeLe32(payload, std::min(loopEnd, endFrame));
     writeLe32(payload, sample.decoded.sampleRate == 0 ? 32000 : sample.decoded.sampleRate);
-    writeU8(payload, pitch.originalKey);
-    writeU8(payload, static_cast<u8>(pitch.correction));
+    payload.push_back(pitch.originalKey);
+    payload.push_back(static_cast<u8>(pitch.correction));
     writeLe16(payload, 0);
     writeLe16(payload, 1);
     startFrame = endFrame + kSf2SamplePaddingFrames;
@@ -538,8 +538,8 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
   writeLe32(payload, 0);
   writeLe32(payload, 0);
   writeLe32(payload, 0);
-  writeU8(payload, 0);
-  writeU8(payload, 0);
+  payload.push_back(0);
+  payload.push_back(0);
   writeLe16(payload, 0);
   writeLe16(payload, 1);
   return Chunk{"shdr", std::move(payload)};

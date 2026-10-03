@@ -111,8 +111,7 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
                      .sampleRate = 32000,
                      .channels = 1,
                  });
-  const auto misc =
-      out.misc("Builder Misc", input.reader.range(0, 1)).data(BuilderPrivateData{.value = 44}).payload({0xaa});
+  const auto misc = out.misc("Builder Misc", input.reader.range(0, 1));
 
   sequence.collectionName("Builder Song").useBank(bank).includeMisc(misc);
   bank.useSamples(samplePool);
@@ -128,13 +127,15 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
   const auto* sequenceData = std::get<SequenceProgramAsset>(result.assets[0]).privateData.get<BuilderPrivateData>();
   const auto* instrumentData = std::get<SoundBankAsset>(result.assets[1]).privateData.get<BuilderPrivateData>();
   const auto* sampleData = std::get<SamplePoolAsset>(result.assets[2]).privateData.get<BuilderPrivateData>();
-  const auto* miscData = std::get<MiscAsset>(result.assets[3]).privateData.get<BuilderPrivateData>();
   expect(sequenceData != nullptr && sequenceData->value == 11 && instrumentData != nullptr &&
-             instrumentData->value == 22 && sampleData != nullptr && sampleData->value == 33 && miscData != nullptr &&
-             miscData->value == 44 &&
+             instrumentData->value == 22 && sampleData != nullptr && sampleData->value == 33 &&
              std::get<SamplePoolAsset>(result.assets[2]).privateData.get<std::string>() == nullptr,
-         "every asset draft should retain an immutable typed private payload");
-  const auto collections = dependencyCollections(AssetCatalog{sources, SharedSequence<Asset>{result.assets}});
+         "audio asset drafts should retain immutable typed private data");
+  const AssetCatalog catalog{sources, SharedSequence<Asset>{result.assets}};
+  const DependencyContext miscContext{catalog, *catalog.asset(misc), ResolutionMode::Automatic};
+  expectThrows<std::logic_error>([&] { static_cast<void>(miscContext.data<BuilderPrivateData>()); },
+                                 "miscellaneous inspection assets should have no dependency data");
+  const auto collections = dependencyCollections(catalog);
   expect(collections.size() == 1, "scan result builder should declare one sequence collection");
   expect(collections[0].selection.sequence == sequence.id(),
          "scan result builder should preserve the collection sequence");
@@ -142,7 +143,7 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
          "scan result builder should preserve the collection instrument set");
   expect(collections[0].members().samplePools == std::vector<AssetId>{samplePool.id()},
          "scan result builder should preserve the collection sample collection");
-  expect(collections[0].selection.miscAssets == std::vector<AssetId>{misc.id()},
+  expect(collections[0].selection.miscAssets == std::vector<AssetId>{misc},
          "scan result builder should preserve the collection misc asset");
   expect(result.diagnostics.size() == 1 && result.diagnostics[0].message == "builder warning",
          "scan result builder should preserve diagnostics");
@@ -185,7 +186,7 @@ void scanResultBuilderPublishesCollectionsByDefaultAndPreservesOptOut() {
                         "Defaults");
   const auto song = out.sequence("Song").program(probeSequenceProgram());
   const auto bank = out.soundBank("Bank");
-  const auto table = out.misc("Table", sources.reader(source).range(0, 1)).payload({0});
+  const auto table = out.misc("Table", sources.reader(source).range(0, 1));
   auto loose = out.sequence("Loose").program(probeSequenceProgram()).withoutCollection();
   loose.useBank(bank).useBanks([id = bank.id()](const DependencyContext&) { return selectAll(std::array{id}); });
   loose.includeMisc(table).collectionName("Still loose");
@@ -196,7 +197,7 @@ void scanResultBuilderPublishesCollectionsByDefaultAndPreservesOptOut() {
          "publishing a sequence must create a collection even without bank requests or explicit collection metadata");
   const auto& retained = std::get<SequenceProgramAsset>(result.assets.back());
   expect(retained.metadata.id == loose.id() && retained.bankRequests.size() == 2 &&
-             retained.collection.miscAssets == std::vector{table.id()} && !retained.collection.enabled,
+             retained.collection.miscAssets == std::vector{table} && !retained.collection.enabled,
          "bank requests, naming, and supplemental assets must not undo an explicit collection opt-out");
 }
 
@@ -253,24 +254,24 @@ void scanResultBuilderChecksAllDraftsBeforeConsumingValues() {
   auto bank = out.soundBank("Complete Bank");
   bank.instruments().append(Instrument{.name = "Retained Instrument"});
   auto sequence = out.sequence("Incomplete Sequence");
-  auto misc = out.misc("Incomplete Misc", input.reader.range(0, 1));
+  const auto misc = out.misc("Retained Misc", input.reader.range(0, 1));
+  const auto annotation = out.sourceMap().table("Retained Misc", input.reader.range(0, 1)).owner(ObjectRefs::misc(misc));
   sequence.collectionName("Broken");
 
   expectThrows<std::logic_error>([&] { static_cast<void>(out.finish()); },
                                  "scan result builder should reject a sequence draft that was never given a program");
 
   sequence.program(SequenceProgram{.tracks = {TrackProgram{.name = "Retained Track"}}});
-  expectThrows<std::logic_error>([&] { static_cast<void>(out.finish()); },
-                                 "scan result builder should reject a misc draft that was never given a payload");
-
-  misc.payload({});
   const auto result = out.finish();
   expect(result.assets.size() == 3 && std::get<SoundBankAsset>(result.assets[0]).instruments.size() == 1 &&
              std::get<SoundBankAsset>(result.assets[0]).instruments[0].name == "Retained Instrument" &&
              std::get<SequenceProgramAsset>(result.assets[1]).program.tracks.size() == 1 &&
              std::get<SequenceProgramAsset>(result.assets[1]).program.tracks[0].name == "Retained Track" &&
-             std::get<MiscAsset>(result.assets[2]).payload.empty(),
-         "failed finalization must leave every draft intact for repair, including an explicitly empty payload");
+             std::get<MiscAsset>(result.assets[2]).metadata.id == misc &&
+             std::get<MiscAsset>(result.assets[2]).metadata.name == "Retained Misc" &&
+             std::get<MiscAsset>(result.assets[2]).metadata.range == input.reader.range(0, 1) &&
+             result.sourceMap.ownedBy(ObjectRefs::misc(misc)) == std::vector{annotation.id()},
+         "a missing sequence program must leave audio drafts and published misc metadata intact for repair");
 }
 
 void scanResultBuilderPublishesEmptySynthDrafts() {

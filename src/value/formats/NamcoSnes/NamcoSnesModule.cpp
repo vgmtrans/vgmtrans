@@ -16,11 +16,6 @@ using namespace core;
 
 namespace {
 
-ScanMiscDraft misc(ScanResultBuilder& result, std::string name, SourceRange range) {
-  const auto bytes = result.reader().slice(range.offset, range.size);
-  return result.misc(std::move(name), range).payload({bytes.begin(), bytes.end()});
-}
-
 AnnotationBuilder pointer(ByteReader reader, SourceMapBuilder& sourceMap, std::string label, u32 address) {
   const SourceRange range = reader.range(address, 2);
   const u16 destination = reader.le16(address);
@@ -110,9 +105,9 @@ void addSongTables(ScanResultBuilder& result, const Layout& layout, const std::s
   }
 
   const SourceRange range = reader.range(begin, end - begin);
-  auto asset = misc(result, "Song Tables", range);
+  const auto asset = result.misc("Song Tables", range);
   auto& sourceMap = result.sourceMap();
-  const ObjectRef owner = ObjectRefs::misc(asset.id());
+  const ObjectRef owner = ObjectRefs::misc(asset);
   const auto resources = sourceMap.table("Resource Pointers", reader.range(begin, 8)).owner(owner).id();
   pointer(reader, sourceMap, "Amplitude Envelopes Pointer", begin).parent(resources);
   pointer(reader, sourceMap, "Pitch Envelopes Pointer", begin + 2).parent(resources);
@@ -132,8 +127,8 @@ void addSongTables(ScanResultBuilder& result, const Layout& layout, const std::s
     if (entryRange.offset >= range.offset && entryRange.endOffset() <= range.endOffset()) {
       entry.owner(owner);
     } else {
-      auto entryAsset = misc(result, "Song Entry", entryRange);
-      entry.owner(ObjectRefs::misc(entryAsset.id()));
+      const auto entryAsset = result.misc("Song Entry", entryRange);
+      entry.owner(ObjectRefs::misc(entryAsset));
       sequence.includeMisc(entryAsset);
     }
     pointer(reader, sourceMap, "Event Data Pointer", entryRange.offset).parent(entry.id());
@@ -169,8 +164,7 @@ void addSongTables(ScanResultBuilder& result, const Layout& layout, const std::s
   auto sequence = result.sequence(name);
   SequenceParse parsed =
       decodeSequence(input.retain(), *layout, sequence.id(), &result.sourceMap(), &result.diagnostics());
-  sequence.range(sequenceSourceRange(input.reader, input.reader.range(layout->sequenceAddress, 1), parsed.program))
-      .program(std::move(parsed.program));
+  sequence.program(std::move(parsed.program));
 
   addSongTables(result, *layout, parsed.percussion, sequence);
   if (const auto synth = addSynth(result, *layout, parsed.srcns, parsed.percussion, parsed.noiseRates, name)) {

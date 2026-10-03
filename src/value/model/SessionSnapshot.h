@@ -22,10 +22,9 @@
 
 namespace vgmtrans::core {
 
+// A supplemental source structure for inspection; its bytes stay in SourceStore.
 struct MiscAsset {
   AssetMetadata metadata;
-  std::vector<u8> payload;
-  AssetPrivateData privateData;
 };
 
 using Asset = std::variant<SequenceProgramAsset, SoundBankAsset, SamplePoolAsset, MiscAsset>;

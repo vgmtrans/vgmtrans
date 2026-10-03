@@ -8,7 +8,6 @@
 
 #include <fmt/format.h>
 
-#include <algorithm>
 #include <string>
 
 namespace vgmtrans::formats::rare_snes {
@@ -16,12 +15,6 @@ namespace vgmtrans::formats::rare_snes {
 using namespace core;
 
 namespace {
-
-[[nodiscard]] SourceRange sequenceRange(ByteReader reader, const Layout& layout, const SequenceProgram& program) {
-  SourceRange range = layout.sequenceHeaderRange;
-  range.include(layout.initialTempoRange);
-  return sequenceSourceRange(reader, range, program);
-}
 
 [[nodiscard]] ScanResult scan(const ScanInput& input) {
   const auto layout = findLayout(input.reader);
@@ -35,7 +28,7 @@ namespace {
   auto sequence = result.sequence(displayName);
   SequenceParse parsed =
       decodeSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics());
-  sequence.range(sequenceRange(input.reader, *layout, parsed.program)).program(std::move(parsed.program));
+  sequence.program(std::move(parsed.program));
 
   if (const auto synth = addSynth(result, *layout, parsed.recipes, displayName)) {
     sequence.useBank(*synth);

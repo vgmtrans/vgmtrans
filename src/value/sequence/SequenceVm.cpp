@@ -260,9 +260,6 @@ public:
       }
       started_ = true;
     }
-    if (!position_.command && position_.pendingTicks == 0) {
-      return SequenceCoordinatorSignal::None;
-    }
     if (position_.pendingTicks != 0) {
       const u32 elapsed = observesEachWaitTick() ? 1 : position_.pendingTicks;
       tick_ = addTicks(tick_, elapsed);
@@ -477,10 +474,9 @@ private:
     }
     const u32 commandIndex = *position_.command;
     const CommandId commandId{commandIndex};
-    const VisitState state = visitState(commandIndex);
-    const auto [previous, firstVisit] = visited_.try_emplace(state, tick_);
+    const auto [previous, firstVisit] = visited_.try_emplace(visitState(commandIndex), tick_);
     if (behavior_.inferLoopsFromRepeatedState && arrivedByControlFlow_ && !firstVisit) {
-      handleLoop(previous->second, lastCommand_.valid() ? lastCommand_ : commandId, commandIndex, state);
+      handleLoop(previous->second, lastCommand_.valid() ? lastCommand_ : commandId, commandIndex, previous->first);
     }
     return position_.command.has_value();
   }
@@ -568,7 +564,7 @@ private:
       }
       visited_.clear();
       if (recordAfterClear) {
-        visited_.emplace(*recordAfterClear, tick_);
+        visited_.emplace(std::move(*recordAfterClear), tick_);
       }
       position_.command = replayIndex;
       arrivedByControlFlow_ = true;

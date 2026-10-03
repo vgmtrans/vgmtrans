@@ -146,7 +146,7 @@ struct RuntimeConfig {
 };
 
 struct ProgramState {
-  ProgramState(const SequenceProgram&, const RuntimeConfig& config) {
+  explicit ProgramState(const RuntimeConfig& config) {
     echo.voiceMask = 0;
     echo.delayMilliseconds = (config.echoDelay & 0x0fu) * 16.0;
   }

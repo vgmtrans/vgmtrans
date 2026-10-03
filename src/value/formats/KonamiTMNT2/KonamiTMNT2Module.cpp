@@ -37,12 +37,10 @@ namespace {
       .offset = layout->sequenceTable.offset,
       .size = sequenceTableEnd - layout->sequenceTable.offset,
   };
-  const auto sequenceTableBytes = input.reader.slice(sequenceTableRange.offset, sequenceTableRange.size);
-  auto sequenceTable = result.misc("Sequence Table", sequenceTableRange)
-                           .payload(std::vector<u8>(sequenceTableBytes.begin(), sequenceTableBytes.end()));
+  const auto sequenceTable = result.misc("Sequence Table", sequenceTableRange);
   const SourceAnnotationId sequenceTableRoot = result.sourceMap()
                                                    .table("Sequence Table", sequenceTableRange)
-                                                   .owner(ObjectRefs::misc(sequenceTable.id()))
+                                                   .owner(ObjectRefs::misc(sequenceTable))
                                                    .kind("konami-tmnt2-sequence-table")
                                                    .id();
   const SourceAnnotationId pointerTable = result.sourceMap()
@@ -72,7 +70,7 @@ namespace {
                                     &result.diagnostics()));
     const SourceAnnotationId trackTable = result.sourceMap()
                                               .entry(sourceSequence.name + " Track Table", sourceSequence.trackTable)
-                                              .owner(ObjectRefs::misc(sequenceTable.id()))
+                                              .owner(ObjectRefs::misc(sequenceTable))
                                               .parent(sequenceTableRoot)
                                               .kind("konami-tmnt2-sequence-track-table")
                                               .id();

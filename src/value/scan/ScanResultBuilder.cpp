@@ -88,18 +88,6 @@ ScanSequenceDraft& ScanSequenceDraft::includeMisc(AssetId asset) {
   return *this;
 }
 
-ScanSequenceDraft& ScanSequenceDraft::includeMisc(const ScanMiscDraft& asset) {
-  return includeMisc(asset.id());
-}
-
-ScanMiscDraft& ScanMiscDraft::payload(std::vector<u8> payload) {
-  if (pending_->payload) {
-    throw std::logic_error("ScanResultBuilder misc draft was given more than one payload");
-  }
-  pending_->payload = std::move(payload);
-  return *this;
-}
-
 ScanResultBuilder::ScanResultBuilder(ScanInput input, std::string format)
     : input_(std::move(input)), format_(std::move(format)),
       sourceMap_([this]() { return input_.ids.nextSourceAnnotationId(); }) {
@@ -149,10 +137,10 @@ ScanSamplePoolDraft ScanResultBuilder::samplePool(std::string name, SourceRange 
   return draft;
 }
 
-ScanMiscDraft ScanResultBuilder::misc(std::string name, SourceRange range) {
+AssetId ScanResultBuilder::misc(std::string name, SourceRange range) {
   const AssetId id = input_.ids.nextAssetId();
-  drafts_.emplace_back(ScanMiscDraft::Pending{.id = id, .name = std::move(name), .range = range});
-  return ScanMiscDraft{std::get<ScanMiscDraft::Pending>(drafts_.back())};
+  drafts_.emplace_back(MiscAsset{.metadata = metadata(id, std::move(name), range)});
+  return id;
 }
 
 void ScanResultBuilder::diagnostic(Diagnostic diagnostic) {
@@ -171,9 +159,6 @@ ScanResult ScanResultBuilder::finish() {
   for (const auto& draft : drafts_) {
     if (const auto* sequence = std::get_if<ScanSequenceDraft::Pending>(&draft); sequence && !sequence->program) {
       throw std::logic_error("ScanResultBuilder sequence draft was never given a program");
-    }
-    if (const auto* misc = std::get_if<ScanMiscDraft::Pending>(&draft); misc && !misc->payload) {
-      throw std::logic_error("ScanResultBuilder misc draft was never given a payload");
     }
   }
 
@@ -212,11 +197,7 @@ ScanResult ScanResultBuilder::finish() {
                 .privateData = std::move(pending.privateData),
             };
           } else {
-            return MiscAsset{
-                .metadata = metadata(pending.id, std::move(pending.name), pending.range),
-                .payload = std::move(*pending.payload),
-                .privateData = std::move(pending.privateData),
-            };
+            return std::move(pending);
           }
         },
         draft);

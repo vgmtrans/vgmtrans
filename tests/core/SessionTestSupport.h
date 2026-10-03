@@ -92,8 +92,8 @@ namespace {
 
   ScanResultBuilder out(input, "ProbeMisc");
   const SourceRange range = input.reader.range(0, input.reader.size());
-  const auto asset = out.misc(input.source.name, range).payload({input.reader.u8At(0), input.reader.u8At(1)});
-  out.sourceMap().annotation(SourceRole::Payload, input.source.name, range).owner(ObjectRefs::misc(asset.id()));
+  const auto asset = out.misc(input.source.name, range);
+  out.sourceMap().annotation(SourceRole::Payload, input.source.name, range).owner(ObjectRefs::misc(asset));
   return out.finish();
 }
 

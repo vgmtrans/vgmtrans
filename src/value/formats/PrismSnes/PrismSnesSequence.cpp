@@ -163,7 +163,7 @@ struct MasterFade {
 };
 
 struct ProgramState {
-  ProgramState(const SequenceProgram&, const RuntimeConfig& config) : version(config.layout.version), data(config) {
+  explicit ProgramState(const RuntimeConfig& config) : version(config.layout.version), data(config) {
     echo.delay = data.layout.echoDelay;
     echo.filter = data.layout.echoFilter;
   }

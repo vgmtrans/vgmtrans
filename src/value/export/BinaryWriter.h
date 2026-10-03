@@ -17,7 +17,6 @@
 namespace vgmtrans::core {
 
 void writeAscii(std::vector<u8>& bytes, std::string_view text);
-void writeU8(std::vector<u8>& bytes, u8 value);
 void writeLe16(std::vector<u8>& bytes, u16 value);
 void writeLeS16(std::vector<u8>& bytes, s16 value);
 void writeLe32(std::vector<u8>& bytes, u32 value);
