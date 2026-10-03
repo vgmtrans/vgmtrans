@@ -153,44 +153,27 @@ struct SfLayout {
   return clampS16(static_cast<s32>(std::lround((std::clamp(pan, 0.0, 1.0) - 0.5) * 1000.0)));
 }
 
-[[nodiscard]] std::optional<u16> sf2GeneratorForDestination(SynthDestination destination) {
+struct SfModulationDestination {
+  u16 generator;
+  u16 defaultController;
+};
+
+[[nodiscard]] std::optional<SfModulationDestination> sf2Destination(SynthDestination destination) {
   switch (destination) {
     case SynthDestination::VolumeAttenuation:
-      return kSfGenInitialAttenuation;
+      return SfModulationDestination{kSfGenInitialAttenuation, kSfModTremoloDepth};
     case SynthDestination::VibratoDepth:
-      return kSfGenVibLfoToPitch;
+      return SfModulationDestination{kSfGenVibLfoToPitch, kSfModModWheel};
     case SynthDestination::VibratoRate:
-      return kSfGenFreqVibLfo;
+      return SfModulationDestination{kSfGenFreqVibLfo, kSfModVibratoRate};
     case SynthDestination::VibratoDelay:
-      return kSfGenDelayVibLfo;
+      return SfModulationDestination{kSfGenDelayVibLfo, kSfModVibratoDelay};
     case SynthDestination::TremoloDepth:
-      return kSfGenModLfoToVolume;
+      return SfModulationDestination{kSfGenModLfoToVolume, kSfModTremoloDepth};
     case SynthDestination::TremoloRate:
-      return kSfGenFreqModLfo;
+      return SfModulationDestination{kSfGenFreqModLfo, kSfModSoundController6};
     case SynthDestination::TremoloDelay:
-      return kSfGenDelayModLfo;
-    case SynthDestination::Unknown:
-      return std::nullopt;
-  }
-
-  return std::nullopt;
-}
-
-[[nodiscard]] std::optional<u16> sf2DefaultSourceForDestination(SynthDestination destination) {
-  switch (destination) {
-    case SynthDestination::VibratoDepth:
-      return kSfModModWheel;
-    case SynthDestination::VibratoRate:
-      return kSfModVibratoRate;
-    case SynthDestination::VibratoDelay:
-      return kSfModVibratoDelay;
-    case SynthDestination::TremoloDepth:
-    case SynthDestination::VolumeAttenuation:
-      return kSfModTremoloDepth;
-    case SynthDestination::TremoloRate:
-      return kSfModSoundController6;
-    case SynthDestination::TremoloDelay:
-      return kSfModSoundController10;
+      return SfModulationDestination{kSfGenDelayModLfo, kSfModSoundController10};
     case SynthDestination::Unknown:
       return std::nullopt;
   }
@@ -201,17 +184,16 @@ struct SfLayout {
 void writeModulator(std::vector<u8>& bytes, const SynthModulator& modulator) {
   // SynthModulator names common controller behavior. This function chooses the SF2 controller
   // and generator numbers and writes their complete SF2 record.
-  const auto source = modulator.source == SynthSource::ChannelPressure
-                          ? std::optional{kSfModChannelPressure}
-                          : sf2DefaultSourceForDestination(modulator.destination);
-  const auto destination = sf2GeneratorForDestination(modulator.destination);
-  if (!source || !destination) {
+  const auto destination = sf2Destination(modulator.destination);
+  if (!destination) {
     return;
   }
 
+  const u16 source = modulator.source == SynthSource::ChannelPressure ? kSfModChannelPressure
+                                                                   : destination->defaultController;
   const s16 amount = clampS16(modulator.amount);
-  writeLe16(bytes, *source);
-  writeLe16(bytes, *destination);
+  writeLe16(bytes, source);
+  writeLe16(bytes, destination->generator);
   writeLeS16(bytes, amount);
   writeLe16(bytes, 0);
   writeLe16(bytes, kSfTransformLinear);
@@ -436,8 +418,8 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
   };
   const auto writeModulation = [&](const LoweredSynthModulation& modulation) {
     for (const auto& generator : modulation.generators) {
-      if (const auto destination = sf2GeneratorForDestination(generator.destination)) {
-        writeAmountGen(generators, *destination, clampS16(generator.amount));
+      if (const auto destination = sf2Destination(generator.destination)) {
+        writeAmountGen(generators, destination->generator, clampS16(generator.amount));
       }
     }
     for (const auto& modulator : modulation.modulators) {

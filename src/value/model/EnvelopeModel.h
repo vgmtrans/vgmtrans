@@ -88,10 +88,7 @@ struct EnvelopeUpdate {
   EnvelopeFields fields = EnvelopeFields::None;
 
   [[nodiscard]] static EnvelopeUpdate replace(Envelope values) {
-    return EnvelopeUpdate{
-        .values = std::move(values),
-        .fields = EnvelopeFields::All,
-    };
+    return set(std::move(values), EnvelopeFields::All);
   }
 
   [[nodiscard]] static EnvelopeUpdate set(Envelope values, EnvelopeFields fields) {

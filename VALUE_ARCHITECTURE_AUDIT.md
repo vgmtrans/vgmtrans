@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Thirty-two validated batches remove 1,089 net production lines
+`cb9e0b766`. Thirty-three validated batches remove 1,109 net production lines
 from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 31 exactly;
-71 expanded raw inventories match, and two differ only by pre-existing concurrent
+cover 37 of 38 registered families. All export records match batch 32 exactly;
+72 expanded raw inventories match, and one differs only by pre-existing concurrent
 sample-pool ID scheduling established in earlier original/cleanup repetitions.
 Raw evidence and the narrow comparison are retained below. The cleanup2 records
 appear at the end of this document.
@@ -6896,3 +6896,132 @@ Next: independently prove a Sony track's immutable zone view across program
 switches, held notes and VM passes before any application. Separately measure a
 fixed-domain SRCN set against the current ordered vector normalization, including
 sparse workloads, template code size and public range/consumption boundaries.
+
+
+## Cleanup2 thirty-third batch: one target mapping and immutable track views
+
+Three production files remove 20 net lines, bringing cleanup2 to 1,109 removed:
+1,005 architecture lines and 104 format lines. Physical diff is 25 additions/
+45 deletions; cumulative production C++/headers are 1,913/3,022 across 157 paths,
+architecture 1,589/2,594 across 88, and formats 324/428 across 69. No fixture
+changes; cumulative tests still gain 559 lines. Preserve SequenceVM and neutral
+source performance/synth models.
+
+- SF2 has one private destination mapping containing its generator and default
+  controller numbers. Replace two parallel SynthDestination switches and two
+  optional results with one reused SfModulationDestination lookup/guard. Both
+  generator and modulator writers read that target mapping; channel pressure
+  overrides its default controller and invalid source enums retain the old
+  fallback. Remove 18 lines. This record represents reusable target routing
+  policy, unlike the deleted single-use full modulator/amount result. Keep SF2
+  routing local; introduce no cross-target mapping framework or enum-index table.
+- Sony PS2 TrackState borrows a span<const PitchBendZone> from its immutable
+  selected ProgramRuntimeInfo. An empty span resets selection. The ProgramState's
+  RuntimeConfig owns that table for the whole semantic/render pass; playback
+  never mutates it, no track state escapes, and loop checkpoints copy only source
+  position. Remove the per-track copied vector and per-program-switch copies.
+  Add the direct span include, so the change adds one production line. Keep
+  mutable RPN defaults and ActiveNote's copied scalar bounds: held/sustained
+  voices must retain their old program's pitch interpretation after selection
+  changes. No new view/config/shared-owner framework or public API.
+- EnvelopeUpdate::replace delegates to existing set(values, All). Keep both
+  semantic names, explicit masks, clear-versus-inherit behavior and restore.
+  Remove duplicated result assembly and three lines. Envelope remains the same
+  trivially copyable, nothrow-movable native scalar value; no storage/heap change.
+
+Validation:
+
+- Full macOS Release integration completes 349 steps without warnings. All 44
+  CTest suites pass; freeze complete matching value sources/headers/tests, four
+  archives and shell. Shell SHA256 is
+  d230f329aed940db0e4dc8c06cbfde006f77d929aaee0088b3e38ee9bc2a59b4.
+- Original corpus against frozen 32 preserves 252 input/policy records and all
+  3,922 artifacts exactly. Expanded `/Volumes/emu/vgm` replay preserves all 894
+  export records, 858 artifact names/sizes/hashes and 218,240,549 bytes per binary.
+  All 852 successes, 42 existing export failures and five unsupported DSF
+  inventory failures retain status and diagnostics. Real inputs still cover
+  37/38 families; KonamiTMNT2 has synthetic coverage only.
+- Seventy-two expanded raw inventories match. Growlanser II/Hoot Hoot.psf2 only
+  swaps the two concurrent Sony pool IDs 0/1 and the coherent selected-pool
+  reference. Four initial/automatic-repeat records agree under the unchanged
+  narrow declaration/member-ID mapping and match retained original evidence.
+  All source/parent/asset/collection metadata, bank 2, sequence 3, collection 0,
+  labels/ranges, status and two ordered Sony warnings stay exact; six exports
+  match. Retain raw differences; no new repetitions or broader normalization.
+- SF2 proof uses complete matching frozen 32 before/after units and preserves
+  29,799 private captures (29,700 modulator and 99 actual instrumentChunks
+  generator cases): 2,151,999 bytes, SHA256
+  da6e2171c788caab562cffab8f9793d70751c6d8ed17c2eaf72c61b9638af785.
+  All four Release/sanitizer streams match. Verify all seven routes, Unknown and
+  invalid destination/source enums, pressure/default fallback, signed amount
+  extremes/clipping, prefixes, capacities and independent complete LE fields.
+  All 4,725 injected allocation failures preserve partial bytes/capacity/ordering;
+  ordinary modulator requests stay 18,270/193,725 bytes per runner.
+- SF2 preserves 3,768 public artifact captures/17,023,170 bytes in all four runs,
+  SHA256 a837e6bc76a760d3a5eff15e3842caef714e9651f0b9745e1f4c4fc37e58ed4e.
+  Complete SynthExport/Modulation suites pass; cover 24 fixture captures, 672 loop/
+  alias cases and 3,072 instrument/region native/simulated modulation cases in
+  all four rounding modes, including zero/subnormal/huge/nonfinite frequencies.
+  Three configured production Werror checks pass before and after exact live
+  application. No heap/speed improvement or full numeric/FENV-flag parity claim.
+- Sony zone views preserve 1,296 interleaved-track/lifecycle cases and the complete
+  SonyPS2 fixture under Release and ASan/UBSan/float-cast-overflow. Four native/
+  MIDI/source-span traces match 155,987,686 bytes, SHA256
+  639fca93f89f72e5b722115c0a31bce30db3b006b1f97934c6ff54541e5bb65e.
+  Cover 1/4/16 channels, 1/8 switch rounds, six empty/disjoint/overlap/extreme/
+  inverted/32-entry zone shapes, finite/infinite MIDI loops and ordinary/two-
+  section/repeating-song forms, wheel extremes, embedded/external runtime,
+  first-match duplicate programs, pending banks, overlapping equal-key voices,
+  held/sustained/released notes and reset/all-notes/all-sound-off.
+- A focused Sony assertion proves a sustained old-program note retains positive
+  256/negative 128 bounds after program change while a new attack adopts
+  1,024/512. Source/config/scanned program/snapshot die before rendering from a
+  copied owning runtime; runtime/program/ProgramState die before durable output
+  observation. Trace includes all relevant note/bend/range/selection fields and
+  other selected native payloads, headers/order, source spans and diagnostics;
+  it does not serialize every hypothetical IR variant.
+- Sony TrackState shrinks 112->104 bytes. Each mode saves 22,032 scoped render
+  allocations/819,720 requested bytes: 1,188 cases reduce count, all 1,296 reduce
+  bytes, none grow. Maximum saving is 32 requests/3,296 bytes. Release totals
+  are 3,654,323->3,632,291 requests and 3,186,842,824->3,186,023,104 bytes;
+  sanitizer totals differ from Release, so compare before/after within each
+  mode. No peak-RSS or arbitrary allocator-failure timing claim. Paired actual
+  Release Werror checks pass. Frozen-31 model/Sequence/fixture/runtime contracts
+  are verified unchanged to 32; original matching archives remain the actual
+  probe authority, with 33 integrated replays validating composition.
+- Envelope forwarding preserves 3,072 mask/bit-pattern/rounding-mode cases and
+  emitter captures in all four Release/sanitizer traces: 762,656 bytes, SHA256
+  ade6b644597a5463afed6acd2282635a0d325188e33f8c9ecc63eb8de81cd91c.
+  Cover 64 optional-stage masks, signed zero, subnormals, extrema, infinity and
+  distinct quiet-NaN payloads, source value preservation, all-fields mask,
+  moved input, restoration and exact emitted scope/header identity. Three full
+  InstrumentVariant/ResolvedInstrument/MP2k suites pass. Twelve actual two-caller
+  Debug/Release/RelWithDebInfo Werror entries pass; scalar type traits are checked.
+  The paired O2 PerformanceEmitter and MP2kSequence object files are byte-identical,
+  including text/exception/unwind/data sections. This is scoped optimized-object
+  evidence, not a timing or whole-application object-equivalence claim.
+- Focused sanitizers cover complete changed writer/sequence/caller/probe/fixture
+  units, with matching VM/timing/resolution where relevant. Remaining frozen
+  archives are Release and libc++ annotations are disabled consistently. No
+  whole-program instrumentation or Windows run claim.
+
+Rejected pointer-kind cache: store commandKindPrefix + '-track-pointer' as the
+session's final owned string and build the constructor header from config directly.
+A temporary 96-case prefix/pointer/null-map comparison preserves annotation kinds
+and labels, but adds a line and grows three ordinary sparse paths. A 16-character
+prefix with zero pointers/map grows 5 requests/344 bytes to 6/376; eight pointers
+improve 51/8,584 to 44/8,360. A 23-character zero-pointer prefix keeps six requests
+but grows 376->392 bytes. Null-map initialization can be delayed to avoid unused
+allocation, but a lazy protocol would recover overhead. Retain the clear owned
+prefix; no full parity/sanitizer claim for the rejected draft.
+
+Evidence: sf2-routing33-frozen32 under /tmp/vgmtrans-, and
+sony-ps2-pitch-zones32, envelope-replace-forward33, sequence-pointer-kind33,
+pass33-baseline, comparison-pass33.json and volume-coverage27/pass32-vs-pass33
+summary/report/retained-classification files under /tmp/vgmtrans-cleanup2.
+
+Next: prove the DLS mapping plus direct guarded connection writers independently.
+Keep the SRCN fixed-set draft temporary while comparing sparse microcosts with
+native app workloads; preserve its moved-vector/failure boundaries. Probe the
+expression helper's missing source-level parameter only if existing default
+calls retain their closure/allocation behavior.

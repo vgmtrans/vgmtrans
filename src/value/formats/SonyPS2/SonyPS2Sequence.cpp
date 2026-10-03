@@ -17,6 +17,7 @@
 #include <limits>
 #include <map>
 #include <optional>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -77,7 +78,7 @@ struct TrackState {
   std::optional<std::pair<u8, u8>> dataEntryNrpn;
   u16 pitchBendPositive = 256;
   u16 pitchBendNegative = 256;
-  std::vector<PitchBendZone> pitchBendZones;
+  std::span<const PitchBendZone> pitchBendZones;
   struct ActiveNote {
     u8 key = 0;
     u16 negative = 256;
@@ -266,7 +267,7 @@ struct Playback : SequencePlayback<TrackState, StreamState> {
   void updateProgramSettings() {
     track.pitchBendPositive = 256;
     track.pitchBendNegative = 256;
-    track.pitchBendZones.clear();
+    track.pitchBendZones = {};
     if (const auto* program = selectedProgram()) {
       track.pitchBendPositive = program->pitchBendPositive;
       track.pitchBendNegative = program->pitchBendNegative;
