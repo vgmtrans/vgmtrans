@@ -9,9 +9,6 @@
 #include "value/export/midi/MidiModel.h"
 #include "value/export/ResolvedPerformance.h"
 #include "value/export/ExportTypes.h"
-#include "value/synth/SynthModel.h"
-
-#include <span>
 
 namespace vgmtrans::core {
 

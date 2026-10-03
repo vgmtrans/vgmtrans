@@ -141,14 +141,10 @@ struct RepeatFrame {
   u16 remaining = 0;
 };
 
-struct RuntimeConfig {
-  u8 echoDelay = 0;
-};
-
 struct ProgramState {
-  explicit ProgramState(const RuntimeConfig& config) {
+  explicit ProgramState(u8 echoDelay) {
     echo.voiceMask = 0;
-    echo.delayMilliseconds = (config.echoDelay & 0x0fu) * 16.0;
+    echo.delayMilliseconds = (echoDelay & 0x0fu) * 16.0;
   }
 
   PerformanceBoundValue<SequenceFixedPointAutomation<s32>> tempo{0x80};
@@ -772,7 +768,7 @@ const SequenceProgramConfig& sequenceConfig() {
 }
 
 SequenceRuntime sequenceRuntime(u8 echoDelay) {
-  return makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{.echoDelay = echoDelay});
+  return makeCompiledRuntime<Playback, ProgramState>(echoDelay);
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, u32 trackNumber, u32 startAddress, u32 sequenceBase, u8 groupIndex,

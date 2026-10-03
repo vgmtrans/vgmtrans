@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "value/synth/SynthModel.h"
+#include "value/model/EnvelopeModel.h"
 
 namespace vgmtrans::core {
 

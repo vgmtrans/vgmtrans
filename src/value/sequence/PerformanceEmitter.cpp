@@ -624,14 +624,14 @@ PerformanceAutomationBinding PerformanceEmitter::noteEnvelope(PerformanceAutomat
   return beginAutomation(target, PerformanceAutomationMotion::NoteEnvelope, targetValue, durationTicks, delayTicks);
 }
 
-PerformanceEmitter PerformanceEmitter::withAutomation(const PerformanceAutomationBinding& automation) const {
-  auto output = *this;
-  if (automation.owner_ == nullptr) {
+PerformanceEmitter PerformanceAutomationBinding::output(const PerformanceEmitter& out) const {
+  auto output = out;
+  if (owner_ == nullptr) {
     output.automation_.reset();
-  } else if (automation.owner_ != &track_) {
+  } else if (owner_ != &out.track_) {
     throw std::logic_error("Performance automation binding belongs to another track");
   } else {
-    output.automation_ = automation.automation_;
+    output.automation_ = automation_;
   }
   return output;
 }

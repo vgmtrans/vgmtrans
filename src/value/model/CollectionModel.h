@@ -96,10 +96,4 @@ struct Collection {
   [[nodiscard]] ResolutionStatus resolutionStatus() const noexcept { return inputs.status(); }
 };
 
-[[nodiscard]] Diagnostic missingSequenceIssue(std::optional<AssetId> asset = std::nullopt);
-[[nodiscard]] Diagnostic missingSoundBankIssue(std::optional<AssetId> asset = std::nullopt);
-[[nodiscard]] Diagnostic missingSamplePoolIssue(std::optional<AssetId> asset = std::nullopt);
-[[nodiscard]] Diagnostic ambiguousMatchIssue(std::string message = "Collection has ambiguous matches",
-                                            std::optional<AssetId> asset = std::nullopt, SourceRange range = {});
-
 }  // namespace vgmtrans::core

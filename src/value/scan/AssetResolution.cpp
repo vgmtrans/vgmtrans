@@ -31,7 +31,11 @@ public:
         }
       } else {
         banks.status = ResolutionStatus::Failed;
-        result_.issues.push_back(missingSequenceIssue(result_.selection.sequence));
+        result_.issues.push_back({.severity = Severity::Error,
+                                  .code = "missing-sequence",
+                                  .message = "Collection references missing sequence asset " +
+                                             std::to_string(result_.selection.sequence->value),
+                                  .object = ObjectRefs::asset(*result_.selection.sequence)});
       }
     } else if (!selected<SoundBankAsset>().empty()) {
       // Standalone bank preparation has no sequence requests.
@@ -112,10 +116,14 @@ private:
       result_.issues.push_back(std::move(diagnostic));
     }
     if (selection.status() == ResolutionStatus::Incomplete && selection.issues().empty()) {
-      auto missing = std::is_same_v<Provider, SoundBankAsset> ? missingSoundBankIssue() : missingSamplePoolIssue();
-      missing.object = ObjectRefs::asset(owner.id);
-      missing.range = owner.range;
-      result_.issues.push_back(std::move(missing));
+      result_.issues.push_back({.severity = Severity::Warning,
+                                .code = std::is_same_v<Provider, SoundBankAsset> ? "missing-sound-bank"
+                                                                             : "missing-sample-pool",
+                                .message = std::is_same_v<Provider, SoundBankAsset>
+                                               ? "Collection has no sound bank asset"
+                                               : "Collection has no sample pool asset",
+                                .range = owner.range,
+                                .object = ObjectRefs::asset(owner.id)});
     }
     // A later successful request cannot hide an earlier unresolved request.
     resolved.status = std::max(resolved.status, selection.status());

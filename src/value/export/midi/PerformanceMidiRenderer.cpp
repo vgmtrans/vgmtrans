@@ -56,14 +56,6 @@ constexpr int kVoiceTerminationPriority = 7;
   return midi::meta(tick, 0x58, {numerator, denominatorPower(denominator), clocksPerMetronomeClick, 8});
 }
 
-[[nodiscard]] u8 midiKey(double key) {
-  return data7(key);
-}
-
-[[nodiscard]] u8 midiVelocity(double linearVelocity) {
-  return LevelScale::midi7FromLinear(linearVelocity);
-}
-
 struct MidiChannelAssignment {
   size_t port = 0;
   u8 channel = 0;
@@ -1070,9 +1062,10 @@ private:
               addCombinedLevel(typedEvent.header.tick);
             }
             hasNote = true;
-            const u8 key = midiKey(attack.key + globalTransposeAt(globalTransposes, typedEvent.header.tick));
-            track.events.push_back(
-                midi::note(typedEvent.header.tick, channel, key, midiVelocity(attack.linearVelocity), attack.durationTicks));
+            const u8 key = data7(attack.key + globalTransposeAt(globalTransposes, typedEvent.header.tick));
+            track.events.push_back(midi::note(
+                typedEvent.header.tick, channel, key, LevelScale::midi7FromLinear(attack.linearVelocity),
+                attack.durationTicks));
           } else if constexpr (std::is_same_v<TypedEvent, MidiInstrumentEvent>) {
             applyInstrumentSelection(typedEvent.header.tick, typedEvent.selection, true, typedEvent.forceBankSelect);
           } else if constexpr (std::is_same_v<TypedEvent, LevelPerformanceEvent>) {
@@ -1150,7 +1143,7 @@ private:
             if (typedEvent.previousKey) {
               const double previousKey =
                   *typedEvent.previousKey + globalTransposeAt(globalTransposes, typedEvent.header.tick);
-              addController(typedEvent.header.tick, MidiController::PortamentoControl, midiKey(previousKey));
+              addController(typedEvent.header.tick, MidiController::PortamentoControl, data7(previousKey));
             }
           } else if constexpr (std::is_same_v<TypedEvent, PortamentoEnablePerformanceEvent>) {
             addController(typedEvent.header.tick, MidiController::Portamento, typedEvent.enabled ? 127 : 0);

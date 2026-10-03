@@ -1,7 +1,7 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Fourteen validated batches remove 780 net production lines from
+`cb9e0b766`. Fifteen validated batches remove 849 net production lines from
 `src/value`. All 44 CTest suites pass; the latest real-file replay preserves
 all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
 records appear at the end of this document.
@@ -4905,7 +4905,7 @@ Validation:
   changed ScanResultBuilder.cpp and test units instrumented. The initial combined
   run encountered libc++ container-overflow across an instrumented std::function
   clone and Release SessionState vector copy. Frozen13 reproduces the same write
-  and stack. Both revisions pass with container annotations disabled;14 also
+  and stack. Both revisions pass with container annotations disabled; 14 also
   passes with _LIBCPP_HAS_NO_ASAN compiled consistently. Ordinary heap/lifetime
   and UB checks remain active. Remaining archives are Release, so this is not
   whole-core sanitizer coverage.
@@ -4922,9 +4922,9 @@ Validation:
 - Nin's full/nonzero-default/reset-isolation probes preserve 1,414 complete
   performance/MIDI captures and 6,745,680 bytes with focused sanitizers. Complete
   Prism/Neverland/Itikiti suites also pass with changed constructor units under
-  ASan, UBSan, and float-cast-overflow using frozen13 public headers/archives.
+  ASan, UBSan, and float-cast-overflow using frozen 13 public headers/archives.
 - The frozen fourteenth-batch shell preserves all 252 input/policy comparisons,
-  3,922 artifact hashes, inventories, diagnostics, and exit statuses against13.
+  3,922 artifact hashes, inventories, diagnostics, and exit statuses against 13.
 
 Next: remove internal diagnostic factories whose only callers can construct their
 complete Diagnostic directly; remove the cursor's duplicate absent/default flow
@@ -4932,3 +4932,86 @@ representation while preserving explicit runtime fallthrough; evaluate three
 single-field runtime configuration wrappers and narrow hardware/export header
 requirements. These candidates have concrete callers and temporary differential
 proofs; public format APIs and mutable working values remain the boundary.
+
+## Cleanup2 fifteenth batch: complete diagnostics and direct runtime values
+
+This batch removes 69 net production lines, bringing cleanup2 to 849 removed.
+No permanent test lines change. SequenceVM and export boundaries remain intact.
+
+- Remove four public collection diagnostic factories and their generic private
+  helper. Their three callers construct the complete Diagnostic where its
+  severity, owner, range, and message are known. The unused optional-asset
+  branches disappear; incomplete and ambiguous dependency behavior stays exact.
+- CompilerCursor::Event stores its default CommandTransition directly. Its
+  private setters only declare non-fallthrough transitions; the existing
+  fallthrough value also expresses an undeclared default. Runtime flowOverride
+  stays optional because explicitly overriding with fallthrough is meaningful.
+  ignore still resets the default and finish still resolves continuation.
+  The member shrinks 32 to 24 bytes; Event stays 224 because of alignment.
+- VM jump handling uses startTick initialized to the current tick, then replaces
+  it when the relevant prior visit exists. Remove the optional whose absent
+  branch immediately selected that same current tick.
+- Capcom, Itikiti, and Falcom pass their existing version, echo-delay value, or
+  PatchTable through makeCompiledRuntime directly. Three single-field Config
+  wrappers disappear. Falcom's borrowed patch span retains the same owned runtime
+  settings, and mutable playback values remain in state.
+- PerformanceAutomationBinding owns its output operation directly; remove the
+  private emitter forwarding method. at composes that operation with emitter.at.
+  Cross-track rejection, clearing, and automation identities are unchanged.
+- Remove private MIDI key/velocity/channel-message forwarders, use existing
+  data7/LevelScale conversion and MidiEvent aggregates, and include only the
+  actual envelope/modulation models in two hardware/export headers. The MIDI
+  renderer header drops unused synth and span includes. All legacy users remain.
+- Infallible private NDS PSG and SNES noise decoders return DecodedSample.
+  The public decoder remains optional for the encodings that can fail.
+- ScanResultBuilder explicitly deletes copying instead of declaring a no-op
+  destructor solely to suppress moves. The source-map callback and pending sinks
+  require a stable builder address. Before this change, type traits advertised
+  copy/move construction through std::deque's unconstrained copy declaration,
+  while actual construction already failed on noncopyable pending values.
+  Traits now report the real contract and misuse fails at the deleted constructor.
+  This clarifies ownership; it is not a repair for an executable copy-time UAF.
+  SequenceProgramConfig also drops an empty runtime initializer.
+
+Validation:
+
+- The complete 352-step macOS Release build is warning-free; all 44 CTest suites
+  pass. Fully matching public headers, core/formats/fmt archives and the shell
+  were frozen after this build, avoiding mixed-layout runtime factories.
+- Diagnostic traces match 4,056 cases, 53,640 lines, and 2,369,690 bytes under
+  ASan/UBSan: all statuses, defaults, empty/custom ambiguity, missing/invalid IDs,
+  attribution, ordering, and sticky failures. Changed units compile with Werror.
+- Cursor traces match 175,616 cases and 36,193,594 bytes with focused sanitizers;
+  the complete cursor fixture passes. Coverage includes ignore/reset, read and
+  operation order, truncation, status, continuation, and duplicate-transition
+  errors. The exact final VM preserves 171,938 cases and 206,284,725 trace bytes.
+- Typed settings preserve 360 constructor/lifetime cases and 570,504 bytes,
+  including copied runtimes and original source/layout/program destruction.
+  Complete Capcom/Itikiti/Falcom fixtures and 38 performance/114 MIDI captures
+  across three policies pass focused ASan/UBSan/float-cast-overflow checks.
+- Automation binding traces preserve 2,880 cases and 340,260 bytes, including
+  default, active, cleared and cross-owner bindings; retagging, counters, errors,
+  realization, ordering, and ticks through u64 max. The complete VM fixture also
+  passes focused sanitizers with the changed emitter unit.
+- Sample decoding preserves 1,337 results and 14,810,013 bytes under focused
+  sanitizers, including all 256 PSG/noise parameters, rates, lengths, channels,
+  loops and ranges. All 42 direct header consumers across legacy, value and tests
+  compile with their actual configured flags; the renderer unit is warning-free.
+- MIDI preserves 75,043 complete renders and 144,890,623 bytes: event payloads,
+  priorities, normalized amounts, diagnostics, order and serialized bytes.
+- The frozen fifteenth shell preserves all 252 input/policy comparisons and
+  3,922 artifact hashes, inventories, diagnostics and exit statuses against 14.
+  Sanitizer claims cover the changed units and focused fixtures; remaining
+  linked archives are Release, not a fully instrumented application.
+
+Additional rejected simplifications: keep Session's parent reset when removing
+a source, because admission permits an unowned cross-source parent and the child
+must detach when that parent's source disappears. A frozen sanitizer probe
+exercises that case. Keep the emitter's optional last-note identity: absent
+means latest-any, while an engaged invalid identity requests an exact lookup.
+Keep synth lowering's inner tremolo guards: physical LFO eligibility does not
+mean native export policy, and simulation still needs fixed no-boost attenuation.
+
+Next: narrow the construction contexts to fields their state constructors read,
+borrow Namco's immutable DriverData from its runtime owner, and evaluate whether
+configured state factories need to retain settings for states that ignore them.

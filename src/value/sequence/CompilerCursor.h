@@ -150,7 +150,7 @@ public:
     // command, so callers may freely mix chained and standalone calls.
     Event& ignore() {
       execution_ = {};
-      defaultTransition_.reset();
+      defaultTransition_ = {};
       discoveryTargets_.clear();
       presentation_.playback = initialPlayback_;
       return *this;
@@ -451,7 +451,7 @@ public:
     }
 
     void setDefaultTransition(CommandTransition transition) {
-      if (defaultTransition_) {
+      if (defaultTransition_.kind != CommandTransitionKind::Fallthrough) {
         throw std::logic_error("Compiled sequence command declared more than one default transition");
       }
       defaultTransition_ = transition;
@@ -463,14 +463,14 @@ public:
       }
       finished_ = true;
       return cursor_.finish(std::move(presentation_), std::move(execution_),
-                            defaultTransition_.value_or(CommandTransition{}), std::move(discoveryTargets_));
+                            defaultTransition_, std::move(discoveryTargets_));
     }
 
     CompilerCursor& cursor_;
     DecodedCommandPresentation presentation_;
     CommandPlaybackStatus initialPlayback_;
     CommandExecution execution_;
-    std::optional<CommandTransition> defaultTransition_;
+    CommandTransition defaultTransition_;
     std::vector<Address> discoveryTargets_;
     bool finished_ = false;
   };

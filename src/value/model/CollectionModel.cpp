@@ -7,24 +7,8 @@
 #include "value/model/CollectionModel.h"
 
 #include <algorithm>
-#include <string>
-#include <utility>
 
 namespace vgmtrans::core {
-
-namespace {
-
-[[nodiscard]] Diagnostic missingRoleIssue(std::string code, std::string role, std::optional<AssetId> asset) {
-  return Diagnostic{
-      .severity = asset ? Severity::Error : Severity::Warning,
-      .code = std::move(code),
-      .message = asset ? "Collection references missing " + role + " asset " + std::to_string(asset->value)
-                       : "Collection has no " + role + " asset",
-      .object = asset ? std::optional{ObjectRefs::asset(*asset)} : std::nullopt,
-  };
-}
-
-}  // namespace
 
 bool Collection::contains(AssetId asset) const noexcept {
   const auto selected = [asset](const auto& ids) { return std::ranges::find(ids, asset) != ids.end(); };
@@ -57,28 +41,6 @@ CollectionMembers Collection::members() const {
     }
   }
   return result;
-}
-
-Diagnostic missingSequenceIssue(std::optional<AssetId> asset) {
-  return missingRoleIssue("missing-sequence", "sequence", asset);
-}
-
-Diagnostic missingSoundBankIssue(std::optional<AssetId> asset) {
-  return missingRoleIssue("missing-sound-bank", "sound bank", asset);
-}
-
-Diagnostic missingSamplePoolIssue(std::optional<AssetId> asset) {
-  return missingRoleIssue("missing-sample-pool", "sample pool", asset);
-}
-
-Diagnostic ambiguousMatchIssue(std::string message, std::optional<AssetId> asset, SourceRange range) {
-  return Diagnostic{
-      .severity = Severity::Warning,
-      .code = "ambiguous-match",
-      .message = std::move(message),
-      .range = range,
-      .object = asset ? std::optional{ObjectRefs::asset(*asset)} : std::nullopt,
-  };
 }
 
 }  // namespace vgmtrans::core

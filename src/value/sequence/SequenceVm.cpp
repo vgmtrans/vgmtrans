@@ -645,7 +645,7 @@ private:
       return;
     }
 
-    std::optional<u64> previous;
+    u64 startTick = tick_;
     switch (semantics) {
       case JumpSemantics::Normal:
       case JumpSemantics::FiniteBranch:
@@ -658,19 +658,19 @@ private:
             found->first.callStack != callStack_) {
           return;
         }
-        previous = found->second;
+        startTick = found->second;
         break;
       }
       case JumpSemantics::DeclaredLoop: {
         const auto found = visited_.find(visitState(*position_.command));
         if (found != visited_.end()) {
-          previous = found->second;
+          startTick = found->second;
         }
         break;
       }
     }
 
-    handleLoop(previous.value_or(tick_), commandId, *position_.command);
+    handleLoop(startTick, commandId, *position_.command);
   }
 
   void warn(std::string message, SourceRange range) {

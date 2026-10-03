@@ -137,7 +137,8 @@ private:
 class ScanResultBuilder {
 public:
   ScanResultBuilder(ScanInput input, std::string format);
-  ~ScanResultBuilder() = default;
+  ScanResultBuilder(const ScanResultBuilder&) = delete;
+  ScanResultBuilder& operator=(const ScanResultBuilder&) = delete;
 
   [[nodiscard]] SourceId source() const noexcept { return input_.source.id; }
   [[nodiscard]] const SourceFile& sourceFile() const noexcept { return input_.source; }

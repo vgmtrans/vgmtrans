@@ -172,13 +172,9 @@ struct PanLfoState {
   bool enabled = false;
 };
 
-struct RuntimeConfig {
-  PatchTable patches;
-};
-
 struct TrackState {
-  TrackState(TrackStateContext source, const RuntimeConfig& config)
-      : patches(config.patches), voiceBit(static_cast<u8>(1u << std::min(source.sourceTrackNumber, u32{7}))) {}
+  TrackState(TrackStateContext source, const PatchTable& sourcePatches)
+      : patches(sourcePatches), voiceBit(static_cast<u8>(1u << std::min(source.sourceTrackNumber, u32{7}))) {}
 
   std::span<const Patch> patches;
   u8 voiceBit;
@@ -713,8 +709,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         track, reader.range(pointer, 2), *layout.trackStarts[track],
         [&](u32 offset) { return decodeCommand(reader, offset, durations, diagnostics, &programs); }, relative);
   }
-  SequenceProgram program =
-      sequence.finish(makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{.patches = patches}));
+  SequenceProgram program = sequence.finish(makeCompiledRuntime<Playback, ProgramState>(patches));
   return SequenceParse{
       .program = std::move(program),
       .programs = std::move(programs),

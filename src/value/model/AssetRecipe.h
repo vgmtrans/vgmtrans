@@ -57,7 +57,7 @@ public:
       status_ = ResolutionStatus::Ambiguous;
     }
     alternatives_ = std::move(alternatives);
-    issues_.push_back(ambiguousMatchIssue(std::move(message)));
+    issues_.push_back({.severity = Severity::Warning, .code = "ambiguous-match", .message = std::move(message)});
     return *this;
   }
 

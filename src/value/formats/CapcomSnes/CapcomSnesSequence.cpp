@@ -156,17 +156,13 @@ struct ProgramState {
   u32 tempoMicrosecondsPerQuarter = 500000;
 };
 
-struct RuntimeConfig {
-  CapcomSnesEngineVersion version = CapcomSnesEngineVersion::none;
-};
-
 // Only registers that persist from one executed command to the next belong in
 // track state. Source bounds and engine-version conversions are decode concerns.
 struct TrackState {
   TrackState() = default;
 
-  explicit TrackState(const RuntimeConfig& config)
-      : resetLfoPhaseOnNote(config.version != CapcomSnesEngineVersion::v1BgmInList) {}
+  explicit TrackState(CapcomSnesEngineVersion version)
+      : resetLfoPhaseOnNote(version != CapcomSnesEngineVersion::v1BgmInList) {}
 
   u8 durationRate256ths = 0;
   s8 transposeSemitones = 0;
@@ -545,7 +541,7 @@ const SequenceProgramConfig& capcomSnesSequenceConfig() {
 }
 
 SequenceRuntime capcomSnesSequenceRuntime(CapcomSnesEngineVersion version) {
-  return makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{.version = version});
+  return makeCompiledRuntime<Playback, ProgramState>(version);
 }
 
 // Decodes one known track directly for focused tests and callers that already

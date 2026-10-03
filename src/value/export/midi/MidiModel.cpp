@@ -10,15 +10,6 @@
 
 namespace vgmtrans::core::midi {
 
-namespace {
-
-MidiEvent channelMessage(u64 tick, MidiChannelMessageKind kind, u8 channel, u8 parameter, s32 value, int priority,
-                         std::optional<double> normalizedAmount = std::nullopt) {
-  return {tick, priority, MidiChannelMessage{kind, channel, parameter, value, normalizedAmount}};
-}
-
-}  // namespace
-
 MidiEvent note(u64 tick, u8 channel, u8 key, u8 velocity, u32 duration) {
   return {tick, 50, NoteDuration{channel, key, velocity, duration}};
 }
@@ -29,16 +20,16 @@ MidiEvent bankSelect(u64 tick, u8 channel, u16 bank, bool writeLsb) {
 
 MidiEvent controller(u64 tick, u8 channel, MidiController controllerNumber, s32 value, int priority,
                      std::optional<double> normalizedAmount) {
-  return channelMessage(tick, MidiChannelMessageKind::ControlChange, channel, static_cast<u8>(controllerNumber), value,
-                        priority, normalizedAmount);
+  return {tick, priority, MidiChannelMessage{MidiChannelMessageKind::ControlChange, channel,
+                                           static_cast<u8>(controllerNumber), value, normalizedAmount}};
 }
 
 MidiEvent programChange(u64 tick, u8 channel, u8 program) {
-  return channelMessage(tick, MidiChannelMessageKind::ProgramChange, channel, 0, program, 15);
+  return {tick, 15, MidiChannelMessage{MidiChannelMessageKind::ProgramChange, channel, 0, program}};
 }
 
 MidiEvent pitchBend(u64 tick, u8 channel, s16 value) {
-  return channelMessage(tick, MidiChannelMessageKind::PitchBend, channel, 0, value, 25);
+  return {tick, 25, MidiChannelMessage{MidiChannelMessageKind::PitchBend, channel, 0, value}};
 }
 
 MidiEvent meta(u64 tick, u8 type, std::vector<u8> data, int priority) {

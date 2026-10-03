@@ -191,7 +191,6 @@ private:
   [[nodiscard]] PerformanceAutomationBinding beginAutomation(PerformanceAutomationTarget target,
                                                             PerformanceAutomationMotion motion, double targetValue,
                                                             u32 durationTicks, u32 delayTicks);
-  [[nodiscard]] PerformanceEmitter withAutomation(const PerformanceAutomationBinding& automation) const;
   [[nodiscard]] PerformanceEventHeader header();
   void append(PerformanceEvent event);
   PerformanceNoteId emitNote(NotePerformanceEvent event, const NotePerformanceEvent* previous);
@@ -224,9 +223,9 @@ public:
     owner_ = nullptr;
     automation_ = 0;
   }
-  [[nodiscard]] PerformanceEmitter output(const PerformanceEmitter& out) const { return out.withAutomation(*this); }
+  [[nodiscard]] PerformanceEmitter output(const PerformanceEmitter& out) const;
   [[nodiscard]] PerformanceEmitter at(const PerformanceEmitter& out, u64 tick) const {
-    return out.at(tick).withAutomation(*this);
+    return output(out.at(tick));
   }
   void stop(const PerformanceEmitter& out) const;
   void interrupt(const PerformanceEmitter& out);

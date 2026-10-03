@@ -361,7 +361,7 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   return decoded;
 }
 
-[[nodiscard]] std::optional<DecodedSample> decodeNdsPsg(const Sample& sample) {
+[[nodiscard]] DecodedSample decodeNdsPsg(const Sample& sample) {
   constexpr std::array<double, 8> dutyCycles{0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 0.0};
   const u32 sampleCount = sample.loop.length != 0 ? sample.loop.length : 32768;
   DecodedSample decoded{
@@ -375,7 +375,7 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   return decoded;
 }
 
-[[nodiscard]] std::optional<DecodedSample> decodeSnesDspNoise(const Sample& sample) {
+[[nodiscard]] DecodedSample decodeSnesDspNoise(const Sample& sample) {
   const u32 sampleCount = sample.loop.length == 0 ? kSnesDspNoiseSampleCount : sample.loop.length;
   DecodedSample decoded{
       .sampleRate = sample.sampleRate == 0 ? kSnesDspSampleRate : sample.sampleRate,
