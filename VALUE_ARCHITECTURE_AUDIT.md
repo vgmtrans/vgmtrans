@@ -4046,3 +4046,70 @@ helpers have actual format callers and save typed callback/capture boilerplate;
 removing them wholesale would make format code longer and less intuitive.
 Further passes will probe stable draft storage, invocation overloads, export
 filenames, and the remaining source/execution/preparation responsibilities.
+
+## Cleanup2: optional source values and local export work
+
+The second batch is committed through `9ae12e699`. It removes another 47
+production lines from `src/value`, bringing the branch to 214 net lines removed
+at this revision. The additional 64 test lines cover an existing scanner failure,
+filename handling, and a subtle pitch representation distinction.
+
+- Pitch transitions store optional samples directly. Missing samples mean a
+  linear glide; a supplied list means a sampled source curve. The empty supplied
+  list retains its previous interpolation fallback, sparse MIDI endpoints, and
+  native-portamento warning. Three curve wrapper types and variant access rules
+  disappear without changing the format-facing pitch-slide binding API.
+- Native YM2151 settings use `optional<Ym2151Voice>` and the explicit `ym2151`
+  field. A one-choice variant and its visitors did not represent a real choice.
+  The retained hardware settings remain independent of export targets. Another
+  native chip is the point at which a sum type would become useful.
+- Pending scan values live directly in a deque. Appending preserves references
+  held by draft handles and synth entries without one allocation per draft.
+  This has a capacity tradeoff: on the current libc++ implementation, the
+  720-byte variant uses 16-element deque blocks, reserving 11,520 bytes for the
+  first published draft. This is transient scan capacity, not durable asset
+  storage. The user-declared default destructor intentionally suppresses moves:
+  builder callbacks and domain builders refer to this builder's members.
+- A failed scanner produces an ordinary error diagnostic in its empty scan
+  result. Workers no longer retain exception pointers for serial rethrow.
+  Standard exception text, including empty text, retains its exact attribution
+  and registry order. Non-standard exceptions now report a failure and allow
+  later scanners to finish instead of escaping admission.
+- Target-neutral preparation contexts now live beside asset recipes in
+  `model/AssetPreparation.h`. Scan drafts no longer include the export layer.
+  Member-method invocation overloads use default empty argument tuples while
+  preserving required-operand compile-time rejection. Handler-only overloads
+  remain because generic callables cannot use the introspected argument path.
+- Stitched parts retain only prepared ownership and their start tick. MIDI is
+  rendered and scaled locally during composition, then its tracks move into the
+  result. Bank mappings come from the authoritative resolved performance.
+  Unique-part preparation collects synth banks, shared pools, and modulation
+  maxima once; repeated playlist entries reuse those prepared values.
+- MIDI artifact titles use the same filename sanitization as SF2 and DLS.
+  The earlier real-file comparison exposed existing export failures for titles
+  containing slashes. The regression fixture checks all three filenames and
+  unchanged MIDI bytes for punctuation in a collection title.
+
+Validation:
+
+- Warning-free full macOS Release build (352 steps); all 44 CTest suites pass.
+  A final incremental build reports no work remaining and all 44 pass again.
+  Intermediate tests from overlapping header edits produced mixed-layout
+  binaries; those are excluded from validation. Further batches wait for edits
+  to settle before building.
+- The expanded VM comparison covers 31,104 programs, including linear,
+  nonempty sampled, and explicitly empty sampled pitch curves. Both original
+  and current implementations run clean under AddressSanitizer, UBSan, and
+  float-cast-overflow checks; their 60,675,546-byte traces match exactly.
+- A stitched-export comparison covers 1,920 successful cases: mixed source
+  clocks and MIDI divisions, repeated collections, sparse banks, shared external
+  pools, both bank styles, modulation policies, used-only selection, and envelope
+  variants. MIDI/SF2 bytes, part IDs/start ticks/maps, and ordered diagnostics
+  match. A separate timeline-overflow case preserves failure diagnostics and
+  an empty returned part list.
+
+Keep gate ownership, prepared-bank lifetimes, and source physical pitch timing
+explicit. Collapsing those distinctions would replace visible state with more
+policy branches. The next pass removes unused lookup APIs and repeated
+collection assembly, and tests whether private source-inspection construction
+can rely on the existing admission boundary.
