@@ -40,7 +40,7 @@ public:
   [[nodiscard]] ScanIdAllocator& scanIds() noexcept { return scanIds_; }
   void appendScan(ScanResult result);
 
-  [[nodiscard]] bool removeAssets(std::span<const AssetId> assets);
+  void removeAssets(std::span<const AssetId> assets);
   void removeSources(std::span<const SourceId> sources);
   [[nodiscard]] CollectionId createUserCollection(DesiredCollection collection);
 

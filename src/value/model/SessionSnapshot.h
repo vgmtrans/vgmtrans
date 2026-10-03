@@ -50,6 +50,7 @@ struct Collection {
   CollectionInputs inputs;
 
   [[nodiscard]] CollectionMembers members() const { return collectionMembers(selection, inputs); }
+  [[nodiscard]] bool contains(AssetId asset) const noexcept;
 
   [[nodiscard]] bool isDiscovered() const noexcept { return origin == CollectionOrigin::Discovered; }
   [[nodiscard]] ResolutionStatus resolutionStatus() const noexcept { return inputs.status(); }

@@ -628,6 +628,9 @@ void scanResultBuilderDraftViewsRemainStableAsTheResultGrows() {
   auto pool = result.samplePool("Stable Samples");
   auto& samples = pool.samples();
   auto sample = samples.add(7, Sample{.name = "Stable Sample", .encodedData = input.reader.range(32, 4)});
+  auto bank = result.soundBank("Stable Bank");
+  auto sequence = result.sequence("Stable Sequence");
+  auto misc = result.misc("Stable Misc", input.reader.range(0, 1));
 
   // Growing the result must not invalidate a draft proxy or an entry returned
   // from one of its domain builders.
@@ -636,12 +639,22 @@ void scanResultBuilderDraftViewsRemainStableAsTheResultGrows() {
   }
   sample.source("Stable Sample", input.reader.range(12, 4), "probe-stable-sample");
   const auto retained = samples.find(7);
+  bank.useSamples(pool);
+  sequence.program(SequenceProgram{}).useBank(bank).includeMisc(misc);
+  misc.payload({0xaa});
 
   const ScanResult scan = result.finish();
   const auto& sampleAsset = std::get<SamplePoolAsset>(scan.assets.front());
   expect(sampleAsset.pool.samples.size() == 1 && pool.id() == sampleAsset.metadata.id && retained &&
              retained->owner() == pool.id() && retained->index() == 0,
          "draft proxies and sparse lookups should survive growth of the result-owned draft list");
+  expect(std::get<SoundBankAsset>(scan.assets[1]).metadata.id == bank.id() &&
+             std::get<DependencyTarget>(std::get<SoundBankAsset>(scan.assets[1]).recipe.samples.front()).asset == pool.id() &&
+             std::get<SequenceProgramAsset>(scan.assets[2]).metadata.id == sequence.id() &&
+             std::get<DependencyTarget>(std::get<SequenceProgramAsset>(scan.assets[2]).recipe.banks.front()).asset == bank.id() &&
+             std::get<SequenceProgramAsset>(scan.assets[2]).collection.miscAssets == std::vector<AssetId>{misc.id()} &&
+             std::get<MiscAsset>(scan.assets[3]).payload == std::vector<u8>{0xaa},
+         "each typed draft should retain its values and links across result growth");
   expect(scan.sourceMap.ownedBy(ObjectRefs::sample(pool.id(), 0)).size() == 1,
          "entries obtained before result growth should still publish their source annotations");
 }

@@ -1420,7 +1420,20 @@ void snapshotFindsTheFirstCollectionContainingAnAsset() {
       Collection{.id = CollectionId{8}, .name = "First", .selection = {.miscAssets = {AssetId{4}}}},
       Collection{.id = CollectionId{9}, .name = "Second", .selection = {.miscAssets = {AssetId{4}}}},
   };
+  builder.collections.front().selection.sequence = AssetId{1};
+  builder.collections.front().selection.soundBanks = {AssetId{2}};
+  builder.collections.front().selection.samplePools = {AssetId{3}};
+  builder.collections.front().inputs.banks = {
+      CollectionBank{.bank = AssetId{5}, .samples = {.targets = {{.asset = AssetId{6}}},
+                                                   .alternatives = {{.asset = AssetId{7}}}}}};
   const SessionSnapshot snapshot = builder.finish();
+  for (const auto id : {1, 2, 3, 5, 6}) {
+    expect(snapshot.firstCollectionContaining(AssetId{static_cast<u32>(id)}) == &snapshot.collections().front() &&
+               snapshot.countCollectionsContaining(AssetId{static_cast<u32>(id)}) == 1,
+           "asset association should include explicit choices and resolved inputs");
+  }
+  expect(snapshot.countCollectionsContaining(AssetId{7}) == 0,
+         "unselected dependency alternatives must not become collection members");
 
   const auto* collection = snapshot.firstCollectionContaining(AssetId{4});
   expect(collection != nullptr && collection->id == CollectionId{8},

@@ -17,6 +17,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -31,7 +32,7 @@ class ScanMiscDraft;
 // it even when a sound bank or sample pool remains empty.
 class ScanSequenceDraft {
 public:
-  [[nodiscard]] AssetId id() const noexcept { return id_; }
+  [[nodiscard]] AssetId id() const noexcept { return pending_->id; }
   ScanSequenceDraft& range(SourceRange range);
   ScanSequenceDraft& program(SequenceProgram program);
   // A sequence produces a collection by default, using its own name.
@@ -57,16 +58,24 @@ public:
 private:
   friend class ScanResultBuilder;
 
-  ScanSequenceDraft(ScanResultBuilder& out, size_t slot, AssetId id);
+  struct Pending {
+    AssetId id;
+    std::string name;
+    SourceRange range;
+    std::optional<SequenceProgram> program;
+    AssetPrivateData privateData;
+    SequenceCollectionOptions collection;
+    SequenceRecipe recipe;
+    SequencePreparer prepare;
+  };
 
-  ScanResultBuilder* out_ = nullptr;
-  size_t slot_ = 0;
-  AssetId id_;
+  explicit ScanSequenceDraft(Pending& pending) : pending_(&pending) {}
+  Pending* pending_;
 };
 
 class ScanSoundBankDraft {
 public:
-  [[nodiscard]] AssetId id() const noexcept { return id_; }
+  [[nodiscard]] AssetId id() const noexcept { return pending_->id; }
 
   [[nodiscard]] InstrumentSetBuilder& instruments();
   [[nodiscard]] SamplePoolBuilder& localSamples();
@@ -87,16 +96,23 @@ public:
 private:
   friend class ScanResultBuilder;
 
-  ScanSoundBankDraft(ScanResultBuilder& out, size_t slot, AssetId id);
+  struct Pending {
+    AssetId id;
+    std::string name;
+    InstrumentSetBuilder instruments;
+    SamplePoolBuilder samples;
+    AssetPrivateData privateData;
+    BankRecipe recipe;
+    BankPreparer prepare;
+  };
 
-  ScanResultBuilder* out_ = nullptr;
-  size_t slot_ = 0;
-  AssetId id_;
+  explicit ScanSoundBankDraft(Pending& pending) : pending_(&pending) {}
+  Pending* pending_;
 };
 
 class ScanSamplePoolDraft {
 public:
-  [[nodiscard]] AssetId id() const noexcept { return id_; }
+  [[nodiscard]] AssetId id() const noexcept { return pending_->id; }
 
   [[nodiscard]] SamplePoolBuilder& samples();
   [[nodiscard]] const SamplePoolBuilder& samples() const;
@@ -107,16 +123,20 @@ public:
 private:
   friend class ScanResultBuilder;
 
-  ScanSamplePoolDraft(ScanResultBuilder& out, size_t slot, AssetId id);
+  struct Pending {
+    AssetId id;
+    std::string name;
+    SamplePoolBuilder samples;
+    AssetPrivateData privateData;
+  };
 
-  ScanResultBuilder* out_ = nullptr;
-  size_t slot_ = 0;
-  AssetId id_;
+  explicit ScanSamplePoolDraft(Pending& pending) : pending_(&pending) {}
+  Pending* pending_;
 };
 
 class ScanMiscDraft {
 public:
-  [[nodiscard]] AssetId id() const noexcept { return id_; }
+  [[nodiscard]] AssetId id() const noexcept { return pending_->id; }
   ScanMiscDraft& payload(std::vector<u8> payload);
 
   template <typename T>
@@ -125,11 +145,16 @@ public:
 private:
   friend class ScanResultBuilder;
 
-  ScanMiscDraft(ScanResultBuilder& out, size_t slot, AssetId id);
+  struct Pending {
+    AssetId id;
+    std::string name;
+    SourceRange range;
+    std::optional<std::vector<u8>> payload;
+    AssetPrivateData privateData;
+  };
 
-  ScanResultBuilder* out_ = nullptr;
-  size_t slot_ = 0;
-  AssetId id_;
+  explicit ScanMiscDraft(Pending& pending) : pending_(&pending) {}
+  Pending* pending_;
 };
 
 // Convenience wrapper for the normal scanner path. It still produces ordinary
@@ -170,19 +195,17 @@ private:
 
   [[nodiscard]] AssetMetadata metadata(AssetId id, std::string name, SourceRange range) const;
 
-  void setPrivateData(size_t slot, AssetPrivateData data);
-  void setSequencePreparer(size_t slot, SequencePreparer prepare);
-  void setBankPreparer(size_t slot, BankPreparer prepare);
+  static void setPrivateData(AssetPrivateData& target, AssetPrivateData data);
 
   ScanInput input_;
   std::string format_;
   ScanResult result_;
   SourceMapBuilder sourceMap_;
 
-  struct DraftSlot;
-  // Domain-builder entries retain pointers to their builders, so each slot has
-  // a stable address even while the list of published drafts grows.
-  std::vector<std::unique_ptr<DraftSlot>> drafts_;
+  using PendingAsset = std::variant<ScanSequenceDraft::Pending, ScanSoundBankDraft::Pending,
+                                    ScanSamplePoolDraft::Pending, ScanMiscDraft::Pending>;
+  // Drafts and domain-builder entries point directly into these stable values.
+  std::vector<std::unique_ptr<PendingAsset>> drafts_;
 };
 
 template <class Data, class Prepare>
@@ -210,25 +233,25 @@ ScanSoundBankDraft& ScanSoundBankDraft::prepare(Prepare callback) {
 
 template <typename T>
 ScanSequenceDraft& ScanSequenceDraft::data(T value) {
-  out_->setPrivateData(slot_, AssetPrivateData::make(std::move(value)));
+  ScanResultBuilder::setPrivateData(pending_->privateData, AssetPrivateData::make(std::move(value)));
   return *this;
 }
 
 template <typename T>
 ScanSoundBankDraft& ScanSoundBankDraft::data(T value) {
-  out_->setPrivateData(slot_, AssetPrivateData::make(std::move(value)));
+  ScanResultBuilder::setPrivateData(pending_->privateData, AssetPrivateData::make(std::move(value)));
   return *this;
 }
 
 template <typename T>
 ScanSamplePoolDraft& ScanSamplePoolDraft::data(T value) {
-  out_->setPrivateData(slot_, AssetPrivateData::make(std::move(value)));
+  ScanResultBuilder::setPrivateData(pending_->privateData, AssetPrivateData::make(std::move(value)));
   return *this;
 }
 
 template <typename T>
 ScanMiscDraft& ScanMiscDraft::data(T value) {
-  out_->setPrivateData(slot_, AssetPrivateData::make(std::move(value)));
+  ScanResultBuilder::setPrivateData(pending_->privateData, AssetPrivateData::make(std::move(value)));
   return *this;
 }
 

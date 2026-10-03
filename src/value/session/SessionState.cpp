@@ -93,7 +93,7 @@ void SessionState::appendScan(ScanResult result) {
                       std::make_move_iterator(result.diagnostics.end()));
 }
 
-bool SessionState::removeAssets(std::span<const AssetId> assets) {
+void SessionState::removeAssets(std::span<const AssetId> assets) {
   std::unordered_set<u32> removed;
   removed.reserve(assets.size());
   for (const AssetId id : assets) {
@@ -101,11 +101,9 @@ bool SessionState::removeAssets(std::span<const AssetId> assets) {
       removed.insert(id.value);
     }
   }
-  if (removed.empty()) {
-    return false;
+  if (!removed.empty()) {
+    removeDiscoveredData({}, removed);
   }
-  removeDiscoveredData({}, removed);
-  return true;
 }
 
 void SessionState::removeSources(std::span<const SourceId> sources) {

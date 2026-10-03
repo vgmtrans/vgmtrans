@@ -12,16 +12,14 @@
 
 namespace vgmtrans::core {
 
-namespace {
-
-[[nodiscard]] bool collectionContains(const Collection& collection, AssetId asset) {
-  const auto& members = collection.members();
-  return members.sequence == asset || std::ranges::find(members.soundBanks, asset) != members.soundBanks.end() ||
-         std::ranges::find(members.samplePools, asset) != members.samplePools.end() ||
-         std::ranges::find(members.miscAssets, asset) != members.miscAssets.end();
+bool Collection::contains(AssetId asset) const noexcept {
+  const auto selected = [asset](const auto& ids) { return std::ranges::find(ids, asset) != ids.end(); };
+  return selection.sequence == asset || selected(selection.soundBanks) || selected(selection.samplePools) ||
+         selected(selection.miscAssets) || std::ranges::any_of(inputs.banks, [asset](const CollectionBank& bank) {
+           return bank.bank == asset || std::ranges::find(bank.samples.targets, asset, &DependencyTarget::asset) !=
+                                            bank.samples.targets.end();
+         });
 }
-
-}  // namespace
 
 AssetMetadata& metadata(Asset& asset) {
   return std::visit([](auto& typedAsset) -> AssetMetadata& { return typedAsset.metadata; }, asset);
@@ -85,7 +83,7 @@ const Collection* SessionSnapshot::collection(CollectionId id) const {
 
 const Collection* SessionSnapshot::firstCollectionContaining(AssetId asset) const {
   for (const auto& collection : storage_->collections) {
-    if (collectionContains(collection, asset)) {
+    if (collection.contains(asset)) {
       return &collection;
     }
   }
@@ -94,7 +92,7 @@ const Collection* SessionSnapshot::firstCollectionContaining(AssetId asset) cons
 
 size_t SessionSnapshot::countCollectionsContaining(AssetId asset) const {
   return std::ranges::count_if(storage_->collections,
-                               [asset](const Collection& collection) { return collectionContains(collection, asset); });
+                               [asset](const Collection& collection) { return collection.contains(asset); });
 }
 
 }  // namespace vgmtrans::core

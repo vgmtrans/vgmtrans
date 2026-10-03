@@ -20,8 +20,6 @@
 #include <array>
 #include <exception>
 #include <future>
-#include <iterator>
-#include <map>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -111,8 +109,8 @@ SourceId Session::addSource(SourceFile file, std::vector<u8> bytes) {
   if (const auto existing = sources_.findFile(file.path)) {
     return *existing;
   }
-  sealFormats();
-  invalidateSnapshot();
+  formats_.seal();
+  snapshotCache_.reset();
   file.parent.reset();
   return sources_.add(std::move(file), std::move(bytes));
 }
@@ -157,7 +155,7 @@ void Session::removeSource(SourceId id) {
 }
 
 void Session::removeSources(std::span<const SourceId> ids) {
-  sealFormats();
+  formats_.seal();
   for (const SourceId id : ids) {
     if (!sources_.hasSlot(id)) {
       throw std::out_of_range("Cannot remove a SourceId that is not present in the Session");
@@ -168,7 +166,7 @@ void Session::removeSources(std::span<const SourceId> ids) {
   for (const SourceId id : ids) {
     if (sources_.contains(id)) {
       if (removed.empty()) {
-        invalidateSnapshot();
+        snapshotCache_.reset();
       }
       removeSourceFamily(id, removed);
     }
@@ -182,7 +180,7 @@ void Session::removeSources(std::span<const SourceId> ids) {
 }
 
 void Session::removeAssets(std::span<const AssetId> assets) {
-  sealFormats();
+  formats_.seal();
   if (!std::ranges::any_of(assets, [&](AssetId id) { return state_->containsAsset(id); })) {
     return;
   }
@@ -202,8 +200,8 @@ void Session::removeAssets(std::span<const AssetId> assets) {
     }
   }
 
-  invalidateSnapshot();
-  static_cast<void>(state_->removeAssets(assets));
+  snapshotCache_.reset();
+  state_->removeAssets(assets);
 
   std::vector<SourceId> removedSources;
   for (const SourceId root : affectedRoots) {
@@ -224,18 +222,18 @@ void Session::removeAssets(std::span<const AssetId> assets) {
 }
 
 CollectionId Session::createUserCollection(std::string name, CollectionMembers members) {
-  sealFormats();
+  formats_.seal();
   DesiredCollection selection{.name = std::move(name), .selection = std::move(members)};
   resolveDependencies(AssetCatalog{sources_, state_->assets()}, selection, ResolutionMode::Manual);
   const CollectionId id = state_->createUserCollection(std::move(selection));
-  invalidateSnapshot();
+  snapshotCache_.reset();
   return id;
 }
 
 // Scan this source if it has not been scanned yet. Any files extracted from it are
 // added as derived sources and scanned before this call returns.
 void Session::scanSource(SourceId id) {
-  sealFormats();
+  formats_.seal();
   if (!sources_.contains(id)) {
     throw std::out_of_range("Cannot scan a SourceId that is not present in the Session");
   }
@@ -244,7 +242,7 @@ void Session::scanSource(SourceId id) {
     return;
   }
 
-  invalidateSnapshot();
+  snapshotCache_.reset();
   scanSourceAndDerived(id);
   rebuildCollections();
 }
@@ -252,7 +250,7 @@ void Session::scanSource(SourceId id) {
 // Scan every user-loaded source that is still pending. Derived sources are skipped
 // here because scanning their parent source already scans them.
 void Session::scanPendingSources() {
-  sealFormats();
+  formats_.seal();
   bool scannedAny = false;
   for (const SourceId source : sources_.activeUserSources()) {
     if (scannedSources_.contains(source.value)) {
@@ -260,7 +258,7 @@ void Session::scanPendingSources() {
     }
 
     if (!scannedAny) {
-      invalidateSnapshot();
+      snapshotCache_.reset();
     }
     scanSourceAndDerived(source);
     scannedAny = true;
@@ -323,21 +321,9 @@ CollectionStitchResult Session::stitchCollections(std::span<const CollectionId> 
   return core::stitchCollections(snapshot(), sources_, collections, request);
 }
 
-void Session::sealFormats() noexcept {
-  formats_.seal();
-}
-
-void Session::invalidateSnapshot() noexcept {
-  snapshotCache_.reset();
-}
-
 // Scan the requested source, then scan any sources extracted from it. This lets an
 // archive or container produce bytes that normal format modules can parse.
 void Session::scanSourceAndDerived(SourceId id) {
-  if (!sources_.contains(id)) {
-    throw std::out_of_range("Cannot scan a SourceId that is not present in the Session");
-  }
-
   const size_t assetsBefore = state_->assets().size();
   const size_t diagnosticsBefore = state_->diagnostics().size();
   std::vector<SourceId> queue{id};

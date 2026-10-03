@@ -67,8 +67,6 @@ public:
 private:
   [[nodiscard]] SourceFile resolveSource(const std::filesystem::path& path,
                                         std::optional<SourceId> parent = {}) const;
-  void invalidateSnapshot() noexcept;
-  void sealFormats() noexcept;
   void scanSourceAndDerived(SourceId id);
   void scanOneSource(const SourceFile& source, std::vector<SourceId>& queue);
   void removeSourceFamily(SourceId source, std::vector<SourceId>& removed);
