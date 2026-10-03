@@ -92,6 +92,13 @@ template <size_t Size>
   return SourceValue{std::string(value, Size - 1)};
 }
 
+// A null text pointer represents an absent source value.
+template <class T>
+  requires(std::same_as<std::remove_cvref_t<T>, const char*> || std::same_as<std::remove_cvref_t<T>, char*>)
+[[nodiscard]] SourceValue makeSourceValue(T&& value) {
+  return value == nullptr ? SourceValue{} : SourceValue{std::string(value)};
+}
+
 template <std::integral T>
   requires(!std::same_as<std::remove_cvref_t<T>, bool>)
 [[nodiscard]] SourceValue makeSourceValue(T value) {

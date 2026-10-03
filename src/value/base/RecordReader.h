@@ -12,6 +12,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -64,14 +65,7 @@ public:
 
   template <class T>
   void derived(std::string_view name, T&& value, SourceValueDisplay display = SourceValueDisplay::Default) {
-    if (!captureFields_) {
-      return;
-    }
-    fields_.push_back(SourceField{
-        .name = std::string(name),
-        .value = makeSourceValue(std::forward<T>(value)),
-        .display = display,
-    });
+    field(name, {}, std::forward<T>(value), display);
   }
 
   [[nodiscard]] u32 begin() const noexcept { return begin_; }
@@ -93,7 +87,18 @@ private:
   bool require(u32 size, std::string_view field);
   [[nodiscard]] std::optional<u32> requireAt(u64 relativeOffset, u64 size, std::string_view field);
   void fail(std::string_view field, SourceRange range);
-  void field(std::string_view name, SourceRange range, SourceValue value, SourceValueDisplay display);
+  template <class T>
+  void field(std::string_view name, SourceRange range, T&& value, SourceValueDisplay display) {
+    if (!captureFields_) {
+      return;
+    }
+    fields_.push_back(SourceField{
+        .name = std::string(name),
+        .range = range,
+        .value = makeSourceValue(std::forward<T>(value)),
+        .display = display,
+    });
+  }
 
   ByteReader reader_;
   u32 begin_ = 0;

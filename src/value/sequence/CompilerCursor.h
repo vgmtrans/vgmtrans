@@ -31,8 +31,6 @@ template <class T>
     return makeSourceValue(value.value);
   } else if constexpr (std::is_enum_v<T>) {
     return makeSourceValue(static_cast<std::underlying_type_t<T>>(value));
-  } else if constexpr (std::is_same_v<T, const char*> || std::is_same_v<T, char*>) {
-    return makeSourceValue(std::string_view(value));
   } else {
     return makeSourceValue(std::move(value));
   }

@@ -48,7 +48,7 @@ RangedValue<T> RecordReader::number(std::string_view name, SourceValueDisplay di
   const SourceRange sourceRange = reader_.range(position_, Size);
   const auto value = static_cast<T>((reader_.*Read)(position_));
   position_ += Size;
-  field(name, sourceRange, makeSourceValue(value), display);
+  field(name, sourceRange, value, display);
   return {value, sourceRange};
 }
 
@@ -60,7 +60,7 @@ RangedValue<T> RecordReader::numberAt(u64 relativeOffset, std::string_view name,
   }
   const SourceRange sourceRange = reader_.range(*position, sizeof(T));
   const auto value = static_cast<T>((reader_.*Read)(*position));
-  field(name, sourceRange, makeSourceValue(value), display);
+  field(name, sourceRange, value, display);
   return {value, sourceRange};
 }
 
@@ -105,22 +105,23 @@ RangedValue<u32> RecordReader::varLen(std::string_view name, SourceValueDisplay 
   }
 
   const SourceRange sourceRange = reader_.range(begin, position_ - begin);
-  field(name, sourceRange, makeSourceValue(*value), display);
+  field(name, sourceRange, *value, display);
   return RangedValue<u32>{*value, sourceRange};
 }
 
 RangedValue<std::string> RecordReader::rawBytes(std::string_view name, u32 size) {
   const u32 begin = position_;
   const u32 available = std::min(size, end_ - begin);
-  const std::string value = hexBytes(reader_.slice(begin, available));
+  std::string value = hexBytes(reader_.slice(begin, available));
   position_ += available;
   if (available != 0) {
-    field(name, reader_.range(begin, available), makeSourceValue(value), SourceValueDisplay::Hex);
+    field(name, reader_.range(begin, available), value, SourceValueDisplay::Hex);
   }
   if (available != size) {
     require(size - available, name);
   }
-  return available != 0 ? RangedValue<std::string>{value, reader_.range(begin, available)} : RangedValue<std::string>{};
+  return available != 0 ? RangedValue<std::string>{std::move(value), reader_.range(begin, available)}
+                        : RangedValue<std::string>{};
 }
 
 RangedValue<s16> RecordReader::s16be(std::string_view name, SourceValueDisplay display) {
@@ -221,18 +222,6 @@ void RecordReader::fail(std::string_view fieldName, SourceRange range) {
     });
   }
   failed_ = true;
-}
-
-void RecordReader::field(std::string_view name, SourceRange range, SourceValue value, SourceValueDisplay display) {
-  if (!captureFields_) {
-    return;
-  }
-  fields_.push_back(SourceField{
-      .name = std::string(name),
-      .range = range,
-      .value = std::move(value),
-      .display = display,
-  });
 }
 
 }  // namespace vgmtrans::core

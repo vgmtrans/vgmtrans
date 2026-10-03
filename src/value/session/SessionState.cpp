@@ -176,16 +176,6 @@ void SessionState::addDiagnostics(std::vector<Diagnostic> diagnostics) {
                       std::make_move_iterator(diagnostics.end()));
 }
 
-SourceMap SessionState::sourceMapForAsset(AssetId asset) const {
-  std::vector<SourceAnnotation> selected;
-  const auto annotations = sourceMap_.annotationsForAsset(asset);
-  selected.reserve(annotations.size());
-  for (const SourceAnnotationId annotation : annotations) {
-    selected.push_back(sourceMap_.get(annotation));
-  }
-  return SourceMap{std::move(selected)};
-}
-
 // Banks and samples can change as files arrive or are removed. Keep a discovered
 // collection's ID while its sequence stays the same; leave user collections alone.
 void SessionState::reconcileCollections(std::vector<Collection> desired) {

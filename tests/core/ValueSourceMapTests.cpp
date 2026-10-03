@@ -12,10 +12,70 @@
 
 #include <algorithm>
 #include <array>
+#include <string>
+#include <string_view>
+#include <utility>
 
 using namespace vgmtrans::core;
 
 namespace {
+
+void sourceValuesOwnTextAndPreserveScalarTypes() {
+  const char* constant = "constant";
+  const char* const constantPointer = constant;
+  char buffer[] = "mutable";
+  char* pointer = buffer;
+  const auto owned = makeSourceValue(pointer);
+  expect(std::get<std::string>(makeSourceValue(constant)) == "constant" &&
+             std::get<std::string>(makeSourceValue(std::move(constant))) == "constant" &&
+             std::get<std::string>(makeSourceValue(constantPointer)) == "constant" &&
+             std::get<std::string>(makeSourceValue(pointer)) == "mutable" &&
+             std::get<std::string>(makeSourceValue(std::move(pointer))) == "mutable",
+         "mutable and const text pointers must produce owned strings rather than booleans");
+  buffer[0] = 'X';
+  expect(std::get<std::string>(owned) == "mutable", "source text must survive mutation of the pointed-to buffer");
+
+  const char* absent = nullptr;
+  char* mutableAbsent = nullptr;
+  expect(std::holds_alternative<std::monostate>(makeSourceValue(absent)) &&
+             std::holds_alternative<std::monostate>(makeSourceValue(mutableAbsent)) &&
+             std::holds_alternative<std::monostate>(makeSourceValue(std::move(absent))) &&
+             std::holds_alternative<std::monostate>(makeSourceValue(std::move(mutableAbsent))) &&
+             std::get<std::string>(makeSourceValue(static_cast<const char*>(""))).empty(),
+         "null text pointers must represent absent values while an empty text pointer remains a string");
+  const char embedded[] = "a\0b";
+  char mutableEmbedded[] = "a\0b";
+  expect(std::get<std::string>(makeSourceValue("a\0b")) == std::string("a\0b", 3) &&
+             std::get<std::string>(makeSourceValue(embedded)) == std::string("a\0b", 3) &&
+             std::get<std::string>(makeSourceValue(mutableEmbedded)) == std::string("a\0b", 3) &&
+             std::get<std::string>(makeSourceValue(std::string_view(embedded, 3))) == std::string("a\0b", 3) &&
+             std::get<std::string>(makeSourceValue(std::string(embedded, 3))) == std::string("a\0b", 3),
+         "text arrays, literals, strings, and views must retain their existing explicit lengths");
+  expect(std::get<bool>(makeSourceValue(true)) && !std::get<bool>(makeSourceValue(false)) &&
+             std::get<s64>(makeSourceValue(s16{-12})) == -12 && std::get<u64>(makeSourceValue(u32{24})) == 24 &&
+             std::get<double>(makeSourceValue(3.5f)) == 3.5 &&
+             makeSourceValue(SourceValue{s64{-8}}) == SourceValue{s64{-8}},
+         "source scalar conversion must preserve booleans, signedness, fractions, and already-normalized values");
+
+  SourceMapBuilder builder;
+  const auto annotation = builder.header("Text", {.source = SourceId{1}, .size = 1})
+                              .derived("pointer", pointer)
+                              .derived("absent", absent);
+  const SourceMap map = builder.finish();
+  expect(std::get<std::string>(map.get(annotation.id()).fields[0].value) == "Xutable" &&
+             std::holds_alternative<std::monostate>(map.get(annotation.id()).fields[1].value),
+         "annotation fields must use the common text conversion");
+
+  const std::array<u8, 1> bytes{0};
+  ProbeCompilerCursor cursor(ByteReader(SourceId{1}, bytes), 0, "probe");
+  auto event = cursor.sourceOnly("Text");
+  cursor.derived("pointer", pointer);
+  cursor.derived("absent", absent);
+  const DecodedBytecodeCommand command = event;
+  expect(command.fields.size() == 2 && std::get<std::string>(command.fields[0].value) == "Xutable" &&
+             std::holds_alternative<std::monostate>(command.fields[1].value),
+         "compiler fields must use the same safe conversion for text and null pointers");
+}
 
 void sourceRangesAccumulateOneSourceIncludingAnchors() {
   const SourceId source{3};
@@ -493,6 +553,8 @@ void sessionSnapshotCarriesScannerSourceMap() {
 
   const auto source = session.addSource(SourceFile{.name = "annotated.probe"}, {0xab, 0x01, 0x02});
   session.scanSource(source);
+  const auto otherSource = session.addSource(SourceFile{.name = "other.probe"}, {0xab, 0x03});
+  session.scanSource(otherSource);
   SessionSnapshot snapshot = session.snapshot();
 
   const auto headerIds = snapshot.sourceMap().withRole(source, SourceRole::Header);
@@ -508,10 +570,13 @@ void sessionSnapshotCarriesScannerSourceMap() {
   const auto inspection = session.inspect(header.owner->asset);
   expect(inspection && inspection->bytes().size() == 3 && inspection->bytes().front() == 0xab,
          "source inspection should expand a primary header range across its explicitly owned graph");
-  expect(inspection->roots().size() == 2 && inspection->annotation(inspection->roots().front()) != nullptr,
-         "source inspection should preserve the asset-owned annotation graph");
+  const auto otherHeaders = snapshot.sourceMap().withRole(otherSource, SourceRole::Header);
+  expect(otherHeaders.size() == 1 && inspection->annotations().size() == 2 && inspection->roots().size() == 2 &&
+             inspection->annotation(inspection->roots().front()) != nullptr &&
+             inspection->annotation(otherHeaders.front()) == nullptr,
+         "source inspection should retain exactly its asset-owned graph and exclude other assets' annotations");
 
-  session.removeSource(source);
+  session.removeSources(std::array{source, otherSource});
 
   snapshot = session.snapshot();
   expect(snapshot.sourceMap().empty(), "removing a source should remove its source annotations");
@@ -522,6 +587,7 @@ void sessionSnapshotCarriesScannerSourceMap() {
 }  // namespace
 
 void runValueSourceMapTests() {
+  sourceValuesOwnTextAndPreserveScalarTypes();
   sourceRangesAccumulateOneSourceIncludingAnchors();
   sourceMapBuilderRecordsAnnotationsFieldsAndLinks();
   sourceAnnotationsCarryOutlinePolicyForTreeConsumers();

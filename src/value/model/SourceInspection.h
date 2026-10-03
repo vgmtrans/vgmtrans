@@ -63,7 +63,7 @@ public:
 private:
   friend class Session;
 
-  SourceInspection(AssetMetadata metadata, SourceMap sourceMap, SharedSourceBytes sourceBytes);
+  SourceInspection(AssetMetadata metadata, const SourceMap& sourceMap, SharedSourceBytes sourceBytes);
 
   void sortBySourceOrder(std::vector<SourceAnnotationId>& annotations) const;
 

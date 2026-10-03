@@ -331,7 +331,7 @@ std::shared_ptr<const SourceInspection> Session::inspect(AssetId asset) const {
     return {};
   }
   return std::shared_ptr<const SourceInspection>(
-      new SourceInspection(metadata(*value), state_->sourceMapForAsset(asset), sources_.sharedBytes(source)));
+      new SourceInspection(metadata(*value), state_->sourceMap(), sources_.sharedBytes(source)));
 }
 
 CollectionPlayback Session::preparePlayback(CollectionId id, const PlaybackRequest& request) const {

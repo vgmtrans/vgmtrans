@@ -1,7 +1,7 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Nine validated batches remove 656 net production lines from
+`cb9e0b766`. Ten validated batches remove 661 net production lines from
 `src/value`. All 44 CTest suites pass; the latest real-file replay preserves
 all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
 records appear at the end of this document.
@@ -4322,7 +4322,7 @@ Validation:
   remain byte-identical.
 
 Further boundary review keeps typed playback, stream-state contexts, pure
-motion, and bound performance values. Playback serves 42 driver families;
+motion, and bound performance values. Playback serves many driver families;
 three require shared-stream specialization. Ten families use bound values to
 interrupt emitted automation independently of their source arithmetic. Folding
 these responsibilities together would either couple pure motion to performance
@@ -4507,3 +4507,72 @@ conversion (which currently becomes boolean in ordinary annotations), and move
 inspection subset preparation into the inspection owner. Keep owned tempo-point
 query results: a reference getter would dangle in an ordinary range-for over a
 temporary tempo map under the project's C++20 lifetime rules.
+
+## Cleanup2 tenth batch: one field-capture path and inspection-owned selection
+
+This batch removes another five net production C++ lines, bringing cleanup2 to
+661 removed. Focused source-value and inspection-isolation coverage adds 66
+test lines. The improvement is removal of duplicate responsibilities and
+unnecessary text copies, rather than a substantial physical line reduction.
+
+- RecordReader uses one field-capture path for decoded and derived values.
+  Capture checks run before display-value construction; CompilerCursor's
+  disabled record capture no longer constructs text values to discard them.
+  Returned raw text moves from its existing local string. A 65,536-byte raw
+  read uses one allocation instead of three without capture, and three instead
+  of four with capture, in the independent allocation probe.
+- Common source-value conversion owns mutable and const C-string pointers as
+  text. Previously, ordinary annotations converted pointer variables to bool,
+  while literals became text. Null text pointers represent an absent value;
+  empty strings remain strings. Arrays retain their explicit length, including
+  embedded zeros. CompilerCursor delegates its text-pointer conversion here,
+  removing the duplicate path and its undefined null-pointer string view.
+  Cursor-specific Address/enum normalization remains pending further review.
+- SourceInspection selects and owns its asset's annotation graph directly.
+  SessionState's single-use subset-construction API disappears. Annotation
+  ordering, inherited ownership, expanded byte range, roots, and shared source
+  lifetime are unchanged. The existing fixture now scans another asset and
+  verifies its annotations stay outside the retained inspection.
+
+Validation:
+
+- The complete 354-step macOS Release build, including Qt, shell, and parity,
+  is warning-free. The initial core test caught an indexing error in the new
+  fixture: the raw decoded command has two derived fields, while opcode is
+  added later during annotation projection. Correcting that assertion required
+  only a two-step test rebuild. All 44 CTest suites then pass.
+- Independent before/after reader/cursor runners match 15,372 cases and
+  19,784,777 serialized bytes, comparing returned values, ranges, captured
+  fields, diagnostics, and truncation. Both use the settled conversion headers;
+  ASan, UBSan, and float-cast-overflow checks are clean.
+- The source-value comparison identifies exactly the nine intended pointer
+  corrections among its 26 original cases; all other values retain their
+  types, ownership, and explicit lengths. A new safe cursor-null case replaces
+  a formerly undefined operation. Independent normal and sanitizer runs agree.
+- The frozen tenth-batch executable matches every ninth-batch corpus result:
+  252 input/policy comparisons and 3,922 artifact hashes, with identical
+  inventories, diagnostics, and exit statuses.
+
+### Pre-existing format coverage limitation
+
+An independent inventory found a value recognition/parsing gap for Org. Legacy
+registers OrgScanner and recognizes the Org-02 signature; the initial
+`core-rewrite` value registration and all value sources contain no corresponding
+module or signature. A temporary valid 122-byte, one-note Org fixture parses
+through legacy OrgSeq's header reader (one track/note, PPQN 4, wait time 100),
+while the frozen initial value shell returns no sources, assets, or collections
+and reports no supported music data. This predates every cleanup2 commit.
+
+The legacy track loader accesses its MIDI object during ordinary loading, so
+the probe establishes legacy recognition/header parsing, not functioning
+end-to-end legacy conversion. Directory renames such as FFT to SuzukiPS1 and
+PS1 to SonyPS1 retain their signatures; value additionally has SculptSoftSnes
+and WolfTeamSnes. Directory counts alone cannot establish equivalent support.
+The corpus is behavior-preservation coverage for sampled value inputs, not
+proof that every legacy feature is implemented or audibly equivalent.
+
+Next: use existing typed IDs directly throughout session/catalog/source-map
+indexes and validation, retaining each owner's existing pointer/index lifetime
+contract. Investigate ordinary optional modulation ranges instead of infinity
+sentinels, and remove private renderer forwarding/state parameters whose
+callers always supply the renderer's own state.

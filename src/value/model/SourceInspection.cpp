@@ -10,9 +10,16 @@
 
 namespace vgmtrans::core {
 
-SourceInspection::SourceInspection(AssetMetadata metadata, SourceMap sourceMap, SharedSourceBytes sourceBytes)
-    : metadata_(std::move(metadata)), range_(metadata_.range), sourceBytes_(std::move(sourceBytes)),
-      sourceMap_(std::move(sourceMap)) {
+SourceInspection::SourceInspection(AssetMetadata metadata, const SourceMap& sourceMap, SharedSourceBytes sourceBytes)
+    : metadata_(std::move(metadata)), range_(metadata_.range), sourceBytes_(std::move(sourceBytes)) {
+  std::vector<SourceAnnotation> selected;
+  const auto annotations = sourceMap.annotationsForAsset(metadata_.id);
+  selected.reserve(annotations.size());
+  for (const SourceAnnotationId annotation : annotations) {
+    selected.push_back(sourceMap.get(annotation));
+  }
+  sourceMap_ = SourceMap{std::move(selected)};
+
   for (const auto& annotation : sourceMap_.annotations()) {
     range_.include(annotation.range);
     if (!annotation.parent) {
