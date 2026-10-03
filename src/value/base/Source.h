@@ -177,7 +177,6 @@ public:
   [[nodiscard]] SharedSourceBytes sharedBytes(SourceId id) const;
   [[nodiscard]] ByteReader reader(SourceId id) const;
   [[nodiscard]] const SourceFile& source(SourceId id) const;
-  [[nodiscard]] size_t sourceCount() const noexcept;
   [[nodiscard]] std::vector<SourceFile> sourceFiles() const;
   [[nodiscard]] std::vector<SourceId> sourceFamily(SourceId id) const;
   [[nodiscard]] std::vector<SourceId> activeUserSources() const;

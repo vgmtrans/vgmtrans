@@ -284,13 +284,10 @@ const SourceFile& SourceStore::source(SourceId id) const {
   return entry(id).file;
 }
 
-size_t SourceStore::sourceCount() const noexcept {
-  return static_cast<size_t>(std::ranges::count_if(entries_, [](const Entry& entry) { return entry.bytes != nullptr; }));
-}
-
 std::vector<SourceFile> SourceStore::sourceFiles() const {
   std::vector<SourceFile> files;
-  files.reserve(sourceCount());
+  files.reserve(static_cast<size_t>(
+      std::ranges::count_if(entries_, [](const Entry& entry) { return entry.bytes != nullptr; })));
   for (const auto& e : entries_) {
     if (e.bytes) {
       files.push_back(e.file);

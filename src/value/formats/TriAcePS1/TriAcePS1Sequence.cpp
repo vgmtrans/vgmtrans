@@ -240,9 +240,9 @@ struct ActiveVoice {
 };
 
 struct TrackState {
-  TrackState(TrackStateContext program, const TriAcePs1SequenceLayout& layout) : slot(program.sourceTrackNumber) {
+  TrackState(TrackStateContext program, const TriAcePs1SequenceLayout& layout) {
     const auto found =
-        std::ranges::find_if(layout.tracks, [&](const TriAcePs1TrackLayout& track) { return track.slot == slot; });
+        std::ranges::find(layout.tracks, program.sourceTrackNumber, &TriAcePs1TrackLayout::slot);
     if (found != layout.tracks.end()) {
       for (const u32 address : found->patternAddresses) {
         patterns.push_back(Address{address});
@@ -250,7 +250,6 @@ struct TrackState {
     }
   }
 
-  u32 slot = 0;
   std::vector<Address> patterns;
   u32 patternIndex = 0;
   u8 bank = 0;
@@ -276,7 +275,7 @@ struct Playback : SequencePlayback<TrackState> {
       return;
     }
     selectInstrument(track.program, track.bank, false);
-    if (track.slot == 0 && program.timeSignatureNumerator != 0 &&
+    if (out.sourceTrackNumber() == 0 && program.timeSignatureNumerator != 0 &&
         program.timeSignatureDenominator != 0) {
       out.timeSignature(program.timeSignatureNumerator, program.timeSignatureDenominator, kPpqn);
     }

@@ -12,7 +12,6 @@
 #include <span>
 #include <string>
 #include <type_traits>
-#include <utility>
 
 namespace vgmtrans::core {
 
@@ -45,14 +44,6 @@ void writeVariableLength(std::vector<u8>& bytes, u64 value) {
   return static_cast<u8>(channel & 0x0f);
 }
 
-void addMessage(std::vector<MidiMessage>& messages, u64 tick, int priority, std::vector<u8> bytes) {
-  messages.push_back(MidiMessage{
-      .tick = tick,
-      .priority = priority,
-      .bytes = std::move(bytes),
-  });
-}
-
 [[nodiscard]] std::vector<u8> metaEvent(u8 type, std::span<const u8> payload) {
   std::vector<u8> bytes{0xff, type};
   writeVariableLength(bytes, payload.size());
@@ -76,16 +67,16 @@ void addChannelMessage(std::vector<MidiMessage>& messages, u64 tick, int priorit
   const u8 channel = channel4(message.channel);
   switch (message.kind) {
     case MidiChannelMessageKind::ControlChange:
-      addMessage(messages, tick, priority, {static_cast<u8>(0xb0 | channel), message.parameter, data7(message.value)});
+      messages.push_back({tick, priority, {static_cast<u8>(0xb0 | channel), message.parameter, data7(message.value)}});
       return;
     case MidiChannelMessageKind::ProgramChange:
-      addMessage(messages, tick, priority, {static_cast<u8>(0xc0 | channel), data7(message.value)});
+      messages.push_back({tick, priority, {static_cast<u8>(0xc0 | channel), data7(message.value)}});
       return;
     case MidiChannelMessageKind::PitchBend: {
       const s32 value = std::clamp<s32>(message.value, -0x2000, 0x1fff) + 0x2000;
-      addMessage(
-          messages, tick, priority,
-          {static_cast<u8>(0xe0 | channel), static_cast<u8>(value & 0x7f), static_cast<u8>((value >> 7) & 0x7f)});
+      messages.push_back({tick, priority,
+                          {static_cast<u8>(0xe0 | channel), static_cast<u8>(value & 0x7f),
+                           static_cast<u8>((value >> 7) & 0x7f)}});
       return;
     }
   }
@@ -106,12 +97,12 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
           // Keep a zero-length note's on/off pair in source order. Sorting its
           // off before its on would leave the attack hanging until a later release.
           const int noteOnPriority = payload.duration == 0 ? 40 : event.priority;
-          addMessage(messages, tick, noteOnPriority,
-                     {static_cast<u8>(0x90 | channel4(payload.channel)), data7(payload.key), payload.velocity});
+          messages.push_back({tick, noteOnPriority,
+                              {static_cast<u8>(0x90 | channel4(payload.channel)), data7(payload.key), payload.velocity}});
           const u64 noteEnd = std::max(midiTick(timebase, event.tick + payload.duration),
                                        tick + (payload.duration != 0));
-          addMessage(messages, noteEnd, 40,
-                     {static_cast<u8>(0x80 | channel4(payload.channel)), data7(payload.key), 64});
+          messages.push_back({noteEnd, 40,
+                              {static_cast<u8>(0x80 | channel4(payload.channel)), data7(payload.key), 64}});
           endTick = std::max(endTick, noteEnd);
         } else if constexpr (std::is_same_v<Payload, BankSelect>) {
           const s32 bankMsb = payload.writeLsb ? (payload.bank >> 7) & 0x7f : payload.bank & 0x7f;
@@ -130,9 +121,9 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
         } else if constexpr (std::is_same_v<Payload, MidiChannelMessage>) {
           addChannelMessage(messages, tick, event.priority, payload);
         } else if constexpr (std::is_same_v<Payload, MidiMetaMessage>) {
-          addMessage(messages, tick, event.priority, metaEvent(payload.type, payload.data));
+          messages.push_back({tick, event.priority, metaEvent(payload.type, payload.data)});
         } else if constexpr (std::is_same_v<Payload, MidiSysExMessage>) {
-          addMessage(messages, tick, event.priority, sysexEvent(payload.data));
+          messages.push_back({tick, event.priority, sysexEvent(payload.data)});
         }
       },
       event.payload);
@@ -144,12 +135,12 @@ void appendTrack(std::vector<u8>& bytes, const MidiTrack& track, Timebase timeba
   std::vector<MidiMessage> messages;
   u64 endTick = midiTick(timebase, track.endTick);
   if (!track.name.empty()) {
-    addMessage(messages, 0, -10, textMetaEvent(0x03, track.name));
+    messages.push_back({0, -10, textMetaEvent(0x03, track.name)});
   }
   for (const auto& event : track.events) {
     addEventMessages(messages, event, timebase, endTick);
   }
-  addMessage(messages, endTick, 1000, metaEvent(0x2f, std::span<const u8>()));
+  messages.push_back({endTick, 1000, metaEvent(0x2f, std::span<const u8>())});
 
   // Preserve insertion order for messages with the same tick and priority.
   std::ranges::stable_sort(messages, [](const MidiMessage& a, const MidiMessage& b) {

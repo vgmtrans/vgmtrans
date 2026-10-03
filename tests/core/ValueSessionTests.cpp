@@ -576,7 +576,6 @@ void sessionRemovesSourceFamilyAndDiscoveredData() {
   expect(project.assets().empty(), "removed source family should remove discovered assets");
   expect(project.collections().empty(), "removed source family should remove discovered collections");
   expect(project.diagnostics().empty(), "removed source family should remove source-backed diagnostics");
-  expect(session.sources().sourceCount() == 0, "source store should count only active sources");
   expect(!session.sources().contains(source), "removed source should no longer be readable");
 
   expectThrows<std::out_of_range>([&] { static_cast<void>(session.sources().bytes(source)); },
@@ -1255,7 +1254,7 @@ void sourceStoreRejectsMissingOrRemovedDerivedParents() {
             }
           },
           "both insertion paths require an existing active parent");
-      expect(store.sourceCount() == 1, "both insertion paths require an existing active parent");
+      expect(store.sourceFiles().size() == 1, "both insertion paths require an existing active parent");
     }
   };
   rejectParent(SourceId{99});
@@ -1264,9 +1263,9 @@ void sourceStoreRejectsMissingOrRemovedDerivedParents() {
   const auto parent = store.add(SourceFile{.name = "parent"}, {0xaa});
   const SharedSourceBytes retainedBytes = store.sharedBytes(parent);
   static_cast<void>(store.removeFamily(parent));
-  expect(
-      !store.contains(parent) && store.sourceCount() == 1 && retainedBytes && *retainedBytes == std::vector<u8>{0xaa},
-      "retained inspection bytes should survive removal without keeping the source active");
+  expect(!store.contains(parent) && store.sourceFiles().size() == 1 && retainedBytes &&
+             *retainedBytes == std::vector<u8>{0xaa},
+         "retained inspection bytes should survive removal without keeping the source active");
 
   rejectParent(parent);
 }
@@ -1432,7 +1431,7 @@ void sessionAddsSourceFromPath() {
   std::filesystem::remove(path);
   expect(session.addSourceFromPath(path) == sourceId, "an open file should not be read again");
   session.scanPendingSources();
-  expect(session.sources().sourceCount() == 1 && session.snapshot().assets().size() == 1,
+  expect(session.snapshot().sources().size() == 1 && session.snapshot().assets().size() == 1,
          "reopening a source must not duplicate scans or assets");
   session.removeSource(sourceId);
   {

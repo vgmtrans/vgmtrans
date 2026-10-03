@@ -196,7 +196,11 @@ void validateSourceMapOwnership(ValidationReport& report, const ScanResult& resu
                                 const std::unordered_set<AssetId>& batchAssetIds) {
   const SourceMap& sourceMap = result.sourceMap;
 
-  std::unordered_map<AssetId, SourceId> assetSources;
+  struct AssetSource {
+    SourceId source;
+    bool hasAnnotations = false;
+  };
+  std::unordered_map<AssetId, AssetSource> assetSources;
   assetSources.reserve(result.assets.size());
   for (const auto& asset : result.assets) {
     const AssetMetadata& meta = metadata(asset);
@@ -205,11 +209,9 @@ void validateSourceMapOwnership(ValidationReport& report, const ScanResult& resu
                                                    " without a primary source range");
       continue;
     }
-    assetSources.emplace(meta.id, meta.range.source);
+    assetSources.emplace(meta.id, AssetSource{meta.range.source});
   }
 
-  std::unordered_set<AssetId> assetsWithAnnotations;
-  assetsWithAnnotations.reserve(result.assets.size());
   for (const auto& annotation : sourceMap.annotations()) {
     const auto inheritedOwner = sourceMap.assetOwner(annotation.id);
     if (annotation.owner && annotation.owner->asset.valid()) {
@@ -243,8 +245,8 @@ void validateSourceMapOwnership(ValidationReport& report, const ScanResult& resu
     if (assetSource == assetSources.end()) {
       continue;
     }
-    assetsWithAnnotations.insert(*inheritedOwner);
-    if (annotation.range.source != assetSource->second) {
+    assetSource->second.hasAnnotations = true;
+    if (annotation.range.source != assetSource->second.source) {
       report.error(
           "scan.asset.multiple-sources",
           "Asset id " + std::to_string(inheritedOwner->value) + " has source annotations in more than one source",
@@ -254,7 +256,7 @@ void validateSourceMapOwnership(ValidationReport& report, const ScanResult& resu
 
   for (const auto& asset : result.assets) {
     const AssetMetadata& meta = metadata(asset);
-    if (meta.range.valid() && !assetsWithAnnotations.contains(meta.id)) {
+    if (meta.range.valid() && !assetSources.at(meta.id).hasAnnotations) {
       report.error("scan.asset.missing-source-annotations",
                    "Scan result contained asset id " + std::to_string(meta.id.value) +
                        " without an explicitly owned source annotation",

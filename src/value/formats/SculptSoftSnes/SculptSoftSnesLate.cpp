@@ -49,7 +49,7 @@ struct ProgramState {
 
 struct TrackState : VoiceState {
   TrackState(TrackStateContext context, const RuntimeConfig& config)
-      : VoiceState(context, config), assignedVoice(static_cast<u8>(number)) {}
+      : VoiceState(context, config), assignedVoice(static_cast<u8>(context.sourceTrackNumber)) {}
 
   u8 pitch = 0;
   u16 finePitch = 0;
@@ -74,7 +74,7 @@ struct Playback : SequencePlayback<TrackState> {
 
   Voice voice() { return Voice{track, program.echo, out, vm}; }
   void retireStolenVoice() {
-    auto& stolen = program.stolen[track.number];
+    auto& stolen = program.stolen[out.sourceTrackNumber()];
     if (stolen) {
       if (track.note) {
         out.setNoteEnd(*track.note, *stolen);
@@ -142,10 +142,10 @@ struct Playback : SequencePlayback<TrackState> {
                         ((track.voiceMode & 1) && track.priority == slot.priority))) {
       return Allocation::Muted;
     }
-    if (slot.owner && *slot.owner != track.number) {
+    if (slot.owner && *slot.owner != out.sourceTrackNumber()) {
       program.stolen[*slot.owner] = vm.tick();
     }
-    slot = VoiceSlot{.owner = track.number, .priority = track.priority, .active = true};
+    slot = VoiceSlot{.owner = out.sourceTrackNumber(), .priority = track.priority, .active = true};
     track.currentVoice = assigned;
     track.dspVoice = assigned;
     return Allocation::Ready;
@@ -261,7 +261,7 @@ struct Playback : SequencePlayback<TrackState> {
     track.assignedVoice = start;
     track.voiceMask = mask;
   }
-  void defaultVoice() { assign(8, static_cast<u8>(track.number), 0); }
+  void defaultVoice() { assign(8, static_cast<u8>(out.sourceTrackNumber()), 0); }
   void reset() {
     if (track.currentVoice) {
       program.voices[*track.currentVoice].active = false;

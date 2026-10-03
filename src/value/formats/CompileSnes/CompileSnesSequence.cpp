@@ -333,7 +333,7 @@ struct ProgramState {
 
 struct TrackState {
   TrackState(TrackStateContext source, const DriverData& data)
-      : trackNumber(source.sourceTrackNumber), early(data.early()), stereoEnabled(data.stereoEnabled()) {
+      : early(data.early()), stereoEnabled(data.stereoEnabled()) {
     const TrackHeader header = data.trackHeader(source.sourceTrackNumber);
     channel = header.channel;
     headerFlags = header.flags;
@@ -350,7 +350,6 @@ struct TrackState {
     slur = (headerFlags & 0x10) != 0;
   }
 
-  u32 trackNumber = 0;
   u8 channel = 0;
   bool early = false;
   bool stereoEnabled = false;

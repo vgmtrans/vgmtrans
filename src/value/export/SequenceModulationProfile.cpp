@@ -84,7 +84,7 @@ template <class Convert>
 }
 
 void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& vibrato, LfoObservation& tremolo,
-                       LfoObservation& pan) {
+                       SequenceModulationProfile& profile) {
   switch (event.target) {
     case ModulationPerformanceTarget::VibratoDepth:
       if (event.pitchDepthSemitones) {
@@ -129,12 +129,12 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
       break;
     case ModulationPerformanceTarget::PanDepth:
       if (event.panDepth) {
-        pan.maxDepth = std::max(pan.maxDepth, std::abs(*event.panDepth));
+        profile.maxPanDepth = std::max(profile.maxPanDepth, std::abs(*event.panDepth));
       }
       break;
     case ModulationPerformanceTarget::PanRate:
       if (event.context.frequencyHz) {
-        observeRange(pan.rate, *event.context.frequencyHz);
+        observeRange(profile.panRateHertz, *event.context.frequencyHz);
       }
       break;
   }
@@ -170,20 +170,16 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
 SequenceModulationProfile analyzeSequenceModulation(const PerformanceSequence& sequence) {
   LfoObservation vibrato;
   LfoObservation tremolo;
-  LfoObservation pan;
+  SequenceModulationProfile profile;
 
   for (const auto& track : sequence.tracks) {
     for (const auto& event : track.events) {
       if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
-        observeModulation(*modulation, vibrato, tremolo, pan);
+        observeModulation(*modulation, vibrato, tremolo, profile);
       }
     }
   }
 
-  SequenceModulationProfile profile{
-      .maxPanDepth = pan.maxDepth,
-      .panRateHertz = pan.rate,
-  };
   if (vibrato.maxDepth > 0.0 && vibrato.rate) {
     profile.instruments.vibrato = VibratoSpec{
         .maxDepthCents = vibrato.maxDepth,

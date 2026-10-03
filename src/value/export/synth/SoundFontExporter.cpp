@@ -233,9 +233,9 @@ struct SfLayout {
   // the reciprocal to preserve the requested dB attenuation.
   constexpr double emu8000InitialAttenuationScale = 2.5;
   constexpr double maxInitialAttenuation = 1440.0;
-  return static_cast<u16>(std::clamp(
-      std::lround((region.attenuationDb + sample.attenuationDb) * centibelsPerDb * emu8000InitialAttenuationScale), 0l,
-      static_cast<long>(maxInitialAttenuation)));
+  return static_cast<u16>(std::lround(std::clamp(
+      (region.attenuationDb + sample.attenuationDb) * centibelsPerDb * emu8000InitialAttenuationScale, 0.0,
+      maxInitialAttenuation)));
 }
 
 [[nodiscard]] s16 sf2EnvelopeTimecents(std::optional<double> seconds) {

@@ -245,16 +245,16 @@ void routesBinPathsAndScansDerivedSources() {
                session.addSourceFromPath(fixture.directory / "disc.cue") == id,
            "BIN and CUE paths should share the same resolved source");
     session.scanSource(id);
-    expect(scans == 1 && session.sources().sourceCount() == 2, "extraction must consume the cue without recursing");
+    expect(scans == 1 && session.snapshot().sources().size() == 2, "extraction must consume the cue without recursing");
     const auto diagnostics = session.snapshot().diagnostics();
     expect(diagnostics.size() == 1 && diagnostics.front().severity == Severity::Info,
            "scanning extracted tracks should not report errors or warnings");
     expect(session.sources().source(SourceId{1}).parent == id, "extracted tracks must belong to the cue source family");
     session.removeSource(id);
-    expect(session.sources().sourceCount() == 0, "removing the cue must remove its tracks");
+    expect(session.snapshot().sources().empty(), "removing the cue must remove its tracks");
     const auto reloaded = session.addSourceFromPath(fixture.directory / "disc.bin");
     session.scanSource(reloaded);
-    expect(reloaded != id && scans == 2 && session.sources().sourceCount() == 2,
+    expect(reloaded != id && scans == 2 && session.snapshot().sources().size() == 2,
            "removing a cue should allow its BIN alias and derived tracks to load again");
   }
   std::filesystem::remove(fixture.directory / "disc.cue");
@@ -329,7 +329,7 @@ void archiveMembersResolveAndLoadOncePerContainer() {
   };
   const auto first = addArchive("first.archive");
   session.scanSource(first);
-  expect(cueLoads == 1 && trackScans == 2 && session.sources().sourceCount() == 6,
+  expect(cueLoads == 1 && trackScans == 2 && session.snapshot().sources().size() == 6,
          "member aliases and duplicate entries should extract one cue and its two tracks");
   expect(session.snapshot().diagnostics().size() == 2 &&
              std::ranges::all_of(session.snapshot().diagnostics(), [](const Diagnostic& d) {
@@ -338,14 +338,14 @@ void archiveMembersResolveAndLoadOncePerContainer() {
   expect(addArchive("first.archive") == first, "reopening an archive should reuse its source family");
   const auto second = addArchive("second.archive");
   session.scanPendingSources();
-  expect(second != first && cueLoads == 2 && trackScans == 4 && session.sources().sourceCount() == 12,
+  expect(second != first && cueLoads == 2 && trackScans == 4 && session.snapshot().sources().size() == 12,
          "identical member names in different archives must remain distinct");
   session.removeSource(first);
   expect(!session.sources().findFile("game/disc.cue", first),
          "members of a removed archive must no longer be found");
   const auto reloaded = addArchive("first.archive");
   session.scanSource(reloaded);
-  expect(reloaded != first && cueLoads == 3 && trackScans == 6 && session.sources().sourceCount() == 12,
+  expect(reloaded != first && cueLoads == 3 && trackScans == 6 && session.snapshot().sources().size() == 12,
          "removing an archive should release the identities of its complete extracted family");
 }
 

@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cfenv>
 #include <cmath>
 #include <limits>
 
@@ -620,6 +621,20 @@ void soundFontExporterWritesSfbkRiffFile() {
            "SoundFont export should clamp large finite reverb sends before integer conversion");
   }
   auto& regions = soundBank.instruments.front().regions;
+  for (const double attenuationDb : {1e20, std::numeric_limits<double>::max()}) {
+    regions.front().attenuationDb = attenuationDb;
+    expect(validateSoundBank(soundBank).empty(), "Large finite attenuation should remain a valid synth value");
+    std::fenv_t environment;
+    expect(std::feholdexcept(&environment) == 0, "Floating-point environment should be saved for attenuation export");
+    const auto saturated = buildSoundFont2(
+        SynthExportInput{.name = "Attenuation", .soundBanks = prepareSynthBanksForTest(soundBanks), .samplePools = samples},
+        sources);
+    const bool invalidRounding = std::fetestexcept(FE_INVALID) != 0;
+    const bool restored = std::fesetenv(&environment) == 0;
+    expect(restored && !invalidRounding && saturated.diagnostics.empty() &&
+               soundFontGeneratorContains(saturated.bytes, "igen", 48, 1440),
+           "SoundFont export should clamp large attenuation before rounding without a floating-point range error");
+  }
   const Region region = regions.front();
   regions.resize(5000, region);
   expectThrows<std::overflow_error>(

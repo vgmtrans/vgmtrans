@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <compare>
 #include <fmt/format.h>
+#include <iterator>
 #include <map>
 #include <optional>
 #include <utility>
@@ -207,11 +208,11 @@ public:
   VmStreamExecutor(const SequenceProgram& program, const TrackProgram& track, const SequenceStream& stream,
                    const SequenceRuntime& runtime, TrackId sourceTrackId, size_t& nextTrack,
                    const SequenceVmOptions& options, PerformanceSequence& targetSequence, u64& outputSequence,
-                   std::any& programState, bool startsActive = true)
+                   std::any& programState)
       : track_(track), sourceTrackId_(sourceTrackId), sequenceRuntime_(runtime), behavior_(program.behavior),
         options_(options), targetSequence_(targetSequence), outputSequence_(outputSequence),
         programState_(programState),
-        position_{.command = startsActive ? track_.commandIndex(track_.startAddress) : std::optional<u32>{}} {
+        position_{.command = program.sectionPlaylist ? std::nullopt : track_.commandIndex(track_.startAddress)} {
     if (stream.channels.empty()) {
       throw std::invalid_argument("A sequence stream must have at least one channel");
     }
@@ -225,7 +226,7 @@ public:
       auto& channel = channels_.back();
       addInitialTrackEvents(outputAt(channel, 0), behavior_, channel.performance.id.value == 0);
     }
-    if (startsActive && !position_.command && !track_.commands.empty()) {
+    if (!program.sectionPlaylist && !position_.command && !track_.commands.empty()) {
       warn(fmt::format("Sequence track start ${:04X} was not decoded", track_.startAddress.value), {});
     }
   }
@@ -871,13 +872,12 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
     std::vector<detail::VmStreamExecutor> executors;
     executors.reserve(program.streamCount());
     size_t nextTrack = 0;
-    const bool hasSectionPlaylist = program.sectionPlaylist.has_value();
     for (size_t trackIndex = 0; trackIndex < program.tracks.size(); ++trackIndex) {
       const TrackProgram& track = program.tracks[trackIndex];
       for (const auto& stream : track.streams) {
         executors.emplace_back(
             program, track, stream, runtime, TrackId{static_cast<u32>(trackIndex)}, nextTrack, options, target,
-            outputSequence, programState, !hasSectionPlaylist);
+            outputSequence, programState);
       }
     }
     auto beginSection = [&](const std::vector<std::optional<Address>>& starts, u64 tick) {
@@ -1029,9 +1029,10 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
 std::any detail::analyzeSequenceProgram(const SequenceVm& vm, const SequenceProgram& program,
                                         std::vector<Diagnostic>* diagnostics) {
   std::any state;
-  const PerformanceSequence analysis = vm.renderImpl(program, program.runtime, &state);
+  PerformanceSequence analysis = vm.renderImpl(program, program.runtime, &state);
   if (diagnostics != nullptr) {
-    diagnostics->insert(diagnostics->end(), analysis.diagnostics.begin(), analysis.diagnostics.end());
+    diagnostics->insert(diagnostics->end(), std::make_move_iterator(analysis.diagnostics.begin()),
+                        std::make_move_iterator(analysis.diagnostics.end()));
   }
   return state;
 }

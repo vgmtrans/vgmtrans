@@ -1,7 +1,7 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Twenty-five validated batches remove 1,014 net production lines from
+`cb9e0b766`. Twenty-six validated batches remove 1,031 net production lines from
 `src/value`. All 44 CTest suites pass; the latest real-file replay preserves
 all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
 records appear at the end of this document.
@@ -5918,3 +5918,144 @@ from this commit.
 Next: inspect the remaining copied channel identities, SourceStore's unused count
 query, and the MIDI writer's aggregate-only message forwarding helper. Probe SF2
 attenuation clipping before rounding while preserving its existing lround policy.
+
+
+## Cleanup2 twenty-sixth batch: one ownership index and direct value transfer
+
+Twelve production files remove 17 net lines; three test files add 14 net lines.
+Cleanup2 now removes 1,031 net production lines, including 944 from architecture
+code. Preserve SequenceVM and the format/export boundary.
+
+Accepted changes:
+
+- Remove three more copied logical channel numbers. CompileSnes never reads its
+  stored trackNumber after construction. TriAcePS1 looks up its layout directly
+  with the constructor context and reads startup identity from out. SculptSoftSnes
+  reads logical ownership from out while retaining mutable DSP voice assignment,
+  priority and stolen-voice state. No new channel facade or identity storage.
+- Remove SourceStore::sourceCount(), whose only production caller was the reserve
+  in sourceFiles(). Keep its exact active-entry count there, so removal history
+  does not inflate returned capacity. Existing assertions inspect source metadata
+  or the snapshot; remove one redundant count assertion next to the empty view.
+- Delete MIDI's addMessage() aggregate-only forwarding helper and its unused
+  utility include. The nine sites directly append {tick, priority, bytes}; retain
+  real channel clipping, wire factories, stable sorting and target serialization.
+- Accumulate pan depth/rate in the final SequenceModulationProfile. Remove a
+  parallel LfoObservation pan object with unused delay, waveform and gain facts.
+  Vibrato/tremolo retain their observation state because conflict resolution and
+  conditional presence require it.
+- Source-map ownership validation stores each asset's source and annotation
+  presence together. Remove a second keyed assetsWithAnnotations set/reserve;
+  retain separate identity validation and all ordered malformed-input diagnostics.
+  The final at() is guarded by valid metadata range, which guarantees first-pass
+  insertion even for invalid and duplicate IDs. This private change adds two
+  lines while deleting a container and its per-ID ownership bookkeeping.
+- Derive executor startup directly from the immutable program.sectionPlaylist.
+  Remove the private startsActive parameter/default and its caller's temporary;
+  the only call always supplied the same derived value. Actual section entry,
+  pre-command delay, tick provenance and command-budget state remain distinct.
+- Move completed analysis diagnostics into the caller's vector. The local
+  performance is discarded immediately; do not allocate/copy its strings again.
+  Preserve prefixes, order and complete attributes with ordinary move iterators.
+  This ownership correction adds two lines, including the explicit iterator
+  include; no generic append wrapper or rollback protocol is introduced.
+- Clip SF2 attenuation in floating point before lround. Retain sum order, the two
+  multiplications, target scale and lround policy. Huge finite values are valid
+  synth inputs, but need not be rounded outside long's domain before saturation.
+  Add a regression that saves/masks the floating-point environment, exports
+  validated 1e20/DBL_MAX attenuation, checks max 1440 without FE_INVALID, and
+  restores the full environment before asserting.
+
+Validation:
+
+- The full 345-step macOS Release build is warning-free; all 44 CTest suites pass.
+  Freeze matching headers, tests, core/formats/fmt/Qt value archives and shell.
+  The twenty-sixth shell preserves all 252 input/policy comparisons and 3,922
+  artifact hashes, inventories, diagnostics and exit statuses against 25.
+- Three complete channel-format suites plus generated TriAce and Sculpt lifecycle
+  cases preserve 2,151 renders/7,776,966 bytes: complete IR, automations, source
+  spans, diagnostics and three MIDI policies. Include raw u32 identity comparisons,
+  late startup, zero/small budgets, copied runtimes, early ownership, DSP allocation,
+  handoff, default/reset, priority and release tails. Compile state shrinks 344->336
+  and TriAce 88->80 bytes; Sculpt base/derived sizes retain their padding. Thirteen
+  configured affected-unit syntax checks are Werror-clean. Focused sanitizer runs
+  rebuild matching VM/emitter and all relevant TriAce units consistently.
+- Source lifetime/removal trace preserves 631,901 lines/39,740,633 bytes, SHA256
+  759f1eea34ee2668b611e4faa9c332fc6cbb034c9d24b4cb8c691ebe185573b8.
+  Cover 16,384 lifecycle steps, copy/move/assignment, parent and scoped aliases,
+  active empty bytes, invalid/removed IDs and error text, retained readers/metadata
+  after store destruction, and 28 capacity/history cases through 4,096 tombstones.
+  Capacity, order and metadata remain exact. Complete Session/Cue fixtures pass;
+  initial concurrent runs collided on an existing fixed fixture path, so rerun
+  sequentially. Both configured Source.cpp syntax checks are Werror-clean.
+- MIDI preserves 216,761 captures/236,608,547 bytes, SHA256
+  463b5a29eb87be131503a963ec315e12b1125bd7e1b53084ca5426995d40d86d.
+  Include 75,043 renderer captures, 141,718 raw-encoder captures, complete renderer/
+  pitch/encoding fixtures, signed-16 pitch sweep, int32 boundaries, timebases,
+  channel/note-duration combinations, track counts and meta/SysEx lengths.
+  All 36 allocation traces remain exact; all three configured syntax checks pass.
+- Pan ownership preserves 43,911 profiles/37,728,599 bytes, SHA256
+  a4f7b987c97661bf6ccb5cd7a3015f68746c13c0178a71e1dcc38f4801466c2c.
+  Capture complete profiles, controller amounts with/without supplied profiles,
+  modulation usage and application to banks. Include all eight targets, ordering,
+  conflicting/absent shapes, delays, signed zero, negative/nonfinite/large values,
+  and complete modulation fixtures. All three configured syntax entries are clean.
+- Ownership validation preserves 16,496 malformed/lifecycle cases: 687,778 lines/
+  95,930,807 bytes, SHA256
+  fa419a7700d1be14957b79928bb54605df824f4827a574268e413e56373511e3.
+  Cover all asset types, invalid/zero/duplicate/reused IDs, invalid/foreign/missing/
+  removed/out-of-bounds ranges, inherited/explicit/unknown owners, backward/shared/
+  cyclic/missing parents, invalid annotations, links/fields and ordered diagnostics.
+  Complete Session/Registry/SourceMap/SynthBuilder suites and both configured
+  validation syntax checks pass. Of 144 allocation cases through 16,384 assets,
+  128 improve count and 110 improve requested bytes; none grow. Aggregate savings
+  are 31,786 allocations/2,782,640 requested bytes. Fully owned largest case
+  improves 65,540->49,155 allocations and 2,097,152->1,703,936 bytes; no-annotation
+  count improves by one with bytes equal.
+- Executor construction preserves the broad 171,938-case VM matrix/206,284,725
+  bytes across independent/shared streams, command calls/repeats, implicit/explicit
+  loops, synchronized checkpoints, delay/polling hooks, startup budgets and
+  playlists. Complete VM/Cursor fixtures, including prepass/analysis, pass.
+  All three configured syntax checks pass for the combined final VM draft.
+- Analysis transfer preserves 840 cases/3,226,575 bytes, SHA256
+  d3d99fa9c2e8afc63de223465ce4b2cbc1d1a0139c8bcff5a3fb61730b4fbd64.
+  Preserve prefixes, complete diagnostic attributes, final program state and
+  finishPrepass counts. Separate O2 allocation traces improve 13,078->10,933
+  allocations and 7,091,168->4,667,504 requested bytes; 588 cases improve, none
+  worsen. Removing copies can change native bad_alloc staging; no new exception
+  rollback guarantee is claimed.
+- SF2 clipping preserves 691,644 private integer results and 405 public/fixture
+  artifacts under all four rounding modes: result/artifact projection 27,005,050
+  bytes, SHA256 da212bae608cefa358e91ffb3f24203bd44d9396b7008fe1f8740863a7f724da.
+  Cover half-unit/nextafter boundaries, both contributions, cancellation, signed
+  zero, subnormals and safe values through 1e15 dB. Saved configured assembly
+  confirms add, multiply 10, multiply 2.5, then the same lround call.
+- Treat attenuation exception flags separately from output parity. Of ordinary
+  records, 118,854 lose only FE_INEXACT (nine retain FE_UNDERFLOW). Forty private
+  and forty public huge-finite cases preserve 27,030,730 projected bytes, SHA256
+  aa7752d3003a41a31375aa4ccc1a63fe49d7c8aa725fa00d45056c31b29a99e4. On this Darwin
+  build old and new outputs both saturate correctly; old raises FE_INVALID in
+  32 cases and new in none. Intermediate overflow/inexact from unchanged
+  arithmetic remains. Do not claim a demonstrated Darwin byte-output fix.
+  The saved-environment permanent regression fails its own assertion with old
+  code and passes new Release/sanitizer code. The new 407-artifact/full numeric
+  trace is 29,773,138 bytes, SHA256
+  3c786f70c41f8380776c114f6dca09b66752ac39c37de2efaa0bac0077485e0f.
+  Both actual MIDI/SF2 writers pass all six configured Werror checks.
+- Focused ASan/UBSan/float-cast-overflow proof rebuilds changed units, probes and
+  fixtures with matching unchanged Release archives; it is not whole-core
+  instrumentation. Mixed libc++ container annotations are disabled where needed;
+  channel/VM lifetime probes instead rebuild the matching involved units.
+  Allocation sums are requested bytes, not peak RSS.
+
+Read-only decisions: keep active-note/event history for analysis because playback
+can consult it. Suppressing only silent-pass source spans would introduce another
+pass-mode flag and bookkeeping path, without simplifying current responsibility.
+Keep explicit song-wide motion owner numbers: a format can interrupt its output
+binding while source motion continues on that track. No owns()/belongsTo() API.
+The include audit still finds zero export headers under value formats; physical
+modulation lowering stays exporter-side.
+
+Next: probe merging validation's remaining batch-ID index with its source facts,
+transferring channel buffers into decode-owned streams directly, and removing
+source-role categories left behind by field projection when no producer uses them.

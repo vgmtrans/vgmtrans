@@ -101,11 +101,11 @@ struct Playback : SequencePlayback<TrackState> {
       voice().silence();
     } else if (opcode != 0xf4 && duration != 0) {
       auto& owner = program.voiceOwners[track.assignedVoice.value_or(0)];
-      if (owner && *owner != track.number) {
+      if (owner && *owner != out.sourceTrackNumber()) {
         voice().warning("Sharing a SculptSoftSnes DSP voice between tracks is not supported");
         return end();
       }
-      owner = track.number;
+      owner = out.sourceTrackNumber();
       track.voicePitch =
           track.pitched
               ? static_cast<u16>(track.pitch + track.finePitch + track.trackTranspose + track.patternTranspose)

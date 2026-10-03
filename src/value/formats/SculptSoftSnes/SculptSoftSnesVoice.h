@@ -27,12 +27,11 @@ struct EchoState {
 struct VoiceState {
   VoiceState(core::TrackStateContext context, const RuntimeConfig& config)
       : data(config.data), frameSeconds(config.frameMicroseconds / 1000000.0), revision(config.revision),
-        number(context.sourceTrackNumber), dspVoice(context.sourceTrackNumber) {}
+        dspVoice(context.sourceTrackNumber) {}
 
   std::shared_ptr<const DriverData> data;
   double frameSeconds;
   Revision revision;
-  u32 number;
   u32 dspVoice;
   u8 sample = 0;
   u8 voiceVolume = 0;
