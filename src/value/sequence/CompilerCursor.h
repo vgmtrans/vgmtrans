@@ -207,8 +207,8 @@ public:
       return appendCallable([=](Playback& playback) { playback.out.level(gain, sourceLevels); });
     }
 
-    Event& emitExpression(double gain) {
-      return appendCallable([=](Playback& playback) { playback.out.expression(gain); });
+    Event& emitExpression(double gain, u32 sourceLevels = 0) {
+      return appendCallable([=](Playback& playback) { playback.out.expression(gain, sourceLevels); });
     }
 
     Event& emitPan(double position) {

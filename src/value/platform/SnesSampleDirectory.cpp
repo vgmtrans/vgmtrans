@@ -63,29 +63,6 @@ std::optional<SnesSampleDirectoryEntry> readSnesSampleDirectoryEntry(ByteReader 
   return result;
 }
 
-std::vector<SnesBrrSample> readSnesBrrCatalog(ByteReader reader, u32 directoryAddress, std::vector<u8> srcns) {
-  std::ranges::sort(srcns);
-  const auto duplicates = std::ranges::unique(srcns);
-  srcns.erase(duplicates.begin(), duplicates.end());
-
-  std::vector<SnesBrrSample> catalog;
-  for (const u8 srcn : srcns) {
-    const auto entry = readSnesSampleDirectoryEntry(reader, directoryAddress + static_cast<u32>(srcn) * 4);
-    if (!entry) {
-      continue;
-    }
-    catalog.push_back(SnesBrrSample{
-        .srcn = srcn,
-        .directoryEntry = entry->entryRange,
-        .startAddress = entry->startAddress,
-        .loopAddress = entry->loopAddress,
-        .stream = *entry->stream,
-    });
-  }
-
-  return catalog;
-}
-
 std::optional<SampleRef> SnesBrrSampleRefs::findSrcn(u8 srcn) const {
   const auto sample = samples_[srcn];
   return sample.valid() ? std::optional{sample} : std::nullopt;

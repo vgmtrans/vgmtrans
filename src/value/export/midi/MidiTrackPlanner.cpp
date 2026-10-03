@@ -821,8 +821,12 @@ std::vector<detail::MidiTrackEvent> detail::planMidiTrack(
   for (const auto& event : track.events) {
     nextSequence = std::max(nextSequence, performanceEventHeader(event).sequence + 1);
   }
+  u32 nextAutomation = 0;
   for (const auto& automation : track.automations) {
     nextSequence = std::max(nextSequence, automation.header.sequence + 1);
+    if (automation.id.valid()) {
+      nextAutomation = std::max(nextAutomation, automation.id.value + 1);
+    }
     if (pitchTransitionIntent(automation)) {
       if (automation.realization.endReason != PerformanceAutomationEndReason::Completed &&
           automation.realization.endTick <= automation.realization.startTick) {
@@ -843,12 +847,6 @@ std::vector<detail::MidiTrackEvent> detail::planMidiTrack(
   // instantaneous pitch transition when no explicit boundary slide replaces it.
   std::vector<PerformanceAutomation> keyChanges;
   keyChanges.reserve(notes.size());
-  u32 nextAutomation = 0;
-  for (const auto& motion : track.automations) {
-    if (motion.id.valid()) {
-      nextAutomation = std::max(nextAutomation, motion.id.value + 1);
-    }
-  }
   for (const auto& note : notes) {
     const auto* previous = note.previousInVoice;
     if (previous == nullptr) {

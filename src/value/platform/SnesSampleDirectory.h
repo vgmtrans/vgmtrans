@@ -10,6 +10,7 @@
 #include "value/synth/SynthBuilder.h"
 
 #include <array>
+#include <bitset>
 #include <functional>
 #include <optional>
 #include <ranges>
@@ -53,23 +54,42 @@ struct SnesBrrSample {
 [[nodiscard]] std::optional<SnesSampleDirectoryEntry> readSnesSampleDirectoryEntry(ByteReader reader, u32 entryAddress,
                                                                                    bool inspectStream = true);
 
-// Validated samples in SRCN order. Formats can filter this list before adding it.
-[[nodiscard]] std::vector<SnesBrrSample> readSnesBrrCatalog(ByteReader reader, u32 directoryAddress,
-                                                            std::vector<u8> srcns);
-
 // Accept sample-number ranges or instrument records with an SRCN projection.
-// Sorting, deduplication, and validation happen here.
+// Byte-sized membership determines the validated catalog's unique SRCN order.
 template <std::ranges::input_range Entries, class Srcn = std::identity>
 [[nodiscard]] std::vector<SnesBrrSample> readSnesBrrCatalog(ByteReader reader, u32 directoryAddress, Entries&& entries,
                                                             Srcn srcn = {}) {
-  std::vector<u8> referencedSrcns;
-  if constexpr (std::ranges::sized_range<Entries>) {
-    referencedSrcns.reserve(std::ranges::size(entries));
-  }
+  std::bitset<256> referenced;
   for (const auto& entry : entries) {
-    referencedSrcns.push_back(std::invoke(srcn, entry));
+    const u8 number = std::invoke(srcn, entry);
+    referenced.set(number);
   }
-  return readSnesBrrCatalog(reader, directoryAddress, std::move(referencedSrcns));
+  if (referenced.none()) {
+    return {};
+  }
+  std::vector<SnesBrrSample> catalog;
+  for (u32 number = 0; number < referenced.size(); ++number) {
+    if (!referenced.test(number)) {
+      continue;
+    }
+    const auto entry = readSnesSampleDirectoryEntry(reader, directoryAddress + number * 4);
+    if (!entry) {
+      continue;
+    }
+    catalog.push_back(SnesBrrSample{
+        .srcn = static_cast<u8>(number),
+        .directoryEntry = entry->entryRange,
+        .startAddress = entry->startAddress,
+        .loopAddress = entry->loopAddress,
+        .stream = *entry->stream,
+    });
+  }
+  return catalog;
+}
+
+[[nodiscard]] inline std::vector<SnesBrrSample> readSnesBrrCatalog(ByteReader reader, u32 directoryAddress,
+                                                                 std::vector<u8> srcns) {
+  return readSnesBrrCatalog<std::vector<u8>&>(reader, directoryAddress, srcns);
 }
 
 // Concrete references created while adding an SNES catalog. SRCNs with

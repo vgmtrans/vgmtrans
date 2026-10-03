@@ -631,13 +631,9 @@ using Cursor = CompilerCursor<Playback>;
     case 0x23:
       return beginEvent(cursor, *source, "Level Fade", SequenceSemantic::Level)
           .invoke<&Playback::controllerFade>({0, cursor.varLen("duration"), cursor.s8("target")});
-    case 0x24: {
-      auto event = beginEvent(cursor, *source, "Expression", SequenceSemantic::Level);
-      const s8 expression = cursor.s8("expression");
-      return event.invoke([expression](Playback& playback) {
-        playback.out.expression(controller(expression), 128);
-      });
-    }
+    case 0x24:
+      return beginEvent(cursor, *source, "Expression", SequenceSemantic::Level)
+          .emitExpression(controller(cursor.s8("expression")), 128);
     case 0x25:
       return beginEvent(cursor, *source, "Expression Fade", SequenceSemantic::Level)
           .invoke<&Playback::controllerFade>({2, cursor.varLen("duration"), cursor.s8("target")});

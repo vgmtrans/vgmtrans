@@ -339,13 +339,16 @@ Artifact exportSoundBank(const SessionSnapshot& snapshot, const SourceStore& sou
   };
   // Filtering to played instruments requires a specific sequence. A full bank
   // export can resolve the bank's samples without choosing one of its collections.
-  const size_t collectionCount = snapshot.countCollectionsContaining(soundBankId);
-  if (request.exportOnlyUsedInstruments && collectionCount > 1) {
-    return failedArtifact(
-        {exportError("Sound bank belongs to multiple collections; export a specific collection instead",
-                     soundBank->metadata.range)});
-  }
-  if (request.exportOnlyUsedInstruments && collectionCount == 1) {
+  if (request.exportOnlyUsedInstruments) {
+    const size_t collectionCount = snapshot.countCollectionsContaining(soundBankId);
+    if (collectionCount > 1) {
+      return failedArtifact(
+          {exportError("Sound bank belongs to multiple collections; export a specific collection instead",
+                       soundBank->metadata.range)});
+    }
+    if (collectionCount == 0) {
+      return failedArtifact({exportError("Used-instrument export requires a collection with a sequence")});
+    }
     const auto* collection = snapshot.firstCollectionContaining(soundBankId);
     auto collectionRequest = request;
     collectionRequest.kinds = {kind};
@@ -357,9 +360,6 @@ Artifact exportSoundBank(const SessionSnapshot& snapshot, const SourceStore& sou
     return failedArtifact({exportError("Collection sound bank export produced no artifact")});
   }
 
-  if (request.exportOnlyUsedInstruments) {
-    return failedArtifact({exportError("Used-instrument export requires a collection with a sequence")});
-  }
   auto binding = bindSoundBank(snapshot, soundBankId);
   if (!binding.collection) {
     return failedArtifact(std::move(binding.diagnostics));

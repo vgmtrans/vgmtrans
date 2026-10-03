@@ -82,7 +82,7 @@ std::vector<File> parseCue(ByteReader reader) {
   if (text.starts_with("\xef\xbb\xbf")) {
     text.erase(0, 3);
   }
-  std::istringstream cue(text);
+  std::istringstream cue(std::move(text));
   std::vector<File> files;
   for (std::string line; std::getline(cue, line);) {
     std::istringstream fields(line);

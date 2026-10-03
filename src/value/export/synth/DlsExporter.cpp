@@ -93,51 +93,42 @@ struct DlsConnection {
   return -static_cast<s32>(units);
 }
 
-[[nodiscard]] std::optional<DlsConnection> dlsConnectionForGenerator(const SynthGenerator& generator) {
-  // Generators with no controller source become DLS connections that are always active.
-  switch (generator.destination) {
-    case SynthDestination::VolumeAttenuation:
-      return DlsConnection{.destination = kDlsConnDstAttenuation, .scale = dls16Dot16Scale(generator.amount)};
-    case SynthDestination::VibratoDepth:
-      return DlsConnection{
-          .source = kDlsConnSrcVibrato,
-          .destination = kDlsConnDstPitch,
-          .scale = dls16Dot16Scale(generator.amount),
-      };
-    case SynthDestination::VibratoRate:
-      return DlsConnection{.destination = kDlsConnDstVibFrequency, .scale = dls16Dot16Scale(generator.amount)};
-    case SynthDestination::VibratoDelay:
-      return DlsConnection{.destination = kDlsConnDstVibStartDelay, .scale = dls16Dot16Scale(generator.amount)};
-    case SynthDestination::TremoloDepth:
-      return DlsConnection{
-          .source = kDlsConnSrcLfo,
-          .destination = kDlsConnDstAttenuation,
-          .scale = dls16Dot16Scale(generator.amount),
-      };
-    case SynthDestination::TremoloRate:
-      return DlsConnection{.destination = kDlsConnDstLfoFrequency, .scale = dls16Dot16Scale(generator.amount)};
-    case SynthDestination::TremoloDelay:
-      return DlsConnection{.destination = kDlsConnDstLfoStartDelay, .scale = dls16Dot16Scale(generator.amount)};
-    case SynthDestination::Unknown:
-      return std::nullopt;
-  }
-
-  return std::nullopt;
+void writeConnection(std::vector<u8>& bytes, DlsConnection connection) {
+  writeLe16(bytes, connection.source);
+  writeLe16(bytes, connection.control);
+  writeLe16(bytes, connection.destination);
+  writeLe16(bytes, kDlsConnTrnNone);
+  writeLeS32(bytes, connection.scale);
 }
 
-[[nodiscard]] std::optional<u16> dlsDefaultSourceForDestination(SynthDestination destination) {
+void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
+  writeConnection(bytes, DlsConnection{.destination = destination, .scale = scale});
+}
+
+struct DlsModulationDestination {
+  u16 oscillator = kDlsConnSrcNone;
+  u16 destination;
+  u16 defaultController;
+};
+
+[[nodiscard]] std::optional<DlsModulationDestination> dlsDestination(SynthDestination destination) {
   switch (destination) {
-    case SynthDestination::VibratoDepth:
-      return kDlsConnSrcCc1;
-    case SynthDestination::VibratoRate:
-    case SynthDestination::TremoloRate:
-      return kDlsConnSrcChannelPressure;
-    case SynthDestination::VibratoDelay:
-    case SynthDestination::TremoloDepth:
     case SynthDestination::VolumeAttenuation:
-      return kDlsConnSrcCc93;
+      return DlsModulationDestination{.destination = kDlsConnDstAttenuation, .defaultController = kDlsConnSrcCc93};
+    case SynthDestination::VibratoDepth:
+      return DlsModulationDestination{kDlsConnSrcVibrato, kDlsConnDstPitch, kDlsConnSrcCc1};
+    case SynthDestination::VibratoRate:
+      return DlsModulationDestination{.destination = kDlsConnDstVibFrequency,
+                                     .defaultController = kDlsConnSrcChannelPressure};
+    case SynthDestination::VibratoDelay:
+      return DlsModulationDestination{.destination = kDlsConnDstVibStartDelay, .defaultController = kDlsConnSrcCc93};
+    case SynthDestination::TremoloDepth:
+      return DlsModulationDestination{kDlsConnSrcLfo, kDlsConnDstAttenuation, kDlsConnSrcCc93};
+    case SynthDestination::TremoloRate:
+      return DlsModulationDestination{.destination = kDlsConnDstLfoFrequency,
+                                     .defaultController = kDlsConnSrcChannelPressure};
     case SynthDestination::TremoloDelay:
-      return kDlsConnSrcCc91;
+      return DlsModulationDestination{.destination = kDlsConnDstLfoStartDelay, .defaultController = kDlsConnSrcCc91};
     case SynthDestination::Unknown:
       return std::nullopt;
   }
@@ -145,29 +136,32 @@ struct DlsConnection {
   return std::nullopt;
 }
 
-[[nodiscard]] std::optional<DlsConnection> dlsConnectionForModulator(const SynthModulator& modulator) {
-  // DLS represents vibrato/tremolo depth as LFO or vibrato sources controlled by another
-  // source. That is why depth destinations set source/control separately below.
-  const auto source = modulator.source == SynthSource::ChannelPressure
-                          ? std::optional{kDlsConnSrcChannelPressure}
-                          : dlsDefaultSourceForDestination(modulator.destination);
-  if (!source) {
-    return std::nullopt;
+void writeGeneratorConnection(std::vector<u8>& bytes, const SynthGenerator& generator) {
+  // Generators with no controller source become DLS connections that are always active.
+  const auto destination = dlsDestination(generator.destination);
+  if (!destination) {
+    return;
+  }
+  writeConnection(bytes, DlsConnection{.source = destination->oscillator,
+                                       .destination = destination->destination,
+                                       .scale = dls16Dot16Scale(generator.amount)});
+}
+
+void writeModulatorConnection(std::vector<u8>& bytes, const SynthModulator& modulator) {
+  const auto destination = dlsDestination(modulator.destination);
+  if (!destination || modulator.destination == SynthDestination::VibratoDelay) {
+    return;
   }
 
-  // Depth connections already use an oscillator source; the controller gates
-  // that source. Rate and attenuation connections take the controller directly.
-  auto connection =
-      dlsConnectionForGenerator(SynthGenerator{.destination = modulator.destination, .amount = modulator.amount});
-  if (!connection || modulator.destination == SynthDestination::VibratoDelay) {
-    return std::nullopt;
-  }
-  if (connection->source == kDlsConnSrcNone) {
-    connection->source = *source;
-  } else {
-    connection->control = *source;
-  }
-  return connection;
+  // Depth connections use an oscillator gated by the controller. Rate and
+  // attenuation connections take the controller directly.
+  const u16 controller = modulator.source == SynthSource::ChannelPressure ? kDlsConnSrcChannelPressure
+                                                                         : destination->defaultController;
+  const bool hasOscillator = destination->oscillator != kDlsConnSrcNone;
+  writeConnection(bytes, DlsConnection{.source = hasOscillator ? destination->oscillator : controller,
+                                       .control = hasOscillator ? controller : kDlsConnSrcNone,
+                                       .destination = destination->destination,
+                                       .scale = dls16Dot16Scale(modulator.amount)});
 }
 
 [[nodiscard]] s32 dlsEnvelopeTimecents(std::optional<double> seconds) {
@@ -266,18 +260,6 @@ struct DlsConnection {
   return Chunk{"wlnk", std::move(payload)};
 }
 
-void writeConnection(std::vector<u8>& bytes, DlsConnection connection) {
-  writeLe16(bytes, connection.source);
-  writeLe16(bytes, connection.control);
-  writeLe16(bytes, connection.destination);
-  writeLe16(bytes, kDlsConnTrnNone);
-  writeLeS32(bytes, connection.scale);
-}
-
-void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
-  writeConnection(bytes, DlsConnection{.destination = destination, .scale = scale});
-}
-
 [[nodiscard]] Chunk art2Chunk(const ResolvedSynthInstrument& instrument, const ResolvedSynthRegion& resolvedRegion) {
   // Each region gets a DLS2 articulation list. Region envelope/pan is always written;
   // instrument- and region-level modulation are appended as additional connections.
@@ -296,14 +278,10 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   writeConnection(art, kDlsConnDstEg1ReleaseTime, dlsEnvelopeTimecents(envelope.releaseSeconds));
   const auto writeModulation = [&](const LoweredSynthModulation& scope) {
     for (const auto& generator : scope.generators) {
-      if (const auto connection = dlsConnectionForGenerator(generator)) {
-        writeConnection(art, *connection);
-      }
+      writeGeneratorConnection(art, generator);
     }
     for (const auto& modulator : scope.modulators) {
-      if (const auto connection = dlsConnectionForModulator(modulator)) {
-        writeConnection(art, *connection);
-      }
+      writeModulatorConnection(art, modulator);
     }
   };
   writeModulation(instrument.modulation);

@@ -155,7 +155,6 @@ public:
   [[nodiscard]] ScanSamplePoolDraft samplePool(std::string name, SourceRange range = {});
   [[nodiscard]] AssetId misc(std::string name, SourceRange range);
 
-  void diagnostic(Diagnostic diagnostic);
   void warning(std::string message, SourceRange range);
 
   [[nodiscard]] ScanResult finish();

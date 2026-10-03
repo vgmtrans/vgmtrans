@@ -143,12 +143,8 @@ AssetId ScanResultBuilder::misc(std::string name, SourceRange range) {
   return id;
 }
 
-void ScanResultBuilder::diagnostic(Diagnostic diagnostic) {
-  diagnostics_.push_back(std::move(diagnostic));
-}
-
 void ScanResultBuilder::warning(std::string message, SourceRange range) {
-  diagnostic(Diagnostic{.severity = Severity::Warning, .message = std::move(message), .range = range});
+  diagnostics_.push_back(Diagnostic{.severity = Severity::Warning, .message = std::move(message), .range = range});
 }
 
 ScanResult ScanResultBuilder::finish() {

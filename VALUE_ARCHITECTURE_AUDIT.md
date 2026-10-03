@@ -1,15 +1,13 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Thirty-three validated batches remove 1,109 net production lines
+`cb9e0b766`. Thirty-four validated batches remove 1,145 net production lines
 from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 32 exactly;
-72 expanded raw inventories match, and one differs only by pre-existing concurrent
-sample-pool ID scheduling established in earlier original/cleanup repetitions.
-Raw evidence and the narrow comparison are retained below. The cleanup2 records
-appear at the end of this document.
+cover 37 of 38 registered families. All export records and all 73 expanded raw
+inventories match batch 33 exactly. Earlier concurrent sample-pool ID scheduling
+evidence is retained below. The cleanup2 records appear at the end of this document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
 
@@ -7025,3 +7023,168 @@ Keep the SRCN fixed-set draft temporary while comparing sparse microcosts with
 native app workloads; preserve its moved-vector/failure boundaries. Probe the
 expression helper's missing source-level parameter only if existing default
 calls retain their closure/allocation behavior.
+
+
+## Cleanup2 thirty-fourth batch: direct writers and one SRCN catalog path
+
+Ten production files remove 36 net lines, bringing cleanup2 to 1,145 removed:
+1,037 architecture lines and 108 format lines. Physical diff is 105 additions/
+141 deletions; cumulative production C++/headers are 2,009/3,154 across 158 paths,
+architecture 1,683/2,720 across 89, and formats 326/434 across 69. No fixture
+changes; cumulative tests still gain 559 lines. Keep SequenceVM and export-neutral
+format models.
+
+- DLS has one private destination mapping for oscillator, destination and default
+  controller. Generator and modulator writers reuse that policy and write their
+  guarded connections directly, without single-use optional connection factories
+  or constructing a fake generator to mutate its result. Preserve the named
+  DlsConnection wire record, pressure override, invalid-source fallback and the
+  unsupported VibratoDelay modulator rule. Remove 22 lines, including four from
+  the direct writer protocol. Keep this mapping within the DLS exporter.
+- Used-instrument sound-bank export owns collection count, uniqueness, zero-input
+  error and the sole-collection path in one policy branch. Full-bank export proceeds
+  to independent binding without an unnecessary membership-count scan. Line count
+  is unchanged; sample binding may still consult collection relationships.
+- MIDI planning derives the next generated automation ID while it already reads
+  every source automation for sequence order and transitions. Compute the ID before
+  pitch-kind, interruption or zero-extent filters; remove the second traversal and
+  two lines. Preserve valid-ID and unsigned wrap behavior.
+- Remove ScanResultBuilder's unused public diagnostic forwarding method; warning()
+  appends the same owned value directly. Keep the general diagnostics() sink and
+  the unrelated live VmApi::diagnostic API. Remove five lines.
+- Move the normalized outer CUE text into its final C++20 istringstream. Line count
+  is unchanged. Keep fields(line) copying: getline reuses line and its capacity.
+- CompilerCursor::Event::emitExpression gains the existing emitter's optional
+  sourceLevels argument, matching emitLevel. Square PS2 uses the named helper with
+  resolution 128 instead of a custom runtime lambda; remove four format lines.
+  Its signed-byte conversion moves to decoding: negative values remain zero and
+  all nonnegative (value+1)/128 results are exact dyadics.
+- SNES catalog reading uses bitset<256> membership, projects each input once in
+  input order, narrows to u8, and walks the unique SRCNs in ascending order with
+  unchanged entry/stream validation. One header implementation replaces projected
+  scratch-vector collection plus the second normalization implementation; remove
+  three lines. Keep the concrete by-value vector overload as an inline adapter,
+  preserving lvalue copies, rvalue consumption, exact function-pointer signature
+  and bare braced/empty calls. No new range or ownership protocol.
+
+Integrated validation:
+
+- Full macOS Release completes 282 steps without warnings. All 44 CTest suites
+  pass. Freeze matching complete value sources/headers/tests, four archives and
+  shell before replay. Shell SHA256 is
+  49099482613f28ac4cad1c97a979e2d4fbc31d6e3fcb639740c8f9160dd9dd80.
+- Against frozen 33, the original corpus preserves all 252 input/policy records
+  and 3,922 artifact names/hashes. The expanded /Volumes/emu/vgm replay preserves
+  all 73 raw inventories and 894 export records, including 852 successes and 42
+  existing export failures. All 858 artifact names/sizes/hashes and 218,240,549
+  bytes per binary match. The five unsupported DSF inventory failures retain
+  status and diagnostics. No ID normalization or fresh scheduling repetitions
+  were needed. Real coverage remains 37/38 families; KonamiTMNT2 is synthetic only.
+- Source SHA256 and the exact approved ten-file diff remain unchanged through
+  build, tests, freeze and both comparisons. Proofs below were reviewed before
+  live application; integrated replay validates their composition.
+
+Focused validation and costs:
+
+- DLS preserves 35,640 private captures (5,940 generator, 29,700 modulator),
+  2,606,499 bytes, SHA256
+  ec2e151b4e33e2519ba381780f2a53563bf45991924f437c2c302291f4f09571,
+  in all four Release/sanitizer streams. Independently check all five LE fields,
+  seven routes, unsupported/invalid destinations, pressure/default/invalid sources,
+  signed16.16 extremes/clipping, prefixes and capacities. All 4,995 injected
+  allocation faults preserve partial bytes and failure order. The skipped scale
+  calculation on unsupported VibratoDelay is pure, bounded signed64 arithmetic.
+- DLS preserves 3,768 public captures/17,023,170 bytes, SHA256
+  a837e6bc76a760d3a5eff15e3842caef714e9651f0b9745e1f4c4fc37e58ed4e,
+  in all four modes, with complete SynthExport/Modulation suites. Three actual
+  configured Werror checks pass after application. Broad captures use matching
+  frozen32; verified 28 transitive value dependencies establish frozen33 authority,
+  with only EnvelopeModel's already-proven scalar forwarding change. No private
+  signature compatibility, heap-saving, performance or full FENV-flag claim.
+- Export preserves 10,032 generated bank calls, 10,100 total public calls and
+  10,000 artifact captures in four Release/sanitizer streams: 3,212,474 bytes,
+  SHA256 f107235f7dabd3c08eb6e97a5f021a11c64e3dc52c7994b9949f4d9ee24bf757.
+  Cover 19 malformed/preparation/runtime/sample states, six collection layouts,
+  SF2/DLS, used/full selection and eight policies, plus wrong types, missing IDs
+  and retained snapshot repetitions. Preserve exception types/messages and error
+  order. Four complete CollectionExport/SequenceExport/ResolvedInstrument/Session
+  suites and three configured Werror entries pass. No allocation/timing claim.
+- Planner preserves 2,160 ID/sequence/intent/end-reason/extent/voice/policy cases,
+  1,638,000 bytes, SHA256
+  d962b54bae89af617a44f94eceed8d0a626780dfe24b12b296c5b973bb5fbaa9,
+  in four Release/sanitizer traces. Complete MidiPitch/MidiRenderer/MidiModulation
+  suites pass. Captures include relevant note/attack/pitch/layer/portamento fields,
+  generated headers/IDs/order/annotations, complete MIDI and diagnostics; no claim
+  to serialize every hypothetical variant. Six configured three-mode Werror checks
+  pass. Paired O2 object text shrinks 80 bytes; no speed or whole-object claim.
+- Builder preserves 480 message/range/source-ID/count cases and general sink values
+  before/after warnings: 5,446,386 bytes, SHA256
+  96e6d602543e52b27cb938c3ee62a4214804203c622435f6fcde90ba62db2a7a,
+  in four modes. Both sides retain 6,336 allocations/8,388,096 requested bytes within
+  each mode. Four full Registry/Session/SourceMap/SynthBuilder fixtures and 83 actual
+  configured Release Werror consumers pass. The initial strict script paired the old
+  builder cpp with the new header; retain that harness failure and its corrected
+  source-path result. No production failure or arbitrary bad_alloc staging claim.
+- CUE preserves 1,224 parser/extractor cases and the full fixture in four modes:
+  810,978 bytes, SHA256
+  1d46447d43f87829b85dfaf878a5a8ec5c0608f1fc6e89e5d36b55fcdfc6097c.
+  BOM, CRLF, final-line, NUL, quoted/backslash paths, missing archive members,
+  multi-track and malformed/duplicate index cases remain exact after input-store
+  destruction. Complete fixtures also cover disk sectors, session parentage,
+  redirects and source-family removal. Parse and extraction scopes each save
+  1,196 requests/14,300,480 bytes; 28 SSO cases are unchanged, none grow. Six
+  configured three-mode Werror checks pass. No RSS or bad_alloc staging claim.
+- Expression preserves 4,092 generated source/IR/MIDI cases (all 256 encoded bytes)
+  and full Cursor/Square fixtures under paired focused sanitizers: 35,491,160
+  generated bytes, SHA256
+  fe2d49c0dd97dd20a6e037d071cac257a914f353717d7e644b3d858d21748f20,
+  plus 9,673 Cursor and 2,317 Square fixture bytes. Owners die before playback.
+  All 256 construction/composition/body-copy allocation cases match; the capture
+  grows 8->16 bytes but stays inline in the 48-byte CommandBody. Twelve actual
+  paired Release Werror checks pass. Four default production callers grow 32
+  text bytes each; Square is unchanged. No blanket code-size/performance claim.
+- The retained-vector SRCN candidate preserves 4,230 generated cases (1,658
+  catalog, 2,572 compatibility), 47,263,070 bytes, with full SynthBuilder fixture
+  and four supplementary direct/function-pointer ownership calls. Cover sized,
+  nonsized, single-pass and projected ranges, signed/unsigned extrema, narrowing,
+  duplicates, throwing projection prefixes, malformed/wrapping/truncated entries,
+  exact ordered catalog/range fields and post-call vector state. Paired focused
+  sanitizer traces and all 23 actual configured Release consumers pass.
+- Across 112 SRCN allocation settings, numeric-vector paths keep their copy/move
+  allocations; 72 nonempty projected/nonvector settings each lose one scratch
+  allocation and 12 empty ones remain allocation-free. A fully matching frozen33
+  native shell loses 3,888 text bytes/4,152 file bytes. Eight SPCs from seven driver
+  families, two policies and 48 MIDI/SF2/DLS payloads match exactly.
+- SRCN fixed-domain iteration retains a bounded sparse cost: malformed singleton
+  helper cases are about 1.9x the old helper. Earlier broad native timing overlapped
+  expression compilation, so its roughly 3% Pandora/events slowdown prompted a
+  clean isolated repeat. After three warmup pairs, 24 shuffled measured pairs have
+  median ratio 0.9959 (range 0.9464..1.0177), with exact outputs; that slowdown did
+  not reproduce. This one-stratum check establishes no all-platform speed claim.
+- Projected SRCN allocation-failure staging changes intentionally: the old scratch
+  vector could throw before/during projection; fixed membership allocates only for
+  output. External side effects under bad_alloc may stage differently. Native
+  projectors are plain reads, and failed scans discard their result. Deterministic
+  projection order/throw prefixes stay exact; add no rollback protocol.
+- Focused ASan/UBSan/float-cast-overflow instruments changed units, instantiated
+  helpers, probes and relevant complete fixtures; other matching frozen archives
+  remain Release. libc++ container annotations are disabled consistently. No
+  whole-program instrumentation or Windows-run claim.
+
+Rejected SRCN drafts: array<bool,256> adds a 256-byte stack object and costs roughly
+11x on empty normalization; the pure generic bitset version changes moved-vector
+post-state and removes the exact numeric function-pointer API. Keep the existing
+inline by-value boundary. Correct the older draft benchmark count: each draft has
+112 settings x six pairs = 672 paired measurements/1,344 executions.
+
+Evidence: dls-routing34/write and used-bank-export-scope34 under /tmp/vgmtrans-,
+and planner-source-ids34, scanner-diagnostic-surface34, cue-stream-owner34,
+expression-levels34, fixed-srcn-domain33, pass34-baseline, comparison-pass34.json
+and volume-coverage27/pass33-vs-pass34 under /tmp/vgmtrans-cleanup2. Exact source
+hashes and complete build/freeze authority are in pass34-baseline/provenance.json.
+
+Next: prove that generated planner changes can finish growing before borrowed
+transition pointers are published, removing reserve-bound coupling and unnecessary
+scans of earlier generated changes. Probe TriAce extraction directly into its final
+image, small dead ROM database surface, AKAO reference collection without temporary
+program vectors, and the redundant void guard around dependent stream-hook discovery.
