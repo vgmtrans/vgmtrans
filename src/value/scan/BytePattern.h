@@ -72,10 +72,7 @@ template <size_t ByteCount, size_t MaskCount>
 }
 
 [[nodiscard]] inline bool matchesBytePattern(ByteReader reader, u64 offset, MaskedBytePattern pattern) {
-  if (!pattern.valid() || !reader.has(offset, pattern.size())) {
-    return false;
-  }
-  return pattern.matches(reader.slice(offset, pattern.size()));
+  return reader.has(offset, pattern.size()) && pattern.matches(reader.slice(offset, pattern.size()));
 }
 
 // Search only complete patterns within [begin, endOffset), bounded by the source.

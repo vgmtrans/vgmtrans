@@ -127,12 +127,10 @@ struct CompiledCommandRuntime {
       // Collected results stay in the same typed object for the real render.
       runtime.finishPrepass = [](std::any& state) { std::any_cast<ProgramState&>(state).finishPrepass(); };
     }
-    if constexpr (!std::is_void_v<StreamState>) {
-      if constexpr (requires(StreamState& state) { state.beginSection(true); }) {
-        runtime.beginStreamSection = [](std::any& state, bool first) {
-          std::any_cast<StreamState&>(state).beginSection(first);
-        };
-      }
+    if constexpr (requires(StreamState& state) { state.beginSection(true); }) {
+      runtime.beginStreamSection = [](std::any& state, bool first) {
+        std::any_cast<StreamState&>(state).beginSection(first);
+      };
     }
     if constexpr (requires(ProgramState& state, PerformanceSequence& performance) {
                     state.finalizePerformance(performance);

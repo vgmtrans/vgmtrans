@@ -64,8 +64,6 @@ public:
   [[nodiscard]] static RomDatabase load(const std::filesystem::path& path);
 
   [[nodiscard]] const RomSetDefinition* find(std::string_view name) const noexcept;
-  [[nodiscard]] size_t size() const noexcept { return sets_.size(); }
-  [[nodiscard]] bool empty() const noexcept { return sets_.empty(); }
 
 private:
   std::map<std::string, RomSetDefinition, std::less<>> sets_;

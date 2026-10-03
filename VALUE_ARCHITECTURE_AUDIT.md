@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Thirty-four validated batches remove 1,145 net production lines
+`cb9e0b766`. Thirty-five validated batches remove 1,160 net production lines
 from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
 cover 37 of 38 registered families. All export records and all 73 expanded raw
-inventories match batch 33 exactly. Earlier concurrent sample-pool ID scheduling
+inventories match batch 34 exactly. Earlier concurrent sample-pool ID scheduling
 evidence is retained below. The cleanup2 records appear at the end of this document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
@@ -7188,3 +7188,160 @@ transition pointers are published, removing reserve-bound coupling and unnecessa
 scans of earlier generated changes. Probe TriAce extraction directly into its final
 image, small dead ROM database surface, AKAO reference collection without temporary
 program vectors, and the redundant void guard around dependent stream-hook discovery.
+
+
+## Cleanup2 thirty-fifth batch: final owners and one hook eligibility rule
+
+Six production paths remove 15 net lines (48 additions/63 deletions), bringing
+cleanup2 to 1,160: 1,043 architecture and 117 format lines. One existing Konami
+fixture assertion changes without net lines; cumulative tests still gain 559.
+Cumulative production C++/headers are 2,057 additions/3,217 deletions across 161
+paths, architecture 1,691/2,734 across 91, formats 366/483 across 70. Retain
+SequenceVM and the export-neutral source models.
+
+- MIDI planner generates all key changes before publishing pointers into that
+  vector. Delete its all-note reserve and in-loop pointer publication; register
+  the completed vector once. This adds one line but removes a lifetime constraint
+  and scans of earlier generated changes that cannot match the current note:
+  collectNotes admits one span per unique valid logical note ID. Preserve source
+  transition inspection, generated IDs, sequence order and coincident sorting.
+- Compiled runtime discovers beginSection with its existing dependent requires
+  expression alone. Forming StreamState& already rejects void/const void; remove
+  the redundant outer type guard and nesting (two lines). Keep state factories,
+  callback body and the wider playback construction guards.
+- TriAce PS1 extraction lazily builds its final image at the first accepted SLZ
+  sequence and appends each decoded sequence directly. Delete the nested payload
+  vector and second assembly loop (four lines). Sequence segment count supplies
+  its index; scan the immutable input only. No-match inputs still produce nothing.
+- Remove unused RomDatabase size/empty queries (two lines). Its sole size use was
+  a mirrored fixture assertion; check find("fixture") and the actual name instead.
+  Parse/load/find/storage and all dispatch/group checks remain.
+- AKAO reference collection resolves the last valid bank/table first, then inserts
+  valid program operands directly into existing ordered sets (five lines). Delete
+  the temporary program vector and replace the now-two-role switch with plain
+  conditions. Preserve program-zero's usesIndividual flag, noAttack membership,
+  exclusion from individual IDs and final-bank table attribution.
+- Byte-pattern matching delegates source bounds to ByteReader and pattern
+  validity/length to MaskedBytePattern::matches. Delete its duplicate validity
+  check and wrapper branch (three lines); the search helper remains unchanged.
+
+Integrated validation:
+
+- Full macOS Release completes 139 steps without warnings; all 44 CTest suites
+  pass. Matching complete value sources/headers/tests, four archives and shell
+  are frozen before comparisons. Shell SHA256 is
+  c7c48ef76ada2ef8720e78d11850082a5d533269c0c88923c2c3aa19114b63a5.
+- Against frozen34, the original corpus preserves all 252 input/policy records
+  and 3,922 artifact names/hashes.
+- The /Volumes/emu/vgm replay preserves all 73 raw inventories and 894 export
+  records: 852 successes and 42 matching existing failures. All 858 artifact
+  names/sizes/hashes and 218,240,549 bytes per binary match. Five unsupported
+  DSF inventory failures retain status/diagnostics. No ID normalization or fresh
+  scheduling repetitions are needed. Real coverage remains 37/38 registered
+  families; KonamiTMNT2 has synthetic coverage only.
+- All seven approved source/fixture hashes and their exact diff remain unchanged
+  through build, tests, freeze and replay. Focused proofs below were reviewed
+  before application; archive replay checks the composed changes.
+
+Focused validation and costs:
+
+- Planner preserves 75,059 actual renderer captures (74,912 generated and 147
+  complete MidiRenderer/Pitch/Modulation fixture captures), 144,898,178 bytes,
+  SHA256 9d16fe441c88baed7fb17b097bd986d2ba137eef0250acf8a9e588822eced47a,
+  in four Release/sanitizer streams. An additional 8,334 planned-event/MIDI
+  boundary traces preserve 17,118,254 bytes, SHA256
+  3f70efd72e6569cad5433bd001ed23c5a6e4e980742ed1d5ba002e2bb576a458.
+  Cover duplicate/invalid/mixed IDs, ties, voices/lanes, sampled/scalar and
+  current/future transitions, explicit boundaries and coincident ordering.
+  Six actual three-configuration production Werror checks pass unsuppressed;
+  three further live checks pass. Fixture-only unused helper/range-loop warnings
+  are suppressed. Configured O3/NDEBUG planner text shrinks 480 bytes.
+- Planner allocation accounting covers 70 complete planner cases, including
+  output observation/destruction, with input/resolution/tempo prepared first.
+  At 65,536 independent notes, requested payload is 82,548,344 -> 69,441,144 bytes
+  and peak 73,183,960 -> 60,076,760; one continuation saves about 13.1 MB too.
+  Dense 1,024-note chains add ten requests and 204,600 requested bytes (~6.8%),
+  while peak remains 2,956,048. Covered 1,024-note changes eliminate 204,800
+  unused reserved bytes; a single note eliminates 200. These are scoped payload
+  counts, excluding allocator overhead, not RSS or full-export memory claims.
+- Clean native-allocator timing runs after all other compilers/runners stop:
+  seven shuffled epochs x 70 cases = 490 paired observations, warmed and taking
+  median seven trials. Dense 1,024-note paired ratios are 0.8908 pitch bend and
+  0.4422 portamento; independent 65,536-note ratios are 0.9550/0.9601. Retain
+  unfavorable strata: dense 16-note pitch bend 1.0487, explicit-covered 1,024
+  pitch bend 1.0364, one-continuation 65,536 pitch/portamento 1.0341/1.0300.
+  Accept the measured localized costs for simpler ownership, lower sparse
+  allocation and elimination of impossible generated-transition scans. No
+  aggregate application-wide or cross-platform speed claim. Reject deque storage:
+  its block allocations and dense cost add a storage policy without removing
+  more responsibility; cold-storage comparison is separate from actual planning.
+- Runtime hook proof covers 1,152 cases/24 signature-state shapes and complete
+  VM/Cursor/SonyPS2/HeartBeatPS1/SegSat suites. All 12 runtime arms pass; paired
+  traces preserve 3,668,984 bytes, including 1,120 generated and 74 fixture renders
+  plus matching throws. Keep callable-with-bool compatibility: ignored nonvoid
+  results, implicit conversion/default arguments, generic/static/callable members,
+  const/noexcept/ref qualifiers, inaccessible/deleted/absent/wrong hooks and void
+  states. Factory/config/prepass/playlist/budget/wait/provenance paths stay exact.
+  Ten actual configured Release Werror checks pass; all five object text payloads
+  are byte-identical. No runtime allocation or speed claim.
+- TriAce preserves 1,952 cases/122 styles and 7,411,350 bytes, SHA256
+  f71c33de009721b7294a424271e8fd280cd4680db89985a1f0b530d94393177a,
+  in all four streams; full TriAce fixtures and six actual configured Werror
+  checks pass. Cover SLZ0..3/run mode2, references, padding, implicit tails,
+  truncation/malformed data, overlapping/nested signatures and multiple accepted
+  layouts. Observe final metadata/segments/bytes after input/store destruction.
+  Three Star Ocean2/Valkyrie dependency closures preserve 10,198,290 bytes per
+  variant of complete images, maps, collections, retained inspection and both
+  policy MIDI/SF2/DLS outputs after the original session dies.
+- TriAce allocation matrix loses 1,152 requests/54,528 requested bytes; no request
+  count/traffic grows. Peak increases 1..248 bytes in 944 cases and falls by up to
+  8,355 in 48. Each native image loses one 24-byte request but peak rises 248
+  bytes because final metadata now exists earlier. Returned retained sizes match.
+  Final output allocation and decoded-buffer release move earlier; arbitrary
+  bad_alloc staging/rollback parity is not claimed. Initial harness ObjectRef and
+  missing nothrow allocation-header overload errors were corrected; all final
+  variants reran. These failures were in probes, not production changes.
+- RomDatabase passes 18 actual configured Werror checks and complete Konami
+  fixtures in both sides' Release/sanitizer modes. Its implementation stays
+  matching frozen Release; fixture/Source/Session are instrumented. An initial
+  strict harness missed copied relative fixture headers; final checks use them.
+- AKAO collector preserves 279,948 cases/18,249,357 bytes, SHA256
+  daa51adc69da1d6776e58c4e8ed8c7d8446c1b0044326e941a095676cee5fb69,
+  in all four streams; full AKAO fixtures and six actual configured Werror checks
+  pass. Exhaust operand orders, duplicate tags, prior states, absent/nonunsigned/
+  overflowing values and explicit zero/noAttack rules. Requests decrease
+  196,818 -> 84,750; requested bytes 3,227,376 -> 2,712,000, with no increases.
+  Bank2 noAttack and individual insertions now interleave per program; failed
+  allocation partial state can differ. Successful sets/flags/attribution are exact.
+- Byte matcher preserves 518,401 generated boundary cases, 1,036,801 bytes,
+  SHA256 4f7d8342d908fb5592117d54352e602179f0adb482037b20b22bcc6f4f94a259,
+  in all four streams against an independent oracle, with zero scoped match
+  allocations. Cover source/pattern/mask lengths and representations, embedded
+  zero/high bits, invalid source IDs and u64 offsets/extrema. Zero-length settings
+  contain duplicates; byte/text dual representation agrees, so no contradictory
+  representation-priority claim. Full Session/AkaoSnes/NinSnes/SculptSoftSnes
+  fixtures and 24 actual configured Werror checks pass. Instantiated inline
+  matcher and all three actual caller units are instrumented. Initial temporary
+  harness shared-include, dependency-link and fixture-entry-name errors were
+  corrected before final four-arm runs. An application gate first expected empty
+  probe stderr, then accepted its exact allocation-count line before mutation;
+  post-copy diff check rejected only Git's hunk-header function context, then
+  verified exact source bytes/content with that metadata suffix excluded.
+- Focused ASan/UBSan/float-cast-overflow covers changed units/helpers, probes and
+  complete relevant fixtures; Source/Session and planner renderer/resolution/
+  emitter/model dependencies are also instrumented where stated. Other matching
+  frozen34 archives remain Release, with consistent libc++ annotation opt-out.
+  No whole-application sanitizer, Windows, universal exception-stage or RSS claim.
+
+Evidence: /tmp/vgmtrans-planner-keychanges-owner35 and, under
+/tmp/vgmtrans-cleanup2, stream-hook-requires35, triace-final-owner35,
+rom-database-surface35, akao-program-owner35, byte-pattern-boundary35,
+pass35-baseline, comparison-pass35.json and volume-coverage27/pass34-vs-pass35.
+Exact source/fixture hashes and build/freeze authority are in
+pass35-baseline/provenance.json.
+
+Next: remove AKAO's never-populated analysis scratch field and redundant sort/
+unique of the builder's set-derived requirements, keeping zero filtering after
+source annotations. Probe active-note map cell reuse, preserving sustain and
+source-span behavior, and remove the unused physical-Hz pan helper if its complete
+consumer audit confirms the live cycles-per-tick path remains sufficient.

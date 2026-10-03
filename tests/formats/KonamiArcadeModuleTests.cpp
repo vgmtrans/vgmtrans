@@ -208,7 +208,7 @@ void mameRomDatabaseAndGroupAssemblyAreValueOriented() {
   )json"};
   const mame::RomDatabase database = mame::RomDatabase::parse(json);
   const auto* set = database.find("fixture");
-  expect(database.size() == 1 && set != nullptr, "MAME database should parse into an immutable named value");
+  expect(set != nullptr && set->name == "fixture", "MAME database should parse into an immutable named value");
   expect(set->format == "KonamiArcade" && set->formatVersion == "MysticWarrior",
          "MAME set should retain format dispatch metadata");
   expect(set->groups.size() == 1 && set->groups[0].attributes.at("seq_table") == "0x100",

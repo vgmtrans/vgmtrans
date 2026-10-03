@@ -846,7 +846,6 @@ std::vector<detail::MidiTrackEvent> detail::planMidiTrack(
   // A changed key is already a source voice operation. Only MIDI needs an
   // instantaneous pitch transition when no explicit boundary slide replaces it.
   std::vector<PerformanceAutomation> keyChanges;
-  keyChanges.reserve(notes.size());
   for (const auto& note : notes) {
     const auto* previous = note.previousInVoice;
     if (previous == nullptr) {
@@ -872,7 +871,9 @@ std::vector<detail::MidiTrackEvent> detail::planMidiTrack(
         },
         .realization = {.startTick = note.source.header.tick, .endTick = note.source.header.tick},
     });
-    addTransition(keyChanges.back());
+  }
+  for (const auto& change : keyChanges) {
+    addTransition(change);
   }
   sortTransitions(portamentoTransitions);
   sortTransitions(pitchBendTransitions);

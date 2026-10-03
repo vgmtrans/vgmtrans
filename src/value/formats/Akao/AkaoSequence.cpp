@@ -1041,24 +1041,15 @@ namespace {
 void collectReferences(const DecodedBytecodeCommand& command, AkaoSequenceReferences& references) {
   std::optional<u32> bank;
   std::optional<u32> instrumentTable;
-  std::vector<u32> programs;
   for (const auto& operand : command.operands) {
     const auto value = operand.unsigned32();
     if (!value) {
       continue;
     }
-    switch (operand.role) {
-      case SemanticOperandRole::InstrumentBank:
-        bank = *value;
-        break;
-      case SemanticOperandRole::InstrumentTablePointer:
-        instrumentTable = *value;
-        break;
-      case SemanticOperandRole::InstrumentProgram:
-        programs.push_back(*value);
-        break;
-      default:
-        break;
+    if (operand.role == SemanticOperandRole::InstrumentBank) {
+      bank = *value;
+    } else if (operand.role == SemanticOperandRole::InstrumentTablePointer) {
+      instrumentTable = *value;
     }
   }
 
@@ -1066,16 +1057,20 @@ void collectReferences(const DecodedBytecodeCommand& command, AkaoSequenceRefere
     (bank == 127 ? references.drumInstrumentTableOffsets : references.customInstrumentTableOffsets)
         .insert(*instrumentTable);
   }
-  if ((bank != 0 && bank != 2) || programs.empty()) {
+  if (bank != 0 && bank != 2) {
     return;
   }
-  references.usesIndividualArticulations = true;
-  if (bank == 2) {
-    references.noAttackArticulationIds.insert(programs.begin(), programs.end());
-  }
-  for (const u32 articulation : programs) {
-    if (articulation != 0) {
-      references.individualArticulationIds.insert(articulation);
+  for (const auto& operand : command.operands) {
+    const auto articulation = operand.unsigned32();
+    if (operand.role != SemanticOperandRole::InstrumentProgram || !articulation) {
+      continue;
+    }
+    references.usesIndividualArticulations = true;
+    if (bank == 2) {
+      references.noAttackArticulationIds.insert(*articulation);
+    }
+    if (*articulation != 0) {
+      references.individualArticulationIds.insert(*articulation);
     }
   }
 }

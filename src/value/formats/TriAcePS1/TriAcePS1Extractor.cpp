@@ -11,7 +11,6 @@
 #include <optional>
 #include <span>
 #include <string>
-#include <utility>
 #include <vector>
 
 namespace vgmtrans::formats::triace_ps1 {
@@ -165,7 +164,7 @@ constexpr u32 kMaximumImplicitTail = 16;
 }
 
 [[nodiscard]] ExtractionResult extractTriAcePs1(const ExtractionInput& input) {
-  std::vector<std::vector<u8>> sequences;
+  ExtractionResult result;
   for (u64 offset = 0; offset + kSlzHeaderSize <= input.reader.size(); ++offset) {
     if (!signatureAt(input.reader, offset) || offset > std::numeric_limits<u32>::max()) {
       continue;
@@ -175,36 +174,33 @@ constexpr u32 kMaximumImplicitTail = 16;
       continue;
     }
     ByteReader decompressed({}, std::span<const u8>(*bytes));
-    if (readTriAcePs1SequenceLayout(decompressed, 0)) {
-      sequences.push_back(std::move(*bytes));
+    if (!readTriAcePs1SequenceLayout(decompressed, 0)) {
+      continue;
     }
-  }
-  if (sequences.empty()) {
-    return {};
-  }
 
-  const auto original = input.reader.slice(0, input.reader.size());
-  std::vector<u8> bytes(original.begin(), original.end());
-  SourceFile file{
-      .name = sourceName(input.source) + " - TriAcePS1 image",
-      .title = input.source.title,
-      .path = input.source.path,
-      .origin = input.reader.range(0, input.reader.size()),
-      .knownFormat = std::string(kTriAcePs1ImageFormat),
-  };
-  file.segments.push_back(SourceSegment{.name = "ram", .offset = 0, .size = bytes.size()});
-  for (u32 index = 0; index < sequences.size(); ++index) {
-    const u64 offset = bytes.size();
-    file.segments.push_back(SourceSegment{
-        .name = "sequence-" + std::to_string(index),
-        .offset = offset,
-        .size = sequences[index].size(),
+    if (result.sources.empty()) {
+      const auto original = input.reader.slice(0, input.reader.size());
+      result.sources.push_back(ExtractedSource{
+          .file = {
+              .name = sourceName(input.source) + " - TriAcePS1 image",
+              .title = input.source.title,
+              .path = input.source.path,
+              .origin = input.reader.range(0, input.reader.size()),
+              .knownFormat = std::string(kTriAcePs1ImageFormat),
+          },
+          .bytes = std::vector<u8>(original.begin(), original.end()),
+      });
+      result.sources.front().file.segments.push_back(
+          SourceSegment{.name = "ram", .offset = 0, .size = original.size()});
+    }
+    auto& image = result.sources.front();
+    image.file.segments.push_back(SourceSegment{
+        .name = "sequence-" + std::to_string(image.file.segments.size() - 1),
+        .offset = image.bytes.size(),
+        .size = bytes->size(),
     });
-    bytes.insert(bytes.end(), sequences[index].begin(), sequences[index].end());
+    image.bytes.insert(image.bytes.end(), bytes->begin(), bytes->end());
   }
-
-  ExtractionResult result;
-  result.sources.push_back(ExtractedSource{.file = std::move(file), .bytes = std::move(bytes)});
   return result;
 }
 
