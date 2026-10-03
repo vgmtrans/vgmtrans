@@ -139,7 +139,7 @@ void prepareAkaoBank(BankPreparationContext& context, const AkaoSoundBankData& d
   for (const auto& input : context.samples<AkaoSamplePoolData>()) {
     for (const auto& articulation : input.data.articulations) {
       if (articulation.sample.valid()) {
-        articulations[articulation.articulationId] = articulation;
+        articulations.insert_or_assign(articulation.articulationId, std::cref(articulation));
       }
     }
   }
@@ -171,7 +171,7 @@ void prepareAkaoBank(BankPreparationContext& context, const AkaoSoundBankData& d
   auto preparedData = data;
   preparedData.runtime.articulationEnvelopes.clear();
   for (const auto& [id, articulation] : articulations) {
-    preparedData.runtime.articulationEnvelopes.emplace(id, AkaoAdsr{articulation.adsr1, articulation.adsr2});
+    preparedData.runtime.articulationEnvelopes.emplace(id, AkaoAdsr{articulation.get().adsr1, articulation.get().adsr2});
   }
   context.privateData = AssetPrivateData::make(std::move(preparedData));
 }

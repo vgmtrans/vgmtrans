@@ -209,7 +209,7 @@ struct TrackProgram {
   // Decoded source track, independent of its playback tracks/channels.
   // Most source tracks have one stream. Several streams can execute the same
   // decoded commands separately; an interleaved stream lists all its channels.
-  std::vector<SequenceStream> streams{{}};
+  std::vector<SequenceStream> streams = std::vector<SequenceStream>(1);
   std::string name;
   Address startAddress;
   SourceAnnotationId annotation;

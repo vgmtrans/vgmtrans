@@ -558,7 +558,7 @@ using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 sequenceBase, u8 groupIndex,
                                                    std::vector<Diagnostic>* diagnostics,
-                                                   ReferencedPrograms* references = nullptr) {
+                                                   std::set<u8>* referencedPrograms = nullptr) {
   Cursor cursor(reader, begin, "itikiti-snes", diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
@@ -640,8 +640,8 @@ using Cursor = CompilerCursor<Playback>;
       const u8 raw = cursor.u8("program", SemanticOperandRole::InstrumentProgram);
       const u8 program = instrumentProgram(raw, groupIndex);
       cursor.derived("effective_program", static_cast<u64>(program), SemanticOperandRole::InstrumentProgram);
-      if (references != nullptr) {
-        references->programs.insert(program);
+      if (referencedPrograms != nullptr) {
+        referencedPrograms->insert(program);
       }
       return event.invoke<&Playback::programChange>({program});
     }
@@ -780,7 +780,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
                              std::vector<Diagnostic>* diagnostics) {
   const u32 headerSize = 2 + layout.trackCount * 2u;
   const SourceRange header = reader.range(layout.sequenceHeaderAddress, headerSize);
-  ReferencedPrograms references{{0}};
+  std::set<u8> referencedPrograms{0};
   SequenceDecodeSession sequence{reader, sequenceConfig(), sequenceId, header, sourceMap, kCommandLimit, kAramSize};
   for (u32 track = 0; track < layout.trackCount; ++track) {
     const u32 pointer = layout.sequenceHeaderAddress + 2 + track * 2;
@@ -789,12 +789,13 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     sequence.addTrack(
         track, reader.range(pointer, 2), start,
         [&](u32 offset) {
-          return decodeCommand(reader, offset, layout.sequenceBaseAddress, layout.groupIndex, diagnostics, &references);
+          return decodeCommand(reader, offset, layout.sequenceBaseAddress, layout.groupIndex, diagnostics,
+                               &referencedPrograms);
         },
         relative);
   }
   SequenceProgram program = sequence.finish(sequenceRuntime(layout.echoDelay));
-  return SequenceParse{.program = std::move(program), .references = std::move(references)};
+  return SequenceParse{.program = std::move(program), .referencedPrograms = std::move(referencedPrograms)};
 }
 
 }  // namespace vgmtrans::formats::itikiti_snes

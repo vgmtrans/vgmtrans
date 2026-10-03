@@ -120,10 +120,10 @@ const DecodedBytecodeCommand& TrackDecodeSession::findOrAppend(DecodedBytecodeCo
 
 TrackProgram TrackDecodeSession::finish() {
   TrackProgram track{
-      .streams = {{.channels = {trackIndex_}}},
       .startAddress = Address{startRange_.offset},
       .annotation = annotation_,
   };
+  track.streams.front().channels.front() = trackIndex_;
   track.commands.reserve(commands_.size());
   SourceRange span;
   for (auto& [offset, decoded] : commands_) {

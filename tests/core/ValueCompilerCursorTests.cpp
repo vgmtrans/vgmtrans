@@ -679,6 +679,17 @@ void compilerCursorAnalysisStopsAfterItsScheduledPrepass() {
   const u32 executed =
       analyzeCompiledProgram<CompilerProbeProgramState>(program, &CompilerProbeProgramState::executedCommands);
   expect(executed == 2, "analysis without a prepass hook must still execute the program exactly once");
+
+  const std::vector<u32> expected{7, 11, 13};
+  const auto projected = [&] {
+    auto external = expected;
+    auto result = analyzeCompiledProgram<CompilerProbeProgramState>(
+        program, [&](const CompilerProbeProgramState&) -> std::vector<u32>& { return external; });
+    expect(external == expected, "generic analysis projection should preserve externally owned data");
+    external.assign({21, 34});
+    return result;
+  }();
+  expect(projected == expected, "generic analysis results should own their data after external mutation and destruction");
 }
 
 void compilerCursorAnalysisReportsPrepassDiagnostics() {

@@ -56,7 +56,7 @@ void applyArticulationToRegion(Region& region, const AkaoArticulation* articulat
 
 [[nodiscard]] const AkaoArticulation* findArticulation(const AkaoArticulationMap& articulations, u32 articulationId) {
   const auto found = articulations.find(articulationId);
-  return found == articulations.end() ? nullptr : &found->second;
+  return found == articulations.end() ? nullptr : &found->second.get();
 }
 
 void requireArticulation(std::set<u32>& required, u32 articulationId) {
@@ -232,7 +232,8 @@ void addDrumInstrument(std::vector<Instrument>& instruments, ByteReader reader, 
 
 void addSyntheticArticulationInstruments(std::vector<Instrument>& instruments,
                                          const AkaoArticulationMap& articulations, const std::set<u32>& noAttackIds) {
-  for (const auto& [articulationId, articulation] : articulations) {
+  for (const auto& [articulationId, retained] : articulations) {
+    const auto& articulation = retained.get();
     Region region{
         .keyRange = KeyRange{.low = 0, .high = 127},
         .velocityRange = VelocityRange{.low = 0, .high = 127},

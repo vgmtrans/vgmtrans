@@ -38,10 +38,10 @@ struct Patch {
 }
 
 [[nodiscard]] std::vector<Patch> collectPatches(ByteReader reader, const Layout& layout,
-                                                const ReferencedPrograms& references) {
+                                                const std::set<u8>& referencedPrograms) {
   std::vector<Patch> result;
-  result.reserve(references.programs.size());
-  for (const u8 program : references.programs) {
+  result.reserve(referencedPrograms.size());
+  for (const u8 program : referencedPrograms) {
     const u16 tuning = static_cast<u16>(layout.tuningTableAddress + program * 2u);
     const u16 adsr = static_cast<u16>(layout.adsrTableAddress + program * 2u);
     if (!reader.has(tuning, 2) || !reader.has(adsr, 2)) {
@@ -62,9 +62,9 @@ struct Patch {
 }  // namespace
 
 std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
-                                           const ReferencedPrograms& references, std::string_view displayName) {
+                                           const std::set<u8>& referencedPrograms, std::string_view displayName) {
   const ByteReader reader = builder.reader();
-  const std::vector<Patch> patches = collectPatches(reader, layout, references);
+  const std::vector<Patch> patches = collectPatches(reader, layout, referencedPrograms);
   const auto catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, patches, &Patch::program);
   if (catalog.empty()) {
     return std::nullopt;

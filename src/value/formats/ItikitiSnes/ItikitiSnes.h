@@ -35,13 +35,9 @@ struct Layout {
   u8 echoDelay;
 };
 
-struct ReferencedPrograms {
-  std::set<u8> programs;
-};
-
 struct SequenceParse {
   core::SequenceProgram program;
-  ReferencedPrograms references;
+  std::set<u8> referencedPrograms;
 };
 
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);
@@ -55,7 +51,7 @@ struct SequenceParse {
 [[nodiscard]] core::SequenceRuntime sequenceRuntime(u8 echoDelay);
 [[nodiscard]] core::Envelope driverEnvelope(u8 adsr1, u8 adsr2);
 [[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
-                                                               const ReferencedPrograms& references,
+                                                               const std::set<u8>& referencedPrograms,
                                                                std::string_view displayName);
 [[nodiscard]] core::FormatModule module();
 

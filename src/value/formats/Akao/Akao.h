@@ -14,6 +14,7 @@
 #include "value/synth/SynthModel.h"
 
 #include <cstddef>
+#include <functional>
 #include <map>
 #include <optional>
 #include <set>
@@ -185,7 +186,9 @@ struct AkaoSamplePoolData {
   std::vector<AkaoArticulation> articulations;
 };
 
-using AkaoArticulationMap = std::map<u32, AkaoArticulation>;
+// A temporary lookup into the selected immutable sample pools; preparation
+// consumes these references before their owning snapshot can be released.
+using AkaoArticulationMap = std::map<u32, std::reference_wrapper<const AkaoArticulation>>;
 
 // A few early games keep the sample header and articulation table in separate
 // fixed locations instead of placing them together in an AKAO block.

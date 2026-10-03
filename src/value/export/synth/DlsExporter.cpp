@@ -176,8 +176,8 @@ struct DlsConnection {
   }
   if (seconds && std::isfinite(*seconds) && *seconds > 0.0) {
     const double timecents = 1200.0 * std::log2(*seconds) * 65536.0;
-    return static_cast<s32>(std::clamp(std::lround(timecents), static_cast<long>(std::numeric_limits<s32>::min()),
-                                       static_cast<long>(std::numeric_limits<s32>::max())));
+    return static_cast<s32>(std::lround(std::clamp(timecents, static_cast<double>(std::numeric_limits<s32>::min()),
+                                                 static_cast<double>(std::numeric_limits<s32>::max()))));
   }
   return std::numeric_limits<s32>::min();
 }

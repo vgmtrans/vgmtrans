@@ -849,6 +849,19 @@ void dlsExporterWritesDlsRiffFile() {
   expect(dlsArt2ContainsConnection(result.bytes, 0x0008, 0x0104, 914 * 65536),
          "DLS export should scale default tremolo-rate modulator from observed MIDI usage");
 
+  auto& envelope = soundBank.instruments.front().regions.front().envelope;
+  const auto originalEnvelope = envelope;
+  envelope.attackSeconds = 1e20;
+  envelope.releaseSeconds = std::numeric_limits<double>::denorm_min();
+  expect(validateSoundBank(soundBank).empty(), "DLS envelope saturation fixture must remain a valid bank");
+  const auto bounded = buildDls(SynthExportInput{.soundBanks = prepareSynthBanksForTest(soundBanks),
+                                                .samplePools = samples}, sources);
+  envelope = originalEnvelope;
+  expect(bounded.diagnostics.empty() &&
+             dlsArt2ContainsConnection(bounded.bytes, 0x0206, std::numeric_limits<s32>::max()) &&
+             dlsArt2ContainsConnection(bounded.bytes, 0x0209, std::numeric_limits<s32>::min()),
+         "DLS export should saturate finite envelope times at its signed timecents limits");
+
   const auto simulatedResult = buildDls(
       SynthExportInput{
           .name = "Probe",

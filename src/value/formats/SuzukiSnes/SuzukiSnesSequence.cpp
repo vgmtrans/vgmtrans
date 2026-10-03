@@ -875,15 +875,15 @@ using Cursor = CompilerCursor<Playback>;
 struct ParsedHeader {
   SourceRange range;
   u32 pointerTable = 0;
-  SequenceRecipes recipes;
+  std::vector<DrumSlot> drums;
 };
 
 [[nodiscard]] ParsedHeader parseHeader(ByteReader reader, const Layout& layout) {
   ParsedHeader parsed;
   u32 drum = layout.version == Version::SeikenDensetsu3 ? layout.sequenceHeaderAddress + kTrackCount * 2
                                                          : layout.sequenceHeaderAddress;
-  while (reader.has(drum, 5) && reader.u8At(drum) < 0x80 && parsed.recipes.drums.size() < 128) {
-    parsed.recipes.drums.push_back(DrumSlot{
+  while (reader.has(drum, 5) && reader.u8At(drum) < 0x80 && parsed.drums.size() < 128) {
+    parsed.drums.push_back(DrumSlot{
         .note = reader.u8At(drum),
         .sourceProgram = reader.u8At(drum + 1),
         .sourceKey = reader.u8At(drum + 2),
@@ -951,7 +951,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   program.behavior.initialLevel = math::levelGain(math::initialVolume(layout.version));
   return SequenceParse{
       .program = std::move(program),
-      .recipes = std::move(header.recipes),
+      .drums = std::move(header.drums),
   };
 }
 

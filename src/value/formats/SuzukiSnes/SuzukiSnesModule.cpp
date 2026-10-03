@@ -30,7 +30,7 @@ namespace {
       decodeSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics());
   sequence.program(std::move(parsed.program));
 
-  if (const auto synth = addSynth(result, *layout, parsed.recipes, displayName)) {
+  if (const auto synth = addSynth(result, *layout, parsed.drums, displayName)) {
     sequence.useBank(*synth);
   } else {
     result.warning("SuzukiSnes sequence found, but no valid instruments or samples were discovered",

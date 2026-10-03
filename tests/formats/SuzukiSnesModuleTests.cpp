@@ -228,10 +228,10 @@ void layoutsAndHeadersAreVersioned() {
   const SequenceParse blSequence =
       decodeSequence(ByteReader(SourceId{126}, laterFixture(false)), *bl, AssetId{126}, &blSources);
   expect(sd3Sequence.program.tracks.size() == 1 && sd3Sources.finish().annotations().front().range.size == 22 &&
-             sd3Sequence.recipes.drums.size() == 1 && sd3Sequence.recipes.drums.front().sourceProgram == 0,
+             sd3Sequence.drums.size() == 1 && sd3Sequence.drums.front().sourceProgram == 0,
          "SD3 should decode pointers before its sequence-owned drum recipe");
   expect(blSequence.program.tracks.size() == 1 && blSources.finish().annotations().front().range.size == 22 &&
-             blSequence.recipes.drums.size() == 1 && blSequence.program.tracks.front().startAddress.value == 0x3000,
+             blSequence.drums.size() == 1 && blSequence.program.tracks.front().startAddress.value == 0x3000,
          "later drivers should decode the same immutable recipe before their track pointers");
 }
 

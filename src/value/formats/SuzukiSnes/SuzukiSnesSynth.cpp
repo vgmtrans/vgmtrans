@@ -133,10 +133,10 @@ void addMelodicInstruments(InstrumentSetBuilder& instruments, const std::vector<
   }
 }
 
-void addDrumKit(InstrumentSetBuilder& instruments, const SequenceRecipes& recipes, const std::vector<Patch>& patches,
-                const SnesBrrSampleRefs& samples) {
+void addDrumKit(InstrumentSetBuilder& instruments, const std::vector<DrumSlot>& drums,
+                const std::vector<Patch>& patches, const SnesBrrSampleRefs& samples) {
   InstrumentSetBuilder::Entry kit;
-  for (const DrumSlot& drum : recipes.drums) {
+  for (const DrumSlot& drum : drums) {
     if (drum.note > 127 - kDrumKeyBias || drum.volume > 0x7f) {
       instruments.warning("Drum row has an out-of-range key or volume", drum.source);
       continue;
@@ -175,7 +175,7 @@ void addDrumKit(InstrumentSetBuilder& instruments, const SequenceRecipes& recipe
 }  // namespace
 
 std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
-                                           const SequenceRecipes& recipes, std::string_view displayName) {
+                                           const std::vector<DrumSlot>& drums, std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const std::vector<Patch> patches = collectPatches(reader, layout);
   const auto catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, patches, &Patch::srcn);
@@ -188,7 +188,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   auto& samplePool = bank.localSamples();
   const SnesBrrSampleRefs samples = addSnesBrrSamples(samplePool, reader, catalog);
   addMelodicInstruments(instruments, patches, samples);
-  addDrumKit(instruments, recipes, patches, samples);
+  addDrumKit(instruments, drums, patches, samples);
   if (instruments.empty()) {
     return std::nullopt;
   }

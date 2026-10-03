@@ -1,11 +1,11 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Twenty-eight validated batches remove 1,045 net production lines
+`cb9e0b766`. Twenty-nine validated batches remove 1,048 net production lines
 from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 27; 72 raw
+cover 37 of 38 registered families. All export records match batch 28; 72 raw
 inventories match and one differs only in proven pre-existing concurrent asset-ID
 allocation order. The cleanup2 records appear at the end of this document.
 
@@ -6331,3 +6331,192 @@ nondeterministic IDs without sacrificing throughput; measure before changing the
 explicit concurrency test. Probe transferring owned analyzed member results
 without changing generic projector dispatch, borrowing immutable Akao articulation
 records only within preparation, and eliminating the redundant SF2 loop wrapper.
+
+
+## Cleanup2 twenty-ninth batch: consume owned analysis results and borrow preparation inputs
+
+Sixteen production files remove three net lines. Cleanup2 now removes 1,048 net
+value production lines: 954 architecture lines and 94 format lines. The cumulative
+value C++ diff is 1,756 added/2,804 removed lines across 151 source/header paths.
+Two existing core fixtures add 24 lines for actual ownership and saturation
+contracts; Akao/Suzuki fixtures adjust their existing inputs/field paths without
+adding lines. Standard containers and reference_wrapper replace redundant owners;
+no new public type, callback phase, state language or export target framework.
+
+Accepted changes:
+
+- analyzeCompiledProgram transfers a directly selected data member from its
+  owned completed state into the durable result. Delete the copy of collected
+  Mori/Nin/Rare synth-analysis containers. Generic callable/member-function
+  projectors still receive const ProgramState&, and references they return still
+  become owned copies. Wrapped member pointers retain that generic path. The
+  return type and erased-state/runtime protocol stay unchanged. Four extra lines
+  make the ownership distinction explicit rather than silently changing all
+  projector overload selection to rvalue invocation.
+- Akao's preparation lookup borrows immutable articulation records from its
+  selected retained sample pools. Use reference_wrapper<const AkaoArticulation>
+  so mapped entries remain non-null; keep ordered lookup and last-valid-definition
+  overwrite behavior. Delete copies of complete source-field owners. Regions
+  copy their source ranges, sample references, tuning, loops and envelopes;
+  runtime ADSR records own their values. No lookup reference escapes preparation.
+- Remove SuzukiSnes' one-vector SequenceRecipes and ItikitiSnes' one-set
+  ReferencedPrograms types. Sequence results expose drums and referencedPrograms
+  directly, and synth readers accept the corresponding const vector/set. Keep
+  Suzuki's 128-row limit and validation, and Itikiti's implicit program 0,
+  group-adjusted program discovery and nullable standalone command collector.
+- Construct TrackProgram's default one stream with the explicit vector count
+  constructor. Initializer-list construction copied the stream's default channel
+  vector. Normal track decoding uses that default and sets its channel number
+  directly, avoiding another explicit initializer-list owner. The normal path
+  and default construction each avoid one allocation without changing layout or
+  adding lines. The exceptional empty-start-list branch keeps its explicit
+  initialization; this is not a claim that every stream copy is eliminated.
+- DLS envelope conversion clips double timecents to the s32 interval before the
+  same lround call. Preserve log2, multiply-by-1200 and multiply-by-65536 order,
+  absent/nonpositive/nonfinite sentinels and positive-infinity saturation. This
+  makes the lround argument representable on 32-bit-long platforms; the previous
+  clipping happened after conversion. Add a public valid-bank fixture covering
+  huge attack and positive subnormal release. On Darwin the fixture passes old
+  code too; it establishes a portable contract, not a demonstrated local byte fix.
+- Delete the private SF2 loop wrapper around region.loop.value_or(sample.loop).
+  State the fallback directly at its two call sites. Keep DLS's separate enabled
+  zero-length-loop normalization; it represents a real target policy.
+
+Validation:
+
+- The full 341-step Release build is warning-free; all 44 CTest suites pass.
+  Freeze complete matching sources/headers/tests, core/formats/fmt/Qt archives and
+  shell as pass29. All 252 original corpus comparisons preserve 3,922 artifacts
+  and complete inventories/diagnostics/statuses against pass28. All 894 expanded
+  export records preserve 858 artifacts/218,240,549 bytes per binary, including
+  exact names/stdout/stderr/statuses. There are 852 successes and the same 42
+  failures, with no timeout. All 4,780 artifact payloads remain exact.
+- Seventy-two expanded raw inventories match; only Growlanser's already-proven
+  concurrent sample-pool AssetId ordering differs. Keep the raw mismatch. All 50
+  initial/repeated inventories match after renumbering only asset declarations
+  and their collection member IDs by unchanged ordered metadata. Fresh 16 runs
+  per binary observe original orders 15/1, pass28 15/1 and pass29 16 in one of the
+  already-observed original orders. No claim that pass29 itself reproduced both
+  orders. Source/collection IDs, ranges, labels, warnings and statuses stay exact;
+  link the earlier original/pass27/pass28 scheduling evidence. Classification is
+  retained in volume-36/classification.json beneath pass28-vs-pass29 comparisons.
+- Analysis preserves 176 native performance renders and 162 complete collected
+  results/1,622,179 bytes across full Mori/Nin/Rare suites, including both Nin
+  Quest collectors. Rebuild four actual collector units with configured Release
+  Werror and matching sanitizer VM/emitter. Native return-only allocations fall
+  from 164/7,512 requested bytes to zero: 91 calls improve and 71 are already
+  empty; none worsen. This is the selected-member transfer only, not whole-decode
+  allocation accounting. All real member result types are nothrow movable.
+- The actual-VM projector matrix preserves 171 successes/5,878,523 bytes, SHA256
+  97b8711d3593abf0129acd8ff4a7180d8a69f30e60cc49d4a603d1ea9e881550.
+  Cover scalar/pointer/reference_wrapper/const members, wrapped selectors,
+  member functions, external references and overloaded callables. Observe owned
+  results after state destruction. Full Cursor fixtures and the new external-
+  reference regression pass before/after with sanitizers: preserve the external
+  vector, mutate/destroy it, then verify the result remains owned. Eight custom
+  copy/move combinations plus projector/factory/bad-state failures bound the
+  contract: direct member copy/move exception and moved-from destructor staging
+  can change. No rollback or borrowed-pointer lifetime repair is promised.
+- Akao's six full fixtures and 7,680 generated preparation/lifetime cases preserve
+  10,327,716 bytes, SHA256
+  0578857ac73ded1f70f01d83bd758170d0af269545d7cc9efa25f249be85d0da.
+  Compare complete regions/sample/loop/envelope/source values, ordered diagnostics,
+  prepared ADSR copies, native EnvelopePerformanceEvent values/fields/scope/
+  attribution/order and MIDI. Destroy original snapshot/sample-pool owners and
+  reuse heap storage before observing results; destroy prepared bank/private data
+  before executing the copied native sequence runtime. Six Akao production units
+  and the full fixture pass configured Release Werror. The changed resolver,
+  instrument and native sequence units plus probes are sanitizer-instrumented.
+- Akao preparation allocation requests improve 779,712->265,632 and requested
+  bytes 121,966,848->43,826,688. Of 7,680 cases, 1,344 improve count and 2,688 improve
+  bytes; none grow. The mapped payload shrinks 96->8 bytes and map pair 104->16,
+  while the map owner stays 24 bytes. These are scoped operator-new requests and
+  object layouts, not peak RSS. Arbitrary slow ADSR combinations stopped in the
+  existing native envelope loop are excluded; no exhaustive register claim.
+- Direct-format wrappers preserve both complete suites and 310 generated cases:
+  320 rendered performances/33,307,183 bytes, with raw commands, source graphs,
+  diagnostics, regions/envelopes and BRR PCM. Suzuki covers three revisions,
+  0/1/16/128/129 rows, missing tracks, invalid key/volume and 30 shortened sources;
+  28 throw the same bounded-reader exception and two partially decode. Itikiti
+  covers five groups, 0/1/16/256 program changes, no/two tracks, static alternative
+  discovery and program 0. All eight format units per side pass configured Release
+  Werror and sanitizer comparison. Result layouts stay 496/496 bytes; all 310
+  allocation traces stay 149,853 requests/33,451,048 bytes. No copy-saving claim
+  for removing those nominal container wrappers.
+- Default/normal stream construction preserves full VM/Cursor fixtures and 800
+  generated tracks plus default/copy ownership: 103,430 trace bytes, SHA256
+  b024d313e22eb2e04f9a1c69e16785b92d72c76fd36dae5db9a49d04bd899a9d.
+  Cover track indices through u32 max, tracked/trackless source maps, empty and
+  varied source lengths, and budgets 0/1/3/100. All 801 measured constructions
+  save one allocation/four requested bytes; default is three requests/32 bytes
+  before and two/28 after. Six actual configured source/command-projector Werror
+  checks pass. Rebuild matching projector, VM, emitter, timing and full fixtures
+  together for the clean ASan/UBSan/float-cast-overflow comparison.
+- DLS numeric results preserve 394,324 private cases under all four rounding modes:
+  5,126,228 bytes, SHA256
+  0c4dae129ce4bede57b205253350e4b408676b7e754940a043dc2dba708f044e.
+  Complete fixture/generated artifacts including the new assertion preserve 280
+  captures/14,480,418 bytes, SHA256
+  a5ac5aa4812f9c4c72aeaa5184ba3f9513c58ea1e5eab910c8eefd5f3ebf7ea9.
+  Before/after floating flags also match within each configuration. Twelve
+  pre-existing quiet-NaN classification FE_INVALID differences separate Release
+  from sanitizer flags; keep that projection separate from results. Old finite
+  positive arguments span -84,462,796,800..80,530,636,800, with 98,376 outside the
+  s32 interval; all fit Darwin's 64-bit long. New arguments fit either 32-bit or
+  64-bit long. Do not claim an actual Windows run or local byte-output correction.
+- SF2 loop inlining preserves the full synth fixture and 336 targeted configurations
+  across SF2/DLS: 695 captures/14,813,045 bytes, SHA256
+  a0b29790ecf2f11ef0e7d98de5749c1768b0f6f264aae728c176e58f38e31a93.
+  Cover absent/enabled/disabled overrides, zero-length/full/short loops, shared/
+  distinct samples, filtering and unreferenced headers. Independent assertions
+  verify first-region SF2 header precedence and DLS's distinct enabled zero-length
+  extension. Nine fresh configured Debug/Release/RelWithDebInfo Werror checks
+  pass across both final writers and the modified synth fixture.
+- Focused sanitizer proofs use matching changed units and unchanged frozen Release
+  archives; disable mixed libc++ container annotations where necessary. This is
+  not whole-program instrumentation. Native allocation-failure timing can change
+  when temporary owners disappear; no broad exception-equivalence claim.
+
+### Rejected larger scheduling simplification
+
+Prototype unconditional serial format scanning in isolation, removing 29 lines
+of worker-count, atomic task queue, future ownership and thread includes. Keep
+all original per-format exception attribution and registry-order admission. The
+production source and explicit concurrency fixture remain unchanged.
+
+Measure 73 real-input closures five times each with paired frozen executables,
+seeded shuffled candidate/side order and one shell process at a time: 365 pairs/
+730 invocations. Sum of per-input median scan times grows 12.490->19.558 seconds
+(+56.6%). The 64 MiB NDS input grows 1.464->6.318 seconds (4.32x), and all six Akao
+closures grow 2.3..2.6x. Some small/native archive inputs improve, but the large
+regressions rule out this deletion. These are observed end-to-end scan timings,
+including loading/extraction/inventory output, on this machine; independent agent
+probes may run concurrently. No cross-machine performance claim.
+
+The rejected prototype also changes raw asset-ID allocation order in 27 paired
+inventories across six multi-format cases. Preserve all raw records; no exported-
+payload equivalence claim is made for this rejected draft. Do not add ID-rebasing
+namespaces or a scan-mode flag just to replace the current bounded worker model.
+Evidence stays under `/tmp/vgmtrans-cleanup2/serial-scan-prototype29`.
+
+Read-only decisions: SharedSequence's chunk owners preserve immutable revision
+storage without copying every prior asset/annotation or adding one pointer per
+item. DependencySelection is one request's answer; ResolvedInputs accumulates
+several requests and retains earlier ambiguity/failure. A consuming protocol only
+to save their copies would add API overhead. SequencePreparer's optional replacement
+separates no replacement from an explicitly invalid/incompatible runtime; mutable
+context-only callbacks would require new change tracking. Source instrument
+address preferences remain distinct from unique assigned export addresses;
+allocation scratch stays unpublished on failure. Preserve those actual roles.
+
+A live numeric-policy issue remains separate: MP2k deliberately supplies minimum
+LFO rate 0 Hz, while synthAmountFromHertz currently passes log2(0) to lround.
+Measured Darwin returns 0 with FE_DIVBYZERO|FE_INVALID in every rounding mode;
+a positive subnormal can also underflow before log2. A finite frequency floor or
+native-LFO disable policy would change output meaning and shared legacy consumers.
+No such policy change is included here; evidence stays in
+`/tmp/vgmtrans-hertz-zero-inventory`.
+
+Next: separate Akao's prepared runtime from its scanned instrument binding recipe,
+and probe direct typed emitter appends without enlarging every variant vector
+growth path. Keep the already demonstrated concurrency/ownership boundaries.

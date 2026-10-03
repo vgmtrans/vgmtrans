@@ -54,13 +54,9 @@ struct DrumSlot {
   friend bool operator==(const DrumSlot&, const DrumSlot&) = default;
 };
 
-struct SequenceRecipes {
-  std::vector<DrumSlot> drums;
-};
-
 struct SequenceParse {
   core::SequenceProgram program;
-  SequenceRecipes recipes;
+  std::vector<DrumSlot> drums;
 };
 
 [[nodiscard]] const char* versionName(Version version);
@@ -74,7 +70,7 @@ struct SequenceParse {
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
 [[nodiscard]] core::SequenceRuntime sequenceRuntime(Version version);
 [[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
-                                                               const SequenceRecipes& recipes,
+                                                               const std::vector<DrumSlot>& drums,
                                                                std::string_view displayName);
 [[nodiscard]] core::FormatModule module();
 

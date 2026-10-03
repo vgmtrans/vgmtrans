@@ -189,8 +189,12 @@ template <class ProgramState, class Project>
 [[nodiscard]] std::remove_cvref_t<std::invoke_result_t<Project&, const ProgramState&>> analyzeCompiledProgram(
     const SequenceProgram& program, Project project, std::vector<Diagnostic>* diagnostics = nullptr,
     SequenceVmOptions options = {}) {
-  const std::any state = detail::analyzeSequenceProgram(SequenceVm(options), program, diagnostics);
-  return std::invoke(project, std::any_cast<const ProgramState&>(state));
+  std::any state = detail::analyzeSequenceProgram(SequenceVm(options), program, diagnostics);
+  if constexpr (std::is_member_object_pointer_v<Project>) {
+    return std::move(std::invoke(project, std::any_cast<ProgramState&>(state)));
+  } else {
+    return std::invoke(project, std::any_cast<const ProgramState&>(state));
+  }
 }
 
 }  // namespace vgmtrans::core

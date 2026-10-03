@@ -155,10 +155,6 @@ struct SfLayout {
   };
 }
 
-[[nodiscard]] Loop effectiveSfLoop(const Region& region, const DecodedSynthSample& sample) {
-  return region.loop.value_or(sample.decoded.loop);
-}
-
 [[nodiscard]] s16 sf2Pan(double pan) {
   return clampS16(static_cast<s32>(std::lround((std::clamp(pan, 0.0, 1.0) - 0.5) * 1000.0)));
 }
@@ -486,7 +482,7 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
       writeAmountGen(generators, kSfGenFineTune, pitch.fineTune);
       writeEnvelope(generators, sf2Envelope(region));
       writeWordGen(generators, kSfGenOverridingRootKey, pitch.rootKey);
-      writeWordGen(generators, kSfGenSampleModes, effectiveSfLoop(region, sample).enabled ? 1 : 0);
+      writeWordGen(generators, kSfGenSampleModes, region.loop.value_or(sample.decoded.loop).enabled ? 1 : 0);
       writeLe16(generators, kSfGenSampleId);
       writeIndex(generators, resolved.sampleIndex);
     }
@@ -521,7 +517,7 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
     const auto* region = firstRegions[i];
     const auto pitch = region ? sf2SampleHeaderPitch(sf2RegionPitch(*region).rootKey, clampS16(sample.pitchCents))
                               : SfSampleHeaderPitch{};
-    const auto loop = region ? effectiveSfLoop(*region, sample) : sample.decoded.loop;
+    const auto loop = region ? region->loop.value_or(sample.decoded.loop) : sample.decoded.loop;
     // Offsets include each preceding sample's required silence padding.
     const u64 end = static_cast<u64>(startFrame) + sample.decoded.pcm.size();
     if (end > std::numeric_limits<u32>::max() - kSf2SamplePaddingFrames) {
