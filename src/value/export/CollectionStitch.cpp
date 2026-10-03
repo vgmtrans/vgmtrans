@@ -35,8 +35,6 @@ constexpr u32 kMaximumPpqn = 1920;
 struct StitchPart {
   std::shared_ptr<const PreparedCollection> prepared;
   u64 startTick = 0;
-  MidiSequence midi;
-  std::vector<CollectionStitchBank> banks;
 };
 
 void append(std::vector<Diagnostic>& destination, const std::vector<Diagnostic>& source) {
@@ -132,11 +130,6 @@ void appendInitialChannelState(MidiTrack& track, u64 tick, u8 channel, u16 bank,
   track.events.push_back(midi::controller(tick, channel, MidiController::Legato, 0));
 }
 
-[[nodiscard]] std::optional<u32> remappedBank(const StitchPart& part, u32 source) {
-  const auto found = std::ranges::find(part.banks, source, &CollectionStitchBank::source);
-  return found == part.banks.end() ? std::nullopt : std::optional{found->target};
-}
-
 [[nodiscard]] u32 normalizedPpqn(u32 ppqn) {
   return ppqn == 0 ? kDefaultPpqn : ppqn;
 }
@@ -144,7 +137,7 @@ void appendInitialChannelState(MidiTrack& track, u64 tick, u8 channel, u16 bank,
 [[nodiscard]] u32 commonPpqn(const std::vector<StitchPart>& parts) {
   u32 common = 0;
   for (const auto& part : parts) {
-    const u32 ppqn = normalizedPpqn(part.midi.timebase.midiDivision());
+    const u32 ppqn = normalizedPpqn(part.prepared->performance()->performance().timebase.midiDivision());
     if (common == 0) {
       common = ppqn;
       continue;
@@ -186,16 +179,20 @@ void appendInitialChannelState(MidiTrack& track, u64 tick, u8 channel, u16 bank,
 }
 
 [[nodiscard]] std::optional<MidiSequence> composeMidi(std::vector<StitchPart>& parts,
-                                                      MidiBankSelectStyle bankStyle) {
+                                                      const ExportRequest& request,
+                                                      const MidiModulationUsage& modulationUsage) {
   MidiSequence midi;
   midi.timebase.ppqn = commonPpqn(parts);
   u64 cursor = 0;
   for (size_t partIndex = 0; partIndex < parts.size(); ++partIndex) {
     auto& part = parts[partIndex];
     part.startTick = cursor;
-    const u32 sourcePpqn = normalizedPpqn(part.midi.timebase.ppqn);
+    auto partMidi = renderMidiSequence(*part.prepared->performance(), request.sequence.midi,
+                                      request.modulationConversion, &part.prepared->rendering.modulation);
+    applyMidiModulationScaling(partMidi, modulationUsage, request.modulationScaling);
+    const u32 sourcePpqn = normalizedPpqn(partMidi.timebase.ppqn);
     u64 end = 0;
-    for (auto& track : part.midi.tracks) {
+    for (auto& track : partMidi.tracks) {
       end = std::max(end, track.endTick);
       for (auto& event : track.events) {
         end = std::max(end, eventEnd(event));
@@ -214,9 +211,10 @@ void appendInitialChannelState(MidiTrack& track, u64 tick, u8 channel, u16 bank,
         }
         MidiTrack initialState;
         initialState.events.reserve(channels.size() * 32);
-        const u16 bank = static_cast<u16>(*remappedBank(part, 0));
+        const u16 bank = static_cast<u16>(part.prepared->performance()->bankMapping().at(0));
         for (const u8 channel : channels) {
-          appendInitialChannelState(initialState, cursor, channel, bank, bankStyle == MidiBankSelectStyle::MsbAndLsb);
+          appendInitialChannelState(initialState, cursor, channel, bank,
+                                    request.sequence.midi.bankSelectStyle == MidiBankSelectStyle::MsbAndLsb);
         }
         track.events.insert(track.events.begin(), initialState.events.begin(), initialState.events.end());
       }
@@ -227,7 +225,7 @@ void appendInitialChannelState(MidiTrack& track, u64 tick, u8 channel, u16 bank,
       track.endTick = *trackEnd + cursor;
       midi.tracks.push_back(std::move(track));
     }
-    append(midi.diagnostics, part.midi.diagnostics);
+    append(midi.diagnostics, partMidi.diagnostics);
     const auto duration = scaled(end, sourcePpqn, midi.timebase.ppqn);
     if (!duration || *duration > std::numeric_limits<u64>::max() - cursor) {
       return std::nullopt;
@@ -252,6 +250,10 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
 
   std::vector<StitchPart> parts;
   parts.reserve(collections.size());
+  std::vector<SynthBankSelection> synthBanks;
+  std::vector<const SamplePoolAsset*> samples;
+  std::unordered_set<u32> includedSamples;
+  MidiModulationUsage modulationUsage;
   u32 nextBank = 0;
   for (const CollectionId collection : collections) {
     if (const auto previous = std::ranges::find(parts, collection, [](const StitchPart& part) {
@@ -268,21 +270,18 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
     StitchPart part{.prepared = std::move(prepared)};
     const auto& performance = *part.prepared->performance();
     nextBank = performance.nextBank();
-    for (const auto& [source, target] : performance.bankMapping()) part.banks.push_back({source, target});
+    mergeModulationUsage(modulationUsage, part.prepared->modulationUsage);
+    auto selected = selectSynthBanks(performance);
+    synthBanks.insert(synthBanks.end(), std::make_move_iterator(selected.begin()), std::make_move_iterator(selected.end()));
+    for (const auto* pool : part.prepared->samplePools) {
+      if (includedSamples.insert(pool->metadata.id.value).second) {
+        samples.push_back(pool);
+      }
+    }
     parts.push_back(std::move(part));
   }
 
-  MidiModulationUsage modulationUsage;
-  for (const auto& part : parts) {
-    mergeModulationUsage(modulationUsage, part.prepared->modulationUsage);
-  }
-  for (auto& part : parts) {
-    part.midi = renderMidiSequence(*part.prepared->performance(), request.sequence.midi,
-                                  request.modulationConversion, &part.prepared->rendering.modulation);
-    applyMidiModulationScaling(part.midi, modulationUsage, request.modulationScaling);
-  }
-
-  auto midi = composeMidi(parts, request.sequence.midi.bankSelectStyle);
+  auto midi = composeMidi(parts, request, modulationUsage);
   if (!midi) {
     fail(result, "Stitched MIDI timeline exceeds the supported tick range");
     return result;
@@ -290,22 +289,6 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
   result.midi.bytes = encodeMidiFile(*midi);
   append(result.midi.diagnostics, midi->diagnostics);
 
-  std::vector<SynthBankSelection> synthBanks;
-  std::vector<const SamplePoolAsset*> samples;
-  std::unordered_set<u32> includedCollections;
-  std::unordered_set<u32> includedSamples;
-  for (const auto& part : parts) {
-    if (!includedCollections.insert(part.prepared->id.value).second) {
-      continue;
-    }
-    auto selected = selectSynthBanks(*part.prepared->performance());
-    synthBanks.insert(synthBanks.end(), std::make_move_iterator(selected.begin()), std::make_move_iterator(selected.end()));
-    for (const auto* collection : part.prepared->samplePools) {
-      if (includedSamples.insert(collection->metadata.id.value).second) {
-        samples.push_back(collection);
-      }
-    }
-  }
   auto soundFont = buildSoundFont2(
       SynthExportInput{
           .name = "Stitched Collections",
@@ -323,12 +306,14 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
   append(result.soundFont.diagnostics, soundFont.diagnostics);
 
   result.parts.reserve(parts.size());
-  for (auto& part : parts) {
-    result.parts.push_back(CollectionStitchPart{
+  for (const auto& part : parts) {
+    auto& exportedPart = result.parts.emplace_back(CollectionStitchPart{
         .collection = part.prepared->id,
         .startTick = part.startTick,
-        .banks = std::move(part.banks),
     });
+    for (const auto& [source, target] : part.prepared->performance()->bankMapping()) {
+      exportedPart.banks.push_back({source, target});
+    }
   }
   return result;
 }

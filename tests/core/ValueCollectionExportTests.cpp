@@ -11,7 +11,7 @@
 #include "SynthExportTestSupport.h"
 
 #include "value/export/CollectionBinding.h"
-#include "value/export/AssetPreparation.h"
+#include "value/model/AssetPreparation.h"
 #include "value/export/Export.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
@@ -566,6 +566,16 @@ void collectionBindingAppliesToWholeExport() {
   expect(forward.size() == 3 && reverse.size() == 3 && forward[0].bytes == reverse[2].bytes &&
              forward[1].bytes == reverse[1].bytes && forward[2].bytes == reverse[0].bytes,
          "collection binding should make multi-artifact export independent of requested output order");
+
+  test::SessionSnapshotBuilder namedBuilder;
+  namedBuilder.assets = {sequence, instruments, samples};
+  namedBuilder.collections = {snapshot.collections().front()};
+  namedBuilder.collections.front().name = "Song/Part\\Final: \"Theme?\"";
+  const auto named = exportCollection(namedBuilder.finish(), sources, CollectionId{0}, forwardRequest);
+  expect(named.size() == 3 && named[0].filename == "Song_Part_Final_ _Theme__.mid" &&
+             named[1].filename == "Song_Part_Final_ _Theme__.sf2" &&
+             named[2].filename == "Song_Part_Final_ _Theme__.dls" && named[0].bytes == forward[0].bytes,
+         "all collection exports must sanitize the title consistently without changing MIDI data");
 
   const auto failed = exportCollection(snapshot, sources, CollectionId{1}, ExportRequest{.kinds = {ExportKind::Midi}});
   expect(failed.size() == 1, "a failing collection performance finalizer should produce one MIDI artifact");

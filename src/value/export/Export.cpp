@@ -66,7 +66,7 @@ namespace {
 [[nodiscard]] Artifact exportMidi(std::string_view baseName, const RenderedCollection& rendering,
                                   const std::optional<MidiSequence>& midi) {
   return Artifact{
-      .filename = std::string(baseName) + ".mid",
+      .filename = filenamePart(std::string(baseName)) + ".mid",
       .mediaType = "audio/midi",
       .bytes = midi ? encodeMidiFile(*midi) : std::vector<u8>{},
       .diagnostics = midi ? midi->diagnostics : rendering.diagnostics,
