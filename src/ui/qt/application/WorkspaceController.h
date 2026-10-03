@@ -50,7 +50,7 @@ public:
   [[nodiscard]] core::CollectionId createUserCollection(std::string name, core::CollectionMembers members);
   [[nodiscard]] core::CollectionPlayback preparePlayback(core::CollectionId id,
                                                          const core::PlaybackRequest& request) const;
-  [[nodiscard]] core::Artifact exportSequenceMidi(core::AssetId id, const core::SequenceExportRequest& request) const;
+  [[nodiscard]] core::Artifact exportSequenceMidi(core::AssetId id, const core::SequenceRenderOptions& request) const;
   [[nodiscard]] core::Artifact exportSoundBank(core::AssetId id, core::SynthExportFormat format,
                                                const core::ExportRequest& request) const;
   [[nodiscard]] std::vector<core::Artifact> exportSamples(core::AssetId id) const;

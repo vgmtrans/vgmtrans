@@ -32,7 +32,7 @@ struct CollectionPlayback {
 };
 
 [[nodiscard]] Artifact exportSequenceMidi(const SessionSnapshot& snapshot, const SourceStore& sources, AssetId sequence,
-                                          const SequenceExportRequest& request);
+                                          const SequenceRenderOptions& request);
 
 [[nodiscard]] Artifact exportSoundBank(const SessionSnapshot& snapshot, const SourceStore& sources, AssetId soundBank,
                                        SynthExportFormat format, const ExportRequest& request);

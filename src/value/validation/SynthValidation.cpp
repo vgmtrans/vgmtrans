@@ -11,7 +11,6 @@
 #include <algorithm>
 #include <cmath>
 #include <set>
-#include <utility>
 
 namespace vgmtrans::core {
 
@@ -127,13 +126,13 @@ ValidationReport validateSampleReferences(const SoundBankAsset& soundBank,
 
 ValidationReport validateSoundBank(const SoundBankAsset& soundBank) {
   ValidationReport report;
-  std::set<std::pair<std::string, u32>> identities;
+  std::set<InstrumentIdentity> identities;
 
   for (const auto& instrument : soundBank.instruments) {
     if (instrument.identity) {
       if (!instrument.identity->valid()) {
         report.error("synth.instrument.identity", "Synth instrument had an empty identity domain", instrument.range);
-      } else if (!identities.emplace(instrument.identity->domain, instrument.identity->key).second) {
+      } else if (!identities.insert(*instrument.identity).second) {
         report.error("synth.instrument.duplicate-identity", "Synth instrument identity was duplicated in its set",
                      instrument.range);
       }

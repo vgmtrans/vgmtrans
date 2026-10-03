@@ -253,7 +253,7 @@ private:
     std::unordered_map<SourceAnnotationId, size_t> annotationsById;
     std::unordered_map<SourceId, std::vector<SourceAnnotationId>> annotationsBySource;
     std::unordered_map<SourceAnnotationId, std::vector<SourceAnnotationId>> annotationsByParent;
-    std::vector<std::optional<AssetId>> assetOwnerByAnnotation;
+    std::vector<AssetId> assetOwnerByAnnotation;
     std::unordered_map<AssetId, std::vector<SourceAnnotationId>> annotationsByAsset;
   };
 

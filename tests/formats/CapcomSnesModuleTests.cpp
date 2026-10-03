@@ -581,7 +581,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "Session MIDI export should match direct builder/exporter output");
 
   const Artifact individualMidi =
-      session.exportSequenceMidi(sequence->metadata.id, SequenceExportRequest{.loopPolicy = LoopPolicy::PlayOnce});
+      session.exportSequenceMidi(sequence->metadata.id, SequenceRenderOptions{.loopPolicy = LoopPolicy::PlayOnce});
   const auto contextualMidi = session.exportCollection(
       project.collections()[0].id, ExportRequest{
                                        .kinds = {ExportKind::Midi},

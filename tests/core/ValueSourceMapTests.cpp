@@ -368,42 +368,52 @@ void sourceMapParentTraversalHandlesBranchesAndCycles() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "parents.bin"}, {0});
   const SourceRange range = sources.reader(source).range(0, 1);
+  const AssetId firstAsset{0};
+  const AssetId lastAsset{invalidIdValue - 1};
   SourceMapBuilder builder;
-  const auto owner = builder.source("Owner", range).owner(ObjectRefs::misc(AssetId{1})).id();
-  const auto branch = builder.section("Branch", range).parent(owner).id();
+  const auto owner = builder.source("Owner", range).owner(ObjectRefs::misc(firstAsset)).id();
+  const auto branch = builder.section("Branch", range).parent(owner).owner(ObjectRefs::misc(AssetId{})).id();
   const auto first = builder.entry("First", range).parent(branch).id();
   const auto second = builder.entry("Second", range).parent(branch).id();
-  const auto unowned = builder.source("Unowned", range).id();
+  const auto unowned = builder.source("Unowned", range).owner(ObjectRefs::misc(AssetId{})).id();
   const auto child = builder.entry("Unowned child", range).parent(unowned).id();
   auto cycleA = builder.section("Cycle A", range);
   const auto cycleB = builder.section("Cycle B", range).parent(cycleA.id());
   cycleA.parent(cycleB.id());
   const auto cycleChild = builder.entry("Cycle child", range).parent(cycleB.id()).id();
-  auto self = builder.source("Owned cycle", range).owner(ObjectRefs::misc(AssetId{2}));
+  auto self = builder.source("Owned cycle", range).owner(ObjectRefs::misc(lastAsset));
   self.parent(self.id());
   const auto selfChild = builder.entry("Owned cycle child", range).parent(self.id()).id();
   const auto missing = builder.section("Missing parent", range).parent(SourceAnnotationId{99}).id();
   const auto missingChild = builder.entry("Missing parent's child", range).parent(missing).id();
   const auto map = builder.finish();
   std::vector<SourceAnnotation> annotations(map.annotations().begin(), map.annotations().end());
+  annotations.push_back(SourceAnnotation{.range = range, .owner = ObjectRefs::misc(firstAsset)});
 
   for (int order = 0; order < 2; ++order) {
     ScanResult result{
         .assets = {
-            MiscAsset{.metadata = AssetMetadata{.id = AssetId{1}, .range = range}},
-            MiscAsset{.metadata = AssetMetadata{.id = AssetId{2}, .range = range}},
+            MiscAsset{.metadata = AssetMetadata{.id = firstAsset, .range = range}},
+            MiscAsset{.metadata = AssetMetadata{.id = lastAsset, .range = range}},
         },
         .sourceMap = SourceMap{annotations},
     };
     for (const auto id : {owner, branch, first, second}) {
-      expect(result.sourceMap.assetOwner(id) == AssetId{1}, "shared parent chains should inherit their owner");
+      expect(result.sourceMap.assetOwner(id) == firstAsset,
+             "zero is a valid owner, and an invalid explicit owner must inherit from its parent");
     }
     for (const auto id : {unowned, child, cycleA.id(), cycleB.id(), cycleChild, missing, missingChild}) {
       expect(!result.sourceMap.assetOwner(id), "unowned, cyclic, and missing parent chains should stay unowned");
     }
-    expect(result.sourceMap.assetOwner(self.id()) == AssetId{2} &&
-               result.sourceMap.assetOwner(selfChild) == AssetId{2},
+    expect(result.sourceMap.assetOwner(self.id()) == lastAsset &&
+               result.sourceMap.assetOwner(selfChild) == lastAsset,
            "an explicit owner should still resolve in a graph that validation must reject");
+    expect(!result.sourceMap.assetOwner(SourceAnnotationId{}) &&
+               result.sourceMap.find(SourceAnnotationId{}) == nullptr &&
+               result.sourceMap.annotationsForAsset(firstAsset).size() == 4 &&
+               result.sourceMap.annotationsForAsset(AssetId{}).empty() &&
+               result.sourceMap.annotations().size() == annotations.size(),
+           "invalid annotation ids must remain visible without entering ownership indexes");
     const auto report = validateScanResult(source, result, sources, {});
     expect(std::ranges::count(report.diagnostics(), "scan.source-annotation.parent-cycle", &Diagnostic::code) == 2,
            "validation should report each cycle once, including cycles with explicit owners");

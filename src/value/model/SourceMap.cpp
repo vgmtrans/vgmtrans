@@ -71,11 +71,11 @@ SourceMap::Part::Part(std::vector<SourceAnnotation> annotationValues)
     }
 
     path.clear();
-    std::optional<AssetId> owner;
+    AssetId owner;
     size_t current = root;
     while (true) {
       if (visited[current]) {
-        // A cycle reaches an unresolved (empty) owner; an earlier walk reaches
+        // A cycle reaches an unresolved (invalid) owner; an earlier walk reaches
         // its cached owner. Both terminate this chain without another state.
         owner = assetOwnerByAnnotation[current];
         break;
@@ -104,8 +104,8 @@ SourceMap::Part::Part(std::vector<SourceAnnotation> annotationValues)
   }
 
   for (size_t i = 0; i < values.size(); ++i) {
-    if (values[i].id.valid() && assetOwnerByAnnotation[i]) {
-      annotationsByAsset[*assetOwnerByAnnotation[i]].push_back(values[i].id);
+    if (values[i].id.valid() && assetOwnerByAnnotation[i].valid()) {
+      annotationsByAsset[assetOwnerByAnnotation[i]].push_back(values[i].id);
     }
   }
 }
@@ -193,7 +193,8 @@ std::optional<AssetId> SourceMap::assetOwner(SourceAnnotationId id) const {
   for (const auto& part : storage_->parts) {
     const auto found = part->annotationsById.find(id);
     if (found != part->annotationsById.end()) {
-      return part->assetOwnerByAnnotation[found->second];
+      const AssetId owner = part->assetOwnerByAnnotation[found->second];
+      return owner.valid() ? std::optional{owner} : std::nullopt;
     }
   }
   return std::nullopt;

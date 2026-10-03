@@ -42,8 +42,9 @@ struct SequenceRuntime {
   std::function<std::any(const SequenceProgram&)> createProgramState;
   std::function<std::any(TrackStateContext)> createTrackState;
   std::function<std::any(StreamStateContext)> createStreamState;
-  // Enter an active section before its first delay: stream state first, then
-  // each playback track. first is true only on this stream's first entry.
+  // Enter an active section before its first delay when command budget remains:
+  // stream state first, then each playback track. first is true only on this
+  // stream's first entry.
   void (*beginStreamSection)(std::any& streamState, bool first) = nullptr;
   void (*beginTrackSection)(bool first, std::any& programState, std::any& trackState, PerformanceEmitter& out,
                             VmApi& vm) = nullptr;

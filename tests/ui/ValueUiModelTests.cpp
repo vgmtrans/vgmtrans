@@ -126,20 +126,18 @@ void workspacePublishesModelsAndRemovesSourceFamilies() {
   expect(inspector->roots().size() == 1, "source inspector should preserve the source annotation hierarchy");
   expect(inspector->children(inspector->roots().front()).size() == 2,
          "source inspector should expose child annotations to both panes");
-  const auto magic = inspector->annotationAt(0);
-  const auto payload = inspector->annotationAt(1);
-  expect(magic && inspector->annotation(*magic)->label == "Magic",
-         "source inspector hit testing should prefer the most specific annotation");
-  expect(payload && inspector->annotation(*payload)->label == "Payload",
-         "source inspector hit testing should follow byte ranges");
   const auto magicField = inspector->itemAt(0);
-  expect(magicField && magicField->isField() && magicField->annotation == *magic && magicField->field == 0,
+  const auto payloadItem = inspector->itemAt(1);
+  expect(magicField && inspector->annotation(*magicField)->label == "Magic",
+         "source inspector hit testing should prefer the most specific annotation");
+  expect(payloadItem && inspector->annotation(*payloadItem)->label == "Payload",
+         "source inspector hit testing should follow byte ranges");
+  expect(magicField && magicField->isField() && magicField->field == 0,
          "opted-in source fields should be addressable as transient inspection children");
   expect(inspector->field(*magicField) != nullptr && inspector->field(*magicField)->name == "value" &&
              inspector->range(*magicField) == SourceRange{.source = SourceId{0}, .offset = 0, .size = 1},
          "a transient field child should retain its exact source range for HexView selection");
-  const auto payloadItem = inspector->itemAt(1);
-  expect(payloadItem && !payloadItem->isField() && payloadItem->annotation == *payload,
+  expect(payloadItem && !payloadItem->isField(),
          "fields should remain annotation details unless their owner explicitly opts into child projection");
 
   const std::array assetIds{assetId};
@@ -150,7 +148,7 @@ void workspacePublishesModelsAndRemovesSourceFamilies() {
   expect(workspace.snapshot().sourceMap().empty(),
          "removing a detected asset should remove its owned source annotation tree");
   expect(workspace.removeAssets(assetIds) == 0, "removing an already removed asset should be a no-op");
-  expect(inspector->bytes().size() == 3 && inspector->annotation(*magic) != nullptr,
+  expect(inspector->bytes().size() == 3 && inspector->annotation(*magicField) != nullptr,
          "an open source inspection should remain valid until its tab closes");
 
   const std::array sourceId{SourceId{0}};
@@ -158,7 +156,7 @@ void workspacePublishesModelsAndRemovesSourceFamilies() {
   expect(sources.rowCount() == 0 && assets.rowCount() == 0 && collections.rowCount() == 0 &&
              diagnostics.rowCount() == 0 && contents.rowCount() == 0,
          "all models should reset to the new immutable snapshot after removal");
-  expect(inspector->bytes().size() == 3 && inspector->annotation(*magic) != nullptr,
+  expect(inspector->bytes().size() == 3 && inspector->annotation(*magicField) != nullptr,
          "an open source inspection should retain its immutable source data after removal");
   const OpenResult reloaded = workspace.openPaths(path);
   expect(reloaded.opened.size() == 1 && reloaded.failures.empty() && sources.rowCount() == 1,

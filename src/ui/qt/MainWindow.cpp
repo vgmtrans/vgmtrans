@@ -743,7 +743,7 @@ void MainWindow::exportSequenceMidi(const QModelIndex& index) {
     return;
   }
 
-  vgmtrans::core::SequenceExportRequest request;
+  vgmtrans::core::SequenceRenderOptions request;
   applyMidiExportSettings(request);
 
   try {

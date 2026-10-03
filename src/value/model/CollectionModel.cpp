@@ -43,11 +43,11 @@ ResolutionStatus CollectionInputs::status() const noexcept {
   return result;
 }
 
-CollectionMembers collectionMembers(const CollectionMembers& selection, const CollectionInputs& inputs) {
+CollectionMembers Collection::members() const {
   auto result = selection;
-  const auto include = [](std::vector<AssetId>& members, AssetId id) {
-    if (std::ranges::find(members, id) == members.end()) {
-      members.push_back(id);
+  const auto include = [](std::vector<AssetId>& members, AssetId asset) {
+    if (std::ranges::find(members, asset) == members.end()) {
+      members.push_back(asset);
     }
   };
   for (const auto& bank : inputs.banks) {

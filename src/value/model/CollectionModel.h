@@ -60,10 +60,6 @@ struct CollectionInputs {
   [[nodiscard]] ResolutionStatus status() const noexcept;
 };
 
-// Flat inspection/export membership is a view, not a second list to synchronize.
-// Explicit choices keep their order; automatically used assets follow once each.
-[[nodiscard]] CollectionMembers collectionMembers(const CollectionMembers& selection, const CollectionInputs& inputs);
-
 // Published sequences produce collections by default. Identity is always the
 // sequence's AssetId; an empty name uses the sequence's display name.
 struct SequenceCollectionOptions {
@@ -91,7 +87,9 @@ struct Collection {
   std::vector<Diagnostic> issues;
   CollectionInputs inputs;
 
-  [[nodiscard]] CollectionMembers members() const { return collectionMembers(selection, inputs); }
+  // Flat inspection/export membership is a view, not a second list to synchronize.
+  // Explicit choices keep their order; automatically used assets follow once each.
+  [[nodiscard]] CollectionMembers members() const;
   [[nodiscard]] bool contains(AssetId asset) const noexcept;
 
   [[nodiscard]] bool isDiscovered() const noexcept { return origin == CollectionOrigin::Discovered; }

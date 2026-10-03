@@ -251,7 +251,7 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
   parts.reserve(collections.size());
   std::vector<SynthBankSelection> synthBanks;
   std::vector<const SamplePoolAsset*> samples;
-  std::unordered_set<u32> includedSamples;
+  std::unordered_set<AssetId> includedSamples;
   MidiModulationUsage modulationUsage;
   u32 nextBank = 0;
   for (const CollectionId collection : collections) {
@@ -273,7 +273,7 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
     auto selected = selectSynthBanks(performance);
     synthBanks.insert(synthBanks.end(), std::make_move_iterator(selected.begin()), std::make_move_iterator(selected.end()));
     for (const auto* pool : part.prepared->samplePools) {
-      if (includedSamples.insert(pool->metadata.id.value).second) {
+      if (includedSamples.insert(pool->metadata.id).second) {
         samples.push_back(pool);
       }
     }

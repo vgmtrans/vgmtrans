@@ -125,7 +125,7 @@ void standaloneSequenceExportDoesNotRequireACollection() {
   expect(snapshot.collections().empty(), "standalone MIDI fixture should not contain a collection");
 
   const SourceStore sources;
-  const Artifact artifact = exportSequenceMidi(snapshot, sources, AssetId{7}, SequenceExportRequest{});
+  const Artifact artifact = exportSequenceMidi(snapshot, sources, AssetId{7}, SequenceRenderOptions{});
 
   expect(artifact.filename == "Loose_Sequence.mid",
          "standalone sequence export should derive a safe filename from sequence metadata");
@@ -135,7 +135,7 @@ void standaloneSequenceExportDoesNotRequireACollection() {
          "standalone sequence export should produce a Standard MIDI file");
 
   const Artifact ambiguous =
-      exportSequenceMidi(ambiguousBuilder.finish(), sources, AssetId{7}, SequenceExportRequest{});
+      exportSequenceMidi(ambiguousBuilder.finish(), sources, AssetId{7}, SequenceRenderOptions{});
   expect(ambiguous.bytes.empty(), "direct sequence export should not choose the first of several collections");
   diagnosticWithMessage(ambiguous.diagnostics,
                         "Sequence belongs to multiple collections; export a specific collection instead");

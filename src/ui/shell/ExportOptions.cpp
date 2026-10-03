@@ -55,7 +55,7 @@ struct Option {
   std::string_view name;
   std::string_view values;  // Empty for a flag.
   std::string_view description;
-  bool sequence;  // Accepted by standalone MIDI's SequenceExportRequest.
+  bool sequence;  // Accepted by standalone MIDI export.
   void (*apply)(ExportRequest&, std::string_view);
 };
 

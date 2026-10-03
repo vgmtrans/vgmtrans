@@ -75,10 +75,6 @@ struct SequenceRenderOptions {
   MidiExportOptions midi;
 };
 
-// Standalone sequence export simulates synth modulation in MIDI because there
-// is no companion instrument container.
-using SequenceExportRequest = SequenceRenderOptions;
-
 // A playback backend selects how the rendered MIDI and companion synth divide
 // modulation work. The value core honors that policy without knowing which
 // backend will consume the prepared data.

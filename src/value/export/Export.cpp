@@ -134,7 +134,7 @@ void appendWavArtifacts(std::vector<Artifact>& artifacts, std::string_view baseN
 }
 
 Artifact exportStandaloneSequenceMidi(const SessionSnapshot& snapshot, AssetId sequenceId,
-                                      const SequenceExportRequest& request) {
+                                      const SequenceRenderOptions& request) {
   const auto* asset = snapshot.asset(sequenceId);
   const auto* sequence = asset != nullptr ? std::get_if<SequenceProgramAsset>(asset) : nullptr;
   if (sequence == nullptr) {
@@ -168,7 +168,7 @@ Artifact exportStandaloneSequenceMidi(const SessionSnapshot& snapshot, AssetId s
 }  // namespace
 
 Artifact exportSequenceMidi(const SessionSnapshot& snapshot, const SourceStore& sources, AssetId sequenceId,
-                            const SequenceExportRequest& request) {
+                            const SequenceRenderOptions& request) {
   const auto* sequence = snapshot.asset<SequenceProgramAsset>(sequenceId);
   const size_t collectionCount = snapshot.countCollectionsContaining(sequenceId);
   if (sequence == nullptr || collectionCount == 0) {

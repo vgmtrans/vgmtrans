@@ -499,6 +499,92 @@ void sequenceVmUsesProgramCommandLimit() {
   expect(performance.tracks[0].endTick == 12, "command-limit stop should preserve ticks from commands already run");
 }
 
+void sequenceVmRequiresCommandBudgetBeforeEnteringASection() {
+  std::vector<std::string> callbacks;
+  const SequenceRuntime runtime{
+      .createProgramState = [&](const SequenceProgram&) { return &callbacks; },
+      .createStreamState = [&](StreamStateContext) { return &callbacks; },
+      .beginStreamSection = [](std::any& state, bool first) {
+        (*std::any_cast<std::vector<std::string>*>(state)).push_back(first ? "first stream" : "later stream");
+      },
+      .beginTrackSection = [](bool first, std::any& state, std::any&, PerformanceEmitter& out, VmApi&) {
+        (*std::any_cast<std::vector<std::string>*>(state)).push_back(first ? "first track" : "later track");
+        out.instrument(0, first ? 7 : 8);
+      },
+      .execute = [](const SourceCommand& command, std::any& state, std::any&, PerformanceEmitter& out, VmApi&) {
+        (*std::any_cast<std::vector<std::string>*>(state)).push_back("command");
+        if (command.opcode == 1) {
+          out.note(60, 1.0, 2);
+          return Effects::wait(2);
+        }
+        return Effects{};
+      },
+      .tick = [](std::any& state, std::any&, PerformanceEmitter& out, VmApi&) {
+        (*std::any_cast<std::vector<std::string>*>(state)).push_back("tick");
+        out.expression(0.5);
+      },
+  };
+  TrackProgram track;
+  for (u32 address : {0u, 10u}) {
+    appendTestCommand(track, Address{address}, 1, {}, {}, CommandFlow::fallthroughTo(Address{address + 1}),
+                      SourceAnnotationId{100 + address});
+    track.commands.back().execution.delayTicks = 3;
+    appendTestCommand(track, Address{address + 1}, 0, {}, {}, CommandFlow::endSection(Address{address + 2}));
+  }
+  SequenceProgram program{
+      .runtime = runtime,
+      .behavior = {.initialLevel = 0.25},
+      .tracks = {track},
+      .sectionPlaylist = SectionPlaylist{.commands = {
+          {.address = Address{0}, .fallthrough = Address{1}, .kind = PlaylistCommandKind::PlaySection,
+           .streamStarts = {Address{0}}},
+          {.address = Address{1}, .fallthrough = Address{2}, .kind = PlaylistCommandKind::PlaySection,
+           .streamStarts = {Address{10}}},
+          {.address = Address{2}},
+      }},
+  };
+  for (u32 limit : {0u, 1u, 2u, 4u}) {
+    callbacks.clear();
+    program.behavior.commandLimit = limit;
+    const auto performance = SequenceVm().render(program);
+    const auto instruments = eventsOfType<InstrumentPerformanceEvent>(performance.tracks.front());
+    const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
+    const size_t entries = limit == 0 ? 0 : limit == 4 ? 2 : 1;
+    expect(instruments.size() == entries && notes.size() == entries &&
+               std::ranges::count(callbacks, "later stream") == (limit == 4 ? 1 : 0) &&
+               performance.diagnostics.size() == (limit == 4 ? 0 : 1),
+           "exhausted command budget should stop section hooks and bodies at the existing command boundary");
+    expect(eventsOfType<LevelPerformanceEvent>(performance.tracks.front()).size() == 1,
+           "declared initial state should remain independent of source execution budget");
+    if (limit == 0) {
+      expect(callbacks.empty() && performance.sourceSpans.empty() && performance.tracks.front().endTick == 0,
+             "a denied first command should neither enter its section nor consume its leading delay");
+      continue;
+    }
+    expect(callbacks[0] == "first stream" && callbacks[1] == "first track" &&
+               std::ranges::count(callbacks, "tick") == (limit == 4 ? 10 : 5) &&
+               instruments.front()->header.tick == 0 &&
+               instruments.front()->header.sourceCommand == SourceCommandRef{TrackId{0}, CommandId{0}} &&
+               instruments.front()->header.sourceAnnotation == SourceAnnotationId{100} &&
+               notes.front()->header.tick == 3,
+           "eligible hooks should keep their order and provenance before the leading delay and tick callbacks");
+    if (limit == 4) {
+      expect(instruments[1]->header.tick == 5 && instruments[1]->header.sourceCommand.id == CommandId{2} &&
+                 notes[1]->header.tick == 8 && performance.tracks.front().endTick == 10,
+             "an eligible later section should preserve its shared boundary and leading delay");
+    } else {
+      expect(performance.tracks.front().endTick == 5,
+             "exhaustion during a wait or at the next section should preserve the preceding command's timing");
+    }
+  }
+  callbacks.clear();
+  program.tracks.front().commands.clear();
+  program.sectionPlaylist.reset();
+  const auto empty = SequenceVm().render(program);
+  expect(callbacks.empty() && empty.diagnostics.empty() && empty.tracks.front().events.size() == 1,
+         "empty tracks should retain declared defaults without entering a section");
+}
+
 void sequenceVmUsesInitialTempoAndGlobalEventOrder() {
   const SequenceProgramConfig tempoConfig = probeSequenceConfig(SequenceProgramBehavior{
       .initialTempoMicrosecondsPerQuarter = 750'000,
@@ -1598,6 +1684,7 @@ void runValueSequenceVmTests() {
   sequenceVmPreservesLoopCandidateAsPerformanceMarkers();
   sequenceVmPreservesLoopsAsPerformanceMarkers();
   sequenceVmUsesProgramCommandLimit();
+  sequenceVmRequiresCommandBudgetBeforeEnteringASection();
   sequenceVmUsesInitialTempoAndGlobalEventOrder();
   sequenceVmEmitsProgramInitialChannelState();
   sequenceVmEmitsInitialMasterLevelOnce();

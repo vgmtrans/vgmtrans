@@ -245,7 +245,7 @@ public:
   [[nodiscard]] std::optional<u64> loopStopTick() const noexcept { return loopStopTick_; }
 
   [[nodiscard]] SequenceCoordinatorSignal executeNext() {
-    if (!sectionEntered_ && position_.command) {
+    if (!sectionEntered_ && position_.command && executedCommands_ < behavior_.commandLimit) {
       sectionEntered_ = true;
       if (sequenceRuntime_.beginStreamSection) {
         sequenceRuntime_.beginStreamSection(streamState_, !started_);

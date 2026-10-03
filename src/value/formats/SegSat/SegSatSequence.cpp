@@ -211,8 +211,8 @@ void updateChannelLevel(SegSatVolumeModel model, ChannelLevel& channel, u8 contr
 }
 
 struct ProgramState {
-  explicit ProgramState(const SequenceProgram&) {}
-  ProgramState(const SequenceProgram&, const SegSatRuntimeConfig& config) : config(config) {}
+  ProgramState() = default;
+  explicit ProgramState(const SegSatRuntimeConfig& config) : config(&config) {}
 
   void finalizePerformance(PerformanceSequence& performance) {
     if (performance.tracks.size() != 17) {
@@ -265,7 +265,7 @@ struct ProgramState {
     }
   }
 
-  std::optional<SegSatRuntimeConfig> config;
+  const SegSatRuntimeConfig* config = nullptr;  // Owned by the runtime's state factory.
 };
 
 struct TrackState {

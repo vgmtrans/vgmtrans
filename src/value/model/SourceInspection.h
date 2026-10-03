@@ -57,7 +57,6 @@ public:
   [[nodiscard]] SourceRange range(SourceInspectionItem item) const;
   [[nodiscard]] std::span<const SourceAnnotationId> roots() const noexcept { return roots_; }
   [[nodiscard]] std::vector<SourceAnnotationId> children(SourceAnnotationId parent) const;
-  [[nodiscard]] std::optional<SourceAnnotationId> annotationAt(u64 offset) const;
   [[nodiscard]] std::optional<SourceInspectionItem> itemAt(u64 offset) const;
 
 private:

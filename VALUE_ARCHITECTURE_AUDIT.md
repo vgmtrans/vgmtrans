@@ -1,7 +1,7 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Eleven validated batches remove 692 net production lines from
+`cb9e0b766`. Twelve validated batches remove 705 net production lines from
 `src/value`. All 44 CTest suites pass; the latest real-file replay preserves
 all 3,922 artifacts, inventories, diagnostics, and exit statuses. The cleanup2
 records appear at the end of this document.
@@ -4672,3 +4672,101 @@ entry-budget rule is being evaluated; no claim of completed repair is made here.
 Next: resolve this lifecycle edge and evaluate whether SourceMap's private owner
 cache can use AssetId's existing invalid sentinel instead of redundant optional
 presence, preserving the public optional query and cycle behavior.
+
+## Cleanup2 twelfth batch: budgeted lifecycle and explicit ownership
+
+This batch removes another 13 net production C++ lines, bringing cleanup2 to
+705 removed. Regression and ownership fixtures add 99 net test lines. Several
+improvements reduce redundant state or allocations without reducing lines.
+
+- Section-entry hooks keep their original placement, stream-before-track order,
+  and first-command provenance before a leading delay. Their existing entry
+  condition now requires remaining command budget. beginCommand still performs
+  counting, loop-state recording, stopping, and warning generation. This repairs
+  the zero-budget distinction introduced by the fourth batch's four migrations;
+  exhausted later playlist sections also stop emitting denied startup output.
+- Hudson initial echo uses its immutable driver's mask in the first-section hook.
+  Its duplicate per-track flag and constructor copy disappear. The five native
+  decoders involved do not route command bodies to undeclared channels. Generic
+  section hooks still initialize declared playback tracks independently of body
+  routing when budget remains; equivalence to old per-command initialization is
+  not claimed for arbitrarily rerouted synthetic format programs.
+- SourceMap's private annotation-owner cache stores AssetId directly. Its invalid
+  sentinel already represents absence; optional conversion happens only at the
+  public query. Zero and the highest valid ID remain valid owners. The cache
+  shrinks from eight to four bytes per annotation, saving exactly 16,384 bytes
+  for 4,096 rows, without changing allocation counts or retained-view ownership.
+- SegSat program state borrows the configuration already owned by its immutable
+  runtime factory. It retains only its actual finalization responsibility. The
+  unused SequenceProgram constructor argument and optional deep configuration
+  copy disappear. State shrinks from 64 to eight bytes; representative creation
+  drops from 15 allocations to zero. The default no-configuration path remains.
+- SourceInspection keeps one item hit-test API for annotations and projected
+  fields. The obsolete annotation-only projection disappears. Collection::members
+  owns its membership projection directly, removing a free-function API and
+  forwarding step while preserving chosen order and alternative exclusion.
+- Standalone MIDI callers use the existing SequenceRenderOptions directly; the
+  identical SequenceExportRequest alias and its duplicate vocabulary disappear.
+  Qt, shell, Session, and export call sites use the same settings type. Behavior
+  still depends on whether a sequence belongs to a collection, rather than on
+  the alias's former standalone-only description.
+- Instrument validation uses InstrumentIdentity directly; stitched sample
+  deduplication uses AssetId directly. Numeric-only envelope/binary writer headers
+  depend on Types instead of the source/diagnostic model. SharedSequence retains
+  empty-chunk filtering but removes null handling: its only two friends and its
+  public value constructor always supply non-null shared owners.
+
+Validation:
+
+- The initial 368-step macOS Release build found two stale variable references in
+  later UI fixture lifetime assertions after the hit-test migration, and a lambda
+  parameter newly shadowing Collection::id after moving the membership body.
+  Updating those references and naming the parameter asset required a 48-step
+  warning-free rebuild. All 44 CTest suites pass, including Qt, shell, and parity.
+- The four earlier startup implementations and repaired hooks match 16 frozen
+  fixture captures at default/zero/one budgets and empty tracks: 107,038 bytes.
+  Hudson matches all 61,440 cases and 198,908,451 bytes across versions, masks,
+  track orders, empty-leading tracks, zero/positive budgets, provenance, DSP,
+  and MIDI. Focused format/VM/probe sanitizer checks are clean.
+- Generic hook/delay/readiness/flow/loop runners match 41,472 positive-budget
+  cases and 67,542,785 bytes. Another 10,368 zero-budget cases differ only by
+  suppressing denied entry output. A 7,776-case later-section matrix is sanitizer
+  clean: 4,950 cases match exactly; 2,826 remove precisely 8,469 denied entry
+  markers and corresponding sequence-number gaps, preserving all other event
+  values/ticks, source spans, warnings, loop behavior, and boundaries. All 972
+  ample-budget cases match byte-for-byte.
+- The new VM regression checks entry order/provenance, a three-tick leading
+  delay, tick callbacks, budgets zero/one/two/four, denied later sections, and
+  empty tracks retaining declared defaults. The complete focused VM fixture
+  also passes ASan, UBSan, and float-cast-overflow checks.
+- Frozen owner-cache runners preserve the full 12,528-line, 559,997-byte
+  index/validation/removal/session trace. The extended branch/cycle fixture
+  covers zero/highest-valid owners, invalid explicit owners inheriting from
+  parents, and visible invalid annotation rows excluded from lookup/ownership.
+  Focused ordinary and ASan/UBSan runs pass.
+- SegSat matches 1,168 complete performance/source-span/ordered-diagnostic/MIDI
+  captures and 1,917,675 bytes in Release and focused sanitizer runs. Coverage
+  includes all four volume models, zero to three banks, copied-runtime retention,
+  overrides, prepass, analysis finalization, no-config rendering, and irregular
+  track counts. Configuration remains factory-owned through all those lifetimes.
+- The startup sanitizer pass exposed two existing Compile fixture borrows from
+  temporary performances. A broader search found the same issue in Namco and
+  GraphRes. Four sites now retain the performance before borrowing event pointers.
+  Independent frozen Namco/GraphRes fixtures reproduce heap-use-after-free before
+  the repairs and pass ASan/UBSan/float-cast-overflow afterward. Unchanged archive
+  code is not fully instrumented; mixed libc++ container annotations are disabled
+  where required, without disabling ordinary heap/UB checks.
+- The frozen twelfth-batch shell matches every eleventh-batch corpus result:
+  252 input/policy comparisons and 3,922 artifact hashes, with identical
+  inventories, diagnostics, and exit statuses.
+
+Retain HeartBeat's existing borrowing wrapper: replacing it with owned Config
+would introduce vector copies, and moving the same reference into every track
+would add dependency boilerplate. Retain the tested modulation-profile empty()
+query; a variable-name-only search missed a chained call, caught before integration.
+
+Next: remove read-only configuration copies in Nin/Quest, Rare/WolfTeam, and
+GraphRes/Neverland/SoftCreat without a new adapter. Temporary layout/allocation
+measurements show substantive reductions while mutable working tables stay owned.
+Evaluate direct private playlist-command references, one bounded SemanticOperand
+query, and a decode-session start range instead of an unused borrowed byte reader.

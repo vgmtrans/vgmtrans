@@ -339,7 +339,7 @@ CollectionPlayback Session::preparePlayback(CollectionId id, const PlaybackReque
   return core::prepareCollectionPlayback(current, sources_, id, request);
 }
 
-Artifact Session::exportSequenceMidi(AssetId id, const SequenceExportRequest& request) const {
+Artifact Session::exportSequenceMidi(AssetId id, const SequenceRenderOptions& request) const {
   return core::exportSequenceMidi(snapshot(), sources_, id, request);
 }
 

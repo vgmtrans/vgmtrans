@@ -203,7 +203,8 @@ void startupShadowsMatchClearedDriverRam() {
 
   DriverFixture staccato;
   staccato.commands({0xec, 0x00, 0x10, 0x08, 0xff});
-  const auto staccatoNotes = eventsOfType<NotePerformanceEvent>(render(staccato).tracks.front());
+  const PerformanceSequence staccatoPerformance = render(staccato);
+  const auto staccatoNotes = eventsOfType<NotePerformanceEvent>(staccatoPerformance.tracks.front());
   expect(staccatoNotes.size() == 1 && staccatoNotes.front()->durationTicks == 1,
          "duration rate zero should key off when the decremented counter falls below its threshold");
 }

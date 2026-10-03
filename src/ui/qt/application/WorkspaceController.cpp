@@ -131,7 +131,7 @@ core::CollectionPlayback WorkspaceController::preparePlayback(core::CollectionId
 }
 
 core::Artifact WorkspaceController::exportSequenceMidi(core::AssetId id,
-                                                       const core::SequenceExportRequest& request) const {
+                                                       const core::SequenceRenderOptions& request) const {
   return session_.exportSequenceMidi(id, request);
 }
 

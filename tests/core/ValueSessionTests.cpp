@@ -1486,7 +1486,7 @@ void sessionExportsASequenceWithoutACollection() {
          "standalone sequence fixture should scan without creating a collection");
 
   const AssetId sequence = metadata(snapshot.assets().front()).id;
-  const Artifact artifact = session.exportSequenceMidi(sequence, SequenceExportRequest{});
+  const Artifact artifact = session.exportSequenceMidi(sequence, SequenceRenderOptions{});
   expect(artifact.filename == "loose.probe.mid", "session sequence export should use the standalone asset name");
   expect(artifact.diagnostics.empty() && artifact.bytes.size() >= 4 &&
              std::string(artifact.bytes.begin(), artifact.bytes.begin() + 4) == "MThd",

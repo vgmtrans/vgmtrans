@@ -68,11 +68,6 @@ std::vector<SourceAnnotationId> SourceInspection::children(SourceAnnotationId pa
   return children;
 }
 
-std::optional<SourceAnnotationId> SourceInspection::annotationAt(u64 offset) const {
-  const auto item = itemAt(offset);
-  return item ? std::optional{item->annotation} : std::nullopt;
-}
-
 std::optional<SourceInspectionItem> SourceInspection::itemAt(u64 offset) const {
   std::optional<SourceInspectionItem> best;
   SourceRange bestRange;

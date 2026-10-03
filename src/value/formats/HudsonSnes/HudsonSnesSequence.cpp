@@ -249,7 +249,6 @@ struct TrackState {
   TrackState(TrackStateContext context, const DriverData& driver)
       : version(driver.version()), timebaseShift(driver.timebaseShift()), velocityEnabled(driver.noteVelocity()),
         volume(math::initialVolume(version)),
-        initialEcho((driver.initialEchoMask() & (1u << context.sourceTrackNumber)) != 0),
         voiceBit(static_cast<u8>(1u << context.sourceTrackNumber)), loopPoint(context.sourceTrack.startAddress) {
     if (const auto instrument = driver.instrument(0)) {
       envelope = *instrument;
@@ -267,7 +266,6 @@ struct TrackState {
   u8 volume = 100;
   u8 pan = 15;
   u8 reversePhase = 0;
-  bool initialEcho = false;
   u8 voiceBit = 1;
   s8 fineTuning = 0;
   s8 transpose = 0;
@@ -316,8 +314,8 @@ struct TrackState {
 struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
-  void beforeCommand() {
-    if (std::exchange(track.initialEcho, false)) {
+  void beginSection(bool first) {
+    if (first && (program.driver->initialEchoMask() & track.voiceBit) != 0) {
       out.reverb(program.echo);
     }
   }

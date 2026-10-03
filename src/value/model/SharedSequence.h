@@ -105,7 +105,7 @@ private:
 
   struct Storage {
     explicit Storage(std::vector<std::shared_ptr<const std::vector<T>>> values) : chunks(std::move(values)) {
-      std::erase_if(chunks, [](const auto& chunk) { return chunk == nullptr || chunk->empty(); });
+      std::erase_if(chunks, [](const auto& chunk) { return chunk->empty(); });
       offsets.reserve(chunks.size() + 1);
       offsets.push_back(0);
       for (const auto& chunk : chunks) {

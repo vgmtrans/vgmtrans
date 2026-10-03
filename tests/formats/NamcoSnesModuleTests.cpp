@@ -213,7 +213,8 @@ void percussionPitchMappingIsAppliedExactlyOnce() {
 void pitchTableIndexUsesSpcAccumulatorWrapping() {
   DriverFixture fixture(Version::WagyanParadise);
   fixture.sequence({0x00, 1, 0x01, 0x80, 0x24, 0x80, 0x80, 0x09, 0x80, 0x30, 0x03});
-  const auto bends = eventsOfType<PitchBendPerformanceEvent>(render(fixture).tracks[0]);
+  const PerformanceSequence performance = render(fixture);
+  const auto bends = eventsOfType<PitchBendPerformanceEvent>(performance.tracks[0]);
 
   expect(bends.size() == 1 && bends.front()->semitones == 0.0,
          "pitch table index $80 should alias index zero like the driver's eight-bit ASL A");
