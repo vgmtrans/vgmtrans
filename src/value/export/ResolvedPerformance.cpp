@@ -73,7 +73,7 @@ void applyEnvelopeUpdate(EnvelopeOverride& state, const EnvelopeUpdate& update) 
   return true;
 }
 
-[[nodiscard]] Diagnostic variantWarning(std::string code, std::string message, const PerformanceEventHeader& header) {
+[[nodiscard]] Diagnostic performanceWarning(std::string code, std::string message, const PerformanceEventHeader& header) {
   return Diagnostic{
       .severity = Severity::Warning,
       .code = std::move(code),
@@ -84,20 +84,20 @@ void applyEnvelopeUpdate(EnvelopeOverride& state, const EnvelopeUpdate& update) 
 
 [[nodiscard]] Diagnostic instrumentNotFoundWarning(bool dynamicEnvelopeOnly, const PerformanceEventHeader& header) {
   if (dynamicEnvelopeOnly) {
-    return variantWarning("dynamic-envelope-instrument-not-found",
-                          "Could not resolve the selected instrument for a dynamic envelope variant", header);
+    return performanceWarning("dynamic-envelope-instrument-not-found",
+                              "Could not resolve the selected instrument for a dynamic envelope variant", header);
   }
-  return variantWarning("instrument-variant-instrument-not-found",
-                        "Could not resolve the selected instrument for an export-only variant", header);
+  return performanceWarning("instrument-variant-instrument-not-found",
+                            "Could not resolve the selected instrument for an export-only variant", header);
 }
 
 [[nodiscard]] Diagnostic noRegionsWarning(bool dynamicEnvelopeOnly, const PerformanceEventHeader& header) {
   if (dynamicEnvelopeOnly) {
-    return variantWarning("dynamic-envelope-no-regions",
-                          "Could not apply a dynamic envelope to an instrument without sampled regions", header);
+    return performanceWarning("dynamic-envelope-no-regions",
+                              "Could not apply a dynamic envelope to an instrument without sampled regions", header);
   }
-  return variantWarning("instrument-variant-no-regions",
-                        "Could not materialize an instrument variant without sampled regions", header);
+  return performanceWarning("instrument-variant-no-regions",
+                            "Could not materialize an instrument variant without sampled regions", header);
 }
 
 enum class WarningSourceKind { Annotation, Command, Event };
@@ -198,9 +198,8 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
   std::vector<SoundingVoice> voices;
   struct CachedSelection {
     InstrumentSelection resolved;
-    bool fallback = false;
-    bool conflict = false;
-    bool reported = false;
+    bool warnFallback = false;
+    bool warnConflict = false;
   };
   std::map<InstrumentSelection, CachedSelection> cache;
   // Freeze source-address preferences before adapting any notes. Generated
@@ -238,17 +237,17 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
       found->second = {first ? InstrumentSelection{*first} : InstrumentSelection{resolveInstrumentAddress(source)},
                        fallback, count > 1};
     }
-    if (header && !found->second.reported) {
-      const auto warn = [&](std::string code, std::string message) {
-        diagnostics.push_back(Diagnostic{
-            .severity = Severity::Warning, .code = std::move(code), .message = std::move(message),
-            .annotation = header->sourceAnnotation.valid() ? std::optional{header->sourceAnnotation} : std::nullopt});
-      };
-      if (found->second.fallback) warn("instrument-selection-fallback",
-                               "Native instrument was not found; using its numeric preset address");
-      if (found->second.conflict) warn("instrument-selection-conflict",
-                               "Several instruments match; using the first definition in selected bank order");
-      found->second.reported = true;
+    if (header) {
+      if (std::exchange(found->second.warnFallback, false)) {
+        diagnostics.push_back(performanceWarning(
+            "instrument-selection-fallback", "Native instrument was not found; using its numeric preset address",
+            *header));
+      }
+      if (std::exchange(found->second.warnConflict, false)) {
+        diagnostics.push_back(performanceWarning(
+            "instrument-selection-conflict", "Several instruments match; using the first definition in selected bank order",
+            *header));
+      }
     }
     return found->second.resolved;
   };
@@ -274,7 +273,7 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
     bool warnedMissingInstrument = false;
     const auto warnActiveStereoChange = [&](bool changed, bool active, const PerformanceEventHeader& header) {
       if (changed && active && activeStereoWarnings.insert(warningSourceKey(header)).second) {
-        diagnostics.push_back(variantWarning(
+        diagnostics.push_back(performanceWarning(
             "signed-stereo-active-voice",
             "A phase or pan change occurred during a sounding note; stereo instrument variants apply it to "
             "future note attacks only",
@@ -298,8 +297,8 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
       if (const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event);
           envelope != nullptr && options.dynamicEnvelopes) {
         if (!validEnvelopeUpdate(envelope->update)) {
-          diagnostics.push_back(variantWarning("dynamic-envelope-invalid",
-                                                "Ignored an invalid dynamic envelope update", envelope->header));
+          diagnostics.push_back(performanceWarning("dynamic-envelope-invalid",
+                                                    "Ignored an invalid dynamic envelope update", envelope->header));
           continue;
         }
 
@@ -308,7 +307,7 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
         auto& lane = lanes[envelope->lane];
         if (affectsActive && lane.voiceEnd > envelope->header.tick &&
             activeEnvelopeWarnings.insert(warningSourceKey(envelope->header)).second) {
-          diagnostics.push_back(variantWarning(
+          diagnostics.push_back(performanceWarning(
               "dynamic-envelope-active-voice",
               "A dynamic envelope update occurred during a sounding note; instrument variants apply it to "
               "future note attacks only",

@@ -187,22 +187,6 @@ struct MidiLevelState {
   friend bool operator==(const MidiLevelState&, const MidiLevelState&) = default;
 };
 
-struct MidiInstrumentSelection {
-  InstrumentAddress address;
-  bool forceBankSelect = false;
-  std::optional<u16> pitchBendRangeCents;
-};
-
-[[nodiscard]] MidiInstrumentSelection instrumentSelection(const ResolvedInstrument& selection,
-                                                          bool forceBankSelect = false) {
-  const Instrument* instrument = selection.instrument;
-  return MidiInstrumentSelection{
-      .address = selection.address,
-      .forceBankSelect = forceBankSelect,
-      .pitchBendRangeCents = instrument != nullptr ? instrument->pitchBendRangeCents : std::nullopt,
-  };
-}
-
 struct SimulatedLfoState {
   double depth = 0.0;
   double frequencyHz = 0.0;
@@ -817,13 +801,14 @@ private:
     }
   }
 
-  void applyInstrumentSelection(u64 tick, const MidiInstrumentSelection& selection, bool forceProgramChange,
+  void applyInstrumentSelection(u64 tick, const ResolvedInstrument& selection, bool forceProgramChange,
+                                bool forceBankSelect = false,
                                 bool selectsSourceInstrument = true) {
     const u16 bank = static_cast<u16>(selection.address.bank & 0x3fff);
     const u16 emittedBank =
         options.bankSelectStyle == MidiBankSelectStyle::MsbOnly ? static_cast<u16>(bank & 0x7f) : bank;
     const bool bankChanged = emittedBank != midiBank;
-    if (bankChanged || selection.forceBankSelect) {
+    if (bankChanged || forceBankSelect) {
       track.events.push_back(midi::bankSelect(tick, channel, bank, writeBankSelectLsb(options)));
       midiBank = emittedBank;
     }
@@ -833,7 +818,7 @@ private:
       track.events.push_back(midi::programChange(tick, channel, program));
     }
     if (selectsSourceInstrument) {
-      pitchBendContext.setInstrumentRangeCents(selection.pitchBendRangeCents);
+      pitchBendContext.selectInstrument(selection.instrument);
     }
   }
 
@@ -846,27 +831,25 @@ private:
   }
 
   void flushSimulatedVibrato(u64 upToTick) {
-    while (true) {
-      std::optional<u64> nextTick;
-      for (const auto& entry : pitchLfos) {
-        const auto& pitch = entry.second;
-        if (pitch.oscillator.cursorTick < upToTick) {
-          nextTick = std::min(nextTick.value_or(pitch.oscillator.cursorTick + 1), pitch.oscillator.cursorTick + 1);
-        }
-      }
-      if (!nextTick) {
-        break;
-      }
+    const auto first = std::ranges::min_element(pitchLfos, {}, [](const auto& entry) {
+      return entry.second.oscillator.cursorTick;
+    });
+    if (first == pitchLfos.end()) return;
+    // All layers share this advancing clock; a layer starting later skips the
+    // earlier samples through its own cursor. Record their sum once per tick.
+    u64 tick = first->second.oscillator.cursorTick;
+    while (tick < upToTick) {
+      ++tick;
       bool sampled = false;
       for (auto& entry : pitchLfos) {
         auto& pitch = entry.second;
-        flushLfo(pitch.oscillator, std::min(*nextTick, upToTick), tempos, [&](u64, double value) {
+        flushLfo(pitch.oscillator, tick, tempos, [&](u64, double value) {
           pitch.semitones = simulatedVibratoAtPhase(pitch.oscillator, value);
           sampled = true;
         });
       }
       if (sampled) {
-        recordPitch(*nextTick);
+        recordPitch(tick);
       }
     }
   }
@@ -1080,8 +1063,8 @@ private:
               return;
             }
             if (typedEvent.instrument) {
-              auto selection = instrumentSelection(*typedEvent.instrument);
-              applyInstrumentSelection(typedEvent.header.tick, selection, false, typedEvent.selectsSourceInstrument);
+              applyInstrumentSelection(typedEvent.header.tick, *typedEvent.instrument, false, false,
+                                       typedEvent.selectsSourceInstrument);
             }
             if (shouldRestartSimulatedVibratoForNote(typedEvent)) {
               restartSimulatedVibratoForNote(typedEvent.header.tick);
@@ -1116,8 +1099,7 @@ private:
             track.events.push_back(
                 midi::note(typedEvent.header.tick, channel, key, midiVelocity(attack.linearVelocity), attack.durationTicks));
           } else if constexpr (std::is_same_v<TypedEvent, MidiInstrumentEvent>) {
-            const auto selection = instrumentSelection(typedEvent.selection, typedEvent.forceBankSelect);
-            applyInstrumentSelection(typedEvent.header.tick, selection, true);
+            applyInstrumentSelection(typedEvent.header.tick, typedEvent.selection, true, typedEvent.forceBankSelect);
           } else if constexpr (std::is_same_v<TypedEvent, LevelPerformanceEvent>) {
             sourceLevelGain = typedEvent.linearGain;
             sourceLevelQuantization = typedEvent.sourceQuantization;

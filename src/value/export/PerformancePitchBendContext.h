@@ -22,7 +22,6 @@ class PerformancePitchBendContext {
   }
 
   void setSourceRangeCents(u16 cents) noexcept { sourceRangeCents_ = cents; }
-  void setInstrumentRangeCents(std::optional<u16> cents) noexcept { instrumentRangeCents_ = cents; }
 
   [[nodiscard]] u16 rangeCents() const noexcept {
     return instrumentRangeCents_.value_or(sourceRangeCents_);
