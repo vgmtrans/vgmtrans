@@ -3998,10 +3998,14 @@ SimulatedModulationStats simulatedModulationStats(std::span<const u8> midiBytes)
 std::string performanceEventLocation(const SequenceProgram& program, const PerformanceEventHeader& header) {
   std::ostringstream out;
   out << "track=" << header.track.value << " tick=" << header.tick;
-  const auto* command = program.command(header.sourceCommand);
-  if (command != nullptr) {
-    out << " addr=0x" << std::hex << command->address.value << std::dec << " opcode=0x" << std::hex
-        << static_cast<int>(command->opcode) << std::dec;
+  const auto source = header.sourceCommand;
+  if (source.valid() && source.track.value < program.tracks.size()) {
+    const auto& commands = program.tracks[source.track.value].commands;
+    if (source.id.value < commands.size()) {
+      const auto& command = commands[source.id.value];
+      out << " addr=0x" << std::hex << command.address.value << std::dec << " opcode=0x" << std::hex
+          << static_cast<int>(command.opcode) << std::dec;
+    }
   }
   return out.str();
 }

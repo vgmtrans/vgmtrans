@@ -62,8 +62,6 @@ namespace {
 std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(ByteReader reader, u32 instrumentTableAddress,
                                                                      u32 spcDirAddress) {
   std::vector<CapcomSnesInstrumentInfo> instruments;
-  const SnesSampleDirectory directory(reader, spcDirAddress);
-
   for (u32 instrumentIndex = 0; instrumentIndex <= 0xff; ++instrumentIndex) {
     const u32 address = instrumentTableAddress + instrumentIndex * 6;
     if (!reader.has(address, 6)) {
@@ -81,7 +79,7 @@ std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(ByteReader 
       continue;
     }
 
-    const auto sample = directory.entry(*srcn, false);
+    const auto sample = readSnesSampleDirectoryEntry(reader, spcDirAddress + static_cast<u32>(*srcn) * 4, false);
     // The table is contiguous; the first impossible nonblank header ends discovery.
     if (*srcn >= 0x80 || (*adsr1 == 0 && *gain == 0) || !sample || !sample->loopAddressIsBlockAligned()) {
       break;

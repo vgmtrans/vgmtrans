@@ -118,8 +118,7 @@ struct CompiledCommandRuntime {
     }
     if constexpr (requires(Playback& playback) { playback.tick(); }) {
       // Rebuild the lightweight view so fades use the current emitter and VM position.
-      runtime.tick = [](const SourceCommand&, std::any& programState, std::any& trackState, PerformanceEmitter& out,
-                        VmApi& vm) {
+      runtime.tick = [](std::any& programState, std::any& trackState, PerformanceEmitter& out, VmApi& vm) {
         withPlayback(programState, trackState, out, vm, [](Playback& playback) { playback.tick(); });
       };
     }

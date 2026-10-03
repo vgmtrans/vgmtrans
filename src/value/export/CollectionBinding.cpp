@@ -214,12 +214,9 @@ CollectionBindingResult bindSoundBank(const SessionSnapshot& snapshot, AssetId i
   if (bank == nullptr) {
     return {.diagnostics = {exportError("Sound bank asset was not found")}};
   }
-  DesiredCollection selected{.name = bank->metadata.name, .selection = {.soundBanks = {id}}};
+  Collection selected{.name = bank->metadata.name, .selection = {.soundBanks = {id}}};
   resolveDependencies(AssetCatalog{snapshot.sources(), snapshot.assets()}, selected);
-  return prepareCollection(snapshot, Collection{.name = std::move(selected.name),
-                                                .selection = std::move(selected.selection),
-                                                .issues = std::move(selected.issues),
-                                                .inputs = std::move(selected.inputs)});
+  return prepareCollection(snapshot, selected);
 }
 
 RenderedCollection renderSequence(const SequenceProgramAsset& sequence, const SequenceRenderOptions& options) {

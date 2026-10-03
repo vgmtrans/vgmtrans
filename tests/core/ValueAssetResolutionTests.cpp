@@ -272,7 +272,7 @@ void manualChoicesOverrideSequenceRequestsAndConstrainBankInputs() {
         SamplePoolAsset{.metadata = {.id = AssetId{id}}, .privateData = AssetPrivateData::make(PoolData{})});
   }
   const AssetCatalog catalog(sources, SharedSequence<Asset>{assets});
-  DesiredCollection manual{
+  Collection manual{
       .selection = {.sequence = AssetId{1}, .soundBanks = {AssetId{2}}, .samplePools = {AssetId{5}, AssetId{3}}}};
   resolveDependencies(catalog, manual, ResolutionMode::Manual);
   expect(
@@ -284,13 +284,13 @@ void manualChoicesOverrideSequenceRequestsAndConstrainBankInputs() {
 
   auto& multipleRequests = std::get<SequenceProgramAsset>(assets.front()).recipe.banks;
   multipleRequests.push_back(DependencyTarget{AssetId{98}, {}});
-  DesiredCollection overridden{.selection = manual.selection};
+  Collection overridden{.selection = manual.selection};
   resolveDependencies(AssetCatalog{sources, SharedSequence<Asset>{assets}}, overridden, ResolutionMode::Manual);
   expect(overridden.inputs.banks.size() == 1,
          "manual choices should replace all requests for a role with one ordered selection");
 
   std::get<SoundBankAsset>(assets[1]).recipe.samples.front() = exact(AssetId{4});
-  DesiredCollection escaped{.selection = manual.selection};
+  Collection escaped{.selection = manual.selection};
   resolveDependencies(AssetCatalog{sources, SharedSequence<Asset>{assets}}, escaped, ResolutionMode::Manual);
   expect(escaped.issues.size() == 1 && escaped.issues.front().code == "invalid-dependency",
          "a selector must not escape the manual candidate set by returning an arbitrary id");
@@ -315,7 +315,7 @@ void manualChoicesStaySeparateFromRepeatedSampleUses() {
       SamplePoolAsset{.metadata = {.id = AssetId{4}}, .privateData = AssetPrivateData::make(PoolData{})},
   };
   const AssetCatalog catalog{sources, SharedSequence<Asset>{builder.assets}};
-  DesiredCollection manual{
+  Collection manual{
       .selection = {.sequence = AssetId{1}, .soundBanks = {AssetId{2}}, .samplePools = {AssetId{4}, AssetId{3}}}};
   resolveDependencies(catalog, manual, ResolutionMode::Manual);
   expect(manual.selection.samplePools == std::vector{AssetId{4}, AssetId{3}} &&
@@ -384,7 +384,7 @@ void automaticCandidatesRespectContainerBoundaries() {
   const auto automatic = dependencyCollections(catalog);
   expect(automatic.front().members().soundBanks.empty(),
          "an incomplete container must not borrow another container's sole bank");
-  DesiredCollection manual{.selection = {.sequence = AssetId{1}, .soundBanks = {AssetId{2}}}};
+  Collection manual{.selection = {.sequence = AssetId{1}, .soundBanks = {AssetId{2}}}};
   resolveDependencies(catalog, manual, ResolutionMode::Manual);
   expect(manual.issues.empty() && manual.members().soundBanks == std::vector{AssetId{2}},
          "explicit manual choices may intentionally cross container boundaries");
@@ -400,7 +400,7 @@ void resolutionStatusAndAlternativePlacementsSurvivePublication() {
   };
   SamplePoolAsset samples{.metadata = {.id = AssetId{2}}};
   const AssetCatalog catalog{sources, SharedSequence<Asset>{std::vector<Asset>{bank, samples}}};
-  DesiredCollection desired{.selection = {.soundBanks = {bank.metadata.id}}};
+  Collection desired{.selection = {.soundBanks = {bank.metadata.id}}};
   resolveDependencies(catalog, desired);
   const auto& selection = desired.inputs.banks.front().samples;
   expect(selection.status == ResolutionStatus::Ambiguous && selection.targets.empty() &&
@@ -609,7 +609,7 @@ void sequencePreparationConfiguresPrivateBanksInOnePass() {
   bank.metadata.id = AssetId{4};
   test::SessionSnapshotBuilder manualBuilder;
   manualBuilder.assets = {*snapshot.asset<SequenceProgramAsset>(AssetId{1}), bank};
-  DesiredCollection manual{.selection = {.sequence = AssetId{1}, .soundBanks = {AssetId{4}}}};
+  Collection manual{.selection = {.sequence = AssetId{1}, .soundBanks = {AssetId{4}}}};
   resolveDependencies(AssetCatalog{sources, SharedSequence<Asset>{manualBuilder.assets}}, manual, ResolutionMode::Manual);
   manualBuilder.collections = {{.id = CollectionId{0}, .selection = manual.selection, .inputs = manual.inputs}};
   const auto manualResult = bindCollection(manualBuilder.finish(), CollectionId{0});

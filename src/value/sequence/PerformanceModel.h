@@ -460,7 +460,7 @@ enum class PerformanceAutomationMotion {
 struct ScalarPerformanceAutomationIntent {
   PerformanceAutomationTarget target = PerformanceAutomationTarget::Level;
   PerformanceAutomationMotion motion = PerformanceAutomationMotion::TargetOverTicks;
-  std::optional<double> targetValue;
+  double targetValue = 0.0;
   u32 durationTicks = 0;
   u32 delayTicks = 0;
 };
@@ -655,8 +655,5 @@ template <class... Events>
 [[nodiscard]] std::optional<double> pitchTransitionKeyAt(const PerformanceTrack& track, PerformanceNoteId note,
                                                          PerformanceLaneId lane, u64 tick);
 [[nodiscard]] double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elapsedTicks);
-[[nodiscard]] const PerformanceTrack* performanceTrackById(const PerformanceSequence& sequence, TrackId id);
-[[nodiscard]] std::vector<const PerformanceEvent*> performanceEventsForCommand(const PerformanceTrack& track,
-                                                                               SourceCommandRef command);
 
 }  // namespace vgmtrans::core

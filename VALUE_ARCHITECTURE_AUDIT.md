@@ -4113,3 +4113,58 @@ explicit. Collapsing those distinctions would replace visible state with more
 policy branches. The next pass removes unused lookup APIs and repeated
 collection assembly, and tests whether private source-inspection construction
 can rely on the existing admission boundary.
+
+## Cleanup2: one collection value and direct source identities
+
+The third batch removes another 122 production lines from `src/value`, bringing
+this branch to 336 net production lines removed. It
+removes four lookup APIs, the intermediate collection description, the private
+inspection factory, and the SNES directory wrapper. Format playback still uses
+SequenceVM and retains its original source attribution.
+
+- Resolution and publication use `Collection` directly. The session assigns
+  or preserves its identity and sets its origin; callers no longer assemble
+  the same selection, issues, and inputs into a second model. Existing lifecycle
+  coverage now checks that incoming IDs/origins cannot override publication,
+  discovered IDs survive reconciliation, and user collections stay independent.
+- Private source-inspection construction relies on scanner admission for byte
+  bounds, source identity, and owned annotations. Its constructor expands the
+  inspection range while collecting roots. The public session boundary still
+  requires a live source-backed asset. Retained inspections keep shared bytes
+  and their immutable annotation graph after later session changes.
+- Scalar automation targets are mandatory values: every producer supplies a
+  target and every consumer requires it. Tick callbacks drop an unused erased
+  source-command argument while the emitter and VM keep exact command context.
+- Removed unused performance query helpers and source-program lookup methods.
+  The latter served fixtures and the parity diagnostic helper; their consumers
+  now inspect the ordinary command vectors. Provenance assertions still compare
+  complete source identities, including moved events and shared streams. Parity
+  diagnostics preserve bounds checks for missing or unowned source commands.
+- SNES sample references use a direct 256-entry table for byte-sized source
+  keys. The private entry vector and linear search disappear. This changes
+  temporary storage from a 24-byte vector plus 12 bytes per entry to a fixed
+  2,048 bytes; it removes heap allocation and becomes smaller at dense catalogs.
+  Alias detection still compares start address, loop flag, and loop address.
+  Adding a duplicate key still fails before assigning an alias reference.
+- Directory callers use the existing entry-reading function directly. MIDI
+  time-signature denominators use integer bit width instead of logarithms;
+  all 256 possible denominator values retain identical results.
+
+Validation:
+
+- Full macOS Release build, including Qt, shell, and parity harness; all 44
+  CTest suites pass. The build caught two missed lookup callers in a format
+  fixture and parity diagnostics; both were migrated before the successful
+  settled build. No warnings remain in the repaired build.
+- The sanitizer VM matrix still matches all 31,104 programs. Observable tick
+  hooks, event/source-span ordering, scalar endpoints, and all pitch-curve forms
+  produce identical 82,265,613-byte traces; ASan, UBSan, and float-cast-overflow
+  checks are clean for both implementations.
+- Independently compiled SNES implementations match across 1,658 catalog cases
+  and 9,216 directory reads. Their 46,387,767-byte catalog traces include every
+  reference query, sample, annotation field/link/owner/parent, and diagnostic.
+  Cases cover all 256 keys, reversed/rotated/shuffled input, sparse selections,
+  unused labels, loop aliases, duplicate keys, and truncated source readers.
+
+The next pass probes initialization hooks and private inspection traversal,
+while keeping actual per-command behavior and delayed initialization explicit.

@@ -26,6 +26,15 @@ namespace {
 
 }  // namespace
 
+bool Collection::contains(AssetId asset) const noexcept {
+  const auto selected = [asset](const auto& ids) { return std::ranges::find(ids, asset) != ids.end(); };
+  return selection.sequence == asset || selected(selection.soundBanks) || selected(selection.samplePools) ||
+         selected(selection.miscAssets) || std::ranges::any_of(inputs.banks, [asset](const CollectionBank& bank) {
+           return bank.bank == asset || std::ranges::find(bank.samples.targets, asset, &DependencyTarget::asset) !=
+                                            bank.samples.targets.end();
+         });
+}
+
 ResolutionStatus CollectionInputs::status() const noexcept {
   auto result = std::max(bankStatus, inspectionStatus);
   for (const auto& bank : banks) {

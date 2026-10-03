@@ -443,7 +443,7 @@ private:
     VmApi vm(*this, command);
     for (auto& channel : channels_) {
       auto out = outputAt(channel, tick_, CommandId{commandIndex}, command.annotation);
-      sequenceRuntime_.tick(command, programState_, channel.state, out, vm);
+      sequenceRuntime_.tick(programState_, channel.state, out, vm);
     }
   }
 

@@ -34,28 +34,6 @@ struct MiscAsset {
 
 using Asset = std::variant<SequenceProgramAsset, SoundBankAsset, SamplePoolAsset, MiscAsset>;
 
-enum class CollectionOrigin { Discovered, User };
-
-struct Collection {
-  CollectionId id;
-  std::string name;
-  // A discovered collection is identified by selection.sequence during rebuilds.
-  // User collections have independent identities, even for the same sequence.
-  CollectionOrigin origin = CollectionOrigin::User;
-  // Collections are the export units. A sequence may be paired with instrument
-  // banks and sample pools loaded from the same or separate sources.
-  // Original choices: automatic collections retain only their root and inspection assets.
-  CollectionMembers selection;
-  std::vector<CollectionIssue> issues;
-  CollectionInputs inputs;
-
-  [[nodiscard]] CollectionMembers members() const { return collectionMembers(selection, inputs); }
-  [[nodiscard]] bool contains(AssetId asset) const noexcept;
-
-  [[nodiscard]] bool isDiscovered() const noexcept { return origin == CollectionOrigin::Discovered; }
-  [[nodiscard]] ResolutionStatus resolutionStatus() const noexcept { return inputs.status(); }
-};
-
 // Copyable read-only view of one Session revision. Copies share immutable
 // storage, so a snapshot remains stable across later Session mutations without
 // duplicating the discovered value graph. Scan-owned domains remain ordered

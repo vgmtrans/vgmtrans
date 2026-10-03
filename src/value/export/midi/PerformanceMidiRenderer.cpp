@@ -12,6 +12,7 @@
 #include "value/export/midi/MidiTrackPlanner.h"
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <map>
 #include <optional>
@@ -41,8 +42,7 @@ constexpr int kVoiceTerminationPriority = 7;
   if (denominator == 0) {
     return 0;
   }
-  constexpr double ln2 = 0.69314718055994530942;
-  return static_cast<u8>(std::log(static_cast<double>(denominator)) / ln2);
+  return static_cast<u8>(std::bit_width(denominator) - 1);
 }
 
 [[nodiscard]] MidiEvent tempoEvent(u64 tick, u32 microsecondsPerQuarter) {

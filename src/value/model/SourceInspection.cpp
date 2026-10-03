@@ -10,38 +10,11 @@
 
 namespace vgmtrans::core {
 
-std::shared_ptr<const SourceInspection> SourceInspection::create(AssetMetadata metadata, SourceMap sourceMap,
-                                                                 SharedSourceBytes sourceBytes) {
-  if (sourceBytes == nullptr) {
-    return {};
-  }
-
-  if (!metadata.range.valid() || metadata.range.offset > sourceBytes->size() ||
-      metadata.range.size > sourceBytes->size() - metadata.range.offset) {
-    return {};
-  }
-
-  SourceRange inspectionRange = metadata.range;
-  for (const auto& annotation : sourceMap.annotations()) {
-    if (annotation.range.source != inspectionRange.source || annotation.range.offset > sourceBytes->size() ||
-        annotation.range.size > sourceBytes->size() - annotation.range.offset) {
-      return {};
-    }
-    inspectionRange.include(annotation.range);
-  }
-  if (sourceMap.empty()) {
-    return {};
-  }
-
-  return std::shared_ptr<const SourceInspection>(
-      new SourceInspection(std::move(metadata), inspectionRange, std::move(sourceBytes), std::move(sourceMap)));
-}
-
-SourceInspection::SourceInspection(AssetMetadata metadata, SourceRange range, SharedSourceBytes sourceBytes,
-                                   SourceMap sourceMap)
-    : metadata_(std::move(metadata)), range_(range), sourceBytes_(std::move(sourceBytes)),
+SourceInspection::SourceInspection(AssetMetadata metadata, SourceMap sourceMap, SharedSourceBytes sourceBytes)
+    : metadata_(std::move(metadata)), range_(metadata_.range), sourceBytes_(std::move(sourceBytes)),
       sourceMap_(std::move(sourceMap)) {
   for (const auto& annotation : sourceMap_.annotations()) {
+    range_.include(annotation.range);
     if (!annotation.parent || sourceMap_.find(*annotation.parent) == nullptr) {
       roots_.push_back(annotation.id);
     }
@@ -51,7 +24,7 @@ SourceInspection::SourceInspection(AssetMetadata metadata, SourceRange range, Sh
 
 std::span<const u8> SourceInspection::bytes() const noexcept {
   return std::span<const u8>{*sourceBytes_}.subspan(static_cast<size_t>(range_.offset),
-                                                    static_cast<size_t>(range_.size));
+                                                 static_cast<size_t>(range_.size));
 }
 
 const SourceAnnotation* SourceInspection::annotation(SourceAnnotationId id) const {

@@ -30,11 +30,6 @@ std::optional<SnesBrrStream> inspectSnesBrrStream(ByteReader reader, u32 startAd
   return std::nullopt;
 }
 
-std::optional<SnesSampleDirectoryEntry> SnesSampleDirectory::entry(u8 index, bool inspectStream) const {
-  const u32 entryAddress = baseAddress_ + static_cast<u32>(index) * 4;
-  return readSnesSampleDirectoryEntry(reader_, entryAddress, inspectStream);
-}
-
 std::optional<SnesSampleDirectoryEntry> readSnesSampleDirectoryEntry(ByteReader reader, u32 entryAddress,
                                                                      bool inspectStream) {
   if (!reader.has(entryAddress, 4)) {
@@ -75,9 +70,8 @@ std::vector<SnesBrrSample> readSnesBrrCatalog(ByteReader reader, u32 directoryAd
   srcns.erase(duplicates.begin(), duplicates.end());
 
   std::vector<SnesBrrSample> catalog;
-  const SnesSampleDirectory directory(reader, directoryAddress);
   for (const u8 srcn : srcns) {
-    const auto entry = directory.entry(srcn);
+    const auto entry = readSnesSampleDirectoryEntry(reader, directoryAddress + static_cast<u32>(srcn) * 4);
     if (!entry) {
       continue;
     }
@@ -94,8 +88,8 @@ std::vector<SnesBrrSample> readSnesBrrCatalog(ByteReader reader, u32 directoryAd
 }
 
 std::optional<SampleRef> SnesBrrSampleRefs::findSrcn(u8 srcn) const {
-  const auto found = std::ranges::find(entries_, srcn, &Entry::srcn);
-  return found == entries_.end() ? std::nullopt : std::optional<SampleRef>{found->sample};
+  const auto sample = samples_[srcn];
+  return sample.valid() ? std::optional{sample} : std::nullopt;
 }
 
 SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reader,
@@ -115,8 +109,8 @@ SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reade
       samples.source(SourceRole::Table, "Sample DIR", directoryRange, "snes-sample-dir").id();
 
   SnesBrrSampleRefs refs;
-  refs.entries_.reserve(catalog.size());
-  for (const auto& info : catalog) {
+  for (size_t index = 0; index < catalog.size(); ++index) {
+    const auto& info = catalog[index];
     const bool unused = !usedSrcns.empty() && std::ranges::find(usedSrcns, info.srcn) == usedSrcns.end();
     const std::string name = fmt::format("Sample {}", info.srcn);
     const char* suffix = unused ? " (unused)" : "";
@@ -150,19 +144,13 @@ SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reade
         .role(SourceRole::Payload)
         .parent(directoryEntry.id());
 
-    SampleRef canonical = sample.ref();
-    const auto earlierSamples = catalog.first(refs.entries_.size());
+    const SampleRef added = sample.ref();
+    const auto earlierSamples = catalog.first(index);
     const auto alias = std::ranges::find_if(earlierSamples, [&](const SnesBrrSample& candidate) {
       return candidate.startAddress == info.startAddress && candidate.stream.loops == info.stream.loops &&
              (!info.stream.loops || candidate.loopAddress == info.loopAddress);
     });
-    if (alias != earlierSamples.end()) {
-      canonical = refs.entries_[std::distance(earlierSamples.begin(), alias)].sample;
-    }
-    refs.entries_.push_back(SnesBrrSampleRefs::Entry{
-        .srcn = info.srcn,
-        .sample = canonical,
-    });
+    refs.samples_[info.srcn] = alias == earlierSamples.end() ? added : refs.samples_[alias->srcn];
   }
 
   return refs;

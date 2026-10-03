@@ -63,31 +63,20 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
   const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&renderedTrack.events[0]);
   expect(instrument != nullptr && std::get<InstrumentAddress>(instrument->instrument).program == 5,
          "program command should emit a target-neutral instrument event");
-  expect(instrument->header.sourceCommand.id == CommandId{0} && instrument->header.tick == 0,
+  expect(instrument->header.sourceCommand == SourceCommandRef{TrackId{0}, CommandId{0}} && instrument->header.tick == 0,
          "instrument event should link to the source command and tick");
 
   const auto* note = std::get_if<NotePerformanceEvent>(&renderedTrack.events[1]);
   expect(note != nullptr, "note command should emit a target-neutral note event");
   expect(note->key == 64.0 && note->linearVelocity == 0.5 && note->durationTicks == 12,
          "note event should use driver state and config context while staying MIDI-neutral");
-  expect(note->header.sourceCommand.id == noteCommandId && note->header.tick == 0,
+  expect(note->header.sourceCommand == SourceCommandRef{TrackId{0}, noteCommandId} &&
+             note->header.sourceCommand != instrument->header.sourceCommand && note->header.tick == 0,
          "note event should link back to the source command that emitted it");
-  expect(program.tracks[0].command(noteCommandId) == &program.tracks[0].commands[1],
-         "track program should resolve source commands by positional command id");
-  expect(program.command(note->header.sourceCommand) == &program.tracks[0].commands[1],
-         "performance event source links should resolve back to source commands");
   auto movedNote = note->header;
   movedNote.track = TrackId{8};
-  expect(program.command(movedNote.sourceCommand) == &program.tracks[0].commands[1],
+  expect(movedNote.sourceCommand == note->header.sourceCommand && movedNote.sourceCommand.track != movedNote.track,
          "moving a performance event should preserve its original command");
-
-  const auto noteEvents = performanceEventsForCommand(renderedTrack, {TrackId{0}, noteCommandId});
-  expect(noteEvents.size() == 1 && noteEvents[0] == &renderedTrack.events[1],
-         "performance helper should collect events emitted by one source command");
-  expect(performanceTrackById(performance, TrackId{0}) == &performance.tracks[0],
-         "performance helper should resolve rendered tracks by stable track id");
-  expect(program.command({TrackId{0}, CommandId{99}}) == nullptr,
-         "performance source-link helper should return null for a missing command");
 
   expect(performance.sourceSpans ==
              std::vector<SourcePlaybackSpan>{
@@ -149,7 +138,7 @@ void sequenceVmRoutesOneStreamAcrossIndependentChannels() {
     expect(initial.header.tick == 0 && note.header.tick == 5 && note.key == 60 &&
                note.durationTicks == (i == 0 ? 9 : 6) && output.endTick == 14,
            "channels should initialize before the first delay and keep note state and releases independent");
-    expect(program.command(note.header.sourceCommand) == &program.tracks[0].commands[i == 0 ? 1 : 0],
+    expect(note.header.sourceCommand == SourceCommandRef{TrackId{0}, CommandId{i == 0 ? 1u : 0u}},
            "channel output should retain its shared stream's source command");
   }
   expect(std::get<TempoPerformanceEvent>(performance.tracks[0].events.back()).microsecondsPerQuarter == 500003,
@@ -1395,7 +1384,7 @@ void sequenceVmSwitchesParallelSectionsAtTheFirstChannelEnd() {
          "the earliest section end should restart every channel at one shared tick");
   const auto& firstLongNote = std::get<NotePerformanceEvent>(performance.tracks[1].events[0]);
   const auto& secondSectionNote = std::get<NotePerformanceEvent>(performance.tracks[1].events[1]);
-  expect(program.command(firstLongNote.header.sourceCommand) == &program.tracks[0].commands[2] &&
+  expect(firstLongNote.header.sourceCommand == SourceCommandRef{TrackId{0}, CommandId{2}} &&
              firstLongNote.header.track == TrackId{1} && firstLongNote.key == 11.0,
          "shared commands should retain their source identity and each channel's independent state");
   expect(firstLongNote.header.tick == 0 && firstLongNote.durationTicks == 8,

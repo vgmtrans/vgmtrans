@@ -14,7 +14,7 @@ namespace {
 
 class Resolver {
 public:
-  Resolver(const AssetCatalog& assets, DesiredCollection& result, ResolutionMode mode)
+  Resolver(const AssetCatalog& assets, Collection& result, ResolutionMode mode)
       : assets_(assets), result_(result), mode_(mode) {}
 
   void resolve() {
@@ -146,18 +146,18 @@ private:
   }
 
   const AssetCatalog& assets_;
-  DesiredCollection& result_;
+  Collection& result_;
   ResolutionMode mode_;
 };
 
 }  // namespace
 
-void resolveDependencies(const AssetCatalog& assets, DesiredCollection& collection, ResolutionMode mode) {
+void resolveDependencies(const AssetCatalog& assets, Collection& collection, ResolutionMode mode) {
   Resolver(assets, collection, mode).resolve();
 }
 
-std::vector<DesiredCollection> dependencyCollections(const AssetCatalog& assets) {
-  std::vector<DesiredCollection> result;
+std::vector<Collection> dependencyCollections(const AssetCatalog& assets) {
+  std::vector<Collection> result;
   auto sequences = assets.assets<SequenceProgramAsset>();
   std::ranges::stable_sort(sequences, {}, [](const auto* sequence) { return sequence->metadata.format; });
   for (const auto* sequence : sequences) {
@@ -165,7 +165,7 @@ std::vector<DesiredCollection> dependencyCollections(const AssetCatalog& assets)
       continue;
     }
     const auto& descriptor = sequence->collection;
-    DesiredCollection collection{
+    Collection collection{
         .name = descriptor.name.empty() ? sequence->metadata.name : descriptor.name,
         .selection = {.sequence = sequence->metadata.id, .miscAssets = descriptor.miscAssets}};
     resolveDependencies(assets, collection);

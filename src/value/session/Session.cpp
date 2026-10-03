@@ -231,7 +231,7 @@ void Session::removeAssets(std::span<const AssetId> assets) {
 
 CollectionId Session::createUserCollection(std::string name, CollectionMembers members) {
   formats_.seal();
-  DesiredCollection selection{.name = std::move(name), .selection = std::move(members)};
+  Collection selection{.name = std::move(name), .selection = std::move(members)};
   resolveDependencies(AssetCatalog{sources_, state_->assets()}, selection, ResolutionMode::Manual);
   const CollectionId id = state_->createUserCollection(std::move(selection));
   snapshotCache_.reset();
@@ -294,7 +294,8 @@ std::shared_ptr<const SourceInspection> Session::inspect(AssetId asset) const {
   if (!sources_.contains(source)) {
     return {};
   }
-  return SourceInspection::create(metadata(*value), state_->sourceMapForAsset(asset), sources_.sharedBytes(source));
+  return std::shared_ptr<const SourceInspection>(
+      new SourceInspection(metadata(*value), state_->sourceMapForAsset(asset), sources_.sharedBytes(source)));
 }
 
 CollectionPlayback Session::preparePlayback(CollectionId id, const PlaybackRequest& request) const {

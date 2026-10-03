@@ -53,8 +53,7 @@ struct SequenceRuntime {
                      VmApi& vm) = nullptr;
   bool (*readyDuringWait)(const SourceCommand&, std::any& programState, std::any& trackState, PerformanceEmitter& out,
                           VmApi& vm) = nullptr;
-  void (*tick)(const SourceCommand&, std::any& programState, std::any& trackState, PerformanceEmitter& out,
-               VmApi& vm) = nullptr;
+  void (*tick)(std::any& programState, std::any& trackState, PerformanceEmitter& out, VmApi& vm) = nullptr;
   void (*finishPrepass)(std::any& programState) = nullptr;
   void (*finalizePerformance)(std::any& programState, PerformanceSequence& performance) = nullptr;
 
@@ -219,7 +218,6 @@ struct TrackProgram {
   std::vector<SourceCommand> commands;
 
   [[nodiscard]] std::optional<u32> commandIndex(Address address) const;
-  [[nodiscard]] const SourceCommand* command(CommandId id) const;
 };
 
 // Borrowed source data for one execution stream. Stream state does not belong
@@ -326,7 +324,6 @@ struct SequenceProgram {
   std::vector<TrackProgram> tracks;
   std::optional<SectionPlaylist> sectionPlaylist;
 
-  [[nodiscard]] const SourceCommand* command(SourceCommandRef source) const;
   [[nodiscard]] size_t playbackTrackCount() const;
   [[nodiscard]] size_t streamCount() const;
 };

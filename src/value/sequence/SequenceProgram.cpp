@@ -22,20 +22,6 @@ std::optional<u32> TrackProgram::commandIndex(Address address) const {
   return static_cast<u32>(std::distance(commands.begin(), found));
 }
 
-const SourceCommand* TrackProgram::command(CommandId id) const {
-  if (!id.valid() || id.value >= commands.size()) {
-    return nullptr;
-  }
-  return &commands[id.value];
-}
-
-const SourceCommand* SequenceProgram::command(SourceCommandRef source) const {
-  if (!source.valid() || source.track.value >= tracks.size()) {
-    return nullptr;
-  }
-  return tracks[source.track.value].command(source.id);
-}
-
 size_t SequenceProgram::playbackTrackCount() const {
   size_t count = 0;
   for (const auto& track : tracks) {

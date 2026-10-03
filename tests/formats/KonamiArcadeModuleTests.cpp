@@ -549,7 +549,7 @@ void konamiArcadeGxLfosMatchDriverState() {
          "F9 should create a reusable note-scoped vibrato depth envelope");
   const auto& fadeIntent = std::get<ScalarPerformanceAutomationIntent>(fade->intent);
   expect(fadeIntent.motion == PerformanceAutomationMotion::NoteEnvelope && fadeIntent.durationTicks == 4 &&
-             fadeIntent.delayTicks == 2 && fadeIntent.targetValue && std::abs(*fadeIntent.targetValue - 0.5) < 0.0001,
+             fadeIntent.delayTicks == 2 && std::abs(fadeIntent.targetValue - 0.5) < 0.0001,
          "F9 depth fade should begin after E4's delay and reach the configured piecewise depth");
 
   const SequenceModulationProfile profile = analyzeSequenceModulation(performance);

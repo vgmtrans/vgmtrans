@@ -125,7 +125,7 @@ void SessionState::removeSources(std::span<const SourceId> sources) {
   removeDiscoveredData(sourceIds, removedAssets);
 }
 
-CollectionId SessionState::createUserCollection(DesiredCollection collection) {
+CollectionId SessionState::createUserCollection(Collection collection) {
   const auto& name = collection.name;
   const auto& members = collection.selection;
   if (name.empty()) {
@@ -157,13 +157,9 @@ CollectionId SessionState::createUserCollection(DesiredCollection collection) {
   validate(members.miscAssets, [this](AssetId id) { return asset<MiscAsset>(id); }, "miscellaneous");
 
   const CollectionId id{nextCollectionId_++};
-  collections_.push_back(Collection{
-      .id = id,
-      .name = std::move(collection.name),
-      .selection = std::move(collection.selection),
-      .issues = std::move(collection.issues),
-      .inputs = std::move(collection.inputs),
-  });
+  collection.id = id;
+  collection.origin = CollectionOrigin::User;
+  collections_.push_back(std::move(collection));
   return id;
 }
 
@@ -192,19 +188,13 @@ SourceMap SessionState::sourceMapForAsset(AssetId asset) const {
 
 // Banks and samples can change as files arrive or are removed. Keep a discovered
 // collection's ID while its sequence stays the same; leave user collections alone.
-void SessionState::reconcileCollections(std::vector<DesiredCollection> desired) {
+void SessionState::reconcileCollections(std::vector<Collection> desired) {
   std::unordered_set<AssetId> sequences;
-  for (auto& candidate : desired) {
-    const AssetId sequence = candidate.selection.sequence.value();
+  for (auto& collection : desired) {
+    const AssetId sequence = collection.selection.sequence.value();
     sequences.insert(sequence);
-    validateMiscAssets(candidate);
-    Collection collection{
-        .name = std::move(candidate.name),
-        .origin = CollectionOrigin::Discovered,
-        .selection = std::move(candidate.selection),
-        .issues = std::move(candidate.issues),
-        .inputs = std::move(candidate.inputs),
-    };
+    validateMiscAssets(collection);
+    collection.origin = CollectionOrigin::Discovered;
     const auto found = std::ranges::find_if(collections_, [&](const Collection& existing) {
       return existing.isDiscovered() && existing.selection.sequence == sequence;
     });
@@ -297,7 +287,7 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
   rebuildIndexes();
 }
 
-void SessionState::validateMiscAssets(DesiredCollection& desired) {
+void SessionState::validateMiscAssets(Collection& desired) {
   // Audio inputs were checked during resolution. These extra assets are for
   // inspection only, so losing one reports a problem without blocking audio preparation.
   if (desired.selection.miscAssets.empty()) {

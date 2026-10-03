@@ -145,8 +145,8 @@ template <class Range>
 
 // Fill in the banks and sample pools a collection needs, along with each asset's
 // chosen inputs and any matching problems. This does not prepare or change assets.
-void resolveDependencies(const AssetCatalog& assets, DesiredCollection& collection,
+void resolveDependencies(const AssetCatalog& assets, Collection& collection,
                          ResolutionMode mode = ResolutionMode::Automatic);
-[[nodiscard]] std::vector<DesiredCollection> dependencyCollections(const AssetCatalog& assets);
+[[nodiscard]] std::vector<Collection> dependencyCollections(const AssetCatalog& assets);
 
 }  // namespace vgmtrans::core

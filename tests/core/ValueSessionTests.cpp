@@ -1072,7 +1072,7 @@ void scanValidationRejectsDanglingSourceAnnotationReferences() {
          "scan validation should reject diagnostics with dangling annotation anchors");
 }
 
-void sessionReportsDesiredCollectionMissingAssetReferences() {
+void sessionReportsCollectionMissingAssetReferences() {
   for (const bool wrongType : {false, true}) {
     Session session;
     auto module = probeSequenceModule();
@@ -1246,9 +1246,32 @@ void sessionStateRebuildsLookupIndexAfterRemoval() {
               .range = SourceRange{.source = SourceId{1}, .offset = 0, .size = 1},
           },
   });
+  secondSourceAssets.emplace_back(SoundBankAsset{
+      .metadata = AssetMetadata{.id = AssetId{3}, .range = SourceRange{.source = SourceId{1}, .size = 1}},
+  });
   state.appendScan(ScanResult{
       .assets = std::move(secondSourceAssets),
   });
+
+  const auto manualId = state.createUserCollection(Collection{
+      .id = CollectionId{99}, .name = "Manual", .origin = CollectionOrigin::Discovered,
+      .selection = {.sequence = AssetId{0}, .soundBanks = {AssetId{3}}},
+  });
+  state.reconcileCollections({Collection{
+      .id = CollectionId{99}, .name = "Discovered", .origin = CollectionOrigin::User,
+      .selection = {.sequence = AssetId{0}},
+  }});
+  const auto discoveredId = state.collections()[1].id;
+  expect(manualId != CollectionId{99} && discoveredId != CollectionId{99} && discoveredId != manualId &&
+             state.collections()[0].origin == CollectionOrigin::User && state.collections()[1].isDiscovered(),
+         "session publication should assign its own identity and origin to collection values");
+  state.reconcileCollections({Collection{
+      .id = CollectionId{100}, .name = "Updated", .origin = CollectionOrigin::User,
+      .selection = {.sequence = AssetId{0}},
+  }});
+  expect(state.collections().size() == 2 && state.collections()[0].id == manualId &&
+             state.collections()[1].id == discoveredId && state.collections()[1].isDiscovered(),
+         "reconciliation should preserve discovered identity and leave manual collections alone");
 
   expect(state.asset<SamplePoolAsset>(AssetId{2}) == std::get_if<SamplePoolAsset>(&state.assets()[2]),
          "session state should look up assets by id before removal");
@@ -1257,7 +1280,7 @@ void sessionStateRebuildsLookupIndexAfterRemoval() {
   state.removeSources(removedSources);
   expect(!state.containsAsset(AssetId{0}) && !state.containsAsset(AssetId{1}),
          "session state should remove deleted asset ids from the lookup index");
-  expect(state.assets().size() == 1 &&
+  expect(state.assets().size() == 2 &&
              state.asset<SamplePoolAsset>(AssetId{2}) == std::get_if<SamplePoolAsset>(&state.assets()[0]),
          "session state lookup index should be rebuilt after removal compacts the asset vector");
 }
@@ -1493,7 +1516,7 @@ void runValueSessionTests() {
   scanValidationRejectsOutOfBoundsScanResultRanges();
   scanValidationRejectsRangeLessSourceAnnotations();
   scanValidationRejectsDanglingSourceAnnotationReferences();
-  sessionReportsDesiredCollectionMissingAssetReferences();
+  sessionReportsCollectionMissingAssetReferences();
   sessionKeepsSequenceCollectionsWhenSupplementalAssetsDisappear();
   sessionReconcilesCollectionsBySequenceIdentity();
   retainedSourceOwnsStableCopiedBytes();

@@ -354,8 +354,9 @@ void segSatCollectionBindingSuppliesVlTablesToSequence() {
   const auto* sourceNote = firstNote(unprepared);
   expect(sourceNote != nullptr && LevelScale::midi7FromLinear(sourceNote->linearVelocity) == 64,
          "a durable SegSat sequence should retain its source velocity when no collection context is present");
-  const auto* noteCommand = sequence.program.command(sourceNote->header.sourceCommand);
-  expect(noteCommand != nullptr && noteCommand->annotation == sourceNote->header.sourceAnnotation,
+  const auto sourceCommand = sourceNote->header.sourceCommand;
+  const auto& noteCommand = sequence.program.tracks.at(sourceCommand.track.value).commands.at(sourceCommand.id.value);
+  expect(sourceCommand.valid() && noteCommand.annotation == sourceNote->header.sourceAnnotation,
          "merging the tempo track should preserve the note's source command");
 
   const CollectionPlayback playback =
@@ -596,7 +597,7 @@ void segSatPreparationReservesExactMatchesBeforeFallbacks() {
             }},
         bank(1, 9), bank(2, 2),
     };
-    DesiredCollection desired{.selection = {.sequence = AssetId{0}, .soundBanks = entry.selected}};
+    Collection desired{.selection = {.sequence = AssetId{0}, .soundBanks = entry.selected}};
     resolveDependencies(AssetCatalog{std::vector<SourceFile>{}, SharedSequence<Asset>{builder.assets}}, desired,
                         ResolutionMode::Manual);
     expect(desired.issues.empty(), "bank mapping diagnostics belong to preparation, after companion selection");
@@ -709,7 +710,7 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
   test::SessionSnapshotBuilder builder;
   builder.sources = sources.sourceFiles();
   builder.assets = {sequence, bank5, foreignBank, bank6};
-  DesiredCollection desired{.selection = collection.selection};
+  Collection desired{.selection = collection.selection};
   resolveDependencies(AssetCatalog{sources, SharedSequence<Asset>{builder.assets}}, desired, ResolutionMode::Manual);
   builder.collections = {collection};
   builder.collections.front().inputs = std::move(desired.inputs);

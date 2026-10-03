@@ -9,6 +9,7 @@
 #include "value/base/Source.h"
 #include "value/synth/SynthBuilder.h"
 
+#include <array>
 #include <functional>
 #include <optional>
 #include <ranges>
@@ -52,17 +53,6 @@ struct SnesBrrSample {
 [[nodiscard]] std::optional<SnesSampleDirectoryEntry> readSnesSampleDirectoryEntry(ByteReader reader, u32 entryAddress,
                                                                                    bool inspectStream = true);
 
-class SnesSampleDirectory {
-public:
-  SnesSampleDirectory(ByteReader reader, u32 baseAddress) : reader_(reader), baseAddress_(baseAddress) {}
-
-  [[nodiscard]] std::optional<SnesSampleDirectoryEntry> entry(u8 index, bool inspectStream = true) const;
-
-private:
-  ByteReader reader_;
-  u32 baseAddress_ = 0;
-};
-
 // Validated samples in SRCN order. Formats can filter this list before adding it.
 [[nodiscard]] std::vector<SnesBrrSample> readSnesBrrCatalog(ByteReader reader, u32 directoryAddress,
                                                             std::vector<u8> srcns);
@@ -92,12 +82,8 @@ private:
   friend SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder&, ByteReader, std::span<const SnesBrrSample>,
                                              std::span<const u8>, std::string_view);
 
-  struct Entry {
-    u8 srcn = 0;
-    SampleRef sample;
-  };
-
-  std::vector<Entry> entries_;
+  // SRCNs are byte-sized source keys, independent of dense sample indexes.
+  std::array<SampleRef, 256> samples_{};
 };
 
 // Populate the generic sample builder from validated samples, with the standard

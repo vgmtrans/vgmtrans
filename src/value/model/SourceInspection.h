@@ -63,9 +63,7 @@ public:
 private:
   friend class Session;
 
-  static std::shared_ptr<const SourceInspection> create(AssetMetadata metadata, SourceMap sourceMap,
-                                                        SharedSourceBytes sourceBytes);
-  SourceInspection(AssetMetadata metadata, SourceRange range, SharedSourceBytes sourceBytes, SourceMap sourceMap);
+  SourceInspection(AssetMetadata metadata, SourceMap sourceMap, SharedSourceBytes sourceBytes);
 
   void sortBySourceOrder(std::vector<SourceAnnotationId>& annotations) const;
 

@@ -115,24 +115,6 @@ void sequenceValidationProtectsPositionalCommandStorage() {
          "sequence validation should reject duplicate, out-of-order, and missing-start command storage");
 }
 
-void performanceEventsForCommandMatchBothTrackAndCommand() {
-  const PerformanceTrack track{
-      .id = TrackId{3},
-      .events =
-          {
-              MarkerPerformanceEvent{.text = "unowned"},
-              LevelPerformanceEvent{.header = {.sourceCommand = {TrackId{3}, CommandId{9}}}, .linearGain = 0.75},
-              LevelPerformanceEvent{.header = {.sourceCommand = {TrackId{3}, CommandId{9}}}, .linearGain = 0.5},
-              NotePerformanceEvent{.header = {.sourceCommand = {TrackId{4}, CommandId{9}}}, .key = 60},
-              NotePerformanceEvent{.header = {.sourceCommand = {TrackId{3}, CommandId{10}}}, .key = 62},
-          },
-  };
-
-  expect(performanceEventsForCommand(track, {TrackId{3}, CommandId{9}}) ==
-             std::vector<const PerformanceEvent*>{&track.events[1], &track.events[2]},
-         "command lookup should return only matching events in timeline order");
-}
-
 void performanceEmitterBindsScalarAutomationWithoutExposingStorage() {
   PerformanceTrack track{.id = TrackId{3}};
   u64 nextSequence = 0;
@@ -589,7 +571,6 @@ void runValueSequenceModelTests() {
   byteReaderChecksBoundsAndEndian();
   sequenceSourceRangeIncludesDecodedCommandsFromTheBaseSource();
   sequenceValidationProtectsPositionalCommandStorage();
-  performanceEventsForCommandMatchBothTrackAndCommand();
   performanceEmitterBindsScalarAutomationWithoutExposingStorage();
   sequenceMotionPreservesDelayAndTargetCompletion();
   fixedPointMotionRetargetsFromTheRoundedSourceValue();

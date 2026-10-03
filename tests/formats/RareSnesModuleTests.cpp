@@ -197,8 +197,7 @@ void rareSnesProfilesDecodeTheirDistinctOpcodeTails() {
   const auto* masterFade = std::get_if<ScalarPerformanceAutomationIntent>(
       &battlemaniacsMasterFade.tracks.front().automations.front().intent);
   expect(masterFade != nullptr && masterFade->target == PerformanceAutomationTarget::MasterLevel &&
-             masterFade->durationTicks == 4 && masterFade->targetValue &&
-             std::abs(*masterFade->targetValue - 0.375) < 0.000001,
+             masterFade->durationTicks == 4 && std::abs(masterFade->targetValue - 0.375) < 0.000001,
          "Battlemaniacs master fade should apply independent signed DSP steps from the current L/R master levels");
 
   const PerformanceSequence battlemaniacsPercussion =

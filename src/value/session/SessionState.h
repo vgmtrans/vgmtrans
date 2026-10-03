@@ -42,7 +42,7 @@ public:
 
   void removeAssets(std::span<const AssetId> assets);
   void removeSources(std::span<const SourceId> sources);
-  [[nodiscard]] CollectionId createUserCollection(DesiredCollection collection);
+  [[nodiscard]] CollectionId createUserCollection(Collection collection);
 
   void addError(std::string message, SourceRange range = {});
   void addDiagnostics(std::vector<Diagnostic> diagnostics);
@@ -50,7 +50,7 @@ public:
   [[nodiscard]] const SourceMap& sourceMap() const noexcept { return sourceMap_; }
   [[nodiscard]] SourceMap sourceMapForAsset(AssetId asset) const;
   // Reconcile all discovered collections; every desired value has a sequence.
-  void reconcileCollections(std::vector<DesiredCollection> desired);
+  void reconcileCollections(std::vector<Collection> desired);
 
 private:
   struct ScanChunk {
@@ -61,7 +61,7 @@ private:
   };
 
   void removeDiscoveredData(const std::unordered_set<u32>& sourceIds, const std::unordered_set<u32>& assetIds);
-  void validateMiscAssets(DesiredCollection& desired);
+  void validateMiscAssets(Collection& desired);
   void rebuildViews();
   void rebuildIndexes();
 

@@ -146,26 +146,4 @@ u32 PerformanceTempoMap::durationTicksForMilliseconds(u64 startTick, double mill
   return static_cast<u32>(std::min<u64>(ticks, std::numeric_limits<u32>::max()));
 }
 
-const PerformanceTrack* performanceTrackById(const PerformanceSequence& sequence, TrackId id) {
-  const auto found =
-      std::ranges::find_if(sequence.tracks, [id](const PerformanceTrack& track) { return track.id == id; });
-  if (found == sequence.tracks.end()) {
-    return nullptr;
-  }
-  return &*found;
-}
-
-std::vector<const PerformanceEvent*> performanceEventsForCommand(const PerformanceTrack& track,
-                                                                 SourceCommandRef command) {
-  std::vector<const PerformanceEvent*> events;
-  for (const auto& event : track.events) {
-    if (performanceEventHeader(event).sourceCommand == command) {
-      events.push_back(&event);
-    }
-  }
-  std::ranges::stable_sort(events, {},
-                           [](const PerformanceEvent* event) { return performanceEventHeader(*event).order(); });
-  return events;
-}
-
 }  // namespace vgmtrans::core
