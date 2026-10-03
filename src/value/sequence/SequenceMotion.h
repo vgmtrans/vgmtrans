@@ -68,7 +68,7 @@ template <typename ValueType>
 class SequenceLinearMotion {
 public:
   SequenceLinearMotion() = default;
-  explicit SequenceLinearMotion(ValueType current) : current_(current), target_(current) {}
+  explicit SequenceLinearMotion(ValueType current) : current_(current) {}
 
   void reset(ValueType current = {}) {
     current_ = current;
@@ -76,7 +76,6 @@ public:
   }
 
   void clear() {
-    target_ = current_;
     step_ = {};
     delay_ = 0;
     ticksRemaining_ = 0;

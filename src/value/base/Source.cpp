@@ -268,8 +268,7 @@ bool SourceStore::hasSlot(SourceId id) const noexcept {
 }
 
 std::span<const u8> SourceStore::bytes(SourceId id) const {
-  const auto& e = entry(id);
-  return *e.bytes;
+  return *entry(id).bytes;
 }
 
 SharedSourceBytes SourceStore::sharedBytes(SourceId id) const {

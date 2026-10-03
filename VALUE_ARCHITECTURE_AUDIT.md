@@ -1,13 +1,15 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Thirty validated batches remove 1,060 net production lines
+`cb9e0b766`. Thirty-one validated batches remove 1,076 net production lines
 from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records and raw inventories match
-batch 29 exactly. Earlier concurrent asset-ID scheduling evidence remains recorded
-below. The cleanup2 records appear at the end of this document.
+cover 37 of 38 registered families. All export records match batch 30 exactly;
+72 expanded raw inventories match, and one differs only by pre-existing concurrent
+sample-pool ID scheduling confirmed in original/30/31 repetitions. Raw evidence
+and the narrow comparison are retained below. The cleanup2 records appear at the
+end of this document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
 
@@ -6655,3 +6657,116 @@ second payload even though typed preparation reads data through get<T>().
 Next: probe the duplicate standalone MIDI lookup/helper boundary, inactive motion
 target writes, and MIDI rendering's separately owned pointer timeline. Measure
 full-event sorting cost before accepting that larger owner deletion.
+
+
+## Cleanup2 thirty-first batch: consolidate lookup and remove inactive writes
+
+This batch removes 16 net production lines across three files, bringing cleanup2
+to 1,076 removed: 974 architecture lines and 102 format lines. The physical diff
+is 136 additions/152 deletions, primarily relocating an unchanged helper body.
+Cumulatively, production C++/headers are 1,876 additions/2,952 deletions across
+154 paths; architecture is 1,560/2,534 across 88, and formats are 316/418 across
+66. No fixture changes; cumulative tests still gain 559 lines.
+
+- exportSequenceMidi performs its one asset lookup and type check before choosing
+  standalone or collection rendering. Remove the sole private standalone helper,
+  which looked up the same asset again, saving six lines. Keep missing/wrong-type
+  diagnostics, collection selection and ambiguity, standalone simulation and
+  owned Artifact results. Move the unchanged exportCollectionImpl definition into
+  the existing private helper section, remove its forward declaration and the
+  reopened anonymous namespace, saving another eight lines. Its function body
+  is byte-identical; private dependencies precede it and public dependencies are
+  already declared in the headers. Public export entry points are now contiguous.
+- SequenceLinearMotion initializes and clears only active motion state. Every
+  begin assigns target before ticking; an inactive target is never observed.
+  Remove the constructor target initializer and clear's target write, saving one
+  line. Keep current/step/delay/tick state, public motion policies, fixed-point
+  wrappers and interruption behavior. No object-size or heap saving claim;
+  private inactive target bytes may differ. Native consumers use s32/double;
+  exotic user-defined ValueType copy/destructor side effects are not promised.
+- SourceStore::bytes directly returns the span over entry(id).bytes, removing its
+  single-use alias and one line. Preserve the same checked lookup, owner, bounds
+  and borrowed lifetime; no allocation or API change.
+
+Validation:
+
+- The complete 161-step macOS Release build finishes without warnings; all 44
+  CTest suites pass. Freeze matching value sources/headers, fixtures, four
+  archives and shell before replays. Shell SHA256 is
+  f2153b76bb4f099f9abb7c379bf6f15d9ee0e1ee02161832312b9e7e36b25e86.
+- Original corpus against frozen 30 preserves all 252 input/policy records and
+  3,922 artifacts exactly. Expanded archive replay preserves all 894 export
+  records, 858 artifact names/sizes/hashes and 218,240,549 bytes per binary.
+  All 852 successful exports, 42 existing export failures and five unsupported
+  DSF inventory failures retain status and diagnostics. Combined real inputs
+  still cover 37/38 registered families; KonamiTMNT2 has synthetic coverage only.
+- Expanded raw inventories match in 72 cases. Onimusha 2/053.psf2 swaps SonyPS1
+  and SonyPS2 sample-pool IDs 0/1, with the SonyPS2 collection member following
+  its correct pool; source IDs, bank 2, sequence 3, collection 0, ranges, names,
+  ordered warnings and every other byte remain unchanged. Fresh 16-run order
+  counts are original 13/3, batch 30 11/5 and batch 31 8/8. All 50 initial and
+  repeated inventories agree after substituting only asset-declaration IDs and
+  corresponding collection-member IDs by unchanged ordered asset metadata.
+  Retain the raw diff and every repetition. This repeats previously established
+  concurrent scanner scheduling on a different input; no broader normalization
+  or stable ID order claim. All six Onimusha exports are exact.
+- Standalone/export-boundary proof rebuilds four complete fixtures independently
+  on each side: SequenceExport, CollectionExport, ResolvedInstrument and Session.
+  Release and focused sanitizer captures preserve 9,504 ordinary cases and
+  1,680,444 bytes, SHA256
+  557df15473104ed8b73ca8e54d89d8e7f2168590e73d725285bd18cf5fb8e365.
+  Cover invalid/missing/wrong/duplicate IDs, zero/one/multiple collections,
+  chosen members, loops, missing executors, standard/nonstandard exceptions,
+  filenames, ordered full diagnostics, callback side effects and observation
+  of returned artifacts after snapshot/source/program/callback owners die.
+- Standalone fault injection preserves 2,960 Release traces (262,600 bytes,
+  SHA256 2b006346fec2e663cdf94548951fb4532a2ec0a779220c635a68c32f7c111b26)
+  and 2,896 sanitizer traces (240,200 bytes,
+  SHA256 7e52fbdec233ab4db47aaa660bdcbabb51dfa0b626ed0e1b59647789d12caa00).
+  Compare before/after within each build mode, including propagated allocation
+  failure and failures caught by rendering/preparation. Optimization and sanitizer
+  builds have different allocation sequences; do not compare those across modes.
+  Ordinary allocation counts stay exact: Release 52,164 requests/5,760,072 bytes,
+  sanitizers 51,300/5,366,088. No storage or allocation improvement claim.
+- Motion preserves 144,648 arithmetic/lifecycle/bound-LFO cases and 70,294,645
+  bytes: 100,080 broad cases, 43,848 lifecycle cases and 720 bound-LFO cases.
+  Include default construction, clear/inactive ticks, reset/rebegin, copying,
+  signed zero, NaN/infinity, interruptions and provenance. Complete SequenceModel
+  fixtures pass on both sides; matching frozen-30 emitter/timing/core refresh
+  preserves bound observations under ASan/UBSan/float-cast-overflow. The pure
+  arithmetic baseline header is unchanged from 29 to 30. Twenty actual consumer
+  Release/Werror checks pass across ten implementations and nine format families.
+- Source alias is configured-Werror-clean in Debug/Release/RelWithDebInfo; full
+  existing session/source fixtures and all 44 integrated suites cover its checked
+  lookup/lifetime contract. Do not add an implementation-mirroring fixture.
+- Focused sanitizers cover the changed units, relevant matching arithmetic/
+  emitter/timing units and complete probes/fixtures. Other frozen archives remain
+  Release; libc++ annotations are disabled consistently where needed. No whole-
+  application instrumentation, Windows run or exhaustive format parity claim.
+
+Rejected larger renderer deletion: in temporary files, collapse the separately
+owned pointer delivery timeline into the mutable planner's variant event vector,
+filter local reverb, append global reverb copies and stable_sort those variants.
+This removes an owner/indirection but sorting 352-byte payloads instead of 8-byte
+pointers is expensive. Across 24 isolated per-track preparation cases with seven
+samples each, the 131,072-event/no-global case grows about 12.0->40.5..40.8 ms;
+requested bytes grow 2,097,152->46,137,344 (22x), despite one fewer request. With
+just eight globals, reserved capacity gives 12.72->41.88 ms; unreserved capacity
+requests 138,414,848 bytes. These measurements exclude existing planner execution
+and global-owner construction and use old then new sample order, not randomized
+whole-renderer timing or peak application memory. Microchecks preserve ordering
+and variant indices; stop before full fixtures/sanitizers because the scoped cost
+already rejects the design. Keep production renderer unchanged. Adding conditional
+merge machinery would recover complexity rather than simplify it.
+
+Evidence: standalone-midi-boundary31, inactive-motion-target30,
+source-bytes-alias31, pass31-baseline, comparison-pass31.json and
+volume-coverage27/pass30-vs-pass31-{summary.json,report.md}, including the retained
+volume-35 classification/repetitions, under /tmp/vgmtrans-cleanup2. Rejected
+renderer evidence stays in /tmp/vgmtrans-renderer-timeline-owner31.
+
+Next: replace the private single-use SF2 modulation return record with its direct
+writer, assess Sony PS2's copied program/track split data with lifetime proofs,
+and remove redundant SNES predicates only after verifying both inspection modes
+and malformed source/diagnostic order. Keep SequenceVM and source/export ownership
+boundaries; do not add move/view APIs without a meaningful reduction.
