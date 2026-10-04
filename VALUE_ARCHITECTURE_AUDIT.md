@@ -1,11 +1,11 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Fifty-three validated batches remove 1,339 net production lines
-from `src/value`, plus the earlier 23 UI lines. All 44 CTest suites pass.
+`cb9e0b766`. Fifty-four validated batches remove 1,345 net production lines
+from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 52 exactly;
+cover 37 of 38 registered families. All export records match batch 53 exactly.
 All 73 expanded raw inventories match byte-for-byte. The cleanup2 records appear
 at the end of this document.
 
@@ -10370,3 +10370,118 @@ volume-coverage27/pass52-vs-pass53-summary.json, session-import54-root-cold-revi
 
 Next: prove the accepted Session import boundary against matching committed53,
 and continue source audits for useful responsibility/concept reductions.
+
+## Cleanup2 fifty-fourth batch: one pan authoring call and explicit export imports
+
+PerformanceEmitter now authors positional pan directly from stereoPosition and
+linearGain, using its declared PanLaw. Remove the unused PanPerformanceEvent
+parameter overload and the scalar forwarding step: seven architecture lines.
+The repository's native callers all use scalars; MP2k's custom gain remains
+unchanged. PanPerformanceEvent remains neutral IR with independent explicit laws.
+Lane-aware channelPan and exact left/right stereoBalance remain separate live
+operations. No helper, new event type, public layout or callback signature is added.
+The guard still rejects an undeclared law before stamping or incrementing headers;
+append still owns source/tick/track/automation attribution and event ordering.
+
+This intentionally removes the public prepared-event pan overload, including its
+per-event law override and associated member-pointer spelling. External callers
+using it need adaptation; no blanket overload-resolution or binary compatibility
+claim is made. Existing ordinary scalar calls, signed positions and gains keep
+their meaning and are not clamped or rescaled.
+
+Session.h now includes ExportTypes.h and forward-declares CollectionPlayback.
+The Qt WorkspaceController implementation and SonyPS2/SquarePS2/MP2k fixtures
+include Export.h directly where they materialize playback. This removes an
+unnecessary export implementation dependency from the Session public header,
+without changing bodies, defaults, ownership or runtime order. It adds one value
+header line, one UI line and three test import lines. External users relying on
+Session's transitive complete playback/free-export imports need the defining
+header. No measured compile-speed or additional native-format decoupling claim
+is made; native implementations already avoid Session.h.
+
+The exact two-path pan and five-path Session drafts were reviewed before live
+application, against committed53 and frozen53 (whose precommit parent remains
+committed52). Their independent checks are distinct from the combined build:
+
+- Pan: four matching complete emitter objects and twelve complete existing
+  sequence-model, compiler-cursor and MIDI-renderer fixture runs cover before/
+  candidate Release and focused ASan+UBSan. Four compact probe runs exercise both
+  declared laws, sixteen law/value-bit cases, ordinary/at/after/saturating/bound
+  headers and four undeclared-law rejections without counter/output mutation.
+  Raw explicit-law IR, channelPan lanes and stereoBalance remain legal. All
+  four arms match at 85,547 captured bytes per arm, including 51 encoded MIDI
+  captures and a 4,087-byte compact probe. Eighteen candidate-only actual Debug/
+  Release/RelWithDebInfo Werror checks pass. All sixteen link maps select the
+  exact side/mode standalone emitter and scalar pan definition, excluding the
+  old archive member. The 3,462 held project/vendor/generated header pins were
+  checked before compilation and after; actual MD closure has 62 non-SDK
+  task/frozen/held inputs. Six host toolchain resource inputs and the compiler
+  are hashed at closure; 898 SDK imports are counted, not exhaustively byte-pinned.
+  One metadata-only /tmp versus /private/tmp allowlist correction is retained;
+  compiler/runtime commands did not fail or repeat for that correction.
+- Session: twenty actual configured Werror syntax checks pass with empty output:
+  five real translation units and an isolated header in all three modes, plus
+  generated Qt MOC in Debug/Release. RelWithDebInfo's generated MOC files are
+  absent; no check is invented. Actual MD dependencies select the candidate
+  Session header. Materializing consumers retain Export.h; isolated/MOC imports
+  exclude Export.h and PerformanceModel.h. All 2,609 prehashed non-SDK pins and
+  271 unique actual non-SDK imports reverify. The 958 SDK imports are counted,
+  not exhaustively byte-pinned. Generated Qt inputs and live=committed UI include
+  paths are separately hashed. Two initial precompiler setup assertions and
+  root's canonical temporary-path metadata correction remain recorded; no passed
+  compiler check was rerun. This is a syntax/import proof, with no standalone
+  runtime, allocation or speed claim.
+
+Focused pan sanitizer runs instrument changed emitter and participating full
+fixtures/probes; remaining immutable libraries are Release. They do not establish
+whole-program ODR/ABI/sanitizer correctness, external binary compatibility,
+Windows/FENV/fault behavior or performance. The combined ordinary build below
+recompiles actual consumers with the new declaration.
+
+- Warning-free Release integration build: 179 steps; all 44 CTest suites pass.
+- Frozen54 retains full matching value/shared/test/Qt UI trees, four archives and
+  shell. Its provenance records committed53 as the precommit parent, distinct
+  from the resulting committed54 hash. Shell SHA256: `28a23c8cf777ffd204b8878753be51cfa2a07d2b8e56691c09c5cf177347090c`.
+  Separate archive hashes remain in provenance.
+- Against frozen53, all 252 original input/policy records and 3,922 artifact
+  names/hashes match exactly.
+- The /Volumes/emu/vgm replay preserves all 894 export records: 852 successes
+  and 42 matching existing failures. All 858 artifact names/sizes/hashes and
+  218,240,549 bytes per binary match. All 73 raw inventories match exactly.
+  No inventory normalization is needed. Five unsupported DSF failures remain unchanged.
+  Real coverage remains 37/38 registered families; KonamiTMNT2 is synthetic only.
+  See volume-coverage27/pass53-vs-pass54-summary.json.
+
+- Value: 2,388 added/3,733 deleted across 174 paths.
+- Architecture: 1,884 added/3,021 deleted across 97 paths.
+- Formats: 504 added/712 deleted across 77 paths.
+- Tests: 1,334 added/432 deleted across 45 paths.
+
+Net reductions are 1,345 value lines: 1,137 architecture and 208 format lines.
+UI reduction is now 22 lines. This batch removes six value lines, adds one UI
+import and three existing-fixture imports: five fewer production lines overall.
+No new permanent test or generic protocol is added.
+
+Fresh source-only audits retained actual complete-item annotation callers,
+primary versus expanded inspection ranges, sourceDirectory's live null/empty
+contracts, and source segment admission distinct from CPS's metadata-only range
+helper. Export/playback paths still preserve different ownership, selection,
+encoding and diagnostic order; SF2/DLS wire tables and WAV's direct PCM owner
+remain necessary. A local MIDI pitch event remains clearer than nullable borrowed
+state or paired numeric fields. Automation binding stores a track-vector index,
+while emitted headers carry the stored public automation ID; replacing the index
+with that ID would add an identity/index invariant. These observations include
+retained earlier findings and are source-only, not additional runtime measurements
+or a claim of exhaustion.
+
+After the exact54 original comparison closes, hash-gated pruning removes only
+3,922 old53 task-owned payloads (1,604,324,580 bytes). All records/logs and frozen
+sources/binaries remain, along with exact54 payloads. User/music files are never
+touched. See pruned-verified-originals53-after54-replay.json.
+
+Evidence: pan-entry54-root-review.json, session-import54-root-review.json,
+pass54-root-review.json, build-pass54.log, ctest-pass54.log, pass54-baseline,
+comparison-pass54.json, volume-coverage27/pass53-vs-pass54-summary.json.
+
+Next: continue cold source audits of synth authoring and durable command state,
+then prove any concrete responsibility reduction before applying it.

@@ -7,6 +7,7 @@
 #include "../TestSupport.h"
 
 #include "value/export/CollectionBinding.h"
+#include "value/export/Export.h"
 #include "../PerformanceTestSupport.h"
 #include "value/export/synth/SynthExportData.h"
 #include "value/extractors/PsfExtractor.h"

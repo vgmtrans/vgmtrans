@@ -7,6 +7,7 @@
 #include "../PerformanceTestSupport.h"
 #include "../TestSupport.h"
 
+#include "value/export/Export.h"
 #include "value/extractors/PsfExtractor.h"
 #include "value/formats/MP2k/MP2k.h"
 #include "value/formats/MP2k/MP2kEnvelope.h"

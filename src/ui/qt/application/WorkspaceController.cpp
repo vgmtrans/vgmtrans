@@ -7,6 +7,7 @@
 #include "application/WorkspaceController.h"
 
 #include "value/export/CollectionStitch.h"
+#include "value/export/Export.h"
 #include "value/formats/ValueFormats.h"
 
 #include <exception>

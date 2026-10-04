@@ -261,19 +261,13 @@ void PerformanceEmitter::expression(double linearGain, u32 sourceLevels) {
   });
 }
 
-void PerformanceEmitter::pan(PanPerformanceEvent event) {
-  if (event.law == PanLaw::Unspecified) {
-    event.law = panLaw_;
-  }
-  if (event.law == PanLaw::Unspecified) {
+void PerformanceEmitter::pan(double stereoPosition, double linearGain) {
+  if (panLaw_ == PanLaw::Unspecified) {
     throw std::logic_error("Positional pan requires a declared pan law");
   }
-  append(std::move(event));
-}
-
-void PerformanceEmitter::pan(double stereoPosition, double linearGain) {
-  pan(PanPerformanceEvent{
+  append(PanPerformanceEvent{
       .stereoPosition = stereoPosition,
+      .law = panLaw_,
       .linearGain = linearGain,
   });
 }

@@ -7,6 +7,7 @@
 #include "../TestSupport.h"
 
 #include "value/export/CollectionBinding.h"
+#include "value/export/Export.h"
 #include "value/extractors/PsfExtractor.h"
 #include "value/formats/SquarePS2/SquarePS2.h"
 #include "value/sequence/SequenceVm.h"

@@ -118,7 +118,6 @@ public:
   // sourceLevels counts distinct source values; zero means continuous or unknown.
   void level(double linearGain, u32 sourceLevels = 0);
   void expression(double linearGain, u32 sourceLevels = 0);
-  void pan(PanPerformanceEvent event);
   void pan(double stereoPosition, double linearGain = 1.0);
   void channelPan(ChannelPanPerformanceEvent event);
   void channelPan(double position);

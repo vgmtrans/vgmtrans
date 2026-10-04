@@ -7,7 +7,7 @@
 #pragma once
 
 #include "value/base/Source.h"
-#include "value/export/Export.h"
+#include "value/export/ExportTypes.h"
 #include "value/model/SessionSnapshot.h"
 #include "value/model/SourceInspection.h"
 #include "value/scan/FormatModule.h"
@@ -23,6 +23,7 @@
 namespace vgmtrans::core {
 
 class SessionState;
+struct CollectionPlayback;
 struct CollectionStitchResult;
 
 // Session is the mutable state for one loaded workspace. It owns the source
