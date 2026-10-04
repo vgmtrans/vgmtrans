@@ -6,9 +6,6 @@
 
 #include "value/scan/AssetCatalog.h"
 
-#include <algorithm>
-#include <optional>
-#include <string>
 #include <utility>
 
 namespace vgmtrans::core {

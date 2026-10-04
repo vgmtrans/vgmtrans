@@ -443,13 +443,13 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
     }
   }
 
-  std::optional<MidiSequence> midi;
+  MidiSequence midi;
   const auto* performance = prepared.performance();
   if (performance) {
     midi = renderMidiSequence(*performance, request.sequence.midi,
                              request.modulationConversion, &prepared.rendering.modulation);
   }
-  const auto synthConversion = midi ? request.modulationConversion : ModulationConversionPolicy::SynthModulators;
+  const auto synthConversion = performance ? request.modulationConversion : ModulationConversionPolicy::SynthModulators;
   auto synthBanks = performance ? std::optional{selectSynthBanks(*performance)}
                                : prepareSynthBanks(prepared.soundBankView(), binding.diagnostics);
   auto soundFont = !synthBanks || (performance && !performance->valid()) ? SynthExportResult{} : buildSoundFont2(
@@ -463,12 +463,12 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
       },
       sources);
 
-  if (midi && performance->valid()) {
-    playback.midi = encodeMidiFile(*midi);
+  if (performance && performance->valid()) {
+    playback.midi = encodeMidiFile(midi);
   }
   playback.soundFont = std::move(soundFont.bytes);
   playback.diagnostics = std::move(binding.diagnostics);
-  auto& midiDiagnostics = midi ? midi->diagnostics : prepared.rendering.diagnostics;
+  auto& midiDiagnostics = performance ? midi.diagnostics : prepared.rendering.diagnostics;
   playback.diagnostics.insert(playback.diagnostics.end(), std::make_move_iterator(midiDiagnostics.begin()),
                               std::make_move_iterator(midiDiagnostics.end()));
   playback.diagnostics.insert(playback.diagnostics.end(), std::make_move_iterator(soundFont.diagnostics.begin()),

@@ -1,14 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Forty-nine validated batches remove 1,318 net production lines
+`cb9e0b766`. Fifty validated batches remove 1,321 net production lines
 from `src/value`, plus the earlier 23 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 48 exactly;
-72 expanded raw inventories match byte-for-byte. 1 previously proven
-Sony scheduling difference matches retained original evidence under
-the existing narrow ID mapping. The cleanup2 records appear
+cover 37 of 38 registered families. All export records match batch 49 exactly.
+All 73 expanded raw inventories match byte-for-byte. The cleanup2 records appear
 at the end of this document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
@@ -9881,3 +9879,102 @@ pruned-verified-originals48-after49-replay.json.
 
 Next: continue the architecture audit, favoring removal of responsibilities
 and duplicate interpretation over new caches, wrappers or denser expressions.
+
+## Cleanup2 fiftieth batch: use existing playback presence
+
+prepareCollectionPlayback already holds a fixed pointer to its resolved
+performance. An optional MidiSequence repeated the pointer's presence state.
+Use an ordinary MidiSequence and the existing pointer at the three read gates.
+Keep performance presence separate from validity for encoding, and retain the
+render → synth build → MIDI encode → diagnostic/source-performance transfer order.
+No export work moves ahead of another writer, new flag or helper is introduced,
+and other optional export results retain their independent admission rules.
+
+This is a conceptual reduction with no line-count change. Two implementation
+include edits remove three net architecture lines: AssetCatalog.cpp drops three
+unused headers; SequenceProgram.cpp replaces unused utility with iterator for
+its live std::distance call. Namespace/function bytes and public headers stay
+unchanged. Format implementations and permanent tests are unchanged.
+
+The playback candidate's root-reviewed paired proof uses committed49 and matching
+frozen49 inputs, retaining the original cold48 authority separately:
+
+- All 37 final command records pass with empty stderr. Eighteen actual configured
+  Werror checks cover both implementations, the two unchanged full fixture TUs,
+  the probe and a direct SynthExportData.h inclusion in all three modes. This is
+  not a standalone Export.h header check or a complete project-consumer build.
+- Complete CollectionExport and ResolvedInstrument fixture assertions pass in
+  Release and focused ASan/UBSan/float-cast-overflow arms. Per arm, 204 generated
+  calls yield 192 successful captures, 192 retained copy/move captures after
+  all input owners die, six fixture playback captures, and twelve genuine MIDI
+  renderer exceptions. Four complete raw streams match at 613,091 bytes each.
+- Captures preserve title/IDs/dependencies/playability, actual MIDI/SF2 bytes,
+  complete owned performance events, automation/spans and ordered diagnostics.
+  Link maps select all six public exports from the changed object and exclude
+  frozen Export.cpp.o. Fixture interception observes playback calls only; other
+  API results are not claimed universally captured.
+
+The initial const-header harness assignment failure, incidental progress-log
+census and header-target report overstatement remain retained and corrected.
+Sources, commands and captures did not change during report correction.
+Focused sanitizers instrument the changed implementation and participating
+fixtures/probe; unchanged archives remain Release with consistent libc++
+container-annotation settings. No whole-program sanitizer, speed, peak memory,
+allocation-fault/destructor, FENV-policy or Windows equivalence is claimed.
+Plain default MidiSequence construction replaces a disengaged optional on
+absence; this change does not establish arbitrary failure-staging equivalence.
+
+The include candidate has its own minimal proof: twelve complete translation-unit
+syntax checks pass using actual Debug/Release/RelWithDebInfo production flags
+plus Werror and frozen49 source/fmt headers. Both bodies are byte-identical.
+No extra runtime matrix or permanent mirror test is added for header maintenance.
+
+- Warning-free Release integration build: 49 steps; all 44 CTest suites pass.
+- Frozen50 retains matching source/header/test trees, four archives and shell.
+  Its provenance records committed49 as the precommit parent. Shell SHA256:
+  `cd53feecd9aec28ab4dbe01f38bce8399c59a48f89b073954b379b124525af8c`.
+- Against frozen49, all 252 original input/policy records and 3,922 artifact
+  names/hashes match exactly.
+- The /Volumes/emu/vgm replay preserves all 894 export records: 852 successes
+  and 42 matching existing failures. All 858 artifact names/sizes/hashes and
+  218,240,549 bytes per binary match. All 73 raw inventories match exactly.
+  No inventory normalization is needed. Five unsupported DSF failures remain unchanged.
+  Real coverage remains 37/38 registered families; KonamiTMNT2 is synthetic only.
+  See volume-coverage27/pass49-vs-pass50-summary.json.
+
+- Value: 2,360 added/3,681 deleted across 171 paths.
+- Architecture: 1,859 added/2,972 deleted across 95 paths.
+- Formats: 501 added/709 deleted across 76 paths.
+- Tests: 1,327 added/428 deleted across 43 paths.
+
+Net production reductions are 1,321 value lines: 1,113 architecture and 208 format lines.
+The earlier 23 UI lines removed remain unchanged; this batch adds no permanent tests.
+
+Further cold reviews retain the distinction between source/provenance ownership,
+physical and musical time, declared intent and realized interruption, and
+optional control-flow override versus explicit fallthrough. Source-family BFS
+ordering cannot become insertion-order filtering; DependencyContext lookup
+uses the catalog's first valid duplicate rather than an arbitrary candidate's
+metadata. Emitter construction preserves independently owned provenance,
+scheduled timestamps and stable indexes. These source-only assessments add
+no runtime or exhaustion claim. See pass50-root-retained-boundaries.md,
+emitter-construction49-root-review.json and cursor-control50-root-review.json.
+
+Root-reviewed pruning reclaims 220 command-listed task-owned relocatable objects
+from closed batches 36, 37 and 40, totaling 1,375,960,608 bytes. Current bytes/types
+were independently recorded because older manifests did not pin every object.
+All 4,709 retained files, 56 debug-symbol bundles and corresponding binaries
+were reverified; unconfirmed shell support objects stay retained. Frozen49/50,
+active proofs, commands, sources, raw captures and user/music files are excluded.
+See intermediate-prune49-plan/applied-object-prune.json. After exact50 original
+comparison closes, hash-gated pruning removes only 3,922 old49 task-owned original
+payloads (1,604,324,580 bytes); every record/log and frozen source/binary stays,
+along with exact50 payloads. See pruned-verified-originals49-after50-replay.json.
+
+Evidence: playback-midi50-root-review.json, cpp-includes50-root-review.json,
+pass50-root-review.json, build-pass50.log, ctest-pass50.log, pass50-baseline,
+comparison-pass50.json, volume-coverage27/pass49-vs-pass50-summary.json.
+
+Next: remove the source-proven unreachable single-artifact adapter fallbacks
+only after paired public-result checks. Investigate reusing the existing playback
+view in erased runtime hooks; its aggregate ABI cost remains an open gate.
