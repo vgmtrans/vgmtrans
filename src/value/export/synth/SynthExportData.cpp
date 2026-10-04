@@ -258,11 +258,10 @@ void resolveSynthInstruments(PreparedSynthData& prepared, const SynthSampleIndex
 }  // namespace
 
 std::optional<std::vector<SynthBankSelection>> prepareSynthBanks(
-    std::span<const SoundBankAsset* const> soundBanks, std::vector<Diagnostic>& diagnostics) {
+    std::span<const SoundBankAsset> soundBanks, std::vector<Diagnostic>& diagnostics) {
   std::vector<std::optional<InstrumentAddress>> preferred;
-  for (const auto* bank : soundBanks) {
-    if (!bank) continue;
-    for (const auto& instrument : bank->instruments) {
+  for (const auto& bank : soundBanks) {
+    for (const auto& instrument : bank.instruments) {
       preferred.push_back(resolveInstrumentAddress(instrument.explicitAddress, instrument.identity));
     }
   }
@@ -274,10 +273,9 @@ std::optional<std::vector<SynthBankSelection>> prepareSynthBanks(
   }
   std::vector<SynthBankSelection> result;
   size_t index = 0;
-  for (const auto* bank : soundBanks) {
-    if (!bank) continue;
-    SynthBankSelection selected{.bank = bank};
-    for (const auto& instrument : bank->instruments) {
+  for (const auto& bank : soundBanks) {
+    SynthBankSelection selected{.bank = &bank};
+    for (const auto& instrument : bank.instruments) {
       selected.instruments.push_back({&instrument, (*addresses)[index++]});
     }
     result.push_back(std::move(selected));

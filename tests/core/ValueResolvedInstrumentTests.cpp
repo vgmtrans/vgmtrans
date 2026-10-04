@@ -17,6 +17,7 @@
 
 #include <array>
 #include <set>
+#include <span>
 #include <limits>
 #include <type_traits>
 
@@ -276,7 +277,7 @@ void nonportableSourceAddressesShareOneCompanionPlan() {
   test::SessionSnapshotBuilder builder;
   builder.assets.emplace_back(bank);
   const auto snapshot = builder.finish();
-  const std::array banks{&bank};
+  const std::span<const SoundBankAsset> banks{&bank, 1};
   const auto selected = prepareSynthBanksForTest(banks);
   for (const auto format : {SynthExportFormat::SoundFont2, SynthExportFormat::Dls}) {
     const auto standalone = exportSoundBank(snapshot, sources, bank.metadata.id, format, {});
@@ -316,7 +317,7 @@ void externalMidiAddressesReserveTheirEncodedSelections() {
   full.instruments.resize(128 * 128 + 1);
   const auto failed = preparePerformance({}, {full});
   expect(!failed.valid() && failed.instrumentAddresses().empty(), "address exhaustion must leave no partial performance plan");
-  const std::array banks{&full};
+  const std::span<const SoundBankAsset> banks{&full, 1};
   std::vector<Diagnostic> diagnostics;
   expect(prepareSynthBanks({}, diagnostics).has_value() && diagnostics.empty(), "empty bank preparation must succeed");
   expect(!prepareSynthBanks(banks, diagnostics) && diagnostics.size() == 1 &&
@@ -579,7 +580,7 @@ void completedCollectionsRetainInputsAcrossRenderingOutcomes() {
                prepared.samplePools[0]->metadata.name == "Samples" && prepared.soundBanks().size() == 1 &&
                prepared.soundBanks()[0].instruments.size() == (rendered ? 2 : 1),
            "moves and copies must retain bank data, metadata, and external sample owners in every outcome");
-    const auto banks = prepared.soundBankView();
+    const auto& banks = prepared.soundBanks();
     const auto synth = buildSoundFont2({.soundBanks = prepareSynthBanksForTest(banks), .samplePools = prepared.samplePools}, sources);
     expect(!synth.bytes.empty() && synth.diagnostics.empty(),
            "retained inputs must remain usable for synth export after their original owners are destroyed");

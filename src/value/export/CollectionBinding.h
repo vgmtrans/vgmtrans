@@ -81,7 +81,6 @@ public:
   [[nodiscard]] const ResolvedPerformance* performance() const noexcept {
     return performance_ ? &*performance_ : nullptr;
   }
-  [[nodiscard]] std::vector<const SoundBankAsset*> soundBankView() const;
   [[nodiscard]] const std::vector<SoundBankAsset>& soundBanks() const noexcept { return *soundBanks_; }
 
   CollectionId id;

@@ -40,7 +40,7 @@ constexpr std::string_view kExtendedId666Signature = "xid6";
   return "SPC";
 }
 
-[[nodiscard]] std::string nullTerminatedString(std::span<const u8> bytes, u64 offset, u64 maxLength) {
+[[nodiscard]] std::string_view nullTerminatedString(std::span<const u8> bytes, u64 offset, u64 maxLength) {
   if (offset >= bytes.size()) {
     return {};
   }
@@ -48,13 +48,13 @@ constexpr std::string_view kExtendedId666Signature = "xid6";
   const u64 available = std::min<u64>(maxLength, bytes.size() - offset);
   const auto field = bytes.subspan(offset, available);
   const auto end = std::ranges::find(field, u8{0});
-  return std::string(reinterpret_cast<const char*>(field.data()), static_cast<size_t>(end - field.begin()));
+  return std::string_view(reinterpret_cast<const char*>(field.data()), static_cast<size_t>(end - field.begin()));
 }
 
 [[nodiscard]] std::optional<std::string> spcTitle(ByteReader reader) {
   const auto bytes = reader.slice(0, reader.size());
-  // Prefer extended ID666 titles when present, but fall back to the fixed SPC title field.
-  std::string title;
+  // Start with the fixed ID666 title; the last complete extended title replaces it.
+  std::string_view title;
   if (bytes.size() > 0x23 && bytes[0x23] == 0x1a) {
     title = nullTerminatedString(bytes, kId666TitleOffset, kId666TitleSize);
   }
@@ -91,7 +91,7 @@ constexpr std::string_view kExtendedId666Signature = "xid6";
   if (title.empty()) {
     return std::nullopt;
   }
-  return title;
+  return std::string(title);
 }
 
 }  // namespace

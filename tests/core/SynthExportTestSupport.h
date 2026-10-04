@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <span>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -19,7 +20,7 @@
 namespace {
 
 std::vector<vgmtrans::core::SynthBankSelection> prepareSynthBanksForTest(
-    std::span<const vgmtrans::core::SoundBankAsset* const> banks) {
+    std::span<const vgmtrans::core::SoundBankAsset> banks) {
   std::vector<vgmtrans::core::Diagnostic> diagnostics;
   auto selected = vgmtrans::core::prepareSynthBanks(banks, diagnostics);
   if (!selected) throw std::runtime_error("Test synth bank address preparation failed");

@@ -201,7 +201,7 @@ void appendCollectionWavArtifacts(std::vector<Artifact>& artifacts, const Prepar
   std::optional<SynthExportInput> synthInput;
   if (exportsSynth && (performance ? performance->valid() : !synthRequiresPerformance)) {
     auto synthBanks = performance ? std::optional{selectSynthBanks(*performance)}
-                                 : prepareSynthBanks(prepared.soundBankView(), binding.diagnostics);
+                                 : prepareSynthBanks(prepared.soundBanks(), binding.diagnostics);
     if (synthBanks) {
       synthInput = SynthExportInput{
           .name = prepared.baseName,
@@ -354,8 +354,7 @@ Artifact exportSoundBank(const SessionSnapshot& snapshot, const SourceStore& sou
   if (!binding.collection) {
     return failedArtifact(std::move(binding.diagnostics));
   }
-  const std::array banks{&binding.collection->soundBanks().front()};
-  auto selected = prepareSynthBanks(banks, binding.diagnostics);
+  auto selected = prepareSynthBanks(binding.collection->soundBanks(), binding.diagnostics);
   if (!selected) return failedArtifact(std::move(binding.diagnostics));
   auto artifact = exportSynth(
       SynthExportInput{
@@ -441,7 +440,7 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
   }
   const auto synthConversion = performance ? request.modulationConversion : ModulationConversionPolicy::SynthModulators;
   auto synthBanks = performance ? std::optional{selectSynthBanks(*performance)}
-                               : prepareSynthBanks(prepared.soundBankView(), binding.diagnostics);
+                               : prepareSynthBanks(prepared.soundBanks(), binding.diagnostics);
   auto soundFont = !synthBanks || (performance && !performance->valid()) ? SynthExportResult{} : buildSoundFont2(
       SynthExportInput{
           .name = playback.title,

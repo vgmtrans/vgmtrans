@@ -25,6 +25,8 @@
 #include <algorithm>
 #include <array>
 #include <limits>
+#include <span>
+#include <utility>
 
 using namespace vgmtrans::core;
 
@@ -923,7 +925,7 @@ void exportDiagnosticsPreserveSourceRanges() {
       }},
   };
 
-  const std::array<const SoundBankAsset*, 1> soundBanks{&badRegionSet};
+  const std::span<const SoundBankAsset> soundBanks{&badRegionSet, 1};
   const std::array<const SamplePoolAsset*, 1> validSamples{&validSamplePool};
   const auto sf2BadRegion = buildSoundFont2(
       SynthExportInput{
@@ -1116,7 +1118,7 @@ void synthPreparationKeepsSampleIdentityAndPhaseOrdering() {
                      Region{.sample = SampleRef::resolved(pool.metadata.id, 1)},
                      Region{.sample = SampleRef::resolved(pool.metadata.id, 0), .invertSamplePhase = true},
                  }});
-  const std::array<const SoundBankAsset*, 1> banks{&bank};
+  const std::span<const SoundBankAsset> banks{&bank, 1};
   const std::array<const SamplePoolAsset*, 1> pools{&pool};
   const auto prepared = prepareSynthData(
       SynthExportInput{.soundBanks = prepareSynthBanksForTest(banks), .samplePools = pools, .filterSamplesToReferencedInstruments = true},
@@ -1147,7 +1149,7 @@ void synthPreparationKeepsSampleIdentityAndPhaseOrdering() {
          "sample-start trimming must preserve phase and rebase the loop");
   auto second = bank;
   second.localSamples.samples[0].encodedData = {sources.add(SourceFile{}, {0, 1, 0, 2}), 0, 4};
-  const std::array copies{&bank, &second};
+  const std::array copies{std::move(bank), std::move(second)};
   for (bool filter : {false, true}) {
     const auto separate = prepareSynthData({.soundBanks = prepareSynthBanksForTest(copies), .samplePools = pools,
                                             .filterSamplesToReferencedInstruments = filter}, sources);

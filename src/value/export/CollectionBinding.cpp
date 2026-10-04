@@ -248,13 +248,4 @@ PreparedCollection::PreparedCollection(BoundCollection collection, const Collect
   }
 }
 
-std::vector<const SoundBankAsset*> PreparedCollection::soundBankView() const {
-  std::vector<const SoundBankAsset*> view;
-  view.reserve(soundBanks().size());
-  for (const auto& soundBank : soundBanks()) {
-    view.push_back(&soundBank);
-  }
-  return view;
-}
-
 }  // namespace vgmtrans::core

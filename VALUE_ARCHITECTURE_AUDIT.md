@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Seventy-three validated batches remove 1,598 net production lines
+`cb9e0b766`. Seventy-four validated batches remove 1,610 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 73 replays both corpora against its
-committed batch 72 predecessor. All 73 expanded raw inventories match exactly;
+cover 37 of 38 registered families. Batch 74 replays both corpora against its
+committed batch 73 predecessor. All 73 expanded raw inventories match exactly;
 no classification is needed. The cleanup2 records appear at the end of this
 document.
 
@@ -11872,3 +11872,92 @@ Evidence includes midi-routing73-root-cold-review.json, the final72 independent
 planner peer, pass73-application-receipt.json, roll-forward73-root-admission.json,
 original73-root-closed.json, corpora73-root-review.json and final/postcommit
 receipts. User-owned changes remain untouched. Architecture review continues.
+
+### cleanup2 batch 74: prepare owned bank collections directly and own only the final SPC title
+
+prepareSynthBanks now accepts span<const SoundBankAsset>. Its callers already
+own contiguous bank vectors; they no longer build a pointer projection just to
+walk those same banks. Delete PreparedCollection::soundBankView and pass the
+existing soundBanks() query directly. The standalone binding also has exactly
+its requested bank: no-sequence dependency resolution selects that one ID and
+subsequently resolves only sample pools. Complete producer review supports the
+direct whole-vector call; an initial conservative slicing preference was
+withdrawn. The separately preserved slice alternative is excluded, and no
+widened-bank regression was demonstrated.
+
+Retain both preparation walks. Gather ordered instrument address preferences,
+allocate once, and return the same exhaustion error before constructing any
+selection on failure. Only then build completed selections borrowing the same
+bank elements and instruments. Empty input is still an engaged empty result;
+empty instruments still retain a bank for unfiltered local samples. Binding
+validation, format callbacks, decoding and writer stages keep their positions.
+The output SynthBankSelection remains useful and unchanged.
+
+This intentionally narrows the public input API: its old pointer-span signature,
+nullable entries and projection of scattered/reordered owners disappear. The
+owning pointer-view query disappears too. Returned selections still require the
+bank owner through conversion; the declaration states that borrowing contract.
+No adapter, overload, generic range framework or new owner type replaces it.
+Removing pointer-vector construction removes its allocation/failure sites; no
+external-client, arbitrary allocator/destructor, speed or peak-memory guarantee
+is asserted.
+
+Existing singleton fixtures use const spans into their same named mutable banks,
+so later mutations remain visible. The retained PreparedCollection fixture uses
+its surviving shared bank vector directly after original owners die. The sole
+two-bank input moves its two final values into an array after their last mutation
+and use. Both keep their same AssetId and distinct local PCM/trim/loop data,
+while external samples remain shared. Existing exhaustion, ownership, writer,
+filtering, PCM and index assertions are unchanged. Four fixture/support files
+add five direct standard-library include lines; no new mirror tests are added.
+
+The private SPC parser now selects bounded string_views and creates one final
+owned optional<string>. No view leaves the synchronous parser. The last complete
+extended title still replaces the fixed title, including empty clearing it;
+truncation, NUL clipping, entry alignment and recognition/RAM-copy/publication
+order remain unchanged. Correct the misleading fallback comment to state that
+precedence. The actual Capcom fixture checks fixed-title derived metadata and
+collection/sequence names; it supplies no dedicated extended/empty-title parser
+coverage. Interim overwritten-title allocations disappear, intentionally changing
+allocation-failure staging without a measured cost or arbitrary-fault claim.
+
+Six production paths remove 12 lines, all architecture. Cumulative removal is
+1,610 value lines: 1,281 architecture and 329 native-format lines,
+plus 22 UI lines. Root reconstructs all ten complete source/fixture bodies from
+committed/frozen73, using exact scoped inputs, whole patches and independent
+SPC/bank peers. The bank draft checks 24 complete inputs (21 frozen and three
+Git/live documentation inputs); the SPC peer checks seven frozen inputs. Earlier
+ownership-only/comment alternatives, setup count/head/inventory/file-order
+failures and provisional source questions remain preserved as source evidence.
+
+The Release build completes 73 warning-free steps and all 44 CTest
+suites pass. Matching value/shared/tests/Qt trees, four archives and shell
+4922d6e60cc08d6375b1d6a300f6216048afc55fb1ae03e039048b380c5caf08 are frozen. Its bytes differ from73, so both corpora are freshly
+replayed against that immediate predecessor. All 252 original result records
+and 3,922 artifacts match. All 894 expanded export pairs and 858 artifacts match;
+All 73 raw inventories match; no classifications are needed. There are no new manual repetitions or
+broader normalization. Existing real inputs cover 37 of 38 registered families;
+this is not every-input, new sanitizer or arbitrary-fault proof.
+
+Original payload retention follows the unchanged reviewed per-pair policy. The
+independent74 runner changes only six generation references. Root gates matching
+sources/archives/shell, selected inputs and exact runner bytes, then verifies
+252 complete equal records, linked 252 pending/completed receipt pairs, every
+old73 removal and all 1,604,324,580 retained candidate74 bytes before expanded
+replay. Matched nonzero-status partial outputs remain retained. Music, all result
+records, frozen sources, archives and shells remain preserved. Fresh-only/manual
+recovery and absence of replay rollback/fsync guarantees remain as documented.
+
+A separate source clarification withdraws the claim that final null
+SynthBankSelection entries are omitted: prepareSynthData dereferences their bank
+pointer. Old nullable prepareSynthBanks inputs and external sample-pool omission
+are different contracts. Accepted74 changes no final-selection admission or
+behavior; the inaccurate existing header sentence is queued for a later comment
+correction. The accepted candidate/peer is preserved, with a separate erratum.
+
+Evidence includes owner-inputs74-root-cold-review.json, both exact source peers,
+pass74-application-receipt.json, original-roll-forward74-scan-peer.json,
+original74-root-closed.json, corpora74-root-review.json, the null-selection
+erratum/annex and final/postcommit receipts. User-owned changes remain untouched.
+Architecture review continues; the separate SegSat constructor draft is outside
+this batch and has no runtime claim yet.

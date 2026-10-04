@@ -30,9 +30,10 @@ struct SynthBankSelection {
 };
 
 // Prepare full banks with the same portable allocator as performance export.
+// Returned selections borrow the banks; their owner must outlive conversion.
 // Address exhaustion returns no selection and appends an error diagnostic.
 [[nodiscard]] std::optional<std::vector<SynthBankSelection>> prepareSynthBanks(
-    std::span<const SoundBankAsset* const> soundBanks, std::vector<Diagnostic>& diagnostics);
+    std::span<const SoundBankAsset> soundBanks, std::vector<Diagnostic>& diagnostics);
 [[nodiscard]] std::vector<SynthBankSelection> selectSynthBanks(
     const ResolvedPerformance& performance);
 

@@ -24,6 +24,7 @@
 #include <cfenv>
 #include <cmath>
 #include <limits>
+#include <span>
 
 using namespace vgmtrans::core;
 
@@ -61,7 +62,7 @@ void regionResponsesAreSampledAtExport() {
   expect(regionSamplingStep(bank, diagnostics, 1) == 128 && diagnostics.size() == 1,
          "even the coarsest sampling must report when native region count exceeds the budget");
 
-  const std::array<const SoundBankAsset*, 1> banks{&bank};
+  const std::span<const SoundBankAsset> banks{&bank, 1};
   const SynthExportInput input{.name = "Response", .soundBanks = prepareSynthBanksForTest(banks)};
   auto prepared = prepareSynthData(input, sources);
   const auto sf2 = buildSoundFont2(input, sources);
@@ -354,7 +355,7 @@ void regionModulationExportsAtTheRegionScope() {
               },
       }},
   };
-  const std::array<const SoundBankAsset*, 1> soundBanks{&instruments};
+  const std::span<const SoundBankAsset> soundBanks{&instruments, 1};
   const std::array<const SamplePoolAsset*, 1> samplePools{&samples};
   const SynthExportInput input{
       .name = "Region LFO",
@@ -478,7 +479,7 @@ void soundFontExporterWritesSfbkRiffFile() {
       }},
   };
 
-  const std::array<const SoundBankAsset*, 1> soundBanks{&soundBank};
+  const std::span<const SoundBankAsset> soundBanks{&soundBank, 1};
   const std::array<const SamplePoolAsset*, 1> samples{&samplePool};
   const MidiModulationUsage midiModulationUsage{
       .vibratoDepth = 38.0 / 127.0,
@@ -686,7 +687,7 @@ void soundFontSampleHeadersUseTheFirstReferencingRegion() {
              .loop = Loop{.enabled = true, .start = 2, .length = 1}},
       Region{.sample = SampleRef::resolved(bank.metadata.id, 0), .unityKey = 72.0},
   }});
-  const std::array<const SoundBankAsset*, 1> banks{&bank};
+  const std::span<const SoundBankAsset> banks{&bank, 1};
   const auto result = buildSoundFont2(SynthExportInput{.soundBanks = prepareSynthBanksForTest(banks)}, sources);
   expect(result.diagnostics.empty() && chunkSize(result.bytes, "shdr") == 3 * 46,
          "SoundFont should retain unreferenced samples when filtering is disabled");
@@ -714,7 +715,7 @@ void synthSampleIndexesRetainTheirRangeUntilContainerExport() {
   bank.instruments.push_back(Instrument{
       .regions = {Region{.sample = SampleRef::resolved(bank.metadata.id, lastSample)}},
   });
-  const std::array<const SoundBankAsset*, 1> banks{&bank};
+  const std::span<const SoundBankAsset> banks{&bank, 1};
   const SynthExportInput input{.soundBanks = prepareSynthBanksForTest(banks)};
   const auto prepared = prepareSynthData(input, sources);
   const u32 resolved = prepared.instruments.at(0).regions.at(0).sampleIndex;
@@ -803,7 +804,7 @@ void dlsExporterWritesDlsRiffFile() {
       }},
   };
 
-  const std::array<const SoundBankAsset*, 1> soundBanks{&soundBank};
+  const std::span<const SoundBankAsset> soundBanks{&soundBank, 1};
   const std::array<const SamplePoolAsset*, 1> samples{&samplePool};
   const MidiModulationUsage midiModulationUsage{
       .vibratoDepth = 38.0 / 127.0,
