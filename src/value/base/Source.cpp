@@ -125,10 +125,6 @@ bool ByteReader::has(u64 offset, u64 size) const noexcept {
   return offset <= bytes_.size() && size <= bytes_.size() - offset;
 }
 
-SourceRange ByteReader::range(u64 offset, u64 size) const noexcept {
-  return SourceRange{.source = source_, .offset = offset, .size = size};
-}
-
 u8 ByteReader::u8At(u64 offset) const {
   require(offset, 1);
   return bytes_[offset];

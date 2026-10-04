@@ -112,15 +112,9 @@ struct CommandFlow {
   }
 
   [[nodiscard]] std::optional<Address> discoveryContinuation() const noexcept {
-    switch (defaultTransition.kind) {
-      case CommandTransitionKind::Fallthrough:
-      case CommandTransitionKind::Call:
-        return continuation;
-      case CommandTransitionKind::Jump:
-      case CommandTransitionKind::Return:
-      case CommandTransitionKind::End:
-      case CommandTransitionKind::EndSection:
-        return std::nullopt;
+    if (defaultTransition.kind == CommandTransitionKind::Fallthrough ||
+        defaultTransition.kind == CommandTransitionKind::Call) {
+      return continuation;
     }
     return std::nullopt;
   }

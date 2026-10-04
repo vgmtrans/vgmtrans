@@ -478,11 +478,7 @@ public:
   CompilerCursor(ByteReader reader, u32 begin, u32 end, std::string_view kindPrefix,
                  std::vector<Diagnostic>* diagnostics = nullptr)
       : record_(reader, begin, end, diagnostics, false), kindPrefix_(kindPrefix), diagnostics_(diagnostics) {
-    const auto opcode = record_.u8("opcode", SourceValueDisplay::Hex);
-    if (opcode) {
-      opcode_ = *opcode;
-      opcodeRange_ = opcode.range;
-    }
+    opcode_ = record_.u8("opcode", SourceValueDisplay::Hex).value;
   }
 
   // Most extracted sequence sources use the complete byte buffer. Formats
@@ -492,7 +488,7 @@ public:
       : CompilerCursor(reader, begin, static_cast<u32>(std::min<u64>(reader.size(), std::numeric_limits<u32>::max())),
                        kindPrefix, diagnostics) {}
 
-  [[nodiscard]] bool hasOpcode() const noexcept { return opcodeRange_.size != 0; }
+  [[nodiscard]] bool hasOpcode() const noexcept { return record_.range().size != 0; }
   [[nodiscard]] bool ok() const noexcept { return record_.ok(); }
   [[nodiscard]] ::u8 opcode() const noexcept { return opcode_; }
 
@@ -622,7 +618,10 @@ public:
   template <class T>
   T opcodeValue(std::string_view name, T value, SourceValueDisplay display = SourceValueDisplay::Default,
                 SemanticOperandRole role = SemanticOperandRole::Value) {
-    add(name, detail::semanticValue(value), opcodeRange_, display, role);
+    const auto consumed = record_.range();
+    const auto range = consumed.size == 0 ? SourceRange{}
+                                          : SourceRange{.source = consumed.source, .offset = consumed.offset, .size = 1};
+    add(name, detail::semanticValue(value), range, display, role);
     return value;
   }
 
@@ -777,7 +776,6 @@ private:
   std::string kindPrefix_;
   std::vector<Diagnostic>* diagnostics_ = nullptr;
   ::u8 opcode_ = 0;
-  SourceRange opcodeRange_;
   std::vector<SourceField> fields_;
   std::vector<SemanticOperand> operands_;
 };

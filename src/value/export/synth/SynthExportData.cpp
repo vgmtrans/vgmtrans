@@ -95,13 +95,13 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
     // Visit inverted variants first, preserving the existing sample order.
     for (auto it = last; it != first;) {
       auto& [key, outputIndex] = *--it;
+      const u64 skip = static_cast<u64>(key.startFrame) * decoded->channels;
+      if (key.startFrame != 0 && skip >= decoded->pcm.size()) {
+        prepared.diagnostics.push_back(exportError("Sample start frame is outside decoded sample data"));
+        continue;
+      }
       auto audio = it == first ? std::move(*decoded) : *decoded;
       if (key.startFrame != 0) {
-        const u64 skip = static_cast<u64>(key.startFrame) * audio.channels;
-        if (skip >= audio.pcm.size()) {
-          prepared.diagnostics.push_back(exportError("Sample start frame is outside decoded sample data"));
-          continue;
-        }
         // Trim after decoding/filtering to preserve ADPCM predictor history.
         audio.pcm.erase(audio.pcm.begin(), audio.pcm.begin() + skip);
         const u32 loopEnd = audio.loop.start + audio.loop.length;

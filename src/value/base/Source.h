@@ -110,7 +110,9 @@ public:
   [[nodiscard]] u64 size() const noexcept { return bytes_.size(); }
   [[nodiscard]] bool empty() const noexcept { return bytes_.empty(); }
   [[nodiscard]] bool has(u64 offset, u64 size) const noexcept;
-  [[nodiscard]] SourceRange range(u64 offset, u64 size) const noexcept;
+  [[nodiscard]] SourceRange range(u64 offset, u64 size) const noexcept {
+    return SourceRange{.source = source_, .offset = offset, .size = size};
+  }
 
   // Fixed-width reads and slices throw on out-of-range access. Use has() first
   // when malformed data should stop parsing without an exception.

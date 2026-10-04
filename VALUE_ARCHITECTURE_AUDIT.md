@@ -1,14 +1,14 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Forty-eight validated batches remove 1,308 net production lines
-from `src/value`, plus 23 UI lines. All 44 CTest suites pass.
+`cb9e0b766`. Forty-nine validated batches remove 1,318 net production lines
+from `src/value`, plus the earlier 23 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 47 exactly;
-72 expanded raw inventories match byte-for-byte. One previously proven
-Sony scheduling difference matches the retained original evidence under the
-existing narrow ID mapping. The cleanup2 records appear
+cover 37 of 38 registered families. All export records match batch 48 exactly;
+72 expanded raw inventories match byte-for-byte. 1 previously proven
+Sony scheduling difference matches retained original evidence under
+the existing narrow ID mapping. The cleanup2 records appear
 at the end of this document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
@@ -9747,3 +9747,137 @@ pruned-closed-endpoint38-intermediates-before48.json.
 Next: continue probing format-authoring and architecture ownership. Two cold
 follow-ups simplify a pure discovery query and validate sample trims before
 cloning PCM; neither is treated as proven or applied in this batch.
+
+## Cleanup2 forty-ninth batch: derive cursor state and validate before copying
+
+The changes keep existing interfaces and remove redundant work:
+
+- CompilerCursor derives opcode presence and its first-byte attribution from
+  RecordReader, which already owns the fixed beginning and consumed position.
+  Remove its duplicate SourceRange and constructor branch. Empty windows still
+  attribute opcodeValue to {}; later truncation retains the consumed opcode.
+- Put ByteReader's unchanged pure range construction beside its other inline
+  queries. Source bounds, invalid IDs, zero anchors and unsigned values remain
+  verbatim; this method constructs attribution rather than validating bytes.
+- CommandFlow expresses physical discovery as the two allowed kinds,
+  Fallthrough and Call. Preserve its named query and independent runtime/default
+  transitions. Future enum additions lose this query's missing-switch warning.
+- Synth preparation rejects an out-of-data trim before cloning decoded PCM.
+  Keep zero-start admission, reverse variant order, final move, filtering, loop
+  metadata, indices, names and ordered diagnostics. This changes no line count.
+
+The five production paths remove ten net architecture lines; no new permanent
+mirror test or format-authoring protocol is introduced.
+
+The three exact candidates have separate root-reviewed proofs against committed48
+and matching frozen48; the precommit parent in frozen provenance remains distinct:
+
+- Discovery: 122 successful command records, including 54 actual configured
+  Werror checks in all three modes. Nine complete Release fixture suites produce
+  861,492 exact bytes per side; three core suites and 44 current/defined-invalid
+  transition cases also match across focused sanitizer arms. Six affected native
+  consumer units are rebuilt for the paired Release proof.
+- Sample trimming: 42 successful records, including 21 actual configured strict
+  checks. Three full existing synth/resolution/collection suites plus 864 generated
+  rows yield 1,728 preparations and 1,728 SF2/DLS writer results. All four raw
+  captures match exactly at 21,306,729 bytes per arm. Link maps select the changed
+  unit and exclude the frozen implementation. This is not a claim that every
+  generated malformed input exports cleanly; ordered diagnostics and partial
+  results match too. The actual decoded channels type is u8, correcting the
+  earlier cold draft's conservative wider bound.
+- Cursor/range: all 114 final records pass, including 24 actual configured
+  Werror checks and six header-selection dependency checks. Complete 19 cursor,
+  17 source-map and 14 synth-builder fixture functions pass in both Release and
+  focused sanitizer arms. The 36 cursor/18 direct-member cases produce four exact
+  31,873-byte captures, preserving fields, roles, diagnostics and graph metadata.
+  Eight link maps rule out the old Source.cpp object and identify the candidate
+  weak inline range body emitted by the reviewed member-address smoke.
+
+Initial harness failures remain visible: sample helper inclusion produced eight
+unused-function Werror diagnostics; the corrected harness uses the public API.
+The first cursor sanitizer attempt named scan/SynthBuilder.cpp instead of the
+actual synth/SynthBuilder.cpp. Its failing command/script/log and initial captures
+remain retained. The corrected run reuses 62 hash-gated unchanged successful
+records and repeats the extended boundary probe; no failed command is counted
+as a success. No permanent test duplicates these implementation-only probes.
+
+The observed x86_64h cursor layout shrinks 192 to 168 bytes. Its O3 presence
+query adds one field load/instruction, with no opaque call or conditional branch.
+Default copy assignment can already fail after replacing the reader but before
+copying the opcode/cache. Derived presence may differ in that partially assigned
+state; arbitrary failed-assignment/reuse equivalence is not promised. Scoped
+consumer inspection finds no direct whole-cursor assignment, while normal copy
+and move construction/assignment are explicitly checked. No timing/speed or
+fixed ABI size claim follows from the observed layout/codegen.
+
+
+The range method keeps its source-level signature and member-pointer callability.
+Focused probes explicitly emit the candidate inline body for unchanged frozen
+archive consumers, and record the replacement Source object and link map.
+Those consumers are compatibility coverage; they are not claimed recompiled.
+The complete integrated build rebuilds the app/core/formats against matching
+headers. No separately compiled old-object or cross-DSO ABI promise is made.
+
+Invalid trims avoid a discarded PCM clone when the rejected variant is not the
+last reverse iteration. Final rejected variants formerly moved that vector;
+no clone saving is claimed there. Allocation-failure staging and destruction
+before the outer body ends can differ. No speed/RSS/fault-ordinal equivalence
+claim is made. Focused sanitizers cover the changed units and participating
+runners/fixtures, with matching remaining archives in Release.
+
+- Warning-free complete Release build: 357 steps. All 44 CTest suites pass.
+- Frozen49 retains exact source/header/test trees, four archives and the shell;
+  its provenance records committed48 as its precommit parent. Shell SHA256:
+  `0f13b130d853e0af6ee87207db3279a6612b416f6f07f8723962932cde38f84c`.
+- Against frozen48, all 252 original input/policy records and 3,922 artifact
+  names/hashes match exactly.
+- The /Volumes/emu/vgm replay preserves all 894 export records: 852 successes
+  and 42 matching existing failures. All 858 artifact names/sizes/hashes and
+  218,240,549 bytes per binary match. 72 raw inventories match exactly.
+  1 previously proven Sony scheduling difference passes the existing narrow
+  asset declaration/member-ID mapping against retained original evidence; all
+  raw records/diffs remain. Five unsupported DSF failures remain unchanged.
+  Real coverage remains 37/38 registered families; KonamiTMNT2 is synthetic only.
+  See volume-coverage27/pass48-vs-pass49-summary.json.
+
+- Value: 2,354 added/3,672 deleted across 171 paths.
+- Architecture: 1,853 added/2,963 deleted across 95 paths.
+- Formats: 501 added/709 deleted across 76 paths.
+- Tests: 1,327 added/428 deleted across 43 paths.
+
+Net production reductions are 1,318 value lines: 1,110 architecture and 208 format lines.
+The earlier 23 UI lines removed remain unchanged; this batch adds no permanent tests.
+
+Binding/snapshot owners, VM source/time/musical state, reader recovery rules,
+validation of unsorted malformed input and explicit synth source ranges retain
+separate purposes. Zero-step timed motion still runs to its requested endpoint;
+interruption cannot replace original duration with realized end. Source spans
+also describe rests/control flow and sustained closures. See
+pass49-root-retained-boundaries.md, sequence-responsibility-cold49,
+snapshot-source-cold49 and scan-handoff-cold49. Their source-only assessments
+retain immutable-revision indexes, declared/expanded ranges, insertion/inspection
+ordering, inherited/explicit ownership and repair/admission/error-phase boundaries.
+These reviews produce no fresh runtime or exhaustion claim.
+
+Closed root-reviewed proofs permit reclaiming 137 task-owned relocatable objects
+and three redundant SegSat proof archive arms, totaling 548,149,440 bytes.
+Sources, raw captures, commands, manifests, reports, executables, candidate
+Release SegSat archive and frozen integration authority remain retained.
+Pruning receipts explicitly identify removed intermediates and their hashes.
+After the exact49 original-corpus comparison closes, independently hash-gated
+pruning reclaims only the 3,922 old48 task-owned original payloads
+(1,604,324,580 bytes); every JSON/log and frozen binary/source stays retained,
+alongside the exact49 payloads. See pruned-verified-originals48-after49-replay.json.
+User source work and /Volumes/emu/vgm remain untouched.
+
+Evidence: discovery49-root-review.json, trim-copy49-root-review.json, cursor-range49-root-review.json,
+snapshot-source49-root-review.json, scan-handoff49-root-review.json,
+pass49-root-review.json, build-pass49.log, ctest-pass49.log,
+pass49-baseline, comparison-pass49.json,
+volume-coverage27/pass48-vs-pass49-summary.json,
+pruned-closed-proof48-intermediates.json,
+pruned-closed-reader-and-scan-intermediates49.json,
+pruned-verified-originals48-after49-replay.json.
+
+Next: continue the architecture audit, favoring removal of responsibilities
+and duplicate interpretation over new caches, wrappers or denser expressions.
