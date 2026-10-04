@@ -90,8 +90,8 @@ void psxAdpcmCatalogBoundsStreamsAndKeepsSampleReferences() {
     addPsxAdpcmSamples(samples, streams, kPs2SpuSampleRate, parent);
     const auto first = samples.find(0);
     const auto second = samples.find(16);
-    expect(first && first->owner() == asset && first->index() == 0 && second && second->owner() == asset &&
-               second->index() == 1 && !samples.find(48),
+    expect(!first.empty() && first.owner() == asset && first.index() == 0 && !second.empty() &&
+               second.owner() == asset && second.index() == 1 && samples.find(48).empty(),
            "sample references should resolve relative source offsets after rejected streams are omitted");
     const auto built = std::move(samples).finish();
     const auto annotations = sourceMap.finish();

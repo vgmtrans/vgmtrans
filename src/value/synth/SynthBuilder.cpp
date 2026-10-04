@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <stdexcept>
 #include <utility>
 
@@ -211,10 +212,10 @@ SamplePoolBuilder::Entry SamplePoolBuilder::add(u64 sourceKey, Sample sample) {
   return Entry{*this, index};
 }
 
-std::optional<SampleRef> SamplePoolBuilder::find(u64 sourceKey) const {
+SampleRef SamplePoolBuilder::find(u64 sourceKey) const {
   const auto found = indexes_.find(sourceKey);
   if (found == indexes_.end()) {
-    return std::nullopt;
+    return {};
   }
   return SampleRef::resolved(asset_, found->second);
 }

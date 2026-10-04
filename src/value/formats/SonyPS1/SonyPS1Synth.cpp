@@ -171,10 +171,10 @@ void addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLayout& layout, 
       externalSamples |= !layout.hasSampleBody;
       if (layout.hasSampleBody) {
         const auto found = samples.find(sampleIndex);
-        if (!found) {
+        if (found.empty()) {
           continue;
         }
-        sample = *found;
+        sample = found;
       }
 
       const auto [pan, panGain] = regionPan(programPan, tonePan);

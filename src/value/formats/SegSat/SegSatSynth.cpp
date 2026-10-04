@@ -431,7 +431,7 @@ std::optional<ScanSoundBankDraft> addSegSatBank(ScanResultBuilder& builder, cons
     for (size_t regionIndex = 0; regionIndex < parsedInstrument.regions.size(); ++regionIndex) {
       auto& parsedRegion = parsedInstrument.regions[regionIndex];
       const auto sample = samples.find(parsedRegion.sample.offset);
-      if (!sample) {
+      if (sample.empty()) {
         continue;
       }
       if (parsedInstrument.index < velocityBank.instruments.size() &&
@@ -440,7 +440,7 @@ std::optional<ScanSoundBankDraft> addSegSatBank(ScanResultBuilder& builder, cons
             velocityBank.instruments[parsedInstrument.index].regions[regionIndex].referenceGain);
       }
       parsedRegion.region.modulation = parsedRegion.modulation;
-      parsedRegion.region.sample = *sample;
+      parsedRegion.region.sample = sample;
       entry.region(std::move(parsedRegion.region)).source("Region", parsedRegion.source, "segsat-region");
     }
   }

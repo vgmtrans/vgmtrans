@@ -284,7 +284,7 @@ void addQSoundRegion(InstrumentSetBuilder& instruments, InstrumentSetBuilder::En
   }
   const u32 sampleIndex = normalizedSampleIndex(rawSample, static_cast<u32>(sampleInfos.size()));
   const auto sample = samples.find(sampleIndex);
-  if (!sample) {
+  if (sample.empty()) {
     instruments.warning("CPS instrument refers to sample data outside the QSound ROM", range);
     return;
   }
@@ -292,7 +292,7 @@ void addQSoundRegion(InstrumentSetBuilder& instruments, InstrumentSetBuilder::En
   instrument
       .region(Region{
                   .keyRange = keys,
-                  .sample = *sample,
+                  .sample = sample,
                   .unityKey = sampleInfos[sampleIndex].unityKey - fineSemitones,
                   .envelope = qsoundEnvelope(version, attack, decay, sustainLevel, sustain, release),
                   .pan = pan,
@@ -402,16 +402,16 @@ Cps1SynthDrafts addCps1Synth(ScanResultBuilder& builder, CpsLayout& layout) {
                                .range = range,
                            });
       instrument.source(name, range, "cps1-oki-instrument").derived("sample", sampleIndex);
-      if (sample) {
+      if (!sample.empty()) {
         instrument
-            .region(Region{.sample = *sample, .unityKey = 60.0, .envelope = Envelope{.releaseSeconds = 10.0}})
+            .region(Region{.sample = sample, .unityKey = 60.0, .envelope = Envelope{.releaseSeconds = 10.0}})
             .source("Region", range, "cps1-oki-region");
       }
     }
   } else {
     for (u32 program = 1; program < 128; ++program) {
       const auto sample = samples.find(program - 1);
-      if (!sample) {
+      if (sample.empty()) {
         continue;
       }
       const SourceRange range = reader.range(layout.sampleRom.offset + 8 + (program - 1) * 8, 8);
@@ -424,7 +424,7 @@ Cps1SynthDrafts addCps1Synth(ScanResultBuilder& builder, CpsLayout& layout) {
                                .range = range,
                            });
       instrument.source(name, range, "cps1-oki-instrument").derived("sample", program - 1);
-      instrument.region(Region{.sample = *sample, .unityKey = 60.0, .envelope = Envelope{.releaseSeconds = 10.0}})
+      instrument.region(Region{.sample = sample, .unityKey = 60.0, .envelope = Envelope{.releaseSeconds = 10.0}})
           .source("Region", range, "cps1-oki-region");
     }
   }

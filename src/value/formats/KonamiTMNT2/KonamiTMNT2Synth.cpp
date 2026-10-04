@@ -157,7 +157,7 @@ std::vector<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layou
     if (source.sampleIndex == kInvalidSampleIndex) {
       continue;
     }
-    if (!sample || source.sampleIndex >= layout.sampleInfos.size()) {
+    if (sample.empty() || source.sampleIndex >= layout.sampleInfos.size()) {
       instruments.warning("KonamiTMNT2 instrument refers to missing sample data", source.range);
       continue;
     }
@@ -165,7 +165,7 @@ std::vector<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layou
     const double unity = layout.version == Version::Vendetta ? 59.0 - pitchCents(info.pitch) / 100.0 : 59.0;
     instrument
         .region(Region{
-                    .sample = *sample,
+                    .sample = sample,
                     .unityKey = unity,
                     .envelope =
                         Envelope{
@@ -211,7 +211,7 @@ std::vector<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layou
         auto region =
             drumKit.region(Region{
                                .keyRange = KeyRange{.low = key, .high = key},
-                               .sample = sample.value_or(SampleRef::none()),
+                               .sample = sample,
                                .range = drum.range,
                                .unityKey = key - pitchCents(drum.pitch) / 100.0,
                                .envelope = Envelope{.releaseSeconds = sampledReleaseSeconds(
@@ -221,7 +221,7 @@ std::vector<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layou
         region.source(fmt::format("Drum {}:{}", drum.bank, drum.slot), drum.range, "konami-tmnt2-drum")
             .derived("sample", drum.sampleIndex)
             .parent(drumSource.id());
-        if (!sample) {
+        if (sample.empty()) {
           instruments.warning("KonamiTMNT2 drum refers to missing sample data", drum.range);
         }
       }

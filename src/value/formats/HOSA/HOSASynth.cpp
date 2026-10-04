@@ -159,12 +159,12 @@ std::optional<ScannedBank> addBank(ScanResultBuilder& result, const BankLayout& 
     instrument.source(fmt::format("Instrument {}", program), source.source, "hosa-instrument").parent(instrumentRoot);
     for (const auto& regionSource : source.regions) {
       const auto sample = samples.find(regionSource.sampleOffset);
-      if (!sample) {
+      if (sample.empty()) {
         continue;
       }
       core::Region region{
           .keyRange = KeyRange{.low = regionSource.keyLow, .high = regionSource.keyHigh},
-          .sample = *sample,
+          .sample = sample,
           .range = regionSource.source.range,
           .unityKey = regionSource.unityKey,
           .envelope = psxSpuEnvelope(regionSource.adsr1, regionSource.adsr2),

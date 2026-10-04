@@ -71,18 +71,14 @@ template <class Handler>
 using HandlerArguments = decltype(handlerArguments(commandArguments(&Handler::operator())));
 
 template <class Playback, class Callable, class... Arguments>
-using CommandResult = std::invoke_result_t<
-    const Callable&, Playback&, const decltype(storedCommandValue(std::declval<Arguments>()))&...>;
-
-template <class Playback, class Callable, class... Arguments>
 [[nodiscard]] auto makeCommandBody(Callable callable, Arguments... arguments) {
-  using Result = CommandResult<Playback, Callable, Arguments...>;
   static_assert(std::is_copy_constructible_v<Callable>, "Compiled sequence command callables must be copyable");
-  static_assert(std::is_same_v<Result, void> || std::is_same_v<Result, Effects>,
-                "A compiled sequence command body must return void or Effects");
   return [callable = std::move(callable), ... values = storedCommandValue(std::move(arguments))](
              void* erasedPlayback) -> Effects {
     auto& playback = *static_cast<Playback*>(erasedPlayback);
+    using Result = decltype(std::invoke(callable, playback, values...));
+    static_assert(std::is_same_v<Result, void> || std::is_same_v<Result, Effects>,
+                  "A compiled sequence command body must return void or Effects");
     if constexpr (std::is_same_v<Result, Effects>) {
       return std::invoke(callable, playback, values...);
     } else {

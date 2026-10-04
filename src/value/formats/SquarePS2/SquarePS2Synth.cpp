@@ -180,13 +180,13 @@ std::optional<ScanSoundBankDraft> addWd(ScanResultBuilder& result, const WdLayou
       for (size_t layer = 0; layer < layers; ++layer) {
         const auto& parsedRegion = regions[index + layer];
         const auto sample = samples.find(parsedRegion.sampleOffset);
-        if (!sample) {
+        if (sample.empty()) {
           continue;
         }
         Region region{
             .keyRange = keys,
             .velocityRange = velocities,
-            .sample = *sample,
+            .sample = sample,
             .range = parsedRegion.source.range,
             .unityKey = 60.0 - parsedRegion.tuning / 256.0,
             .envelope = psxSpuEnvelope(parsedRegion.adsr1, parsedRegion.adsr2, PsxSpuGeneration::Ps2),

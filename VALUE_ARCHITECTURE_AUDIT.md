@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Sixty-nine validated batches remove 1,579 net production lines
+`cb9e0b766`. Seventy validated batches remove 1,583 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 69 replays both corpora against its
-committed batch 68 predecessor. All 73 expanded raw inventories match exactly;
+cover 37 of 38 registered families. Batch 70 replays both corpora against its
+committed batch 69 predecessor. All 73 expanded raw inventories match exactly;
 no classification is needed. The cleanup2 records appear at the end of this
 document.
 
@@ -11529,3 +11529,91 @@ corpus/final/postcommit records. The invocation census's provisional extraction
 correction remains separate from final authority. Further architecture review
 continues, including a direct SampleRef lookup return that may remove redundant
 optional presence from sample authoring; it is not part of this batch.
+
+### cleanup2 batch 70: use the values already owned
+
+This batch removes two redundant representations from shared architecture while
+keeping SequenceVM and the source-format/export boundary. `SamplePoolBuilder::find`
+now returns `SampleRef` directly; an absent key uses the reference's existing
+empty state. `makeCommandBody` obtains its result type from the actual invocation
+of its const owned captures instead of reconstructing those types through a
+separate `detail::CommandResult` alias. There are 20 changed source/fixture paths.
+The lookup migration has no net production or fixture line reduction: its
+contract comment adds one architecture line, and Konami Arcade loses one native
+local. The invocation change removes four architecture lines. Combined, this
+batch removes four production lines (three architecture, one native), bringing
+the branch to 1,583 net value lines removed: 1,260 architecture and
+323 native-format lines, plus the prior 22 UI lines.
+
+The lookup improvement is conceptual. A format can guard `sample.empty()` when
+absence matters and assign the reference directly to a region. There is no new
+boolean conversion or sentinel protocol. All 21 native calls in 14 families and
+12 calls in three existing fixture files were migrated, including downstream
+uses of named results. MP2k retains its optional parse-failure results and wraps
+a hit only after testing the direct reference. NDS's bridging local becomes a
+plain reference; its three empty checks retain both missing-sample warnings and
+its parse-failure return. Optional directory and instrument parsing elsewhere
+remain unchanged. Sony PS1's separate external, unbound reference path remains.
+Konami Arcade still creates and annotates its empty-sample region before issuing
+the missing-sample warning.
+
+Lookup presence uses `empty()`, not `valid()`. If assertion-disabled code reaches
+a nonempty unbound or valid-owner/invalid-index reference, its presence agrees
+with the old engaged optional. A found reference whose owner and index are both
+invalid would change engagement, but violates `resolved()`'s construction
+assertions. No universal parity for unsupported construction states is claimed. The map lookup, owner,
+dense index, finalization and index clearing are unchanged. Existing fixtures
+still verify sparse keys, missing keys, builder entry invalidation and references
+retained after finalization. The separate SNES getter intentionally normalizes
+cells using `valid()`; its possible direct-return migration is a later scope.
+
+The command result is now `decltype(std::invoke(callable, playback, values...))`
+inside the existing const lambda. It observes the same const callable and const
+stored values, with mutable playback, through an unevaluated expression. The
+`void`/`Effects` restriction and both execution branches remain. Callable
+copyability, by-value capture ownership, string-view-to-owned-string conversion,
+and batch69's tuple reference unpacking remain unchanged. Compiler diagnostic
+location/order for unsupported callables is not promised identical. The deleted
+alias is an intentional narrowing of a detail API.
+
+This also intentionally changes the public lookup return API/ABI. External
+optional boolean/arrow/dereference/value-or callers must migrate, and an optional
+assignment must explicitly preserve absence rather than implicitly wrapping an
+empty reference. Root rebuilt the complete matching core, native formats,
+fixtures, Qt library and shell; new headers were not overlaid onto old objects.
+No external-source compatibility, object-size, speed, allocation, sanitizer or
+failure-injection claim is made.
+
+Cold authority and review were completed before root application. The original
+lookup draft remains sealed against committed/frozen68 under
+`/tmp/vgmtrans-cleanup2/sample-ref-find70-cold68`; a separate 30-body authority
+refresh establishes current committed/frozen69 equality (the one legacy MP2k
+exclusion pin is Git/live only). Its final patch is
+`afe161640f2a9313269926f9698a52d23de0c071187d64d4a9f7ccc3c2561173`.
+Both independent source reviews pin that final patch. Earlier receiver-only
+inventories missed NDS bridges and retained-after-finalization assertion uses;
+the original drafts and incomplete review judgments remain preserved and are
+superseded by complete result-use reviews, not treated as passing runtime proof.
+The command result's original68 authority is separately refreshed69 at
+`invocation-owned-result70-cold69`, preserving the accepted69 unpacking change.
+Root reconstructed all 20 whole candidate bodies, checked all sealed records,
+rechecked full matching source trees and applied only those exact bodies.
+`owned-values70-root-cold-review.json` and `pass70-application-receipt.json`
+record the admission gates. Source-only setup/read errors remain source-only;
+no cold compiler or runtime was used.
+
+The Release build completed 281 steps without warnings; all 44 CTest
+suites pass. Full value/shared/tests/Qt trees and all four linked archives were
+frozen with shell hash `8bbfbe9f3952515825d2a40c339da7ef9e116cc1cc84351664384aea68b4a4ef`. This differs from batch69, so both corpora
+were replayed freshly against the immediate committed69 predecessor. All 252
+original result records and 3,922 artifacts match, as do all 894 expanded export
+pairs and 858 artifacts. 73 of 73 expanded raw inventories match;
+0 require the existing, separately proved Sony scheduling
+classification. No new manual inventory repetitions or broader normalization
+were added. These checks cover the existing 37-family real archive corpus; they
+do not establish behavior for every possible input or a new sanitizer result.
+After full retained70 payload rehash and closed comparison, only recorded old69
+generated original-corpus payloads were pruned to reclaim disk space. All music,
+result records, frozen source trees, libraries and shell generations are kept.
+`corpora70-root-review.json`, `pass70-final-root-review.json` and the matching
+postcommit receipt close the root proof. User-owned changes remain untouched.

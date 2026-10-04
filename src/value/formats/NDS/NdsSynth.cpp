@@ -82,13 +82,13 @@ struct ParsedNdsRegion {
     return std::nullopt;
   }
 
-  std::optional<SampleRef> sample;
+  SampleRef sample;
   u8 effectiveRootKey = *rootKey;
   if (type == InstrumentType::Sample) {
     if (*collectionIndex < waveCollections.size() && waveCollections[*collectionIndex]) {
       sample = waveCollections[*collectionIndex]->samples().find(*sourceIndex);
     }
-    if (!sample) {
+    if (sample.empty()) {
       builder.warning(fmt::format("Sample {} in wave archive slot {} was not found", *sourceIndex, *collectionIndex),
                       range);
     }
@@ -97,12 +97,12 @@ struct ParsedNdsRegion {
     const u32 psgIndex = pulse ? (*sourceIndex & 0x07) : 8;
     const std::string description = pulse ? fmt::format("PSG duty sample {}", psgIndex) : "PSG noise sample";
     sample = psgCollection.samples().find(psgIndex);
-    if (!sample) {
+    if (sample.empty()) {
       builder.warning(description + " was not found", range);
     }
     effectiveRootKey = pulse ? 69 : 45;
   }
-  if (!sample) {
+  if (sample.empty()) {
     return std::nullopt;
   }
 
@@ -115,7 +115,7 @@ struct ParsedNdsRegion {
       .region =
           Region{
               .keyRange = keys,
-              .sample = *sample,
+              .sample = sample,
               .range = range,
               .unityKey = static_cast<double>(effectiveRootKey),
               .envelope = *envelope,

@@ -10,7 +10,6 @@
 #include "value/synth/SynthModel.h"
 
 #include <cstddef>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -60,7 +59,8 @@ public:
   SamplePoolBuilder& operator=(SamplePoolBuilder&&) noexcept = default;
 
   Entry add(u64 sourceKey, Sample sample);
-  [[nodiscard]] std::optional<SampleRef> find(u64 sourceKey) const;
+  // Returns an empty reference when the source key is absent.
+  [[nodiscard]] SampleRef find(u64 sourceKey) const;
 
   [[nodiscard]] bool empty() const noexcept { return samples_.empty(); }
   [[nodiscard]] size_t size() const noexcept { return samples_.size(); }

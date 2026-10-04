@@ -1500,7 +1500,7 @@ void ndsSynthBuilderPreservesSparseWaveIndexesAcrossArchives() {
   const auto secondWave = addNdsWaveArchive(out, input.reader.range(0x100, 0x100), "Second Wave");
   expect(firstWave && secondWave, "NDS builder fixture should create both wave archives");
   const auto laterFirstWaveSample = firstWave->samples().find(2);
-  expect(!firstWave->samples().find(1) && laterFirstWaveSample && laterFirstWaveSample->index() == 1,
+  expect(firstWave->samples().find(1).empty() && !laterFirstWaveSample.empty() && laterFirstWaveSample.index() == 1,
          "a skipped SWAR entry must not shift the lookup for a later source sample index");
 
   std::array<std::optional<ScanSamplePoolDraft>, 4> waves{};

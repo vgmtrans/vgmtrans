@@ -216,7 +216,7 @@ struct SynthContext {
   const u32 phaseStep = tone.fixed() ? 0 : directSoundPhaseStep(*frequency, sourceKey, context.sampleRate);
   const u64 sampleKey = (static_cast<u64>(tone.reverse()) << 57) | (static_cast<u64>(phaseStep) << 25) | *offset;
   unityKey = sourceKey;
-  if (const auto existing = context.pcm.find(sampleKey)) {
+  if (const auto existing = context.pcm.find(sampleKey); !existing.empty()) {
     return existing;
   }
   u32 loopStart = *encodedLoopStart;
@@ -250,7 +250,7 @@ struct SynthContext {
     return std::nullopt;
   }
   const u64 key = (static_cast<u64>(period) << 32) | *offset;
-  if (const auto existing = context.psg.find(key)) {
+  if (const auto existing = context.psg.find(key); !existing.empty()) {
     return existing;
   }
   const std::string name = fmt::format("PSG programmable wave {:#x}", *offset);
@@ -267,8 +267,8 @@ struct SynthContext {
 
 [[nodiscard]] SampleRef generatedPsgSample(SynthContext& context, u64 key, std::string_view name, u32 sampleRate,
                                            u32 period, u32 parameter) {
-  if (const auto existing = context.psg.find(key)) {
-    return *existing;
+  if (const auto existing = context.psg.find(key); !existing.empty()) {
+    return existing;
   }
   return context.psg
       .add(key,

@@ -301,8 +301,8 @@ void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
   expect(samples.range() == directory, "an included table range should remain the asset's primary range");
   const auto firstRef = samples.find(7);
   const auto secondRef = samples.find(20);
-  expect(firstRef && firstRef->owner() == asset && firstRef->index() == 0 && secondRef && secondRef->owner() == asset &&
-             secondRef->index() == 1 && !samples.find(99),
+  expect(!firstRef.empty() && firstRef.owner() == asset && firstRef.index() == 0 && !secondRef.empty() &&
+             secondRef.owner() == asset && secondRef.index() == 1 && samples.find(99).empty(),
          "sample lookup should resolve sparse keys to dense references and reject missing keys");
 
   const Sample* firstValue = &first.value();
@@ -310,14 +310,14 @@ void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
   const SourceMap annotations = sourceMap.finish();
   expect(samples.range() == directory, "finish should retain the final sample collection range");
   expect(collection.samples.size() == 2, "sample builder should finish ordinary sample values");
-  expect(firstValue == &collection.samples.front() && !first && !second && !samples.find(7),
+  expect(firstValue == &collection.samples.front() && !first && !second && samples.find(7).empty(),
          "finish must transfer sample ownership and invalidate builder entries and sparse lookups");
   expectThrows<std::logic_error>([&] { static_cast<void>(std::move(samples).finish()); },
                                 "sample builder finalization must still reject a second finish");
   expectThrows<std::logic_error>([&] { static_cast<void>(samples.add(30, Sample{})); },
                                 "sample builder finalization must still reject adding values afterward");
-  expect(firstRef && collection.samples[firstRef->index()].name == "First" && secondRef &&
-             collection.samples[secondRef->index()].name == "Fallback",
+  expect(!firstRef.empty() && collection.samples[firstRef.index()].name == "First" && !secondRef.empty() &&
+             collection.samples[secondRef.index()].name == "Fallback",
          "concrete sample references should retain their meaning after finalization");
   expect(diagnostics.size() == 1 && diagnostics[0].code == "synth.sample-key.duplicate",
          "sample builder should diagnose a duplicate key once");
@@ -564,9 +564,9 @@ void scanResultBuilderRetainsSampleKeysAndExposesExistingRegions() {
   const AssetId samplesAsset = pool.id();
   samples.add(12, Sample{.name = "Sparse Sample", .encodedData = input.reader.range(32, 4)});
   const auto sample = samples.find(12);
-  expect(sample && sample->owner() == samplesAsset && sample->index() == 0,
+  expect(!sample.empty() && sample.owner() == samplesAsset && sample.index() == 0,
          "a sample draft should retain sparse keys for later instrument tables");
-  if (!samples.find(99)) {
+  if (samples.find(99).empty()) {
     samples.warning("Required sample 99 was not found", input.reader.range(4, 1));
   }
 
@@ -577,7 +577,7 @@ void scanResultBuilderRetainsSampleKeysAndExposesExistingRegions() {
                                            .name = "Prebuilt Instrument",
                                            .range = input.reader.range(8, 8),
                                            .regions = {Region{
-                                               .sample = *sample,
+                                               .sample = sample,
                                                .range = input.reader.range(12, 4),
                                            }},
                                        });
@@ -668,8 +668,8 @@ void scanResultBuilderDraftViewsRemainStableAsTheResultGrows() {
 
   const ScanResult scan = result.finish();
   const auto& sampleAsset = std::get<SamplePoolAsset>(scan.assets.front());
-  expect(sampleAsset.pool.samples.size() == 1 && pool.id() == sampleAsset.metadata.id && retained &&
-             retained->owner() == pool.id() && retained->index() == 0,
+  expect(sampleAsset.pool.samples.size() == 1 && pool.id() == sampleAsset.metadata.id && !retained.empty() &&
+             retained.owner() == pool.id() && retained.index() == 0,
          "draft proxies and sparse lookups should survive growth of the result-owned draft list");
   expect(std::get<SoundBankAsset>(scan.assets[1]).metadata.id == bank.id() &&
              std::get<DependencyTarget>(std::get<SoundBankAsset>(scan.assets[1]).sampleRequests.front()).asset == pool.id() &&

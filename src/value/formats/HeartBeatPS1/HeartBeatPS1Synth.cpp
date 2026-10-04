@@ -184,14 +184,14 @@ std::optional<HeartBeatPs1ScannedBank> addHeartBeatPs1Bank(ScanResultBuilder& re
       record.derived("unity_key", unityKey);
       runtime.tones.push_back(tone);
       const auto sample = samples.find(sampleOffset);
-      if (!sample || tone.keys.low > tone.keys.high) {
+      if (sample.empty() || tone.keys.low > tone.keys.high) {
         continue;
       }
       const double gain = driverLevel(layout.masterVolume) * driverLevel(sourceProgram.volume) * driverLevel(volume);
       instrument
           .region(Region{
                       .keyRange = tone.keys,
-                      .sample = *sample,
+                      .sample = sample,
                       .unityKey = unityKey,
                       .envelope = psxSpuEnvelope(adsr1, adsr2),
                       .loop = streams.at(sampleOffset).loop,

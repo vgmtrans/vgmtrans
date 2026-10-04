@@ -70,7 +70,7 @@ bool addBank(ScanResultBuilder& result, const BankLayout& layout, std::string_vi
   for (u32 program = 1; program < kProgramCount; ++program) {
     const u32 sampleOffset = reader.le32(program * 4);
     const auto sample = samples.find(sampleOffset);
-    if (!sample) {
+    if (sample.empty()) {
       continue;
     }
     const u32 storedAdsr = reader.le32(kProgramTableSize + program * 4);
@@ -86,7 +86,7 @@ bool addBank(ScanResultBuilder& result, const BankLayout& layout, std::string_vi
     instrument.source(instrument.value().name, pointerRange, "tamsoft-ps1-instrument").parent(pointerRoot);
     instrument
         .region(Region{
-                    .sample = *sample,
+                    .sample = sample,
                     .unityKey = 48.0,
                     .envelope = psxSpuEnvelope(static_cast<u16>(adsr), static_cast<u16>(adsr >> 16), spuGeneration),
                     .loop = streams.at(sampleOffset).loop,

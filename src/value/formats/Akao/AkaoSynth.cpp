@@ -342,7 +342,7 @@ void emitSamplePool(const ScanInput& input, ScanResultBuilder& result, ParsedSam
                                                    .derived("articulation_count", parsed.table.articulationCount)
                                                    .id();
   for (AkaoArticulation& articulation : parsed.articulations) {
-    articulation.sample = samples.find(articulation.sampleOffset).value_or(SampleRef::none());
+    articulation.sample = samples.find(articulation.sampleOffset);
     auto annotation = result.sourceMap()
                           .annotation(SourceRole::TableEntry,
                                       fmt::format("Articulation {}", articulation.articulationId), articulation.source)

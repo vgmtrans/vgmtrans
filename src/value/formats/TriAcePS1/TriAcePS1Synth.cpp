@@ -173,13 +173,13 @@ std::optional<ScanSoundBankDraft> addTriAcePs1Bank(ScanResultBuilder& result, co
 
     for (const auto& sourceRegion : source.regions) {
       const auto sample = samples.find(sourceRegion.sampleOffset);
-      if (!sample) {
+      if (sample.empty()) {
         continue;
       }
       Region region{
           .keyRange = sourceRegion.keys,
           .velocityRange = sourceRegion.velocities,
-          .sample = *sample,
+          .sample = sample,
           .range = sourceRegion.source.range,
           .unityKey = kDriverUnityKey - sourceRegion.semitone - sourceRegion.fine / 64.0,
           .envelope = psxSpuEnvelope(source.adsr1, source.adsr2),
