@@ -1,13 +1,13 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Seventy-two validated batches remove 1,600 net production lines
+`cb9e0b766`. Seventy-three validated batches remove 1,598 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 72 replays both corpora against its
-committed batch 71 predecessor. 71 expanded raw inventories match exactly; 2 retain the previously
-proved Sony asset-ID scheduling variation. The cleanup2 records appear at the end of this
+cover 37 of 38 registered families. Batch 73 replays both corpora against its
+committed batch 72 predecessor. All 73 expanded raw inventories match exactly;
+no classification is needed. The cleanup2 records appear at the end of this
 document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
@@ -11808,3 +11808,67 @@ continues with a separate direct pitch-write routing draft: its first version's
 longer buffer lifetime was identified independently, and the consuming revision
 restores destruction before final sorting. That source-only draft is outside
 this batch and has no runtime claim yet.
+
+### cleanup2 batch 73: send source pitch writes directly to transition lowering
+
+Remove takeSourcePitchBends and its copy/erase pass over the wide MIDI event
+list. planMidiTrack selects one private nullable write destination: nonnull
+exactly when the pitch-transition list is nonempty. The native portamento
+producer and source-event visitor send wheel writes directly to the existing
+PitchBendWrites vector in the old extraction order. Tracks without those
+transitions retain wheels at their original general-event positions. This mode
+cannot use timeline presence: native-portamento-only tracks also have a timeline.
+Missing-anchor and unrealized transitions retain the original list-based rule.
+
+After physical note planning, lowerPitchBends consumes the write vector by value
+at its sole call. Generated writes, layer selection, held/release resets and
+resolved event append order remain unchanged. Neither producer retains the
+vector pointer, and output events copy scalar bend payloads. Note output indices
+still identify their own immediately inserted placeholders before final bend
+append. No public type, header, format code or new permanent fixture changes.
+
+The original reference-vector draft would have retained its capacity through
+final event sorting. Independent review identified that lifetime difference;
+the separately preserved consuming revision ends phase ownership before that
+sort. Producer write allocation can now fail earlier than the old extraction
+pass. The completed-events reserve is unchanged. This is an intentional failure
+staging difference; there is no allocation-fault-prefix, speed or peak-memory
+claim. Braced routing branches add two production lines overall, while removing
+a traversal and a throwaway representation. Cumulative reduction is 1,598
+value lines: 1,269 architecture and 329 format lines, plus 22 UI lines.
+
+Root reconstructs all thirteen exact transformations and the complete candidate
+from committed/frozen72. All eighteen scoped inputs match Git/live and the
+sixteen source/fixture inputs present in the freeze match there too; audit and
+review documentation use Git/live authority. Original70 and consuming71 drafts,
+independent peers and the corrected unified-diff-label setup failure remain
+preserved. The final72 peer supports raw ordering, note indices and consumed
+ownership. Source-only review is kept separate from integration/runtime results.
+
+The Release build completes 47 warning-free steps and all 44 CTest
+suites pass. Matching value/shared/tests/Qt trees, four archives and shell
+12cd925eaa186ce49798da9920b8e7eb9f6f0dfbaf052d7b0679e8a259004eb8 are frozen. Its bytes differ from72. Fresh replays against that
+immediate predecessor match all 252 original result records and 3,922 artifacts,
+and all 894 expanded export pairs and 858 artifacts. 73 of 73 raw
+inventories match; 0 use only previously proved Sony asset-ID
+ordering classifications. No new manual repetitions or broader normalization
+are introduced. Existing real inputs cover 37 of 38 registered families; these
+checks do not establish every-input, sanitizer or arbitrary-fault parity.
+
+The already reviewed original-corpus roll-forward policy is unchanged; only six
+generation references change in its independently reviewed73 runner. Matching
+complete source/archive/shell authority, input selection and exact runner bytes
+are gated before invocation. Each old72 payload is removed only after the whole
+result and both payloads match, an immutable pending receipt is written and both
+hashes are repeated immediately before unlink. A separate completion receipt
+links that pending hash. All candidate73 payloads remain, including matched
+nonzero-status partial exports. Root closes 252 exact records, 252 pending and
+252 completed journals, every old removal and all 1,604,324,580 retained bytes
+before expanded replay. Music, sources, archives, shells and all result records
+remain preserved. Fresh-only/manual recovery, per-pair retention and the absence
+of rollback/fsync guarantees remain as documented in72.
+
+Evidence includes midi-routing73-root-cold-review.json, the final72 independent
+planner peer, pass73-application-receipt.json, roll-forward73-root-admission.json,
+original73-root-closed.json, corpora73-root-review.json and final/postcommit
+receipts. User-owned changes remain untouched. Architecture review continues.

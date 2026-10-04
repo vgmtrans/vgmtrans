@@ -475,19 +475,6 @@ PitchBendState resolvePitchBends(PitchBendWrites& writes, PitchBendLayerId heldT
   return std::nullopt;
 }
 
-[[nodiscard]] PitchBendWrites takeSourcePitchBends(std::vector<MidiTrackEvent>& events) {
-  PitchBendWrites bends;
-  std::erase_if(events, [&](const MidiTrackEvent& event) {
-    const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
-    if (bend == nullptr) {
-      return false;
-    }
-    bends.push_back(PitchBendWrite{.bend = *bend});
-    return true;
-  });
-  return bends;
-}
-
 [[nodiscard]] PitchBendLayerId unusedPitchBendLayer(const PitchBendWrites& bends) {
   std::unordered_set<u32> used;
   for (const auto& write : bends) {
@@ -504,10 +491,10 @@ PitchBendState resolvePitchBends(PitchBendWrites& writes, PitchBendLayerId heldT
 }
 
 void lowerPitchBends(std::vector<Diagnostic>& diagnostics, std::vector<MidiTrackEvent>& events,
-                     const std::vector<NoteDraft*>& physicalNotes, std::deque<NoteSpan>& notes, const NoteIndex& noteIndex,
+                     PitchBendWrites bends, const std::vector<NoteDraft*>& physicalNotes,
+                     std::deque<NoteSpan>& notes, const NoteIndex& noteIndex,
                      const std::vector<const PerformanceAutomation*>& transitions,
                      const SourcePitchTimeline& sourcePitch, const PerformanceTrack& track) {
-  auto bends = takeSourcePitchBends(events);
   const PitchBendLayerId heldTransitionLayer = unusedPitchBendLayer(bends);
   for (const auto* automation : transitions) {
     const auto& transition = *pitchTransitionIntent(*automation);
@@ -595,7 +582,7 @@ void lowerPortamento(std::vector<Diagnostic>& diagnostics, std::vector<MidiTrack
                      const NoteIndex& noteIndex,
                      const std::vector<const PerformanceAutomation*>& transitions, const PerformanceTempoMap& tempos,
                      u64& nextSequence, const SourcePitchTimeline& sourcePitch, const ResolvedPerformance& resolved,
-                     const PerformanceTrack& track) {
+                     const PerformanceTrack& track, PitchBendWrites* pitchBendWrites) {
   for (const auto* automation : transitions) {
     const auto& transition = *pitchTransitionIntent(*automation);
     auto* note = findNote(noteIndex, transition.note);
@@ -637,10 +624,15 @@ void lowerPortamento(std::vector<Diagnostic>& diagnostics, std::vector<MidiTrack
     splitForPortamento(*note, *automation, transition, previous != nullptr);
 
     if (sourceEstablishesStart && std::abs(*sourceBend) > 0.000001) {
-      events.emplace_back(PitchBendPerformanceEvent{
+      PitchBendPerformanceEvent bend{
           .header = atTick(automation->header, startTick, nextSequence),
           .semitones = 0.0,
-      });
+      };
+      if (pitchBendWrites) {
+        pitchBendWrites->push_back(PitchBendWrite{.bend = std::move(bend)});
+      } else {
+        events.emplace_back(std::move(bend));
+      }
     }
 
     events.emplace_back(MidiPortamentoEvent{
@@ -662,7 +654,7 @@ void lowerPortamento(std::vector<Diagnostic>& diagnostics, std::vector<MidiTrack
 std::vector<NoteDraft*> appendSourceEvents(
     std::vector<MidiTrackEvent>& events, const std::vector<PerformanceEvent>& sourceEvents,
     std::deque<NoteSpan>& notes, const NoteIndex& noteIndex, bool renderPortamentoSettings, u64& nextSequence,
-    const ResolvedPerformance& resolved, std::deque<NoteDraft>& ties) {
+    const ResolvedPerformance& resolved, std::deque<NoteDraft>& ties, PitchBendWrites* pitchBendWrites) {
   std::vector<NoteDraft*> boundaries;
   const auto append = [&](NoteDraft& note) {
     note.outputIndex = events.size();
@@ -694,6 +686,12 @@ std::vector<NoteDraft*> appendSourceEvents(
         append(note);
       } else if constexpr (std::is_same_v<Event, InstrumentPerformanceEvent>) {
         events.emplace_back(MidiInstrumentEvent{source.header, resolved.selectionFor(source), source.forceBankSelect});
+      } else if constexpr (std::is_same_v<Event, PitchBendPerformanceEvent>) {
+        if (pitchBendWrites) {
+          pitchBendWrites->push_back(PitchBendWrite{.bend = source});
+        } else {
+          events.emplace_back(source);
+        }
       } else if constexpr (std::is_same_v<Event, ReverbPerformanceEvent>) {
         // Song-wide reverb is supplied by the sequence renderer.
         if (!source.voiceMask) events.emplace_back(source);
@@ -888,9 +886,12 @@ std::vector<detail::MidiTrackEvent> detail::planMidiTrack(
 
   std::vector<MidiTrackEvent> events;
   events.reserve(track.events.size() + (portamentoTransitions.size() + pitchBendTransitions.size()) * 4);
+  // Route wheels directly into transition lowering; otherwise retain their source positions.
+  PitchBendWrites sourceBends;
+  auto* const pitchBendWrites = pitchBendTransitions.empty() ? nullptr : &sourceBends;
   if (!portamentoTransitions.empty()) {
     lowerPortamento(diagnostics, events, noteIndex, portamentoTransitions, tempos,
-                    nextSequence, *sourcePitch, resolved, track);
+                    nextSequence, *sourcePitch, resolved, track, pitchBendWrites);
   }
   const bool renderPortamentoSettings =
       !portamentoTransitions.empty() || options.pitchTransitions == MidiPitchTransitionRendering::Portamento ||
@@ -900,13 +901,14 @@ std::vector<detail::MidiTrackEvent> detail::planMidiTrack(
   // after this point. Gate planning and pitch sampling share those same records.
   std::deque<NoteDraft> ties;
   const auto physicalNotes = appendSourceEvents(events, track.events, notes, noteIndex, renderPortamentoSettings,
-                                                nextSequence, resolved, ties);
+                                                nextSequence, resolved, ties, pitchBendWrites);
   planPhysicalNotes(physicalNotes, resolved);
   for (const auto* note : physicalNotes) {
     events[note->outputIndex] = finishNote(*note, resolved, options);
   }
   if (!pitchBendTransitions.empty()) {
-    lowerPitchBends(diagnostics, events, physicalNotes, notes, noteIndex, pitchBendTransitions, *sourcePitch, track);
+    lowerPitchBends(diagnostics, events, std::move(sourceBends), physicalNotes, notes, noteIndex,
+                    pitchBendTransitions, *sourcePitch, track);
   }
   std::ranges::stable_sort(events, {},
                            [](const MidiTrackEvent& event) { return performanceEventHeader(event).order(); });
