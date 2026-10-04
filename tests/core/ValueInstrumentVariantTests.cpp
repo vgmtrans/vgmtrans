@@ -9,6 +9,7 @@
 #include "../TestSupport.h"
 #include "SynthExportTestSupport.h"
 
+#include "value/base/Source.h"
 #include "value/export/ResolvedPerformance.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/export/synth/SynthExportData.h"

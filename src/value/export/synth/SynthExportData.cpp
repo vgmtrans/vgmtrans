@@ -6,6 +6,7 @@
 
 #include "value/export/synth/SynthExportData.h"
 
+#include "value/base/Source.h"
 #include "value/export/ExportDiagnostics.h"
 #include "value/synth/SampleDecoder.h"
 

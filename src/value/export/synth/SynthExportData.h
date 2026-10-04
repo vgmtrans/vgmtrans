@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include "value/base/Source.h"
 #include "value/export/ExportTypes.h"
 #include "value/export/ResolvedPerformance.h"
 #include "value/export/synth/ModulationScaling.h"
@@ -19,6 +18,8 @@
 #include <vector>
 
 namespace vgmtrans::core {
+
+class SourceStore;
 
 // A bank supplies local samples and the region-sampling policy for its selected
 // instruments. Keep it even when no instruments are selected: unfiltered sample

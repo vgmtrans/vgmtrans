@@ -1,11 +1,11 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Fifty-one validated batches remove 1,335 net production lines
+`cb9e0b766`. Fifty-two validated batches remove 1,339 net production lines
 from `src/value`, plus the earlier 23 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 50 exactly;
+cover 37 of 38 registered families. All export records match batch 51 exactly;
 All 73 expanded raw inventories match byte-for-byte. The cleanup2 records appear
 at the end of this document.
 
@@ -10091,3 +10091,108 @@ comparison-pass51.json, volume-coverage27/pass50-vs-pass51-summary.json.
 Next: review two unused compiler-reader role-only conveniences and the preparation
 header's complete-source dependency. Continue searching for larger responsibility
 or state reductions without adding authoring concepts or runtime work.
+
+## Cleanup2 fifty-second batch: narrow reader choices and synth imports
+
+Remove the unused CompilerCursor::s8(name, role) and varLen(name, role)
+conveniences. The default, explicit display and explicit display/role readers
+retain their original implementations; every actual format/test call keeps
+its spelling. The repository inventory reviews 268 receiver calls, including
+all fourteen two-argument calls and the unrelated RecordReader member pointer.
+Neither removed overload has a consumer. This removes six architecture lines
+and two public choices without a new helper, state or algorithm. External callers
+selecting an old role-only signature must use the existing three-argument form.
+It is small source-API narrowing, not substantial state/type elimination.
+
+SynthExportData.h needs only SourceStore reference declarations. Replace its
+complete Source.h import with an existing-class forward declaration. The shared
+implementation imports Source.h directly for contains()/bytes(), as does the
+one fixture that actually constructs SourceStore/SourceFile. SF2/DLS writers,
+ResolvedPerformance and test-support declarations stop pulling in source storage
+and loading through this header. Owned musical/sample types retain their explicit
+dependencies. No function/type layout, signature, callback, default, body or
+ownership changes. This adds two production lines and one required fixture
+include; dependency simplicity is the benefit. Clients relying on the incidental
+complete SourceStore import must include its header directly.
+
+Both minimal, root-reviewed proofs use committed51 with matching frozen51 and
+retain the original cold50 plus separate test-include-group refinement:
+
+- Cursor: twelve candidate-only actual Debug/Release/RelWithDebInfo Werror syntax
+  checks pass with empty stdout/stderr. RareSnes, NDS, the complete cursor fixture
+  TU and direct header smoke compile; the smoke exercises both retained readers'
+  default/display/explicit-role signatures. Fixture assertions are compiled,
+  not run by this proof. Actual configured project include directories redirect
+  to frozen51 and 3,462 current-byte-verified held dependency header paths.
+  Compiler default-resource inputs are not separately exhaustively pinned.
+- Synth imports: 48 candidate-only actual three-config Werror syntax checks pass
+  with empty stdout/stderr: fifteen affected TUs and direct header inclusion in
+  each mode. All compiler dependency files select the candidate header and
+  exclude its old copy; direct header checks omit Source.h. The 163 resolved
+  non-SDK inputs are prehashed/reverified, including real parity legacy/vendor/
+  generated and clang resource headers. SDK imports are counted rather than
+  individually pinned. Value/shared/test inputs are frozen; real vendor/legacy
+  include roots retain their actual configured flags.
+
+Two initial synth setup metadata/path errors occurred before any compiler ran.
+The first compiler attempt then failed its dependency gate on unprehashed builtin
+stddef.h; raw queued logs/commands/dependencies remain and not every initial
+status was harvested. Adding the real clang resource roots allowed the unchanged
+candidate's final 48 checks to close. No runtime/sanitizer matrix, archive copy,
+link/object/codegen, speed/memory, arbitrary fault/FENV/Windows or external binary
+compatibility claim follows from these syntax/import checks. No permanent mirror
+test is added; integrated suites/corpora provide separate composition evidence.
+
+- Warning-free Release integration build: 111 steps; all 44 CTest suites pass.
+- Frozen52 retains matching source/header/test/UI trees, four archives and shell.
+  Its provenance records committed51 as precommit parent. Shell SHA256:
+  `fd1cda13328ca68b5e84f0c64f81166bfb3001dea40a6283d64b53c46895b800`.
+  Its bytes match frozen51 exactly. The separate archive hashes remain recorded.
+- Against frozen51, all 252 original input/policy records and 3,922 artifact
+  names/hashes match exactly.
+- The /Volumes/emu/vgm replay preserves all 894 export records: 852 successes
+  and 42 matching existing failures. All 858 artifact names/sizes/hashes and
+  218,240,549 bytes per binary match. All 73 raw inventories match exactly.
+  No inventory normalization is needed. Five unsupported DSF failures remain unchanged.
+  Real coverage remains 37/38 registered families; KonamiTMNT2 is synthetic only.
+  See volume-coverage27/pass51-vs-pass52-summary.json.
+
+- Value: 2,371 added/3,710 deleted across 174 paths.
+- Architecture: 1,867 added/2,998 deleted across 97 paths.
+- Formats: 504 added/712 deleted across 77 paths.
+- Tests: 1,330 added/431 deleted across 44 paths.
+
+Net production reductions are 1,339 value lines: 1,131 architecture and 208 format lines.
+The earlier 23 UI lines removed remain unchanged; this batch adds one required fixture include and no new test.
+
+A factual erratum remains separate from the immutable reader cold assessment:
+SequenceRuntime.valid() checks only execute, and the VM already accepts an absent
+program-state factory. The earlier sentence implying a mandatory placeholder
+factory/validity change was incorrect. This does not affect the unused-overload
+proof. A separate source-only proposal may remove EmptyCompiledProgramState by
+using the existing void/no-state path. Its default factory presence and one
+monitoring fixture assumption are real boundaries requiring review and runtime
+proof; no such change belongs to this batch. See the retained cold50-factory-
+erratum and pending void-program-state-cold52 draft.
+
+Fresh persistent-session source review keeps per-scan copy-on-write owners separate
+from revision views, attempted-source state separate from published values, and
+an optional built snapshot separate from valid empty snapshots. ScanInput's
+retained owner can keep a builder's reader alive after caller ownership dies;
+pending-scan live-set checks observe redirects made by earlier scans. Replacing
+these with prefiltered lists or fewer owners would add lifecycle protocols or
+change pruning. All 23 scoped files are gated across committed50/51 and both
+frozens; existing fixture assertions were read, not rerun by this cold assessment.
+No exhaustion or new runtime claim follows. See session-persistent52-root-review.json.
+
+After the exact52 original comparison closes, hash-gated pruning removes only
+3,922 old51 task-owned payloads (1,604,324,580 bytes). All records/logs and frozen
+sources/binaries remain, along with exact52 payloads. User/music files are never
+touched. See pruned-verified-originals51-after52-replay.json.
+
+Evidence: cursor-conveniences52-root-review.json, synth-source52-root-review.json,
+pass52-root-review.json, build-pass52.log, ctest-pass52.log, pass52-baseline,
+comparison-pass52.json, volume-coverage27/pass51-vs-pass52-summary.json.
+
+Next: review default void program state and a PSF tag parser's premature value
+ownership, then prove any accepted exact candidate before live application.

@@ -511,8 +511,6 @@ public:
     return decoded(record_.s8(name, display), name, display, role);
   }
 
-  ::s8 s8(std::string_view name, SemanticOperandRole role) { return s8(name, SourceValueDisplay::SignedDecimal, role); }
-
   [[nodiscard]] EncodedSemanticField<::s8> rawS8(std::string_view name,
                                                  SourceValueDisplay display = SourceValueDisplay::SignedDecimal) {
     return {record_.s8(name, display), std::string(name), display};
@@ -571,10 +569,6 @@ public:
   u32 varLen(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
              SemanticOperandRole role = SemanticOperandRole::Value) {
     return decoded(record_.varLen(name, display), name, display, role);
-  }
-
-  u32 varLen(std::string_view name, SemanticOperandRole role) {
-    return varLen(name, SourceValueDisplay::Default, role);
   }
 
   void rawBytes(std::string_view name, u32 size) {
