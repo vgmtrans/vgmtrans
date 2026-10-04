@@ -248,10 +248,10 @@ void parseTags(PsfData& psf, std::span<const u8> bytes, size_t offset) {
       }
 
       std::string name(reinterpret_cast<const char*>(bytes.data() + nameBegin), nameEnd - nameBegin);
-      std::string value(reinterpret_cast<const char*>(bytes.data() + valueBegin), valueEnd - valueBegin);
       std::transform(name.begin(), name.end(), name.begin(),
                      [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
-      auto [it, inserted] = psf.tags.emplace(std::move(name), std::move(value));
+      auto [it, inserted] = psf.tags.try_emplace(
+          std::move(name), reinterpret_cast<const char*>(bytes.data() + valueBegin), valueEnd - valueBegin);
       if (!inserted) {
         it->second += "\n";
         it->second.append(reinterpret_cast<const char*>(bytes.data() + valueBegin), valueEnd - valueBegin);

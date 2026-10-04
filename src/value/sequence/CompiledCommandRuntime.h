@@ -19,8 +19,6 @@ namespace vgmtrans::core {
 
 // This adapter is the only place a compiled format sees std::any. Format
 // commands and Playback methods remain fully typed.
-struct EmptyCompiledProgramState {};
-
 namespace detail {
 
 template <class Type>
@@ -56,7 +54,7 @@ template <class State, class Context, class Config>
 
 }  // namespace detail
 
-template <class Playback, class ProgramState = EmptyCompiledProgramState>
+template <class Playback, class ProgramState = void>
 struct CompiledCommandRuntime {
   using TrackState = typename Playback::TrackState;
   using StreamState = typename Playback::StreamState;
@@ -143,11 +141,13 @@ struct CompiledCommandRuntime {
 
 // Construct one complete erased runtime for a format whose state needs no
 // program-specific immutable configuration.
-template <class Playback, class ProgramState = EmptyCompiledProgramState>
+template <class Playback, class ProgramState = void>
 [[nodiscard]] SequenceRuntime makeCompiledRuntime() {
   using Compiled = CompiledCommandRuntime<Playback, ProgramState>;
   SequenceRuntime runtime;
-  runtime.createProgramState = detail::createCompiledState<ProgramState, SequenceProgram>;
+  if constexpr (!std::is_void_v<ProgramState>) {
+    runtime.createProgramState = detail::createCompiledState<ProgramState, SequenceProgram>;
+  }
   runtime.createTrackState = detail::createCompiledState<typename Playback::TrackState, TrackStateContext>;
   if constexpr (!std::is_void_v<typename Playback::StreamState>) {
     runtime.createStreamState = detail::createCompiledState<typename Playback::StreamState, SequenceProgram>;
@@ -158,7 +158,7 @@ template <class Playback, class ProgramState = EmptyCompiledProgramState>
 
 // Construct one complete erased runtime whose state factories close over
 // immutable typed format settings.
-template <class Playback, class ProgramState = EmptyCompiledProgramState, class Config>
+template <class Playback, class ProgramState = void, class Config>
 [[nodiscard]] SequenceRuntime makeCompiledRuntime(Config config) {
   using Compiled = CompiledCommandRuntime<Playback, ProgramState>;
   using TrackState = typename Playback::TrackState;
@@ -169,7 +169,9 @@ template <class Playback, class ProgramState = EmptyCompiledProgramState, class 
                 "A supplied runtime Config must be consumed by program, stream, or channel state");
   SequenceRuntime runtime;
   auto settings = std::make_shared<const Config>(std::move(config));
-  runtime.createProgramState = detail::compiledStateFactory<ProgramState, const SequenceProgram&>(settings);
+  if constexpr (!std::is_void_v<ProgramState>) {
+    runtime.createProgramState = detail::compiledStateFactory<ProgramState, const SequenceProgram&>(settings);
+  }
   runtime.createTrackState = detail::compiledStateFactory<TrackState, TrackStateContext>(settings);
   if constexpr (!std::is_void_v<StreamState>) {
     runtime.createStreamState = detail::compiledStateFactory<StreamState, const SequenceProgram&>(settings);

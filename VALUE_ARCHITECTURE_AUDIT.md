@@ -1,11 +1,11 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Fifty-two validated batches remove 1,339 net production lines
+`cb9e0b766`. Fifty-three validated batches remove 1,339 net production lines
 from `src/value`, plus the earlier 23 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 51 exactly;
+cover 37 of 38 registered families. All export records match batch 52 exactly;
 All 73 expanded raw inventories match byte-for-byte. The cleanup2 records appear
 at the end of this document.
 
@@ -10196,3 +10196,177 @@ comparison-pass52.json, volume-coverage27/pass51-vs-pass52-summary.json.
 
 Next: review default void program state and a PSF tag parser's premature value
 ownership, then prove any accepted exact candidate before live application.
+
+## Cleanup2 fifty-third batch: remove unused state and repeated ownership checks
+
+Use the existing `void` convention for a compiled runtime with no song state.
+Delete EmptyCompiledProgramState and default the three adapter/factory templates
+to void. The two runtime factories install createProgramState only for real
+state. The VM already accepts its absence and supplies empty any; ordinary
+execute/ready/begin/tick callback references and real typed state/hooks remain
+unchanged. Supplied Config must still be consumed by a state factory. One
+existing collection-export monitoring wrapper checks its captured factory before
+calling it; the wrapper remains installed and still tests retained original
+runtime behavior after a nullopt preparation result. This removes a bespoke
+concept and an unused placeholder factory, at +2 production/net0 fixture lines.
+
+This intentionally changes the public default factory/any presence and removes
+the old empty type spelling. Explicit ProgramState=void becomes supported.
+External unconditional factory calls, placeholder inspection or Playback
+constructors that depended on that placeholder need adaptation. Dependent void
+references disable real-state hooks through the existing requires expressions.
+Default execute specialization identity changes, so all actual native default
+producers must be rebuilt consistently; family replacement checks retain their
+existing meaning. No ordinary erased callback argument ABI changes.
+
+Construct a new PSF tag's string directly in its final map owner using
+try_emplace(name, pointer, length). Duplicate tags still append the original
+trimmed bytes with the same newline. Remove the local value string and its move;
+the raw view is consumed synchronously by the owning string constructor. All
+tags, including unknown/library metadata, remain preserved. This is LOC-neutral
+and removes one needless value owner. Arbitrary bad_alloc staging is not
+equivalent: the removed duplicate temporary and changed node/string construction
+can alter implementation-dependent partial private state or library warnings.
+No allocation count, speed or broad fault-ordinal claim is made.
+
+Entry::regionAt now checks its nullable builder then delegates directly to the
+existing validRegion rule, which already checks finished state and instrument
+bounds before region lookup. Remove the duplicate complete instrument check.
+Default/null entries, inert duplicate entries, finished/empty builders and
+membership after live builder moves retain their existing behavior. No owner
+sentinel, helper, callback or public layout/API is introduced. This removes two
+architecture lines; it does not promise safety after the builder is destroyed.
+
+All three exact TEMP proofs were independently source- and evidence-reviewed
+against committed52/frozen52 before their four bodies were applied together:
+
+- Void state: twelve paired native object compiles rebuild complete AkaoSequence,
+  SquarePS2Sequence and MoriSnesSequence units in Release/focused ASan+UBSan.
+  Twenty-eight complete existing fixture runs cover VM, cursor, collection export,
+  collection stitch, AKAO, SquarePS2 and MoriSnes across four arms. Four corrected
+  seven-scenario probes exercise context-only/no-state execution, real stream and
+  program state/hooks/analysis, Config consumption/priority and retained owners.
+  Sixteen common raw comparisons total 306,071 bytes per arm, including the
+  19,083-byte probe; no normalization. Default factory/any presence differences
+  are separately asserted and excluded from common parity. Two explicit-void
+  positive runs pass. Seven expected-negative compiles individually preserve
+  ignored-Config and unsupported void-analysis rejection and document the old
+  explicit-void rejection. Thirty-six unique actual three-config Werror checks
+  pass in 39 invocations, including the three corrected-probe checks. All 34
+  link maps select exactly the resolved three replacement objects and reject old
+  formats archive lines, including Darwin's numbered-member spelling. Actual
+  depfiles identify 101 non-SDK task/frozen/held paths with no live fallback;
+  3,462 held include-root header paths match current52. The sealed 459-file proof
+  and original cold51 authority remain distinct from the refreshed52 authority.
+- PSF tags: 66 final commands pass with empty stderr, including 30 actual
+  three-config Werror checks and four paired public/parser probes plus complete
+  SquarePS2 standalone fixture runs. Complete MP2k fixture assertions also run.
+  Twenty-two complete parser-map and 30 public extraction cases cover duplicate,
+  case/whitespace, binary/unknown tag, library, malformed and owned-PSF2 data.
+  Returned source bytes/segments/attributes/ordered diagnostics survive original
+  raw/source/metadata owners, overwritten parser input and removed library files.
+  Four 8,669-byte/212-line raw captures match. A separate renamed private parser
+  bridge exposes the actual complete parse result; exact unappended production
+  objects serve public extraction and the full fixtures. All eight maps select
+  the correct PsfExtractor object and exclude the archive copy. The 213-file
+  manifest closes; fifteen scoped sources and 51 resolved project dependencies
+  match frozen/current/committed52, with two live vendor headers posthashed.
+  Unlike the region prehash inventory, this does not claim every SDK, standard
+  resource or vendor import was exhaustively prehashed.
+- Region membership: fifteen actual three-config Werror checks and four paired
+  runtime arms pass, with complete unchanged builder and AKAO fixture suites
+  (14 builder cases, 30 AKAO case invocations). Eleven additional public boundary
+  rows and three generated source annotation captures produce exact 3,844-byte
+  streams. Captures retain generated source maps/ordered diagnostics and authored
+  physical instrument/region fields; native fixture artifacts are assertion-
+  checked rather than independently byte-captured here. Four maps assign
+  regionAt to the exact standalone changed builder object, exclude its archive
+  copy and load the unchanged actual AKAO instrument producer. The 148-file
+  final manifest, 585 prehashed inputs and 58 resolved non-system paths close.
+
+Initial void probe executions aborted in all four arms because the synthetic
+program emitted positional pan without declaring a pan law. Successful native
+objects and all fixture runs were retained; correcting that harness declaration
+repeated only four probe runs and three configured checks, then ran the two
+explicit-void positives. Initial sources/commands/logs and the unchanged production
+guard remain preserved. A later map-parser strengthening was metadata-only;
+the first sealed records remain separate, with no compiler/runtime rerun.
+Region proof had two metadata gate failures: /tmp versus /private/tmp dependency
+keys, then Darwin's numbered archive-member spelling. Final 34 commands pass;
+all 57 historical completed commands (2+21+34) succeeded without stderr, alongside
+the two retained metadata AssertionErrors. Five repeated Release objects/binary
+match the initial hashes. These are attempts, not 57 unique checks. Root's own
+final region metadata comparison initially had the same temporary-path spelling
+difference; canonicalizing its expected source path closed it without rerunning
+the proof. PSF final proof had no compiler/runtime/configured failure.
+
+Focused sanitizer proofs instrument the changed inline/native or builder/parser
+code and their participating full fixtures/probes. Unchanged immutable library
+and dependency archives remain Release; instrumented libc++ container annotations
+are consistently disabled. These are not whole-program sanitizer runs, exhaustive
+raw traces of internal library calls, all-38-native-factory rebuilds, external
+binary compatibility checks, Windows/FENV/fault injection or speed measurements.
+
+- Warning-free Release integration build: 100 steps; all 44 CTest suites pass.
+- Frozen53 retains matching value/shared/test/UI trees, four archives and shell.
+  Its provenance records committed52 as the precommit parent, separately from
+  the resulting committed53 hash. Shell SHA256: `180b34eabeaff2a3ac7ebeede7c9680c2324793e6c952a7e6abd75c725867f85`.
+  The shell differs from frozen52; all separate archive hashes remain recorded.
+- Against frozen52, all 252 original input/policy records and 3,922 artifact
+  names/hashes match exactly.
+- The /Volumes/emu/vgm replay preserves all 894 export records: 852 successes
+  and 42 matching existing failures. All 858 artifact names/sizes/hashes and
+  218,240,549 bytes per binary match. All 73 raw inventories match exactly.
+  No inventory normalization is needed. Five unsupported DSF failures remain unchanged.
+  Real coverage remains 37/38 registered families; KonamiTMNT2 is synthetic only.
+  See volume-coverage27/pass52-vs-pass53-summary.json.
+
+- Value: 2,382 added/3,721 deleted across 174 paths.
+- Architecture: 1,878 added/3,009 deleted across 97 paths.
+- Formats: 504 added/712 deleted across 77 paths.
+- Tests: 1,331 added/432 deleted across 44 paths.
+
+Net production reductions are 1,339 value lines: 1,131 architecture and 208 format lines.
+The earlier 23 UI lines removed remain unchanged; this batch adjusts one existing fixture statement and adds no new test; net production/fixture line change is zero.
+
+Fresh root source reads retain explicit versus inferred builder ranges,
+post-finish admission state, sequential reader failure versus positioned recovery,
+and consumed extent versus reserved record extent. Source command attribution,
+annotation parents and root sequence ownership still describe distinct scopes.
+Absent transition overrides differ from explicit fallthrough; song, stream,
+channel, wait, note and source lifetimes remain separate VM/emitter duties.
+Prepared validated bank/sample views still preserve validation before callbacks
+and cardinality checks. Original MIDI note source identity cannot be derived
+from mutable lowered attack segments, which may split or disappear. These
+22-source observations are source-only, include earlier retained findings, and
+do not claim new measurements or exhaustion. See root-architecture-retained53.
+
+The next source-only Session import draft moves complete playback imports to
+actual consumers: +1 value header/+1 UI/+3 test lines, with no body/layout/lifetime
+change. Root reviewed the 33-file cold52 draft and 20 scoped inputs, allowing the
+known collection-export support change in this batch. It intentionally narrows
+external transitive include convenience. Its future compiler proof must refresh
+to committed/frozen53; no such proof or live change belongs to this batch.
+
+After the exact53 original comparison closes, hash-gated pruning removes only
+3,922 old52 task-owned payloads (1,604,324,580 bytes). All records/logs and frozen
+sources/binaries remain, along with exact53 payloads. User/music files are never
+touched. See pruned-verified-originals52-after53-replay.json.
+
+Separate hash-gated historical debugger-symbol pruning removes 168 auxiliary
+files from 56 closed task-owned dSYM bundles (1,220,071,141 bytes). All 4,541
+retained files and 56 UUID-matched binaries were reverified before and after;
+sources, commands, logs, raw captures, frozen archives and user/music data remain.
+Old49 receipts remain immutable; the separate prune record explicitly supersedes
+their historical symbol-retention state. Debug symbols require regeneration;
+no byte-exact regeneration promise is made. See debug-symbol-prune53/applied.json.
+The root pre-deletion script's drafted record count was corrected from 253 to
+the actual 252 before any deletion; neither its gates nor corpus records changed.
+
+Evidence: void-state53-root-review.json, psf-tags53-root-review.json,
+region53-root-review.json, pass53-root-review.json, build-pass53.log,
+ctest-pass53.log, pass53-baseline, comparison-pass53.json,
+volume-coverage27/pass52-vs-pass53-summary.json, session-import54-root-cold-review.json.
+
+Next: prove the accepted Session import boundary against matching committed53,
+and continue source audits for useful responsibility/concept reductions.

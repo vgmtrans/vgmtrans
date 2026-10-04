@@ -599,7 +599,7 @@ void sequencePreparationValidatesRuntimeReplacement() {
   original.createProgramState = [factory = original.createProgramState,
                                  &createdOriginalState](const SequenceProgram& program) {
     createdOriginalState = true;
-    return factory(program);
+    return factory ? factory(program) : std::any{};
   };
   const auto kept = bind(original, unchanged);
   expect(kept.collection && renderCollection(*kept.collection, {}).performance && createdOriginalState,

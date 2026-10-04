@@ -359,10 +359,8 @@ InstrumentSetBuilder::RegionEntry InstrumentSetBuilder::Entry::region(SampleRef 
 }
 
 InstrumentSetBuilder::RegionEntry InstrumentSetBuilder::Entry::regionAt(u32 regionIndex) const {
-  if (!*this) {
-    return {};
-  }
-  return builder_->validRegion(index_, regionIndex) ? RegionEntry{*builder_, index_, regionIndex} : RegionEntry{};
+  return builder_ != nullptr && builder_->validRegion(index_, regionIndex)
+             ? RegionEntry{*builder_, index_, regionIndex} : RegionEntry{};
 }
 
 InstrumentSetBuilder::RegionEntry::RegionEntry(InstrumentSetBuilder& builder, u32 instrumentIndex, u32 regionIndex)
