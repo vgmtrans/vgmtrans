@@ -337,13 +337,6 @@ void overlayPsfExe(const PsfData& psf, Image& image) {
   overlay(image, address, data, imageSize);
 }
 
-void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Image& image,
-                  std::vector<Diagnostic>& diagnostics, SourceRange range, int depth = 0);
-
-void loadPsf2WithLibs(const PsfData& psf, const std::filesystem::path& basePath,
-                      Psf2Filesystem& filesystem, std::vector<Diagnostic>& diagnostics, SourceRange range,
-                      int depth = 0);
-
 template <class Load>
 void tryOpenLibrary(const std::filesystem::path& basePath, std::string libName, std::string_view kind,
                     std::vector<Diagnostic>& diagnostics, SourceRange range, Load&& load) {
@@ -376,7 +369,7 @@ void loadNumberedLibraries(const PsfData& psf, Load&& load) {
 
 void loadPsf2WithLibs(const PsfData& psf, const std::filesystem::path& basePath,
                       Psf2Filesystem& filesystem, std::vector<Diagnostic>& diagnostics, SourceRange range,
-                      int depth) {
+                      int depth = 0) {
   if (depth >= kMaxRecursion) {
     diagnostics.push_back(warning("PSF2 library recursion limit was reached", range));
     return;
@@ -402,7 +395,7 @@ void loadPsf2WithLibs(const PsfData& psf, const std::filesystem::path& basePath,
 }
 
 void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Image& image,
-                  std::vector<Diagnostic>& diagnostics, SourceRange range, int depth) {
+                  std::vector<Diagnostic>& diagnostics, SourceRange range, int depth = 0) {
   // Load _lib first, overlay the current file, then load numbered libraries. This matches
   // common PSF dependency ordering where the track file patches a shared driver image.
   if (depth >= kMaxRecursion) {

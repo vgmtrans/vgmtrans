@@ -393,12 +393,6 @@ struct Playback : SequencePlayback<TrackState> {
                         VoiceEnvelopeScope::FutureAttacks);
   }
 
-  [[nodiscard]] u16 targetPitch(u8 sourceNote) const {
-    const u8 coarse = static_cast<u8>(sourceNote + static_cast<s8>(track.liveControls[kTranspose]));
-    // $0120+x is the coarse note and $0100+x is its fractional byte.
-    return static_cast<u16>((coarse << 8) | track.liveControls[kFineTuning]);
-  }
-
   void advancePortamento() {
     if (!track.driverPitch || !track.portamentoTarget || track.liveControls[kPortamento] == 0) {
       return;
@@ -466,7 +460,8 @@ struct Playback : SequencePlayback<TrackState> {
     // The drum region maps its sequence key to the table's source note. Only
     // live pitch controls remain to be applied by the sequence.
     const double tuning = percussion ? transpose * 100.0 + fine : fine;
-    const u16 target = targetPitch(sourceNote);
+    // $0120+x is the coarse note and $0100+x is its fractional byte.
+    const u16 target = static_cast<u16>((coarse << 8) | track.liveControls[kFineTuning]);
 
     const PerformanceNoteId previous = track.activeNote;
     const bool continues = track.slur && previous.valid();

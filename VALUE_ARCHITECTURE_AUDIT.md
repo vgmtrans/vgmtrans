@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Seventy-one validated batches remove 1,583 net production lines
+`cb9e0b766`. Seventy-two validated batches remove 1,600 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 71 replays both corpora against its
-committed batch 70 predecessor. 71 expanded raw inventories match exactly; 2 retain the previously
+cover 37 of 38 registered families. Batch 72 replays both corpora against its
+committed batch 71 predecessor. 71 expanded raw inventories match exactly; 2 retain the previously
 proved Sony asset-ID scheduling variation. The cleanup2 records appear at the end of this
 document.
 
@@ -11719,3 +11719,92 @@ remain. `corpora71-root-review.json`, final review and postcommit receipts close
 root integration. User-owned changes remain untouched. Further architecture
 review continues, including a separate catalog adapter and private PSF signature
 duplication cleanup; neither is part of this batch.
+
+### cleanup2 batch 72: consolidate catalog reading, PSF declarations and native pitch packing
+
+Remove the five-line concrete by-value vector overload of readSnesBrrCatalog.
+The existing input-range implementation now handles the three-argument vector
+calls directly. Its bitset membership, ordered one-time projection, ascending
+unique SRCNs, validation, range provenance and owned catalog result remain
+unchanged. There are 22 native calls and six fixture call sites; none needs a
+rewrite or extra helper. Mori's temporary vector lives through the call. The
+existing range fixture covers mutable/const vectors, spans, sets and iota; its
+moved vector has no later ownership observation. Both addSnesBrrSamples author
+conveniences remain useful for actual source-kind/subset callers. The accepted71
+findSrcn API/comment and all native reference migrations remain intact.
+
+This deliberately revises batch34's earlier compatibility retention. Vector
+lvalues no longer copy into the adapter, and rvalues no longer transfer their
+owner into a by-value parameter. The exact concrete function signature and bare
+braced/empty argument deduction disappear. That is an intentional source API
+and ownership narrowing, not an arbitrary external-client, move/destructor or
+allocation-failure equivalence claim. Generic single-pass ranges can still
+advance shared iterator state, and projections can affect aliases; only the
+actual vector ownership behavior is described as non-consuming. No new range
+protocol, options object, cache, reservation scheme or mirrored test is added.
+
+Remove the two private PSF loader prototypes, moving the same depth=0 defaults
+to their definitions. Both loaders recurse only into themselves; generic library
+helpers name only the supplied callbacks. Both entry calls appear after the
+complete definitions. The two loader bodies and four calls remain byte-identical,
+including explicit recursive depth+1, PSF primary/current/numbered overlay order,
+PSF2 libraries/current complete-filesystem overlay order, catches, warnings and
+publication boundaries. One definition now owns each signature/default, removing
+seven lines without adding a wrapper or changing the public extraction API.
+
+Namco startNote already computes the same wrapped coarse byte as its sole-call
+private targetPitch helper. Reuse it to pack the unchanged raw fine-tuning byte,
+remove the five-line helper and retain the hardware-register comment beside the
+target declaration. Only pure scalar calculations intervene. The wrapped driver
+target stays separate from clamped/percussion outputKey and interpreted tuning
+cents; target construction still precedes mutable attack/emitter/portamento work.
+
+Three production paths change, removing 17 lines: 12 architecture and five native
+format lines. Fixtures are unchanged. Cumulative removal is 1,600 value
+lines: 1,271 architecture and 329 native-format lines, plus the prior
+22 UI lines. Source proof uses separate original70 and committed/frozen71 seals.
+The catalog refresh checks 28 complete scoped bodies and preserves all accepted71
+changes in its full header and consumer contexts; PSF checks ten, Namco six.
+The top-level audit has Git/live authority and is not claimed as a frozen header.
+Root reconstructs all three complete candidates, checks matching value/shared/
+tests/Qt trees and four archives, and applies only those bodies. Independent
+final71 peers support all three; both PSF peers retain its unchanged-body/default
+judgment. Original setup failures and corrected metadata-key/read-path failures
+remain preserved as source-only evidence, not compiler/runtime validation.
+
+The Release build completes 79 warning-free steps and all 44 CTest
+suites pass. Full frozen trees and all four archives match shell 8170043d80569734cf6dc577929ee24abe46bc84f7e8e5ca5b48bd25d645359e.
+Its bytes differ from committed71, so both real corpora are freshly replayed
+against that immediate predecessor. All 252 original result records and 3,922
+artifacts match. All 894 expanded export pairs and 858 artifacts match; 71
+of 73 raw inventories match, with 2 previously proved Sony asset-ID
+ordering classifications. There are no new manual repetitions or broader
+normalization. Existing real inputs cover 37 of 38 registered families; this
+is not a claim about every input or new sanitizer/performance evidence.
+
+To avoid the previous batch's temporary disk exhaustion, original-corpus payload
+retention rolls forward per exact pair. Export arguments, options, four workers,
+timeout and normalization retain the original runner. Before removing an old71
+payload, the entire result (status/diagnostics/names/hashes) must equal72, both
+sides' bytes/names/SHA must match, and an immutable pending receipt is saved.
+Each unlink repeats both hashes; a separate completed receipt links the pending
+hash. All candidate outputs remain retained, including exact nonzero-status
+partial exports; only their duplicate old payloads may be removed. A mismatch
+retains both sides and fails. Final closure verifies 252 exact results, 252
+pending/completed receipt pairs, every old removal and all 1,604,324,580 retained
+bytes before expanded replay. Failed pairs, diagnostic/result records, music,
+frozen sources, archives and shells are preserved. This is a per-pair retention
+policy with fresh-only/manual recovery on interruption, not rollback, immediate
+executor cancellation or fsync durability. The independent source review caught
+pending-receipt overwrite and clarified failure-payload wording before execution;
+the corrected revision preserves both records. A preparation newline-escape
+parser failure is preserved and corrected before any invocation or deletion.
+
+Evidence includes small-owners72-root-cold-review.json, its additional PSF peer
+annex, pass72-application-receipt.json, original-roll-forward72-scan-peer.json,
+original72-root-closed.json, corpora72-root-review.json and final/postcommit
+receipts. User-owned changes remain untouched. Further architecture review
+continues with a separate direct pitch-write routing draft: its first version's
+longer buffer lifetime was identified independently, and the consuming revision
+restores destruction before final sorting. That source-only draft is outside
+this batch and has no runtime claim yet.

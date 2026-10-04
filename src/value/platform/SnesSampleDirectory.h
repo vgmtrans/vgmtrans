@@ -87,11 +87,6 @@ template <std::ranges::input_range Entries, class Srcn = std::identity>
   return catalog;
 }
 
-[[nodiscard]] inline std::vector<SnesBrrSample> readSnesBrrCatalog(ByteReader reader, u32 directoryAddress,
-                                                                 std::vector<u8> srcns) {
-  return readSnesBrrCatalog<std::vector<u8>&>(reader, directoryAddress, srcns);
-}
-
 // Concrete references created while adding an SNES catalog. SRCNs with
 // equivalent BRR data and loop behavior resolve to the first matching sample.
 class SnesBrrSampleRefs {
