@@ -26,7 +26,7 @@ std::optional<Loop> PsxAdpcmStream::loopAt(u32 byteOffset) const {
   if (byteOffset >= encodedData.size) {
     return std::nullopt;
   }
-  const u32 start = psxAdpcmDecodedOffset(byteOffset);
+  const u32 start = psxAdpcmDecodedFrames(byteOffset);
   const u32 frames = psxAdpcmDecodedFrames(static_cast<u32>(encodedData.size));
   return Loop{
       .enabled = loop.enabled,
@@ -63,8 +63,8 @@ std::optional<PsxAdpcmStream> inspectPsxAdpcmStream(ByteReader reader, u32 offse
       .loop =
           Loop{
               .enabled = loops,
-              .start = loopStartBytes ? psxAdpcmDecodedOffset(*loopStartBytes) : 0,
-              .length = loopStartBytes ? psxAdpcmDecodedOffset(encodedLength - *loopStartBytes) : 0,
+              .start = loopStartBytes ? psxAdpcmDecodedFrames(*loopStartBytes) : 0,
+              .length = loopStartBytes ? psxAdpcmDecodedFrames(encodedLength - *loopStartBytes) : 0,
           },
   };
 }

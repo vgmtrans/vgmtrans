@@ -1,11 +1,11 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Fifty validated batches remove 1,321 net production lines
+`cb9e0b766`. Fifty-one validated batches remove 1,335 net production lines
 from `src/value`, plus the earlier 23 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 49 exactly.
+cover 37 of 38 registered families. All export records match batch 50 exactly;
 All 73 expanded raw inventories match byte-for-byte. The cleanup2 records appear
 at the end of this document.
 
@@ -9978,3 +9978,116 @@ comparison-pass50.json, volume-coverage27/pass49-vs-pass50-summary.json.
 Next: remove the source-proven unreachable single-artifact adapter fallbacks
 only after paired public-result checks. Investigate reusing the existing playback
 view in erased runtime hooks; its aggregate ABI cost remains an open gate.
+
+## Cleanup2 fifty-first batch: one artifact contract and one PSX conversion
+
+The single-sequence MIDI and used-bank synth adapters each request exactly one
+recognized export kind. exportCollectionImpl returns a diagnostic artifact on
+binding failure and an artifact for every recognized requested kind on success,
+even when its bytes are empty or its renderer reports errors. Remove their two
+unreachable empty-vector fallbacks and directly rename/return the first artifact.
+This removes ten architecture lines and two misleading failure paths. General
+collection requests may still return no artifacts for undefined kinds; actual
+sample/WAV fallbacks retain their different admission rules. Exceptions still
+propagate before the artifact vector returns, and callback code cannot mutate
+the adapters' private one-kind requests. No new assertion, helper or API replaces
+these branches.
+
+PSX ADPCM byte lengths and positions use the same unsigned divide-then-multiply
+conversion. Remove psxAdpcmDecodedOffset and use psxAdpcmDecodedFrames at its six
+production call sites, including the loop-length site that already used the
+"offset" name for a length. This removes four architecture lines without changing
+truncation, u32 wrap, casts or stream/loop admission. Existing ValuePsxTests keeps
+its frame-conversion assertion and removes only the obsolete alias conjunct
+(one net test line). This deliberately narrows the source API; consumers rebuild
+with the new header. It is not an overflow fix or an old-object ABI promise.
+
+Separate root-reviewed paired proofs close before integration:
+
+- Single-artifact proof: 37 final commands pass with empty stderr, including
+  18 actual Debug/Release/RelWithDebInfo Werror checks for both implementations,
+  the two complete fixture TUs, the probe and direct Export.h inclusion. Full
+  SequenceExport/CollectionExport fixtures pass in Release and focused SAN.
+  Per arm, 132 public calls yield 243 complete Artifact captures, including
+  102 retained after input owners die, and one genuine renderer exception.
+  Four raw streams match at 151,870 bytes each. Captures retain complete owned
+  bytes, media/filenames and ordered attributed diagnostics; unchanged playback
+  is asserted by fixtures, not claimed universally captured. Invalid defined
+  SynthExportFormat values, empty/repeated/irrelevant request kinds, failed
+  binding and empty bytes are exercised. Maps select all six changed public
+  exports and exclude the old Export.cpp archive member.
+- PSX proof: 68 final commands pass with empty stderr, including 24 actual
+  configured Werror checks for all three helper-consuming implementation TUs
+  and a header inclusion, before/after in all three modes. Complete PSX/AKAO
+  fixtures pass in Release and focused SAN. Four final 2,497-byte streams match,
+  covering sixteen arithmetic inputs, 24 stream flag/boundary cases and an
+  annotated sparse catalog. The true first u32 wrap boundary is included.
+  Captures record selected stream/loop/catalog fields; full fixtures assert
+  further native behavior. Maps include all three rebuilt implementations and
+  exclude the old members. Their Release object bytes and final runner bytes
+  are identical; this is not a universal neutral-IR or full-family rebuild claim.
+
+Initial attempts remain recorded: the artifact metadata-helper quoting error
+occurred after proof execution and required no source/test rerun; the PSX relocated
+fixture initially needed its test-support include path corrected. Its initial
+successful near-wrap runner stopped one block short of the true wrap. The final
+runner corrects nearby inputs and reruns all four compile/link/run arms using
+hash-gated unchanged implementation/fixture objects. Old attempts, commands,
+captures and maps remain. Focused sanitizers instrument changed code and participating
+fixtures/harnesses; other archives stay Release with consistent libc++ container
+annotations. No whole-program sanitizer, speed, allocation/fault/destructor,
+FENV, Windows or arbitrary external ABI equivalence is claimed.
+
+- Warning-free Release integration build: 76 steps; all 44 CTest suites pass.
+- Frozen51 retains matching value/shared/test/UI source trees, four archives and
+  shell. Its provenance records committed50 as the precommit parent. Shell SHA256:
+  `fd1cda13328ca68b5e84f0c64f81166bfb3001dea40a6283d64b53c46895b800`.
+- Against frozen50, all 252 original input/policy records and 3,922 artifact
+  names/hashes match exactly.
+- The /Volumes/emu/vgm replay preserves all 894 export records: 852 successes
+  and 42 matching existing failures. All 858 artifact names/sizes/hashes and
+  218,240,549 bytes per binary match. All 73 raw inventories match exactly.
+  No inventory normalization is needed. Five unsupported DSF failures remain unchanged.
+  Real coverage remains 37/38 registered families; KonamiTMNT2 is synthetic only.
+  See volume-coverage27/pass50-vs-pass51-summary.json.
+
+- Value: 2,368 added/3,703 deleted across 174 paths.
+- Architecture: 1,864 added/2,991 deleted across 97 paths.
+- Formats: 504 added/712 deleted across 77 paths.
+- Tests: 1,329 added/431 deleted across 43 paths.
+
+Net production reductions are 1,335 value lines: 1,127 architecture and 208 format lines.
+The earlier 23 UI lines removed remain unchanged; this batch removes one obsolete alias assertion line and adds no tests.
+
+Reject the separate five-line erased-runtime callback draft. Reusing the existing
+three-reference SequencePlayback aggregate looked simpler at the source boundary,
+but four actual configured Release TU builds show aggregate materialization,
+stack copies and reloads at all four VM hook sites. Static whole-function instruction
+counts increase by 8–9 (including alignment instructions); these are not dynamic
+per-event counts. VM/native KonamiSnes object __text increases by 160/48 bytes,
+with larger VM stack reservations; native callee reductions partly compensate.
+No timing regression is measured, and no full linked-binary, ARM64 or borrowed-
+reference rescue is evaluated. The exact by-value draft remains unapplied.
+See runtime-view51-root-rejection.json and runtime-playback-view-codegen51.
+
+Further source-only review retains independent domains: permanent LFO waveform
+conflict cannot be represented as ordinary absence; sealed registration and
+scanned-source membership have different lifetimes; prepared shared bindings
+and retained snapshots have different ownership. Anonymous decoder bounds,
+post-callback synth validation, sample index zero versus lookup failure, and
+empty-bank sample selection retain real callers. Source inspection, physical
+modulation and export-target conversion remain separated. No exhaustion or new
+runtime claim follows from these reads; see pass51-root-retained-boundaries.md.
+
+After the exact51 original comparison closes, hash-gated pruning removes only
+3,922 old50 task-owned payloads (1,604,324,580 bytes). All records/logs and frozen
+sources/binaries remain, along with exact51 payloads. User/music files are never
+touched. See pruned-verified-originals50-after51-replay.json.
+
+Evidence: single-artifact51-root-review.json, psx-frame51-root-review.json,
+pass51-root-review.json, build-pass51.log, ctest-pass51.log, pass51-baseline,
+comparison-pass51.json, volume-coverage27/pass50-vs-pass51-summary.json.
+
+Next: review two unused compiler-reader role-only conveniences and the preparation
+header's complete-source dependency. Continue searching for larger responsibility
+or state reductions without adding authoring concepts or runtime work.

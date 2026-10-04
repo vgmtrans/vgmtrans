@@ -53,9 +53,8 @@ void psxAdpcmInspectionFindsStreamAndLoopBoundaries() {
   expect(stream->loop.enabled && stream->loop.start == kPsxAdpcmFramesPerBlock &&
              stream->loop.length == kPsxAdpcmFramesPerBlock * 2,
          "PSX ADPCM loop flags should convert block positions to decoded frames");
-  expect(psxAdpcmDecodedFrames(kPsxAdpcmBlockBytes * 3) == kPsxAdpcmFramesPerBlock * 3 &&
-             psxAdpcmDecodedOffset(kPsxAdpcmBlockBytes * 2) == kPsxAdpcmFramesPerBlock * 2,
-         "PSX ADPCM frame helpers should use the native sixteen-byte block size");
+  expect(psxAdpcmDecodedFrames(kPsxAdpcmBlockBytes * 3) == kPsxAdpcmFramesPerBlock * 3,
+         "PSX ADPCM frame conversion should use the native sixteen-byte block size");
   expect(!inspectPsxAdpcmStream(reader, 0, kPsxAdpcmBlockBytes - 1),
          "PSX ADPCM inspection should reject a range without one complete block");
   expect(stream->loopAt(47) == Loop{.enabled = true, .start = 56, .length = 28} && !stream->loopAt(48),

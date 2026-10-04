@@ -308,13 +308,6 @@ Artifact exportSequenceMidi(const SessionSnapshot& snapshot, const SourceStore& 
                                         .modulationScaling = ModulationScalingPolicy::FullFormatRange,
                                         .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
                                     });
-  if (artifacts.empty()) {
-    return Artifact{
-        .filename = artifactBaseName(sequence->metadata, "sequence") + ".mid",
-        .mediaType = "audio/midi",
-        .diagnostics = {exportError("Collection MIDI export produced no artifact")},
-    };
-  }
   artifacts.front().filename = artifactBaseName(sequence->metadata, "sequence") + ".mid";
   return std::move(artifacts.front());
 }
@@ -353,11 +346,8 @@ Artifact exportSoundBank(const SessionSnapshot& snapshot, const SourceStore& sou
     auto collectionRequest = request;
     collectionRequest.kinds = {kind};
     auto artifacts = exportCollectionImpl(snapshot, sources, collection->id, collectionRequest, soundBankId);
-    if (!artifacts.empty()) {
-      artifacts.front().filename = baseName + extension;
-      return std::move(artifacts.front());
-    }
-    return failedArtifact({exportError("Collection sound bank export produced no artifact")});
+    artifacts.front().filename = baseName + extension;
+    return std::move(artifacts.front());
   }
 
   auto binding = bindSoundBank(snapshot, soundBankId);

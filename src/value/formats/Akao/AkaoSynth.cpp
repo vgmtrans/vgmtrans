@@ -290,7 +290,7 @@ struct ParsedSamplePool {
       Loop& sampleLoop = samples[found->second].value.loop;
       if (sampleLoop.enabled && sampleLoop.start == 0 && sampleLoop.length == 0) {
         const u32 loopStart =
-            articulation.loopPoint < encodedLength ? psxAdpcmDecodedOffset(articulation.loopPoint) : 0;
+            articulation.loopPoint < encodedLength ? psxAdpcmDecodedFrames(articulation.loopPoint) : 0;
         articulation.loop = Loop{
             .enabled = true,
             .start = loopStart,
@@ -299,7 +299,7 @@ struct ParsedSamplePool {
         };
       } else if (!sampleLoop.enabled && sampleLoop.start == 0 && sampleLoop.length == 0 &&
                  articulation.loopPoint != 0 && articulation.loopPoint < encodedLength) {
-        const u32 loopStart = psxAdpcmDecodedOffset(articulation.loopPoint);
+        const u32 loopStart = psxAdpcmDecodedFrames(articulation.loopPoint);
         sampleLoop.start = loopStart;
         sampleLoop.length =
             loopStart < psxAdpcmDecodedFrames(encodedLength) ? psxAdpcmDecodedFrames(encodedLength) - loopStart : 0;

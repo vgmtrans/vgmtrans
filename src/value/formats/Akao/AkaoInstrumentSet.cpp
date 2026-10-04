@@ -253,7 +253,7 @@ void addSyntheticArticulationInstruments(std::vector<Instrument>& instruments,
       auto sustain = instruments.back();
       sustain.explicitAddress->bank = 2;
       sustain.name += " [no attack]";
-      sustain.regions[0].sampleStartFrame = psxAdpcmDecodedOffset(articulation.loopPoint);
+      sustain.regions[0].sampleStartFrame = psxAdpcmDecodedFrames(articulation.loopPoint);
       if (sustain.regions[0].loop) sustain.regions[0].loop->start = 0;
       instruments.push_back(std::move(sustain));
     }

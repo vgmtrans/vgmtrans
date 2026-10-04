@@ -33,10 +33,6 @@ struct PsxAdpcmStream {
   return (encodedBytes / kPsxAdpcmBlockBytes) * kPsxAdpcmFramesPerBlock;
 }
 
-[[nodiscard]] constexpr u32 psxAdpcmDecodedOffset(u32 encodedOffset) noexcept {
-  return (encodedOffset / kPsxAdpcmBlockBytes) * kPsxAdpcmFramesPerBlock;
-}
-
 // Walks whole ADPCM blocks until the stream end flag or the supplied boundary.
 // Loop metadata is retained even when the stream does not enable looping.
 [[nodiscard]] std::optional<PsxAdpcmStream> inspectPsxAdpcmStream(ByteReader reader, u32 offset, u32 endOffset);
