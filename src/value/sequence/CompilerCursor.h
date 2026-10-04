@@ -394,7 +394,7 @@ public:
     template <class Callable, class... Arguments>
     Event& appendInvocation(Callable callable, detail::CommandArguments<Arguments...> arguments) {
       return std::apply(
-          [&](auto... values) -> Event& { return appendCallable(std::move(callable), std::move(values)...); },
+          [&](auto&&... values) -> Event& { return appendCallable(std::move(callable), std::move(values)...); },
           std::move(arguments.values));
     }
 

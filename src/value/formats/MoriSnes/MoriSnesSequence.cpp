@@ -48,7 +48,6 @@ struct EventTiming {
 struct InspectedEvent {
   EventTiming timing;
   u8 status = 0;
-  u32 operandAddress = 0;
   bool valid = false;
 };
 
@@ -76,11 +75,10 @@ struct InspectedEvent {
         }
       }
     }
-    result.status = reader.u8At(cursor++);
+    result.status = reader.u8At(cursor);
   } else {
     result.status = first;
   }
-  result.operandAddress = cursor;
   result.valid = true;
   return result;
 }

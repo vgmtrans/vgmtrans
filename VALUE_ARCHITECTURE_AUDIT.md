@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Sixty-eight validated batches remove 1,577 net production lines
+`cb9e0b766`. Sixty-nine validated batches remove 1,579 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 68 replays both corpora against its
-committed batch 67 predecessor. All 73 expanded raw inventories match exactly;
+cover 37 of 38 registered families. Batch 69 replays both corpora against its
+committed batch 68 predecessor. All 73 expanded raw inventories match exactly;
 no classification is needed. The cleanup2 records appear at the end of this
 document.
 
@@ -11468,3 +11468,64 @@ model-helper-retentions68-source67 review and pass68 application/build/test/
 freeze/corpus/final/postcommit records. Source-only setup failures and count/prose
 errata remain in the original cold records; none is reported as runtime validation.
 Further architecture and exporter review continues.
+
+### cleanup2 batch 69: simplify command capture and Mori inspection
+
+CompilerCursor's immediate std::apply callback now borrows tuple elements with
+`auto&&... values` before passing them to the existing by-value appendCallable.
+The braced CommandArguments tuple remains the ordered decoded-value owner; the
+final typed command body still owns its captures, including conversion of a
+string_view into a string. This removes an intermediate owning argument pack
+without adding a type, overload, forwarding utility or native migration. It is
+one changed line with zero net line reduction. It intentionally removes one
+move/destruction stage; arbitrary custom move side effects and throw points are
+not promised equivalent. Actual native payloads use scalar/container or implicit
+aggregate moves. No measured allocation or throughput improvement is claimed.
+
+Remove Mori's private InspectedEvent.operandAddress and its sole assignment.
+Only timing/status/valid are consumed, and the separate CompilerCursor still
+consumes and annotates all timing/status/operand bytes. The terminal status-read
+postincrement also becomes an ordinary read because the resulting local cursor
+value has no observer. Every earlier prefix advance and bounds gate remains.
+This removes two format lines and dead state, with no optional-return migration
+or replacement helper. An independent source-only review supports the same
+read/provenance boundary. The private representation is rebuilt with its runtime;
+no layout, sizeof or old-object compatibility measurement is claimed.
+
+Root reconstructs both complete candidates, verifies the cold manifests, and
+checks the 1,011 tracked invocation-census inputs against committed/live68 before
+application. Census counts describe source tokens, including negative requires
+expressions, not executed calls or compiler overload resolution. Defining bodies
+and actual owning-vector/Phrase consumers have separately pinned frozen68
+contexts. The existing cursor fixture mutates a temporary domain string before
+finishing decoding, then renders after source storage dies; its owned output
+check remains meaningful. Existing Mori fixtures cover native timing/voice and
+script behavior. No implementation-mirror fixture is added.
+
+Retain DLS's bank-field packing. Early address validation does not establish an
+invariant through arbitrary region-response callbacks: a callback holding a
+mutable input alias can change a later selected address before its copy. A
+source-only, unexecuted two-instrument counterexample defeats the proposed
+14-bit-mask deletion without vector invalidation or const-object mutation.
+Adding another validation/snapshot protocol just to remove two lines would add
+complexity and alter failure staging. This rejection is not a runtime result.
+
+The Release consumer build completes 96 warning-free steps and all
+44 CTest suites pass. Complete value/shared/test/Qt bodies, four archives and the
+shell match the frozen final source, shell SHA-256 9b7c9a07765a94239df3b4216650d9ca95ea0a042f8d4814b6252e0b39172a2d. Fresh replay
+against the immediate68 predecessor matches all 252 original records and 3,922
+artifacts, all 894 expanded export pairs and 858 artifacts, and all 73 raw
+expanded inventories. No classification is needed. No new normalization, manual repetition,
+sanitizer or numerical campaign is claimed. Root rehashes closed proof before
+reclaiming only older68 generated original-corpus payloads; original music,
+records, frozen sources, archives and shells remain.
+
+Cumulative production removal is 1,579 value lines: 1,257 architecture
+and 322 formats, plus the earlier 22 UI lines. Evidence under
+/tmp/vgmtrans-cleanup2 includes invocation-tuple-owner69-cold68,
+mori-inspected-event69-cold68, dls-bank-packing69-cold68-rejected,
+local-owners69-root-cold-review.json and pass69 application/build/test/freeze/
+corpus/final/postcommit records. The invocation census's provisional extraction
+correction remains separate from final authority. Further architecture review
+continues, including a direct SampleRef lookup return that may remove redundant
+optional presence from sample authoring; it is not part of this batch.
