@@ -1,11 +1,11 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Thirty-seven validated batches remove 1,187 net production lines
+`cb9e0b766`. Thirty-eight validated batches remove 1,183 net production lines
 from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 36 exactly;
+cover 37 of 38 registered families. All export records match batch 37 exactly;
 72 expanded raw inventories match byte-for-byte. One Sony input differs only in
 previously proven concurrent sample-pool ID scheduling. Its narrowly mapped
 inventory matches retained original evidence; all raw differences are preserved.
@@ -7750,3 +7750,157 @@ extreme interpolation/LFO arithmetic remains a distinct future scope. Existing
 LevelScale final integer clamps stay because its public inputs do not enforce
 a NaN policy. Source/tempo point owners and copied mutable RegionResponse
 callables remain; reducing them would change valid behavior.
+
+## Cleanup2 thirty-eighth batch: narrow modulation dependencies and clip MIDI before conversion
+
+Parent is `ac4020692`, the committed thirty-seventh batch. Seven production
+paths add 17 lines and delete 13: net **+4 architecture lines**, with no format
+changes. The existing MIDI renderer fixture adds 35 lines. The cumulative
+production reduction is **1,183 lines**: 1,060 architecture and 123 format lines.
+Cumulative C++/header totals are 2,094 additions/3,277 deletions across 165 value
+paths; architecture is 1,726/2,786 across 94 paths and formats 368/491 across 71.
+Tests are 1,019 additions/424 deletions across 43 paths. The small line increase
+buys explicit, narrower dependencies; reducing conceptual coupling is preferable
+here to keeping fewer declarations through a broad include.
+
+### Borrow the immutable primary PSF library tag
+
+`primaryLibName` returns the selected string's address instead of allocating an
+optional copy. Both actual callers consume it synchronously while their local
+`PsfData` owns the immutable tags, including through recursive library loading.
+Missing tags remain distinct from present-empty tags. `tryOpenLibrary` still
+owns the string it normalizes; returned extracted values own their payloads.
+The three substitutions are line-neutral and introduce no public borrowed API.
+
+Against matching frozen37, 1,942 cases preserve four Release/focused-SAN traces
+of 1,470,687 bytes, SHA-256
+3019096193d63156d324e555ed7e3162173280961e0d28c7f85104de34d9dfe9.
+Absent/empty/SSO/long/duplicate/backslash tags, ordered and recursive libraries,
+immutable inputs, retained output after input destruction, and all five complete
+SquarePS2/SonyPS2/MP2k/SegSat/NDS fixture suites pass. Forty-two actual configured
+compiler checks pass with Werror in Debug, Release and RelWithDebInfo. Eight
+natural archive closures preserve 34,798,705 captured bytes per variant after
+input-store destruction; these focused captures do not independently establish
+export parity.
+
+Scoped generated C++ allocation requests fall from 30,247 to 29,971 and requested
+payload from 20,350,996 to 20,140,372 bytes. No measured case grows; 153 peaks fall,
+by at most 4,112 bytes, and retained output is exact. Among natural cases NiGHTS
+saves one 32-byte request and 32 requested/live peak bytes; the other selected
+closures are unchanged. The private return representation changes from 32 to
+8 bytes, while PsfData remains 72. Removing the copy removes an allocation-failure
+site; arbitrary bad_alloc staging equivalence is not claimed. Instrumented
+extractor/probes/native/five fixture TUs and Source/Session link other matching
+frozen37 Release objects, with consistent libc++ container-annotation opt-out.
+Scoped counters exclude allocator metadata, aligned allocation and zlib malloc;
+there is no whole-program, Windows, process-RSS or timing claim. Evidence:
+/tmp/vgmtrans-cleanup2/primary-lib-name-owner38/proof-summary.json and applied.json.
+
+### Keep modulation analysis headers independent of sequence execution
+
+SequenceModulationProfile.h now includes the physical ModulationModel and
+explicit optional, with forward declarations for its sequence/event parameters.
+ModulationAnalysis.h needs only optional and forward declarations. Their cpp
+files explicitly include the complete PerformanceModel they consume. No body,
+public signature, layout, validation or ownership changes. The four include-only
+paths add five physical lines and require no consumer include repairs.
+
+Local quoted-header closure shrinks from 14 project headers/2,322 lines to
+2/114 for SequenceModulationProfile, 14/2,313 to 1/29 for ModulationAnalysis, and
+17/2,554 to 8/642 for ModulationScaling. These are dependency inventories, not
+compile-time measurements. All 156 actual configured checks pass with empty
+output: 23 translation units plus three self-contained headers, before/after in
+Debug, Release and RelWithDebInfo. Consumers include value production, legacy
+modulation, core/native fixtures, parity and Qt. The initial temporary draft's
+missing ModulationPerformanceEvent declaration was caught and corrected before
+application; all final checks use final sources. The final include order was
+checked in each configuration. A separate one-line SynthValidation pan comment
+removes a false claim that performance pan is validated elsewhere; validation
+policy is unchanged and one comment line disappears. Evidence:
+/tmp/vgmtrans-modulation-header-boundary38/results.json, configured-werror.json,
+include-closure.json and applied-files.json. No standalone runtime or sanitizer
+claim is attached to this include/comment change.
+
+### Clip target ranges before narrowing MIDI values
+
+The private data7/data14 helpers, physical pitch-wheel conversion and coarse
+RPN tuning now clamp the floating value to the MIDI target range before integer
+conversion. This removes redundant narrowing operations and fixes a reproduced
+bug: large finite source pitches/transposes could wrap to the wrong note, large
+wheel/controller amounts could lose their limit, and coarse tuning could perform
+an undefined floating-to-int conversion. Four expressions change, with no net
+production lines. Earlier arithmetic order and the zero wheel-range return stay.
+
+The matching frozen37 proof preserves 873,184 defined-domain helper observations
+per arm across four floating rounding modes, including half/nextafter boundaries
+and ten pitch ranges. An independent floor/fraction/copysign oracle checks
+half-away-from-zero rounding. It also preserves 376 public encoded MIDI captures
+and diagnostic messages plus all three complete MIDI renderer/pitch/modulation
+fixture suites. All four ordinary traces are 1,753,572 bytes with SHA-256
+943e924a2b0f2987ff85b47aca55a232a3ef80595c8850f0809084be99aa3efb.
+Six actual configured production Werror compilations pass across all three
+configurations, retaining their flags without added warning suppression.
+
+Thirteen deliberately large finite public cases cover notes, signed int
+transpose endpoints, coarse tuning, bends, finite bend arithmetic overflow and
+native portamento time. The old Release implementation matches 3/13 expectations;
+old focused SAN matches 2/13 and aborts on two coarse tuning cast cases. The
+candidate matches 13/13 in both modes with empty stderr. The new permanent
+fixture in ValueMidiRendererTests fails before in Release and SAN, then passes
+after in both; its expected note/wheel/RPN/portamento limits are explicit. All
+22 ordinary compile/link/run matrix statuses pass. Initial temporary harness
+repairs (missing MIDI exporter declaration and a rounding-mode-dependent oracle)
+are retained separately; the final four arms were rebuilt against frozen37.
+
+The full renderer plus planner/resolution/emitter/model/probes and all three
+fixture TUs are instrumented in focused SAN; remaining frozen37 objects are
+Release with consistent container-annotation opt-out. There is no full-app or
+cross-platform sanitizer claim. Finite intermediate arithmetic can still
+overflow before clipping, preserving its earlier floating flags. Extreme
+interpolation or LFO arithmetic can still derive NaN, which clamp passes through;
+this is not a whole-finite-IR safety policy or broad FENV parity claim. No timing,
+allocation or RSS claim. Evidence:
+/tmp/vgmtrans-cleanup2/midi-numeric-boundaries38/refresh37/proof.json,
+extreme-results.json, regression-results.json and applied.json.
+
+### Integrated verification
+
+- Complete Release build: 92 steps, no warnings; all 44 CTest suites pass.
+- Frozen38 contains matching complete value headers/sources, tests and four
+  archives; executable SHA-256 `d6a7ef9314539301c34533a329b467e1536062427a660aef7ce2bfac8f7fcb53`.
+- Against frozen37, the original corpus preserves all 252 input/policy records
+  and 3,922 artifact names/hashes.
+- The /Volumes/emu/vgm replay preserves all 894 export records: 852 successes
+  and 42 matching existing failures. All 858 artifact names/sizes/hashes and
+  218,240,549 bytes per binary match. Seventy-two raw inventories match exactly,
+  including five unchanged unsupported DSF failures. Onimusha2/053.psf2 differs
+  only in pool IDs0/1 and the matching member reference: source metadata/IDs/
+  parentage, bank/sequence IDs2/3, collection0, asset order/names/ranges, status
+  and both ordered Sony warnings are unchanged. The existing narrow declaration/
+  member-ID mapping compares four current initial/automatic-repeat records to
+  retained original scheduling evidence; canonical SHA-256 is
+  385c5d5905f4791847f2a86635c70b0aefbdcdd66dcbb488d1ff2a95a3f231a1.
+  No broader normalization or new additional repetitions are used; raw records
+  and diffs remain. Real coverage remains 37/38 families; KonamiTMNT2 is synthetic
+  only. See volume-coverage27/pass37-vs-pass38-summary.json and the matching
+  volume-35/classification.json.
+- The eight approved source/test hashes and exact diff remain held through build,
+  freeze and replay. Live source changes are excluded during these operations;
+  independent future drafts compile only against frozen owners. All raw proof,
+  commands, statuses, comparisons and application records remain under /tmp.
+
+### Continuing audit
+
+A direct map lookup at each of two PSF loader boundaries may make the private
+primary-library wrapper unnecessary; a separate frozen38 draft is being tested.
+An unrestricted std::lerp replacement was rejected. It fixes finite overflow and
+missed endpoints, but a mixed-sign interior boundary matrix finds 93 valid cases
+with 186 MIDI policy outputs one wheel step farther from the exact rational
+oracle; the old expression is correct in these cases. All natural exports remain
+exact, which does not erase this public regression. Initial/dyadic matrices and
+raw generated, arithmetic and archive results are retained in
+/tmp/vgmtrans-cleanup2/pitch-linear-interpolation37. A narrower endpoint-only
+correction is being drafted separately; it is excluded from this batch. Public NaN policy, required
+source/tempo owners, mutable RegionResponse copies, used-instrument filtering and
+source command flow remain distinct responsibilities; their guards or owners are
+not deleted solely to reduce lines.

@@ -31,11 +31,11 @@ namespace {
 constexpr int kVoiceTerminationPriority = 7;
 
 [[nodiscard]] u8 data7(double value) {
-  return static_cast<u8>(std::clamp<int>(static_cast<int>(std::lround(value)), 0, 127));
+  return static_cast<u8>(std::lround(std::clamp(value, 0.0, 127.0)));
 }
 
 [[nodiscard]] u16 data14(double value) {
-  return static_cast<u16>(std::clamp<int>(static_cast<int>(std::lround(value)), 0, 16383));
+  return static_cast<u16>(std::lround(std::clamp(value, 0.0, 16383.0)));
 }
 
 [[nodiscard]] u8 denominatorPower(u8 denominator) {
@@ -154,7 +154,7 @@ struct LoweredStereoBalance {
   }
 
   const double normalized = (semitones * 100.0) / static_cast<double>(rangeCents);
-  return static_cast<s16>(std::clamp<int>(static_cast<int>(std::lround(normalized * 8192.0)), -8192, 8191));
+  return static_cast<s16>(std::lround(std::clamp(normalized * 8192.0, -8192.0, 8191.0)));
 }
 
 [[nodiscard]] MidiLevelResolution resolveLevelResolution(MidiLevelResolution requested,
@@ -1126,7 +1126,7 @@ private:
             addController(typedEvent.header.tick, MidiController::MonoMode, typedEvent.channels);
           } else if constexpr (std::is_same_v<TypedEvent, TuningPerformanceEvent>) {
             if (options.tuning == MidiTuningRendering::CoarseAndFineTune) {
-              const s32 coarse = std::clamp<s32>(static_cast<s32>(typedEvent.cents / 100.0), -64, 63);
+              const s32 coarse = static_cast<s32>(std::clamp(typedEvent.cents / 100.0, -64.0, 63.0));
               addCoarseTune(typedEvent.header.tick, static_cast<s8>(coarse));
               addFineTune(typedEvent.header.tick, typedEvent.cents - coarse * 100.0);
             }

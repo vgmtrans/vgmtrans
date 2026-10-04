@@ -6,8 +6,9 @@
 
 #include "value/export/SequenceModulationProfile.h"
 
-#include "value/synth/SynthModel.h"
 #include "value/export/synth/ModulationScaling.h"
+#include "value/sequence/PerformanceModel.h"
+#include "value/synth/SynthModel.h"
 
 #include <algorithm>
 #include <cmath>

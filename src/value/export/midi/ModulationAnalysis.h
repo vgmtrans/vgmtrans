@@ -6,12 +6,11 @@
 
 #pragma once
 
-#include "value/sequence/PerformanceModel.h"
-
 #include <optional>
 
 namespace vgmtrans::core {
 
+struct PerformanceSequence;
 struct SequenceModulationProfile;
 
 struct MidiModulationUsage {

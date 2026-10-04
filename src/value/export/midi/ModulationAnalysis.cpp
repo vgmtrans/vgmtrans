@@ -7,6 +7,7 @@
 #include "value/export/midi/ModulationAnalysis.h"
 
 #include "value/export/SequenceModulationProfile.h"
+#include "value/sequence/PerformanceModel.h"
 
 #include <algorithm>
 

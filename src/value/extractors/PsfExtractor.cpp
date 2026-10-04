@@ -293,11 +293,11 @@ void parseTags(PsfData& psf, std::span<const u8> bytes, size_t offset) {
   return psf;
 }
 
-[[nodiscard]] std::optional<std::string> primaryLibName(const PsfData& psf) {
+[[nodiscard]] const std::string* primaryLibName(const PsfData& psf) {
   if (auto it = psf.tags.find("_lib"); it != psf.tags.end()) {
-    return it->second;
+    return &it->second;
   }
-  return std::nullopt;
+  return nullptr;
 }
 
 void overlay(Image& image, u32 address, std::span<const u8> data, size_t imageSize) {

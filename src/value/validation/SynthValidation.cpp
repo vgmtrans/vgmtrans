@@ -146,8 +146,7 @@ ValidationReport validateSoundBank(const SoundBankAsset& soundBank) {
     }
 
     for (const auto& region : instrument.regions) {
-      // Region pan is intentionally unipolar in the synth model. Performance
-      // pan uses a different bipolar range and is validated elsewhere.
+      // Synth region pan is unipolar; performance positional pan is bipolar.
       if (!std::isfinite(region.pan) || region.pan < 0.0 || region.pan > 1.0) {
         report.error("synth.region.pan", "Synth region pan was outside the 0.0 to 1.0 range", region.range);
       }

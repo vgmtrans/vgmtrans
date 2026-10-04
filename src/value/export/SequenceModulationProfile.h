@@ -6,10 +6,14 @@
 
 #pragma once
 
-#include "value/sequence/PerformanceModel.h"
+#include "value/model/ModulationModel.h"
+
+#include <optional>
 
 namespace vgmtrans::core {
 
+struct PerformanceSequence;
+struct ModulationPerformanceEvent;
 struct SoundBankAsset;
 
 // One physical LFO description derived from the rendered song. The same

@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <array>
+#include <limits>
 
 using namespace vgmtrans::core;
 
@@ -255,6 +256,39 @@ void performanceMidiRendererSelectsTuningRepresentation() {
          "coarse tuning mode should retain the standards-oriented RPN representation");
   expect(coarseBends == std::vector<std::pair<u64, s32>>{{6, 2048}},
          "coarse tuning mode should leave the source pitch-bend lane unchanged");
+}
+
+void performanceMidiRendererClipsBeforeIntegerConversion() {
+  for (const s32 sign : {-1, 1}) {
+    PerformanceTrackFixture fixture{24};
+    auto& out = fixture.out;
+    out.globalTranspose(sign > 0 ? std::numeric_limits<s32>::max() : std::numeric_limits<s32>::min());
+    out.tuning(sign * 1e20);
+    out.pitchBend(sign * 1e20);
+    out.pitchTransitionSettings(sign * 1e20);
+    out.note(sign * 60.0, 1.0, 12);
+    out.at(12).note(sign * 1e20, 1.0, 12);
+    const auto midi = renderTestMidi(PerformanceSequence{.timebase = {.ppqn = 48}, .tracks = {fixture.track}},
+                                   {.pitchTransitions = MidiPitchTransitionRendering::Portamento,
+                                    .tuning = MidiTuningRendering::CoarseAndFineTune});
+    const auto& events = midi.tracks.front().events;
+    const auto notes = midiNotes(events);
+    expect(notes.size() == 2 && std::ranges::all_of(notes, [sign](const MidiNoteView& note) {
+             return note.key == (sign > 0 ? 127 : 0);
+           }),
+           "large finite source pitches and transposes should saturate MIDI note keys");
+    expect(std::ranges::any_of(events, [sign](const MidiEvent& event) {
+             const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+             return bend && bend->value == (sign > 0 ? 8191 : -8192);
+           }),
+           "large finite physical bends should saturate the MIDI wheel before conversion");
+    expect(std::ranges::any_of(midiRpns(events), [sign](const MidiRpnView& rpn) {
+             return rpn.parameterMsb == 0 && rpn.parameterLsb == 2 && rpn.value == (sign > 0 ? 16256 : 0);
+           }),
+           "large finite tuning should saturate coarse tuning before conversion");
+    expect(firstMidiController14(events, MidiController::PortamentoTime) == (sign > 0 ? 16383 : 0),
+           "large finite glide times should saturate the native MIDI controller before conversion");
+  }
 }
 
 void performanceMidiRendererWritesTimeSignaturesToFirstTrack() {
@@ -915,6 +949,7 @@ void runValueMidiRendererTests() {
   performanceMidiRendererKeepsPhysicalLimitsAcrossVoiceContinuations();
   performanceMidiRendererLimitsOnlyTheOwningVoice();
   performanceMidiRendererSelectsTuningRepresentation();
+  performanceMidiRendererClipsBeforeIntegerConversion();
   performanceMidiRendererWritesTimeSignaturesToFirstTrack();
   performanceMidiRendererUsesGlobalExecutionOrderForTransposeAndMeter();
   performanceMidiRendererWritesPanGainResetWhenRequested();
