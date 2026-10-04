@@ -646,7 +646,7 @@ template <auto Handler, class... Args>
 
 [[nodiscard]] DecodedBytecodeCommand sourceSubcommand(Cursor& cursor, std::string_view label,
                                                       SequenceSemantic semantic, std::string_view category) {
-  auto event = cursor.command(label, semantic, CommandPlaybackStatus::SourceOnly, category);
+  auto event = cursor.command(label, semantic, category);
   cursor.u8("command", SourceValueDisplay::Hex);
   cursor.u8("value", SourceValueDisplay::Hex);
   return event;

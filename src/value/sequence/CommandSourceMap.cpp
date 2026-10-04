@@ -50,7 +50,6 @@ namespace {
   auto annotation =
       sourceMap->command(command.presentation.label, command.range, command.presentation.semantic)
           .kind(command.presentation.kind)
-          .playbackStatus(command.presentation.playback)
           .field("opcode", SourceRange{.source = command.range.source, .offset = command.range.offset, .size = 1},
                  command.opcode, SourceValueDisplay::Hex)
           .fields(command.fields);

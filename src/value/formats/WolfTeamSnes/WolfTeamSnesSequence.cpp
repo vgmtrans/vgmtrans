@@ -678,7 +678,7 @@ using Cursor = CompilerCursor<Playback>;
     case 0xfd:
       return cursor.command("Phrase Boundary", SequenceSemantic::End).invokeFlow<&Playback::advancePhrase>();
     case 0x92: {
-      auto event = cursor.command("Loop Marker", SequenceSemantic::Repeat, CommandPlaybackStatus::AffectsControlFlow);
+      auto event = cursor.command("Loop Marker", SequenceSemantic::Repeat);
       const Address destination{begin + 1};
       cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
       return event.invoke<&Playback::beginRepeat>({destination});
@@ -727,12 +727,12 @@ using Cursor = CompilerCursor<Playback>;
     case 0xaa:
       return cursor.ignored("Echo Feedback/FIR", 2, "echo-feedback-fir");
     case 0xad: {
-      auto event = cursor.command("Phase/Surround", SequenceSemantic::Pan, CommandPlaybackStatus::SourceOnly);
+      auto event = cursor.command("Phase/Surround", SequenceSemantic::Pan);
       cursor.u8("mode");
       return event;
     }
     case 0xae: {
-      auto event = cursor.command("Random Volume", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly);
+      auto event = cursor.command("Random Volume", SequenceSemantic::State);
       cursor.u8("enabled");
       return event;
     }
@@ -744,7 +744,7 @@ using Cursor = CompilerCursor<Playback>;
       return cursor.command("Echo Volume Mode", SequenceSemantic::State)
           .invoke<&Playback::echoMode>({cursor.u8("mode")});
     case 0xb2: {
-      auto event = cursor.command("Gate Jitter", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly);
+      auto event = cursor.command("Gate Jitter", SequenceSemantic::State);
       cursor.u8("enabled");
       return event;
     }
@@ -770,8 +770,7 @@ using Cursor = CompilerCursor<Playback>;
   }
 
   auto command = [&](std::string_view label, SequenceSemantic semantic,
-                     CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback,
-                     std::string_view kind = {}) { return cursor.command(label, semantic, playback, kind); };
+                     std::string_view kind = {}) { return cursor.command(label, semantic, kind); };
 
   switch (opcode) {
     case 0xe0: {
@@ -786,7 +785,7 @@ using Cursor = CompilerCursor<Playback>;
       if (middle) {
         return command("End", SequenceSemantic::End).invoke<&Playback::endTrack>().end();
       }
-      return cursor.noOp("No Operation", "nop");
+      return cursor.sourceOnly("No Operation", "nop");
     case 0xe1: {
       auto event = command("Volume", SequenceSemantic::Level);
       return event.invoke<&Playback::level>({cursor.u8("delay"), cursor.u8("volume")});
@@ -816,26 +815,25 @@ using Cursor = CompilerCursor<Playback>;
       if (middle && opcode == 0xf7) {
         return cursor.unsupported("Invalid Middle-Family Opcode", "invalid").stop();
       }
-      auto event = command("Driver Flag", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly, "driver-flag");
+      auto event = command("Driver Flag", SequenceSemantic::State, "driver-flag");
       cursor.u8("enabled");
       return event;
     }
     case 0xe6:
       if (middle) {
-        auto event = command("Control E6", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly, "control");
+        auto event = command("Control E6", SequenceSemantic::State, "control");
         cursor.rawBytes("bytes", 2);
         return event;
       }
-      return cursor.noOp("No Operation", "nop");
+      return cursor.sourceOnly("No Operation", "nop");
     case 0xe8:
     case 0xe9:
       if (middle) {
-        auto event = command(opcode == 0xe8 ? "Control E8" : "Control E9", SequenceSemantic::State,
-                             CommandPlaybackStatus::SourceOnly, "control");
+        auto event = command(opcode == 0xe8 ? "Control E8" : "Control E9", SequenceSemantic::State, "control");
         cursor.rawBytes("bytes", 3);
         return event;
       }
-      return cursor.noOp("No Operation", "nop");
+      return cursor.sourceOnly("No Operation", "nop");
     case 0xe5: {
       auto event = command("Vibrato Parameters", SequenceSemantic::Modulation);
       return event.invoke<&Playback::segmentedVibratoParameters>(
@@ -847,22 +845,21 @@ using Cursor = CompilerCursor<Playback>;
     }
     case 0xf2:
       if (middle) {
-        auto event = command("Control F2", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly, "control");
+        auto event = command("Control F2", SequenceSemantic::State, "control");
         cursor.rawBytes("bytes", 1);
         return event;
       }
-      return cursor.noOp("No Operation", "nop");
+      return cursor.sourceOnly("No Operation", "nop");
     case 0xf8: {
       auto event = command("Return to Saved Segment", SequenceSemantic::Repeat);
       return event.invokeFlow<&Playback::returnSaved>();
     }
     case 0xf9: {
-      auto event = command("Save Segment", SequenceSemantic::Repeat, CommandPlaybackStatus::AffectsControlFlow);
+      auto event = command("Save Segment", SequenceSemantic::Repeat);
       return event.invoke<&Playback::saveSegment>();
     }
     case 0xef: {
-      auto event =
-          command("Echo Feedback", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly, "echo-feedback");
+      auto event = command("Echo Feedback", SequenceSemantic::State, "echo-feedback");
       cursor.u8("feedback");
       if (middle) {
         cursor.u8("unknown");
@@ -870,14 +867,13 @@ using Cursor = CompilerCursor<Playback>;
       return event;
     }
     case 0xe3: {
-      auto event =
-          command("Release/Modulation Flag", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly, "driver-flag");
+      auto event = command("Release/Modulation Flag", SequenceSemantic::State, "driver-flag");
       cursor.u8("value");
       return event;
     }
     default:
       if (!middle) {
-        return cursor.noOp("No Operation", "nop");
+        return cursor.sourceOnly("No Operation", "nop");
       }
       return cursor.unsupported("Invalid Middle-Family Opcode", "invalid").stop();
   }

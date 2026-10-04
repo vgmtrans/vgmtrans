@@ -1593,9 +1593,9 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
     }
 
     case EventType::Nop:
-      return cursor.noOp("NOP");
+      return cursor.sourceOnly("NOP");
     case EventType::Nop1: {
-      auto event = cursor.noOp("NOP");
+      auto event = cursor.sourceOnly("NOP");
       cursor.u8("arg1");
       return event;
     }
@@ -1710,13 +1710,13 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
       return cursor.command("Tremolo Off", SequenceSemantic::Modulation)
           .invoke<&Playback::clearLfo>({LfoTarget::Tremolo});
     case EventType::PanLfoOn: {
-      auto event = cursor.command("Pan LFO", SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
+      auto event = cursor.command("Pan LFO", SequenceSemantic::Modulation);
       cursor.u8("depth");
       cursor.u8("rate");
       return event;
     }
     case EventType::PanLfoOnWithDelay: {
-      auto event = cursor.command("Pan LFO", SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
+      auto event = cursor.command("Pan LFO", SequenceSemantic::Modulation);
       cursor.u8("delay");
       cursor.u8("rate");
       cursor.u8("depth");
@@ -1956,13 +1956,12 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
       return event;
     }
     case EventType::CpuControlledJump: {
-      auto event =
-          cursor.command("CPU-Controlled Jump", SequenceSemantic::Jump, CommandPlaybackStatus::AffectsControlFlow);
+      auto event = cursor.command("CPU-Controlled Jump", SequenceSemantic::Jump);
       const Address destination = relocated(SemanticOperandRole::JumpTarget);
       return event.discoverTarget(destination);
     }
     case EventType::CpuControlledJumpV2: {
-      auto event = cursor.command("CPU-Controlled Jump", SequenceSemantic::Jump, CommandPlaybackStatus::SourceOnly);
+      auto event = cursor.command("CPU-Controlled Jump", SequenceSemantic::Jump);
       cursor.u8("arg");
       relocated(SemanticOperandRole::JumpTarget);
       return event;

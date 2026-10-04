@@ -1140,7 +1140,7 @@ using Cursor = CompilerCursor<Playback>;
 
   switch (opcode) {
     case 0xd0:
-      return cursor.noOp("No Operation", "nop");
+      return cursor.sourceOnly("No Operation", "nop");
     case 0xd1: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
       const u8 raw = cursor.u8("tempo");
@@ -1166,7 +1166,7 @@ using Cursor = CompilerCursor<Playback>;
     case 0xd7:
     case 0xd8:
       if (version == Version::V2) {
-        return cursor.noOp("No Operation", "nop");
+        return cursor.sourceOnly("No Operation", "nop");
       } else {
         auto event = cursor.sourceOnly("Ignored Parameter", "nop");
         cursor.u8("unused");
@@ -1250,14 +1250,14 @@ using Cursor = CompilerCursor<Playback>;
           .invokeFlow<&Playback::jumpLoopPointOnce>();
     case 0xee:
       if (version == Version::V2) {
-        return cursor.noOp("No Operation", "nop");
+        return cursor.sourceOnly("No Operation", "nop");
       } else {
         return cursor.command("Indexed Volume", SequenceSemantic::Level)
             .invoke<&Playback::volumeFromTable>({cursor.u8("index")});
       }
     case 0xef:
       if (version == Version::Early) {
-        return cursor.noOp("No Operation", "nop");
+        return cursor.sourceOnly("No Operation", "nop");
       } else {
         auto event = cursor.command("Pitch Script", SequenceSemantic::Pitch);
         const u8 script = cursor.u8("script");
@@ -1268,14 +1268,14 @@ using Cursor = CompilerCursor<Playback>;
       }
     case 0xf0:
       if (version == Version::Early) {
-        return cursor.noOp("No Operation", "nop");
+        return cursor.sourceOnly("No Operation", "nop");
       } else {
         return cursor.command("Pitch Script Range", SequenceSemantic::Pitch)
             .set<&TrackState::pitchScriptScale>(cursor.u8("semitones"));
       }
     case 0xf1:
       if (version == Version::Early) {
-        return cursor.noOp("No Operation", "nop");
+        return cursor.sourceOnly("No Operation", "nop");
       } else {
         auto event = cursor.command("Portamento", SequenceSemantic::Portamento);
         const u8 speed = cursor.u8("speed");
@@ -1286,13 +1286,13 @@ using Cursor = CompilerCursor<Playback>;
       if (version == Version::V2) {
         return cursor.command("Tremolo", SequenceSemantic::Modulation).invoke<&Playback::tremolo>({cursor.u8("delay")});
       }
-      return cursor.noOp("No Operation", "nop");
+      return cursor.sourceOnly("No Operation", "nop");
     case 0xf3:
       if (version == Version::V2) {
         return cursor.command("Periodic Volume Slide", SequenceSemantic::Level)
             .invoke<&Playback::volumeSlide>({cursor.s8("amount")});
       }
-      return cursor.noOp("No Operation", "nop");
+      return cursor.sourceOnly("No Operation", "nop");
     case 0xf4:
     case 0xf5:
     case 0xf6:
@@ -1303,7 +1303,7 @@ using Cursor = CompilerCursor<Playback>;
     case 0xfb:
     case 0xfc:
     case 0xfd:
-      return cursor.noOp("No Operation", "nop");
+      return cursor.sourceOnly("No Operation", "nop");
     case 0xfe:
       return decodeSubcommand(cursor, version, references);
     case 0xff: {

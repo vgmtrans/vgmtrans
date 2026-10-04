@@ -164,8 +164,8 @@ std::vector<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layou
     const auto& info = layout.sampleInfos[source.sampleIndex];
     const double unity = layout.version == Version::Vendetta ? 59.0 - pitchCents(info.pitch) / 100.0 : 59.0;
     instrument
-        .region(*sample,
-                Region{
+        .region(Region{
+                    .sample = *sample,
                     .unityKey = unity,
                     .envelope =
                         Envelope{
@@ -209,9 +209,9 @@ std::vector<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layou
         const u8 key = static_cast<u8>(drum.bank * 16 + drum.slot);
         const auto sample = samples.find(drum.sampleIndex);
         auto region =
-            drumKit.region(sample.value_or(SampleRef::none()),
-                           Region{
+            drumKit.region(Region{
                                .keyRange = KeyRange{.low = key, .high = key},
+                               .sample = sample.value_or(SampleRef::none()),
                                .range = drum.range,
                                .unityKey = key - pitchCents(drum.pitch) / 100.0,
                                .envelope = Envelope{.releaseSeconds = sampledReleaseSeconds(

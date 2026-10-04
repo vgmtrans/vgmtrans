@@ -235,12 +235,11 @@ void extendedCommandsRetainSourceMetadata() {
   const SourceAnnotation noise = extendedCommandAnnotation(Version::Original, false, 0x11);
   const SourceAnnotation reserved = extendedCommandAnnotation(Version::Modern, false, 0x05);
   const SourceAnnotation drift = extendedCommandAnnotation(Version::Modern, true, 0x05);
-  expect(noise.label == "DSP Noise On" && noise.playbackStatus == CommandPlaybackStatus::SourceOnly &&
-             noise.category() == "noise" && reserved.label == "Reserved Extended Command" &&
+  expect(noise.label == "DSP Noise On" && noise.category() == "noise" &&
+             reserved.label == "Reserved Extended Command" &&
              reserved.sequenceSemantic == SequenceSemantic::Meta && reserved.category() == "reserved" &&
-             drift.label == "Pitch Drift Up" && drift.sequenceSemantic == SequenceSemantic::Pitch &&
-             drift.playbackStatus == CommandPlaybackStatus::AffectsPlayback,
-         "extended commands should retain source-only, reserved, and playback metadata");
+             drift.label == "Pitch Drift Up" && drift.sequenceSemantic == SequenceSemantic::Pitch,
+         "extended commands should retain their labels, categories, and semantics");
 }
 
 void modernEffectsRetainPhysicalDriverState() {

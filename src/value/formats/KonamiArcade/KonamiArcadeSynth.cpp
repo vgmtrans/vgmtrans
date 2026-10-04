@@ -194,8 +194,8 @@ ScanSoundBankDraft addKonamiArcadeSynth(ScanResultBuilder& builder, const Konami
       continue;
     }
     instrument
-        .region(*sample,
-                Region{
+        .region(Region{
+                    .sample = *sample,
                     .unityKey = 66.0,
                     .envelope = Envelope{.releaseSeconds = 0.0},
                 })
@@ -228,13 +228,14 @@ ScanSoundBankDraft addKonamiArcadeSynth(ScanResultBuilder& builder, const Konami
       const SampleRef sampleRef = sample.value_or(SampleRef::none());
       const u8 key = static_cast<u8>(index + 24);
       const double driverPitch = konamiArcadeDrumPitch(layout.version, drum);
-      auto region = drumKit.region(sampleRef, Region{
-                                                  .keyRange = KeyRange{.low = key, .high = key},
-                                                  .range = drum.range,
-                                                  .unityKey = static_cast<double>(key) + 0x2a - driverPitch,
-                                                  .envelope = Envelope{.releaseSeconds = 0.0},
-                                                  .attenuationDb = attenuationDb(drum.attenuation),
-                                              });
+      auto region = drumKit.region(Region{
+                                       .keyRange = KeyRange{.low = key, .high = key},
+                                       .sample = sampleRef,
+                                       .range = drum.range,
+                                       .unityKey = static_cast<double>(key) + 0x2a - driverPitch,
+                                       .envelope = Envelope{.releaseSeconds = 0.0},
+                                       .attenuationDb = attenuationDb(drum.attenuation),
+                                   });
       auto annotation = region.source(fmt::format("Drum {}", index), drum.range, "konami-arcade-drum");
       annotation.derived("sample", sourceSample);
       if (!sample) {

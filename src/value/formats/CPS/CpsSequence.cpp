@@ -801,7 +801,7 @@ using Cursor = CompilerCursor<Playback>;
 
   switch (opcode) {
     case 0xc0:
-      return cursor.noOp("No Operation");
+      return cursor.sourceOnly("No Operation");
     case 0xc1: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
       const u16 raw = cursor.u16be("ticks_per_iteration");

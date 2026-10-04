@@ -105,7 +105,7 @@ ScanResult scanProbe(const ScanInput& input, bool emptyBank) {
   if (!emptyBank) {
     bank.instruments()
         .append(Instrument{.explicitAddress = InstrumentAddress{.bank = 3, .program = 7}, .name = "Instrument"})
-        .region(sample.ref(), Region{.range = input.reader.range(2, 8)});
+        .region(Region{.sample = sample.ref(), .range = input.reader.range(2, 8)});
   }
   sequence.collectionName("Same title").useBank(bank);
   result.warning("Probe warning", input.reader.range(0, 1));

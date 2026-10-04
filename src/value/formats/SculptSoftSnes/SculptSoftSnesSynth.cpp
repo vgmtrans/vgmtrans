@@ -211,11 +211,11 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .name = fmt::format("Sample {}", srcn),
     });
     // The sequence performs the sample tuning and software GAIN envelopes.
-    instrument.region(*sample, Region{.unityKey = 72.0,
-                                      .envelope = Envelope{.attackSeconds = 0.0,
-                                                           .decaySeconds = std::numeric_limits<double>::infinity(),
-                                                           .releaseSeconds = 0.0,
-                                                           .sustainAmplitude = 1.0}});
+    instrument.region(Region{.sample = *sample, .unityKey = 72.0,
+                             .envelope = Envelope{.attackSeconds = 0.0,
+                                                  .decaySeconds = std::numeric_limits<double>::infinity(),
+                                                  .releaseSeconds = 0.0,
+                                                  .sustainAmplitude = 1.0}});
   }
   constexpr std::array<std::string_view, 4> laneNames{"GAIN curves", "Pitch curves", "Pan curves", "Sample curves"};
   const std::array<u8, 4> flags{1, 4, 8, 2};

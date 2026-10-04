@@ -189,9 +189,9 @@ std::optional<HeartBeatPs1ScannedBank> addHeartBeatPs1Bank(ScanResultBuilder& re
       }
       const double gain = driverLevel(layout.masterVolume) * driverLevel(sourceProgram.volume) * driverLevel(volume);
       instrument
-          .region(*sample,
-                  Region{
+          .region(Region{
                       .keyRange = tone.keys,
+                      .sample = *sample,
                       .unityKey = unityKey,
                       .envelope = psxSpuEnvelope(adsr1, adsr2),
                       .loop = streams.at(sampleOffset).loop,

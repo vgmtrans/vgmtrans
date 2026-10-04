@@ -131,6 +131,7 @@ std::optional<SuzukiPs1ScannedBank> addSuzukiPs1Bank(ScanResultBuilder& result, 
     instrument.source(fmt::format("Instrument {}", program), source, "suzuki-ps1-instrument").parent(instrumentRoot);
 
     Region region{
+        .sample = *sample,
         .range = source.range,
         // The driver subtracts both pitch fields from middle C. Keeping the
         // fractional root avoids a lossy coarse/fine split during export.
@@ -140,7 +141,7 @@ std::optional<SuzukiPs1ScannedBank> addSuzukiPs1Bank(ScanResultBuilder& result, 
     if (loopOffset != 0) {
       region.loop = sampleStreams.at(sampleOffset).loopAt(loopOffset);
     }
-    instrument.region(*sample, std::move(region)).source("Region", source.range, "suzuki-ps1-region");
+    instrument.region(std::move(region)).source("Region", source.range, "suzuki-ps1-region");
   }
 
   return SuzukiPs1ScannedBank{

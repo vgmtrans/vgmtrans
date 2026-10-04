@@ -437,9 +437,9 @@ using Cursor = CompilerCursor<Playback>;
       return cursor.command("Program Change", SequenceSemantic::Program)
           .invoke<&Playback::selectProgram>({cursor.u8("program", SemanticOperandRole::InstrumentProgram)});
     case 0xae:
-      return cursor.noOp("Percussion On");
+      return cursor.sourceOnly("Percussion On");
     case 0xaf:
-      return cursor.noOp("Percussion Off");
+      return cursor.sourceOnly("Percussion Off");
     case 0xb0:
       return cursor.command("Slur On", SequenceSemantic::State).emitLegatoPedal(true);
     case 0xb1:
@@ -484,31 +484,30 @@ using Cursor = CompilerCursor<Playback>;
     case 0xd0:
     case 0xd1:
     case 0xd2: {
-      auto event = cursor.command("Pitch Parameter", SequenceSemantic::Pitch, CommandPlaybackStatus::SourceOnly);
+      auto event = cursor.command("Pitch Parameter", SequenceSemantic::Pitch);
       cursor.s8("value");
       return event;
     }
     case 0xd4: {
-      auto event = cursor.command("Portamento", SequenceSemantic::Portamento, CommandPlaybackStatus::SourceOnly);
+      auto event = cursor.command("Portamento", SequenceSemantic::Portamento);
       cursor.u8("duration");
       cursor.s8("depth");
       return event;
     }
     case 0xd6: {
-      auto event = cursor.command("Detune Parameter", SequenceSemantic::Pitch, CommandPlaybackStatus::SourceOnly);
+      auto event = cursor.command("Detune Parameter", SequenceSemantic::Pitch);
       cursor.s8("value");
       return event;
     }
     case 0xd7: {
-      auto event =
-          cursor.command("Pitch Modulation Depth", SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
+      auto event = cursor.command("Pitch Modulation Depth", SequenceSemantic::Modulation);
       cursor.u8("depth");
       return event;
     }
     case 0xd8:
     case 0xd9: {
       auto event = cursor.command(status == 0xd8 ? "Pitch Modulation Shape" : "Pitch Modulation Envelope",
-                                  SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
+                                  SequenceSemantic::Modulation);
       cursor.u8("parameter_1");
       cursor.u8("parameter_2");
       cursor.u8("parameter_3");
@@ -520,8 +519,7 @@ using Cursor = CompilerCursor<Playback>;
       return event.emitLevel(linearController(value));
     }
     case 0xe1: {
-      auto event =
-          cursor.command("Relative Volume Parameter", SequenceSemantic::Level, CommandPlaybackStatus::SourceOnly);
+      auto event = cursor.command("Relative Volume Parameter", SequenceSemantic::Level);
       cursor.s8("value");
       return event;
     }
@@ -529,15 +527,14 @@ using Cursor = CompilerCursor<Playback>;
       return cursor.command("Volume Slide", SequenceSemantic::Level)
           .invoke<&Playback::volumeSlide>({cursor.u8("duration"), cursor.u8("target")});
     case 0xe3: {
-      auto event =
-          cursor.command("Volume Modulation Depth", SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
+      auto event = cursor.command("Volume Modulation Depth", SequenceSemantic::Modulation);
       cursor.u8("depth");
       return event;
     }
     case 0xe4:
     case 0xe5: {
       auto event = cursor.command(status == 0xe4 ? "Volume Modulation Shape" : "Volume Modulation Envelope",
-                                  SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
+                                  SequenceSemantic::Modulation);
       cursor.u8("parameter_1");
       cursor.u8("parameter_2");
       cursor.u8("parameter_3");
@@ -549,7 +546,7 @@ using Cursor = CompilerCursor<Playback>;
       return event.emitPan(panPosition(value));
     }
     case 0xe9: {
-      auto event = cursor.command("Relative Pan Parameter", SequenceSemantic::Pan, CommandPlaybackStatus::SourceOnly);
+      auto event = cursor.command("Relative Pan Parameter", SequenceSemantic::Pan);
       cursor.s8("value");
       return event;
     }
@@ -557,15 +554,14 @@ using Cursor = CompilerCursor<Playback>;
       return cursor.command("Pan Slide", SequenceSemantic::Pan)
           .invoke<&Playback::panSlide>({cursor.u8("duration"), cursor.u8("target")});
     case 0xeb: {
-      auto event =
-          cursor.command("Pan Modulation Depth", SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
+      auto event = cursor.command("Pan Modulation Depth", SequenceSemantic::Modulation);
       cursor.u8("depth");
       return event;
     }
     case 0xec:
     case 0xed: {
       auto event = cursor.command(status == 0xec ? "Pan Modulation Shape" : "Pan Modulation Envelope",
-                                  SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
+                                  SequenceSemantic::Modulation);
       cursor.u8("parameter_1");
       cursor.u8("parameter_2");
       cursor.u8("parameter_3");

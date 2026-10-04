@@ -144,8 +144,8 @@ std::optional<ScanSoundBankDraft> addCapcomSnesSynth(ScanResultBuilder& builder,
         instrument.source(name, info.source, "capcom-snes-instrument").derived("instrument", info.index).parent(root);
 
     instrument
-        .region(*sample,
-                Region{
+        .region(Region{
+                    .sample = *sample,
                     .unityKey = unityKey,
                     .envelope = capcomInstrumentEnvelope(info.adsr1, info.adsr2, info.gain),
                 })

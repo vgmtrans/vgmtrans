@@ -173,15 +173,6 @@ enum class SourceOutlinePolicy : u8 {
   Hide,
 };
 
-enum class CommandPlaybackStatus : u8 {
-  SourceOnly,
-  NoOp,
-  AffectsPlayback,
-  AffectsControlFlow,
-  StopsPlayback,
-  Unsupported,
-};
-
 // Persistent source annotations are source-backed: every annotation stored in a
 // session SourceMap must have a valid primary range. Derived/range-less facts
 // should be fields on a source-backed annotation instead of standalone nodes.
@@ -192,7 +183,6 @@ struct SourceAnnotation {
   std::string label;
   std::string description;
   std::optional<SequenceSemantic> sequenceSemantic;
-  std::optional<CommandPlaybackStatus> playbackStatus;
   // Qualified identity used by inspectors and format-specific behavior. The
   // final segment remains the format-neutral category used for coloring and
   // grouping (for example, "capcom-snes.note" -> "note").
@@ -280,7 +270,6 @@ public:
   AnnotationBuilder& outline(SourceOutlinePolicy policy);
   AnnotationBuilder& fieldsAsChildren(bool enabled = true);
   AnnotationBuilder& sequenceSemantic(SequenceSemantic semantic);
-  AnnotationBuilder& playbackStatus(CommandPlaybackStatus status);
   AnnotationBuilder& field(std::string_view name, SourceRange range, SourceValue value,
                            SourceValueDisplay display = SourceValueDisplay::Default);
   AnnotationBuilder& fields(std::span<const SourceField> fields);

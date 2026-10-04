@@ -63,8 +63,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .parent(root)
         .description(fmt::format("transpose {}, pitch table {}", info.transpose, info.pitchTable));
     entry
-        .region(*sample,
-                Region{
+        .region(Region{
+                    .sample = *sample,
                     .range = info.source,
                     .unityKey = unityKey,
                     // Compile owns ADSR in track state; this is merely a safe

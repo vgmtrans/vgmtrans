@@ -152,7 +152,6 @@ public:
       execution_ = {};
       defaultTransition_ = {};
       discoveryTargets_.clear();
-      presentation_.playback = initialPlayback_;
       return *this;
     }
 
@@ -163,7 +162,6 @@ public:
 
     Event& end() {
       presentation_.semantic = SequenceSemantic::End;
-      presentation_.playback = CommandPlaybackStatus::StopsPlayback;
       setDefaultTransition(CommandTransition::end());
       return *this;
     }
@@ -185,13 +183,11 @@ public:
     }
 
     Event& synchronizedLoopStart() {
-      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       execution_.coordinatorSignal = SequenceCoordinatorSignal::SynchronizedLoopStart;
       return *this;
     }
 
     Event& synchronizedLoopEnd() {
-      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       execution_.coordinatorSignal = SequenceCoordinatorSignal::SynchronizedLoopEnd;
       return *this;
     }
@@ -352,31 +348,26 @@ public:
     }
 
     Event& jump(Address destination) {
-      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       setDefaultTransition(CommandTransition::jump(destination));
       return *this;
     }
 
     Event& finiteBranch(Address destination) {
-      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       setDefaultTransition(CommandTransition::jump(destination, JumpSemantics::FiniteBranch));
       return *this;
     }
 
     Event& loopCandidate(Address destination) {
-      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       setDefaultTransition(CommandTransition::jump(destination, JumpSemantics::LoopCandidate));
       return *this;
     }
 
     Event& declaredLoop(Address destination) {
-      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       setDefaultTransition(CommandTransition::jump(destination, JumpSemantics::DeclaredLoop));
       return *this;
     }
 
     Event& call(Address destination) {
-      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       setDefaultTransition(CommandTransition::call(destination));
       return *this;
     }
@@ -384,20 +375,17 @@ public:
     // Set the default return path for decoding and execution. A runtime body
     // may override it, for example when the same opcode ends playback at top level.
     Event& return_() {
-      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       setDefaultTransition(CommandTransition::return_());
       return *this;
     }
 
     Event& repeatUntil(::u8 slot, u32 totalPlays, Address destination) {
-      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       appendCallable([=](Playback& playback) { return playback.vm.countedRepeatUntil(slot, totalPlays, destination); });
       discoveryTargets_.push_back(destination);
       return *this;
     }
 
     Event& repeatBreak(::u8 slot, Address destination) {
-      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       appendCallable([=](Playback& playback) { return playback.vm.countedRepeatBreak(slot, destination); });
       discoveryTargets_.push_back(destination);
       return *this;
@@ -406,7 +394,6 @@ public:
     // Decode an additional reachable block without changing the default path.
     // Conditional branches supply their runtime decision through invokeFlow().
     Event& discoverTarget(Address destination) {
-      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       discoveryTargets_.push_back(destination);
       return *this;
     }
@@ -417,14 +404,13 @@ public:
     friend class CompilerCursor;
 
     Event(CompilerCursor& cursor, DecodedCommandPresentation presentation)
-        : cursor_(cursor), presentation_(std::move(presentation)), initialPlayback_(presentation_.playback) {}
+        : cursor_(cursor), presentation_(std::move(presentation)) {}
 
     template <bool ControlFlow, class Callable, class... Arguments>
     Event& appendInvocation(Callable callable, detail::CommandArguments<Arguments...> arguments) {
       if constexpr (ControlFlow) {
         static_assert(std::is_same_v<detail::CommandResult<Playback, Callable, Arguments...>, Effects>,
                       "A runtime control-flow handler must return Effects");
-        presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       }
       return std::apply(
           [&](auto... values) -> Event& { return appendCallable(std::move(callable), std::move(values)...); },
@@ -433,10 +419,6 @@ public:
 
     template <class Callable, class... Arguments>
     Event& appendCallable(Callable callable, Arguments... arguments) {
-      if (presentation_.playback == CommandPlaybackStatus::SourceOnly ||
-          presentation_.playback == CommandPlaybackStatus::NoOp) {
-        presentation_.playback = CommandPlaybackStatus::AffectsPlayback;
-      }
       auto next = detail::makeCommandBody<Playback>(std::move(callable), std::move(arguments)...);
       if (!execution_.body) {
         execution_.body = std::move(next);
@@ -468,7 +450,6 @@ public:
 
     CompilerCursor& cursor_;
     DecodedCommandPresentation presentation_;
-    CommandPlaybackStatus initialPlayback_;
     CommandExecution execution_;
     CommandTransition defaultTransition_;
     std::vector<Address> discoveryTargets_;
@@ -667,27 +648,21 @@ public:
   }
 
   [[nodiscard]] Event command(std::string_view label, SequenceSemantic semantic,
-                              CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback,
                               std::string_view category = {}) {
     return Event{*this, DecodedCommandPresentation{
                             .label = std::string(label),
                             .kind =
                                 category.empty() ? qualifiedKind(sourceKindFromLabel(label)) : qualifiedKind(category),
                             .semantic = semantic,
-                            .playback = playback,
                         }};
   }
 
   [[nodiscard]] Event sourceOnly(std::string_view label, std::string_view category = {}) {
-    return command(label, SequenceSemantic::Meta, CommandPlaybackStatus::SourceOnly, category);
-  }
-
-  [[nodiscard]] Event noOp(std::string_view label, std::string_view category = {}) {
-    return command(label, SequenceSemantic::Meta, CommandPlaybackStatus::NoOp, category);
+    return command(label, SequenceSemantic::Meta, category);
   }
 
   [[nodiscard]] Event unsupported(std::string_view label, std::string_view category = "unsupported") {
-    return command(label, SequenceSemantic::Unsupported, CommandPlaybackStatus::Unsupported, category);
+    return command(label, SequenceSemantic::Unsupported, category);
   }
 
   // Records the command and its raw operands for source inspection, but
@@ -737,7 +712,6 @@ private:
         .label = "Truncated Command",
         .kind = qualifiedKind("truncated"),
         .semantic = SequenceSemantic::Unsupported,
-        .playback = CommandPlaybackStatus::Unsupported,
     };
   }
 

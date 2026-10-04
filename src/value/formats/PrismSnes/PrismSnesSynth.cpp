@@ -61,8 +61,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     entry.source("Coarse Tuning", reader.range(tuningHigh, 1), "prism-snes-tuning-high").parent(root);
     entry.source("Fine Tuning", reader.range(tuningLow, 1), "prism-snes-tuning-low").parent(root);
     entry
-        .region(*sample,
-                Region{
+        .region(Region{
+                    .sample = *sample,
                     .unityKey = 93.0 - semitones,
                     .envelope = driverEnvelope(reader.u8At(adsr1), reader.u8At(adsr2)),
                 })

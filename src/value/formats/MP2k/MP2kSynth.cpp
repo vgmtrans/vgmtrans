@@ -345,13 +345,13 @@ void addToneRegion(SynthContext& context, InstrumentSetBuilder::Entry instrument
     for (u32 key = keys.low; key <= keys.high; ++key) {
       const KeyRange singleKey{.low = static_cast<u8>(key), .high = static_cast<u8>(key)};
       if (auto region = regionForTone(context, tone, singleKey)) {
-        instrument.region(region->sample, *region).source("Tone", tone.source, "mp2k-tone");
+        instrument.region(*region).source("Tone", tone.source, "mp2k-tone");
       }
     }
     return;
   }
   if (auto region = regionForTone(context, tone, keys, rhythmKey)) {
-    instrument.region(region->sample, *region).source("Tone", tone.source, "mp2k-tone");
+    instrument.region(*region).source("Tone", tone.source, "mp2k-tone");
   }
 }
 

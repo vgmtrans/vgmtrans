@@ -22,7 +22,6 @@ struct DecodedCommandPresentation {
   std::string label;
   std::string kind;
   SequenceSemantic semantic = SequenceSemantic::Unknown;
-  CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback;
 };
 
 // Roles identify relationships used by source links, channel attribution, and

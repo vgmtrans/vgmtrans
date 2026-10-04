@@ -250,8 +250,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .identity = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = srcn},
         .name = fmt::format("Instrument {}", static_cast<unsigned>(srcn)),
     });
-    instrument.region(*sample, Region{.unityKey = unityKey(layout.version, *scale),
-                                      .envelope = neutral});
+    instrument.region(Region{.sample = *sample, .unityKey = unityKey(layout.version, *scale),
+                             .envelope = neutral});
   }
 
   if (!noiseRates.empty()) {
@@ -262,9 +262,10 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     });
     for (const u8 rate : noiseRates) {
       const u8 key = static_cast<u8>(kNoiseOutputKeyBase + rate);
-      noise.region(noiseSamples[rate], Region{.keyRange = KeyRange{.low = key, .high = key},
-                                              .unityKey = static_cast<double>(key),
-                                              .envelope = neutral});
+      noise.region(Region{.keyRange = KeyRange{.low = key, .high = key},
+                          .sample = noiseSamples[rate],
+                          .unityKey = static_cast<double>(key),
+                          .envelope = neutral});
     }
   }
 
@@ -275,8 +276,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     });
     for (const Drum& drum : drums) {
       if (drum.noise()) {
-        kit.region(noiseSamples[drum.noiseRate()],
-                   Region{.keyRange = KeyRange{.low = drum.index, .high = drum.index},
+        kit.region(Region{.keyRange = KeyRange{.low = drum.index, .high = drum.index},
+                          .sample = noiseSamples[drum.noiseRate()],
                           .unityKey = static_cast<double>(drum.index),
                           .envelope = neutral});
         continue;
@@ -288,10 +289,11 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
       }
       Region region{
           .keyRange = KeyRange{.low = drum.index, .high = drum.index},
+          .sample = *sample,
           .unityKey = unityKey(layout.version, *scale) + drum.index - drum.sourceKey,
           .envelope = neutral,
       };
-      kit.region(*sample, std::move(region));
+      kit.region(std::move(region));
     }
   }
   return bank;

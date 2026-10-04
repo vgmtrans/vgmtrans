@@ -164,12 +164,13 @@ std::optional<ScannedBank> addBank(ScanResultBuilder& result, const BankLayout& 
       }
       core::Region region{
           .keyRange = KeyRange{.low = regionSource.keyLow, .high = regionSource.keyHigh},
+          .sample = *sample,
           .range = regionSource.source.range,
           .unityKey = regionSource.unityKey,
           .envelope = psxSpuEnvelope(regionSource.adsr1, regionSource.adsr2),
           .attenuationDb = linearAmplitudeToAttenuationDb(regionSource.volume / 127.0),
       };
-      instrument.region(*sample, std::move(region)).source("Region", regionSource.source, "hosa-region");
+      instrument.region(std::move(region)).source("Region", regionSource.source, "hosa-region");
     }
   }
   return ScannedBank{.bank = bank, .instruments = std::move(parsed)};

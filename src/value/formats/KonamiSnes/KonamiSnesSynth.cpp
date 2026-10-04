@@ -260,6 +260,7 @@ void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader read
 
     const double unityKey = konamiUnityKey(info);
     Region region{
+        .sample = *sample,
         .unityKey = unityKey,
         // The shared DSP conversion understands both ADSR and GAIN modes.
         .envelope = snesDspEnvelope(info.adsr1, info.adsr2, info.gain),
@@ -267,7 +268,7 @@ void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader read
     if (info.percussion) {
       region.keyRange = KeyRange{.low = info.percussionNote, .high = info.percussionNote};
     }
-    instrument.region(*sample, std::move(region))
+    instrument.region(std::move(region))
         .source("Region", entryRange, "konami-snes-region")
         .description(fmt::format("Sample {}", sample->index()));
   }

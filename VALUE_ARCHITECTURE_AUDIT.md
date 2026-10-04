@@ -1,12 +1,13 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Fifty-four validated batches remove 1,345 net production lines
+`cb9e0b766`. Fifty-five validated batches remove 1,489 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 53 exactly.
-All 73 expanded raw inventories match byte-for-byte. The cleanup2 records appear
+cover 37 of 38 registered families. All export records match batch 54 exactly.
+Seventy-one expanded raw inventories match byte-for-byte; two retain the previously
+documented Sony sample-pool ID scheduling variation. The cleanup2 records appear
 at the end of this document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
@@ -10485,3 +10486,158 @@ comparison-pass54.json, volume-coverage27/pass53-vs-pass54-summary.json.
 
 Next: continue cold source audits of synth authoring and durable command state,
 then prove any concrete responsibility reduction before applying it.
+
+## Cleanup2 fifty-fifth batch: remove playback classifications and insert complete regions
+
+Delete the unused playback-status protocol from decoded presentation and durable
+source annotations. Formats no longer classify commands as SourceOnly, NoOp,
+AffectsPlayback, AffectsControlFlow, StopsPlayback or Unsupported in a second
+enum. They author the existing label/semantic/category, actual body and flow.
+Remove the enum, both fields, AnnotationBuilder setter, projector write, saved
+initial classification, promotion/reset logic and twelve flow-status assignments.
+The smaller cursor signature is command(label, semantic, category={}). Actual
+body composition, Effects result checks, duplicate transition/override rejection,
+time overflow, delay, channel/coordinator routing and during-wait validation stay.
+
+The published classification has no production reader. Tamsoft's one transient
+reader belongs to its private decoder's inherited-state discovery. There, missing
+or truncated commands already have Unsupported semantic; valid undefined commands
+become End through end(). Query that existing semantic instead. This equivalence
+is private to that producer: NDS's Unsupported-semantic recovery stop and arbitrary
+presentation aggregates disprove a universal status-to-semantic mapping.
+
+Delete SonyPS2 and HeartBeatPS1's classification-only controller switches; turn
+KonamiPS1's label/boolean table into the same label-only lookup. All twenty changed
+native files preserve their full quoted-literal sequence and invoke/delay counts
+in the cold source check. Consolidate the now-identical noOp helper into sourceOnly
+at thirty native calls, retaining labels, categories and raw operands. Existing
+local event wrappers still consume their delta/raw bytes. Remove only obsolete
+status assertions/setup from the six participating test/support paths; genuine
+source links, flow rejection, recovery, diagnostic and render checks remain.
+
+This intentionally removes public status inspection/information and authoring
+arguments, including noOp's spelling. External consumers must adapt; remaining
+semantics/body/flow do not promise to encode every erased distinction. Both value
+layouts change, so all consumers rebuild consistently. The historical source-only
+durable-state54 retention conclusion is superseded by this current-reader audit;
+its immutable evidence and all eight live SourceCommand fields remain retained.
+
+InstrumentSetBuilder::Entry::region now receives one complete Region. SampleRef
+already belongs to that value; remove the second argument, forwarding parameter
+and automatic overwrite. All fifty native insertion calls, eight existing builder
+fixture calls and one shell-fixture call migrate. Most native aggregate values
+declare .sample inline; named/parsed values assign it before insertion when needed.
+Seven already-complete native values keep their reference. Nin's private parsed
+region loses its parallel SampleRef field: tuned/noise/melodic/drum clones carry
+the completed Region.sample. NDS's duplicate sample local also disappears.
+SonyPS2 previews still evaluate the original empty-sample Region before response
+installation/sample completion; its owned callbacks do not inspect sample. Builder
+admission guards, moves, ranges, insertion order and source projection stay.
+
+The public two-argument automatic-overwrite convenience intentionally disappears.
+No current caller requires conflicting overwrite; external authors can complete
+Region.sample explicitly. Ordinary pure reference expressions migrate, without
+claiming arbitrary argument-evaluation, throwing-copy or allocation parity. This
+part adds eight production lines (architecture -2/formats +10); its benefit is a
+single complete-value contract and one fewer redundant native representation.
+
+The two exact cold drafts had 31 and 40 disjoint paths. Root reviewed full diffs,
+held source bodies, migration inventories and retained execution constraints.
+Initial integration exposed two fixture calls with implicit {} status arguments,
+which an enum-token inventory missed. Drop those arguments while retaining their
+categories. Independent arity inventory accounts for all 1,267 lexical calls:
+no four-argument calls remain. Preserve the original cold draft, initial expected
+map/diff and failed build log. Its warning is a secondary parse diagnostic from
+the same failed calls; no warning remains in the successful completion.
+
+The Tamsoft proof executes three complete existing fixtures in four arms (before/
+candidate Release/focused ASan+UBSan): twelve suite executions plus four compact
+actual-native decoder/owner probes. All 282 opcode/truncation/branch cases and
+three owner cases preserve every common decoded/source/flow/IR/MIDI observation.
+Each common probe is 229,920 exact bytes. Removed status is separately recorded
+only on Before; candidate absence is explicit. Eighteen actual configured TU
+checks and three TEMP probe checks pass; 65 commands exit0 with empty stderr.
+Sixteen raw maps prove exact standalone SourceMap/CommandSourceMap/native owners,
+rejecting both Darwin archive-member spellings. The probe's actual native driver
+temporary object is not retained; source/command/map/binary are retained. Root
+verifies 1,375 precompiler pins and 126 resolved non-SDK inputs; 906 SDK/toolchain
+headers are counted only. The compiler is pinned. Original narrow map parser and
+separate stronger metadata check remain, without successful execution reruns.
+
+The region proof compiles four complete Builder objects, executes twelve full
+Builder/Nin/Sony fixtures and four compact probes. Their nine capture blocks and
+two owned-response evaluations preserve refs, physical values, source links,
+clone/preview/finish/inert/stale-index behavior; explicit callback oracles pass.
+All four 13,620-byte probes match. Eighteen actual configured TU checks plus three
+TEMP probe checks pass. Sixteen losslessly decoded raw maps prove Entry::region
+and appendRegion's actual standalone owners and matching archives. All 81 final
+compiler/link/runtime commands pass. Thirteen earlier SAN attempts remain,
+including two failed runtimes: Darwin leak-detection initialization and a mixed
+libc++ container-annotation mismatch in Before. Only affected SAN objects/runs
+are rebuilt with _LIBCPP_HAS_NO_ASAN; all Release/configured successes are reused.
+Final SAN uses detect_leaks=0:abort_on_error=1, with no container-overflow override.
+Unicode map decoding and final seal class-name corrections are metadata only,
+with original failures retained. Root verifies all 124 actual non-SDK dependencies
+and 1,524 resumed permitted-root pins. The first 29 commands had selected source/
+configuration/library prehashes, with their full resolved closure verified at
+resume; there is no historical full-closure prehash claim for that group.
+
+Both focused proofs rebuild complete participating TUs while the rest of their
+matching archives stay Release. Tamsoft consistently disables libc++ annotations
+and sets detect_container_overflow=0:halt_on_error=1; region disables annotations
+and leak detection as above. Neither establishes whole-program sanitizer or leak
+coverage. Sony optional real-file fixture branches are separate from this focused
+proof; the root expanded archive replay supplies independent integration coverage.
+
+Focused instrumentation and captures establish the stated regression scope;
+remaining matching native/core libraries are Release. They do not establish
+whole-program sanitizer/ODR/ABI, arbitrary FENV/fault behavior or performance.
+No permanent mirror test, exporter coupling or new generic protocol is added.
+
+The complete Release rebuild originally planned 352 steps; after the two fixture
+corrections, the remaining 138 steps finish without warnings/errors. All 44 CTest
+suites pass. Frozen55 holds matching 359 value, one shared, 90 test and 199 Qt UI
+files, plus core/formats/fmt/Qt archives and shell. Its precommit parent is actual
+committed54, distinct from the resulting committed55. SourceAnnotation/layout and
+region-signature consumers use that matching snapshot; old/new libraries are not
+mixed. Shell SHA256: 24ca21adfeb25fb8175442e1a0fce9def4a7919b615d5c284169801455ce349c.
+
+All 252 original input/policy records and 3,922 artifact names/hashes match frozen54.
+The expanded /Volumes/emu/vgm replay matches all 894 export records (852 successes,
+42 existing failures), 858 artifacts and 218,240,549 bytes per binary. Seventy-one
+raw inventories match exactly. The two known Sony sample-pool ID scheduling
+differences pass the existing narrow asset-declaration/member-ID mapping against
+retained original and same-binary evidence. Sources, collections, ordered metadata,
+ranges and diagnostics remain unchanged; raw records/diffs remain. No new manual
+repeat or broader normalization is added. Five unsupported DSF failures remain;
+real coverage is still 37/38 registered families, with KonamiTMNT2 synthetic only.
+
+Cumulative .cpp/.h counts against core-rewrite:
+
+| Scope | Added | Deleted | Paths |
+| --- | ---: | ---: | ---: |
+| value | 2,612 | 4,101 | 203 |
+| architecture | 1,892 | 3,074 | 97 |
+| formats | 720 | 1,027 | 106 |
+| tests | 1,360 | 481 | 48 |
+
+This batch removes 144 production lines: 45 architecture and 99 native format
+lines. Existing test/support changes remove 23 net lines. UI is unchanged.
+Cumulative value reductions are 1,489 lines: 1,182 architecture and 307 formats;
+the earlier 22-line UI reduction remains separate.
+
+After exact55 original comparison closes, hash-gated pruning removes only 3,922
+old54 task-owned payloads (1,604,324,580 bytes). Records/logs/frozen sources/binaries
+and the exact55 payloads remain; user/music files are untouched. Root independently
+rechecks all retained55 payload hashes and pins 2,447 corpus/provenance records.
+
+Evidence: playback-status55-root-cold-review.json, complete-region55-root-cold-review.json,
+pass55-default-status-correction.json, pass55-integration-authority.json,
+corpora55-root-review.json, tamsoft-status55-root-review.json, region-authoring55-root-review.json,
+pass55-final-root-review.json, build-pass55.log, ctest-pass55.log,
+pass55-baseline, comparison-pass55.json, volume-coverage27/pass54-vs-pass55-summary.json,
+pruned-verified-originals54-after55-replay.json.
+
+Next: review the cold proposal to make the currently fixed s32/Q8 automation helper
+an ordinary type, regenerate it against committed55, and continue probing shared
+decode/runtime boundaries for removable responsibilities.

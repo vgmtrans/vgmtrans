@@ -191,7 +191,7 @@ void addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLayout& layout, 
           .pan = pan,
           .attenuationDb = linearAmplitudeToAttenuationDb(amplitude * amplitude * panGain),
       };
-      instrument.region(sample, std::move(region))
+      instrument.region(std::move(region))
           .source(fmt::format("Tone {}", tone), reader.range(toneOffset, kToneSize), "sony-ps1-tone")
           .fieldsAsChildren()
           .field("volume", reader.range(toneOffset + 2, 1), toneVolume)

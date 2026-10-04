@@ -115,8 +115,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .parent(root)
         .description(fmt::format("sample index {} -> SRCN {}", patch.sampleIndex, patch.srcn));
     entry
-        .region(*sample,
-                Region{
+        .region(Region{
+                    .sample = *sample,
                     .unityKey = unityKey(layout.version, patch.pitchScale),
                     .envelope = driverEnvelope(patch.adsr1, patch.adsr2),
                 })

@@ -282,10 +282,6 @@ AnnotationBuilder& AnnotationBuilder::sequenceSemantic(SequenceSemantic semantic
   return set(&SourceAnnotation::sequenceSemantic, semantic);
 }
 
-AnnotationBuilder& AnnotationBuilder::playbackStatus(CommandPlaybackStatus status) {
-  return set(&SourceAnnotation::playbackStatus, status);
-}
-
 AnnotationBuilder& AnnotationBuilder::field(std::string_view name, SourceRange range, SourceValue value,
                                             SourceValueDisplay display) {
   if (auto* found = annotation()) {

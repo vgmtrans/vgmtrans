@@ -749,13 +749,13 @@ using Cursor = CompilerCursor<Playback>;
   }
   if ((version == Version::Summer && opcode >= 0xa0 && opcode <= 0xdc) ||
       (version != Version::Summer && opcode >= 0xb6 && opcode <= 0xda)) {
-    return cursor.noOp("No Operation", "nop");
+    return cursor.sourceOnly("No Operation", "nop");
   }
 
   switch (opcode) {
     case 0xdb: {
       if (version == Version::Summer) {
-        return cursor.noOp("No Operation", "nop");
+        return cursor.sourceOnly("No Operation", "nop");
       }
       auto event = cursor.command("Alternate Repeat Break", SequenceSemantic::RepeatBreak);
       const s16 relative = cursor.s16le("relative");
@@ -765,7 +765,7 @@ using Cursor = CompilerCursor<Playback>;
     }
     case 0xdc: {
       if (version == Version::Summer) {
-        return cursor.noOp("No Operation", "nop");
+        return cursor.sourceOnly("No Operation", "nop");
       }
       auto event = cursor.command("Alternate Repeat Twice", SequenceSemantic::Repeat);
       const s16 relative = cursor.s16le("relative");
@@ -876,7 +876,7 @@ using Cursor = CompilerCursor<Playback>;
         return cursor.command("Gain Envelope", SequenceSemantic::Envelope)
             .invoke<&Playback::gainEnvelope>({cursor.u8("script")});
       }
-      return cursor.noOp("No Operation", "nop");
+      return cursor.sourceOnly("No Operation", "nop");
     case 0xf8: {
       auto event = cursor.command("Call", SequenceSemantic::Call);
       const s16 relative = cursor.s16le("relative");

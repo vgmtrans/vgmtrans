@@ -174,9 +174,8 @@ struct Playback : SequencePlayback<TrackState> {
 using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] Cursor::Event beginEvent(Cursor& cursor, const SonyPs1EventLayout& source, std::string_view label,
-                                       SequenceSemantic semantic,
-                                       CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback) {
-  auto event = cursor.command(label, semantic, playback);
+                                       SequenceSemantic semantic) {
+  auto event = cursor.command(label, semantic);
   event.delay(source.delta);
   cursor.opcodeValue("delta_byte_0", cursor.opcode(), SourceValueDisplay::Hex);
   for (u32 i = 1; i < source.deltaSize; ++i) {
@@ -255,8 +254,7 @@ using Cursor = CompilerCursor<Playback>;
     return event.invoke<&Playback::tempo>({tempo});
   }
   if (source.status == 0xff && source.data1 == 0x2f) {
-    auto event =
-        beginEvent(cursor, source, "End of Sequence", SequenceSemantic::End, CommandPlaybackStatus::StopsPlayback);
+    auto event = beginEvent(cursor, source, "End of Sequence", SequenceSemantic::End);
     cursor.u8("meta_type", SourceValueDisplay::Hex);
     if (source.dataBytes > 1) {
       cursor.u8("terminator", SourceValueDisplay::Hex);

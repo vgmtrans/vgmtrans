@@ -275,6 +275,7 @@ void addAkaoSnesInstruments(InstrumentSetBuilder& instruments, ByteReader reader
 
     const double unityKey = akaoUnityKey(info);
     Region region{
+        .sample = *sample,
         .range = info.tuning.range,
         .unityKey = unityKey,
         .envelope = (info.adsr1 & 0x80) != 0 ? snesDspEnvelope(info.adsr1, info.adsr2, 0xa0) : Envelope{},
@@ -284,7 +285,7 @@ void addAkaoSnesInstruments(InstrumentSetBuilder& instruments, ByteReader reader
       region.keyRange = KeyRange{.low = static_cast<u8>(info.percussionIndex + kAkaoSnesDrumKeyBias),
                                  .high = static_cast<u8>(info.percussionIndex + kAkaoSnesDrumKeyBias)};
     }
-    auto regionEntry = instrument.region(*sample, std::move(region));
+    auto regionEntry = instrument.region(std::move(region));
     if (info.percussion) {
       auto percussion = regionEntry.source(fmt::format("Percussion {}", static_cast<unsigned>(info.percussionIndex)),
                                            *info.percussionSource, "akao-snes-percussion-entry");

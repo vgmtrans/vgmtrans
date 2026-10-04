@@ -93,8 +93,8 @@ void addMelodic(InstrumentSetBuilder& instruments, const std::vector<Patch>& pat
         entry.source(fmt::format("Instrument {}", patch.row.program), patch.row.source, "hudson-snes-instrument").id();
     entry.source("Sample tuning", patch.tuningSource, "hudson-snes-tuning").parent(root);
     entry
-        .region(*sample,
-                Region{
+        .region(Region{
+                    .sample = *sample,
                     .unityKey = patch.unityKey,
                     .envelope = snesDspEnvelope(patch.row.adsr1, patch.row.adsr2, patch.row.gain),
                 })
@@ -124,9 +124,9 @@ void addDrums(InstrumentSetBuilder& instruments, const SequenceRecipes& recipes,
       });
     }
     const u8 key = static_cast<u8>(drum.note + kDrumKeyBias);
-    kit.region(*sample,
-               Region{
+    kit.region(Region{
                    .keyRange = KeyRange{.low = key, .high = key},
+                   .sample = *sample,
                    .unityKey = patch->unityKey + key - drum.sourceKey,
                    .envelope = snesDspEnvelope(patch->row.adsr1, patch->row.adsr2, patch->row.gain),
                })

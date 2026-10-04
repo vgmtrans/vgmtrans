@@ -42,7 +42,6 @@ struct InstrumentInfo {
 };
 
 struct InstrumentRegion {
-  SampleRef sample;
   u16 pitchScale = 0;
   Region region;
   SourceRecord source;
@@ -340,13 +339,13 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
     }
     const bool rateBasedGain = (info.adsr1 & 0x80) == 0 && (info.gain & 0x80) != 0;
     Region region{
+        .sample = *sample,
         .unityKey = unityKey(reader, layout, info),
         // Direct GAIN is fully described by the header. Rate-based GAIN starts
         // from the DSP's live envelope, so a static region cannot infer it.
         .envelope = rateBasedGain ? Envelope{} : snesDspEnvelope(info.adsr1, info.adsr2, info.gain),
     };
     regionsByProgram.emplace(info.program, InstrumentRegion{
-                                               .sample = *sample,
                                                .pitchScale = pitchScale,
                                                .region = region,
                                                .source = info.source,
@@ -375,11 +374,11 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
       for (u8 key = 0; key < 128; ++key) {
         region.keyRange = KeyRange{.low = key, .high = key};
         region.unityKey = key;
-        instrument.region(*sample, region).source("Noise", info.source, "nin-snes-region");
+        instrument.region(region).source("Noise", info.source, "nin-snes-region");
       }
     } else {
       const auto addRegion = [&](const Region& zone) {
-        instrument.region(*sample, zone)
+        instrument.region(zone)
             .source("Region", info.source, "nin-snes-region")
             .description(fmt::format("Sample {}", sample->index()));
       };
@@ -433,7 +432,7 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
       }
       region.unityKey = source->noise ? slot->key
                                     : region.unityKey + static_cast<int>(slot->key) - slot->sourceKey;
-      drum.region(source->sample, std::move(region))
+      drum.region(std::move(region))
           .source(fmt::format("Drum {}", slot->key), source->source, "nin-snes-drum-region");
     }
   }

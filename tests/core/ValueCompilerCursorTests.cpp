@@ -314,9 +314,6 @@ void compilerCursorCompilesAndExecutesTypedCommands() {
   expect(noteFields.size() == 3 && noteFields[1].name == "key" && noteFields[1].range.offset == 6 &&
              noteFields[2].name == "duration" && noteFields[2].range.offset == 7,
          "braced arguments should read and annotate fields in source order");
-  expect(sourceMap.get(annotations[5]).playbackStatus == CommandPlaybackStatus::AffectsPlayback &&
-             sourceMap.get(annotations[6]).playbackStatus == CommandPlaybackStatus::SourceOnly,
-         "compiled behavior should promote source-only presentation unless the event is explicitly ignored");
 
   const SequenceProgramConfig config = compilerProbeConfig();
   const SequenceProgram program{
@@ -444,11 +441,6 @@ void compilerCursorCompilesControlFlow() {
          "static call, jump, return, and end flow should compile no redundant runtime bodies");
   const SourceAnnotation& callAnnotation = sourceMap.get(track.commands[0].annotation);
   const SourceAnnotation& jumpAnnotation = sourceMap.get(track.commands[2].annotation);
-  const SourceAnnotation& returnAnnotation = sourceMap.get(track.commands[4].annotation);
-  expect(callAnnotation.playbackStatus == CommandPlaybackStatus::AffectsControlFlow &&
-             jumpAnnotation.playbackStatus == CommandPlaybackStatus::AffectsControlFlow &&
-             returnAnnotation.playbackStatus == CommandPlaybackStatus::AffectsControlFlow,
-         "compiler-cursor flow operations should annotate their playback status automatically");
   expect(hasLinkRole(callAnnotation, SourceLinkRole::CallTarget) &&
              hasLinkRole(jumpAnnotation, SourceLinkRole::JumpTarget),
          "target roles declared at operand creation should project to the matching source links");
@@ -642,7 +634,7 @@ void compilerCursorRetainsPartialIgnoredPayload() {
              command.fields[0].range == SourceRange{SourceId{11}, 1, 2} &&
              command.fields[0].display == SourceValueDisplay::Hex && !command.execution.valid() &&
              command.flow.defaultTransition.kind == CommandTransitionKind::End &&
-             command.presentation.playback == CommandPlaybackStatus::Unsupported && diagnostics.size() == 1 &&
+             diagnostics.size() == 1 &&
              diagnostics[0].code == "truncated-record" && diagnostics[0].range == SourceRange{SourceId{11}, 3, 0},
          "an ignored truncated payload must preserve available source bytes without executable behavior");
 }
@@ -670,13 +662,7 @@ void compilerCursorRejectsConflictingDefaultFlowDeclarations() {
 
 void compilerCursorRejectsConflictingComposedFlow() {
   const std::vector<u8> bytes{0x26, 0xff};
-  ScanIdAllocator ids;
-  SourceMapBuilder sourceMapBuilder([&ids]() { return ids.nextSourceAnnotationId(); });
-  const TrackProgram track =
-      decodeProbeTrack(ByteReader(SourceId{13}, bytes), static_cast<u32>(bytes.size()), &sourceMapBuilder);
-  const SourceMap sourceMap = sourceMapBuilder.finish();
-  expect(sourceMap.get(track.commands[0].annotation).playbackStatus == CommandPlaybackStatus::AffectsControlFlow,
-         "runtime-selected flow should be classified as control flow without a separate annotation call");
+  const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{13}, bytes), static_cast<u32>(bytes.size()));
   const SequenceProgramConfig config = compilerProbeConfig();
   const SequenceProgram program{
       .runtime = compilerProbeRuntime(),

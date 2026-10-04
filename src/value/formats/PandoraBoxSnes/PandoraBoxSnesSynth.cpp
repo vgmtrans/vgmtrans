@@ -87,8 +87,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .description(fmt::format("Local program {} maps global instrument {} to SRCN {}", patch.program,
                                  patch.globalInstrument, patch.srcn));
     entry
-        .region(*sample,
-                Region{
+        .region(Region{
+                    .sample = *sample,
                     // The audited pitch table reaches the DSP's $1000 unity
                     // ratio at sequence octave 3, A (exported key 45).
                     .unityKey = 45.0,

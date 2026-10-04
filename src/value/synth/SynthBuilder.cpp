@@ -354,8 +354,8 @@ AnnotationBuilder InstrumentSetBuilder::Entry::source(std::string_view label, co
   return source(label, record.range, kind).fields(record.fields);
 }
 
-InstrumentSetBuilder::RegionEntry InstrumentSetBuilder::Entry::region(SampleRef sample, Region region) const {
-  return *this ? builder_->appendRegion(index_, sample, std::move(region)) : RegionEntry{};
+InstrumentSetBuilder::RegionEntry InstrumentSetBuilder::Entry::region(Region region) const {
+  return *this ? builder_->appendRegion(index_, std::move(region)) : RegionEntry{};
 }
 
 InstrumentSetBuilder::RegionEntry InstrumentSetBuilder::Entry::regionAt(u32 regionIndex) const {
@@ -403,9 +403,7 @@ InstrumentSetBuilder::Entry InstrumentSetBuilder::appendAccepted(Instrument inst
   return Entry{*this, index};
 }
 
-InstrumentSetBuilder::RegionEntry InstrumentSetBuilder::appendRegion(u32 instrumentIndex, SampleRef sample,
-                                                                     Region region) {
-  region.sample = sample;
+InstrumentSetBuilder::RegionEntry InstrumentSetBuilder::appendRegion(u32 instrumentIndex, Region region) {
   const u32 regionIndex = static_cast<u32>(instruments_[instrumentIndex].regions.size());
   observedRange_.include(region.range);
   states_[instrumentIndex].regions.push_back(RegionState{.rangeWasExplicit = region.range.valid()});

@@ -852,7 +852,8 @@ void emitProgramSampleRegion(const InstrumentSetBuilder::Entry& instrument, Byte
   if (keys || velocities) {
     region.response = {.keyDependent = keys, .velocityDependent = velocities, .evaluate = evaluate};
   }
-  instrument.region(SampleRef::unbound(sample.vag), std::move(region))
+  region.sample = SampleRef::unbound(sample.vag);
+  instrument.region(std::move(region))
       .source("Sample region", reader.range(sample.offset, kSampleBytes), "sony-ps2-sample-param");
 }
 
@@ -1048,7 +1049,8 @@ void addSetbNote(InstrumentSetBuilder& instruments, const InstrumentSetBuilder::
   if (velocityZones) {
     region.response = {.velocityDependent = velocityZones, .evaluate = evaluate};
   }
-  instrument.region(SampleRef::unbound(vagIndex), std::move(region))
+  region.sample = SampleRef::unbound(vagIndex);
+  instrument.region(std::move(region))
       .source("SE timbre note", noteRange, "sony-ps2-setb-note");
   if ((note.groupLimit != 0 || note.group != 0 || note.priority != 0) && !warnings.setbVoicePolicy) {
     // Group limits and priorities affect voice stealing rather than the static

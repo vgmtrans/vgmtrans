@@ -112,8 +112,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .parent(root)
         .description(fmt::format("SRCN {} tuning {:+d}/4096", patch.srcn, patch.tuning));
     entry
-        .region(*sample,
-                Region{
+        .region(Region{
+                    .sample = *sample,
                     .unityKey = 81.0 - driverTuningCents(patch.tuning) / 100.0,
                     .envelope = driverEnvelope(patch.adsr1, patch.adsr2, patch.gain),
                 })

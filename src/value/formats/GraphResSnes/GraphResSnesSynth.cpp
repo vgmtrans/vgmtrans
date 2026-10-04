@@ -48,8 +48,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     const SourceAnnotationId root =
         entry.source(fmt::format("Instrument {}", program), source, "graph-res-snes-instrument").id();
     entry
-        .region(*sample,
-                Region{
+        .region(Region{
+                    .sample = *sample,
                     .unityKey = kUnityKey,
                     // Regular instruments use ADSR; the chip's GAIN
                     // mode is unused here.

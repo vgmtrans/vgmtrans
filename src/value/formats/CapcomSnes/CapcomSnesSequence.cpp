@@ -519,7 +519,7 @@ using CapcomCursor = CompilerCursor<Playback>;
       if (version == CapcomSnesEngineVersion::v1BgmInList) {
         return cursor.ignored("Unknown One-Byte Event", 1, "unknown-one-byte");
       }
-      return cursor.noOp("No Operation", "nop");
+      return cursor.sourceOnly("No Operation", "nop");
     default:
       return cursor.unsupported("Unsupported").stop();
   }

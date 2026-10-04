@@ -90,8 +90,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .field("coarse_tuning", coarseSource, coarse, SourceValueDisplay::SignedDecimal)
         .field("fine_tuning", fineSource, fineTuningCents(fine), SourceValueDisplay::Cents)
         .description(fmt::format("Bank {}, program {}; selects SRCN {}", srcn >> 7, srcn & 0x7f, srcn));
-    entry.region(*sample,
-                 Region{
+    entry.region(Region{
+                     .sample = *sample,
                      // The pitch table reaches $1000 at internal note 62.
                      // Source note zero is exported as MIDI key 24.
                      .unityKey = 86.0 - tuning,

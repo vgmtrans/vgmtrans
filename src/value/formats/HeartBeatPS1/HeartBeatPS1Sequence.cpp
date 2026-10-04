@@ -332,41 +332,6 @@ struct Playback : SequencePlayback<TrackState, StreamState> {
 
 using Cursor = CompilerCursor<Playback>;
 
-[[nodiscard]] bool controllerAffectsPlayback(u8 controller) {
-  switch (controller) {
-    case 1:
-    case 2:
-    case 5:
-    case 7:
-    case 10:
-    case 11:
-    case 20:
-    case 22:
-    case 32:
-    case 52:
-    case 53:
-    case 54:
-    case 55:
-    case 56:
-    case 64:
-    case 71:
-    case 72:
-    case 73:
-    case 74:
-    case 75:
-    case 76:
-    case 77:
-    case 78:
-    case 79:
-    case 91:
-    case 92:
-    case 121:
-      return true;
-    default:
-      return false;
-  }
-}
-
 [[nodiscard]] std::string_view controllerLabel(u8 controller) {
   switch (controller) {
     case 1:
@@ -458,7 +423,6 @@ using Cursor = CompilerCursor<Playback>;
   const u8 channel = source.status & 0x0f;
   std::string_view label = "MIDI Event";
   SequenceSemantic semantic = SequenceSemantic::State;
-  CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback;
   if (family == 0x80) {
     label = "Note Off";
     semantic = SequenceSemantic::Note;
@@ -467,22 +431,17 @@ using Cursor = CompilerCursor<Playback>;
     semantic = SequenceSemantic::Note;
   } else if (family == 0xa0) {
     label = "Polyphonic Key Pressure";
-    playback = CommandPlaybackStatus::SourceOnly;
   } else if (source.loopDestination) {
     label = "Loop End";
     semantic = SequenceSemantic::Loop;
-    playback = CommandPlaybackStatus::AffectsControlFlow;
   } else if (family == 0xb0) {
     label = source.data1 == 99 && source.data2 == 20 ? "Loop Start" : controllerLabel(source.data1);
     semantic = source.data1 == 99 && source.data2 == 20 ? SequenceSemantic::Loop : SequenceSemantic::State;
-    playback = controllerAffectsPlayback(source.data1) ? CommandPlaybackStatus::AffectsPlayback
-                                                       : CommandPlaybackStatus::SourceOnly;
   } else if (family == 0xc0) {
     label = "Program Change";
     semantic = SequenceSemantic::Program;
   } else if (family == 0xd0) {
     label = "Channel Pressure";
-    playback = CommandPlaybackStatus::SourceOnly;
   } else if (family == 0xe0) {
     label = "Pitch Bend";
     semantic = SequenceSemantic::Pitch;
@@ -492,14 +451,12 @@ using Cursor = CompilerCursor<Playback>;
   } else if (source.status == 0xff && source.data1 == 0x2f) {
     label = "End of Sequence";
     semantic = SequenceSemantic::End;
-    playback = CommandPlaybackStatus::StopsPlayback;
   } else if (source.status == 0xff) {
     label = "Meta Event";
     semantic = SequenceSemantic::Meta;
-    playback = CommandPlaybackStatus::SourceOnly;
   }
 
-  auto event = cursor.command(label, semantic, playback).delay(source.delta);
+  auto event = cursor.command(label, semantic).delay(source.delta);
   if (source.end > source.offset + 1) {
     cursor.rawBytes("encoded_bytes", source.end - source.offset - 1);
   }

@@ -85,8 +85,8 @@ bool addBank(ScanResultBuilder& result, const BankLayout& layout, std::string_vi
     });
     instrument.source(instrument.value().name, pointerRange, "tamsoft-ps1-instrument").parent(pointerRoot);
     instrument
-        .region(*sample,
-                Region{
+        .region(Region{
+                    .sample = *sample,
                     .unityKey = 48.0,
                     .envelope = psxSpuEnvelope(static_cast<u16>(adsr), static_cast<u16>(adsr >> 16), spuGeneration),
                     .loop = streams.at(sampleOffset).loop,

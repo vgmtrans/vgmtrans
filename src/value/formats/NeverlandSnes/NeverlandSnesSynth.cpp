@@ -87,8 +87,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .parent(root)
         .description(fmt::format("scale ${:04X}", patch.tuning));
     instrument
-        .region(*sample,
-                Region{
+        .region(Region{
+                    .sample = *sample,
                     .unityKey = instrumentUnityKey(patch.tuning),
                     .envelope = driverEnvelope(patch.adsr1, patch.adsr2),
                 })

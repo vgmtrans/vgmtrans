@@ -110,8 +110,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     Envelope envelope = snesDspEnvelope(patch.adsr1, patch.adsr2, patch.gain);
     envelope.releaseSeconds = snesDspAdsrSustainSeconds(defaultReleaseRate(layout.version));
     entry
-        .region(*sample,
-                Region{
+        .region(Region{
+                    .sample = *sample,
                     .unityKey = unityKey(layout, patch.pitchScale),
                     .envelope = envelope,
                 })

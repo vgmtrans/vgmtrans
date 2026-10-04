@@ -665,7 +665,7 @@ using Cursor = CompilerCursor<Playback>;
     case 0xc6:
       return cursor.command("Set Octave", SequenceSemantic::Pitch).set<&TrackState::octave>(cursor.u8("octave"));
     case 0xc7:
-      return cursor.noOp("No Operation", "nop");
+      return cursor.sourceOnly("No Operation", "nop");
     case 0xc8:
     case 0xdf:
       return cursor.ignored(opcode == 0xc8 ? "Noise Frequency" : "Relative Noise Frequency", 1, "noise");

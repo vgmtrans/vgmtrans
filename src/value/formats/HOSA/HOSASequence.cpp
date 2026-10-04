@@ -471,14 +471,12 @@ using Cursor = CompilerCursor<Playback>;
       return event.invoke<&Playback::adsr>({command - 16, value}).invoke<&Playback::controlWait>({readTiming()});
     }
     case 21: {
-      auto event = cursor.command("Voice Allocation Class", SequenceSemantic::State,
-                                  CommandPlaybackStatus::SourceOnly);
+      auto event = cursor.command("Voice Allocation Class", SequenceSemantic::State);
       cursor.u8("class");
       return event.invoke<&Playback::controlWait>({readTiming()});
     }
     default: {
-      auto event = cursor.command(command == 13 ? "Driver Parameter" : "Driver No-op", SequenceSemantic::Meta,
-                                  CommandPlaybackStatus::NoOp);
+      auto event = cursor.command(command == 13 ? "Driver Parameter" : "Driver No-op", SequenceSemantic::Meta);
       for (u8 i = 0; i < bytecode::kControlParameterBytes[command]; ++i) {
         cursor.u8("parameter", SourceValueDisplay::Hex);
       }

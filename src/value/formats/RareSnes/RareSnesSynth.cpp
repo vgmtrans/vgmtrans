@@ -70,7 +70,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .unityKey = 72.0 - tuningSemitones(patch.tuning),
         .envelope = snesDspEnvelope(patch.adsr1, patch.adsr2, patch.gain),
     };
-    auto regionEntry = entry.region(*sample, std::move(region));
+    auto regionEntry = entry.region(std::move(region));
     if (patch.source.valid()) {
       regionEntry.source(fmt::format("Patch {} Region", patch.key), patch.source, "rare-snes-region");
     }

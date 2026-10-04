@@ -578,53 +578,48 @@ struct Playback : SequencePlayback<TrackState> {
 
 using Cursor = CompilerCursor<Playback>;
 
-struct ControllerInfo {
-  std::string_view label;
-  bool affectsPlayback;
-};
-
-[[nodiscard]] ControllerInfo controllerInfo(u8 controller) {
+[[nodiscard]] std::string_view controllerLabel(u8 controller) {
   // CC4's raw-SPU pitch mode, CC12's post-mix squaring, CC15's phase inversion,
   // CC16's per-key pan, CC118's beat state, and CC126's voice allocator mode
   // have no lossless per-track performance representation. They remain named,
   // source-visible commands instead of being approximated as different effects.
   // clang-format off
   switch (controller) {
-    case 0: return {"Bank Select", true};
-    case 1: return {"Channel Pitch LFO Depth", true};
-    case 2: return {"Channel Pitch LFO Period", true};
-    case 3: return {"Channel Pitch LFO Mode", true};
-    case 4: return {"Pitch Calculation Mode", false};
-    case 5: return {"Portamento Time", true};
-    case 6: return {"NRPN Data Entry", true};
-    case 7: return {"Channel Volume", true};
-    case 10: return {"Channel Pan", true};
-    case 11: return {"Expression", true};
-    case 12: return {"Quadratic Volume Curve", false};
-    case 13: return {"Random Pitch Rate", true};
-    case 14: return {"Random Pitch Depth", true};
-    case 15: return {"Right Channel Phase Invert", false};
-    case 16: return {"Key Pan Scale", false};
-    case 20: return {"Vibrato Delay", true};
-    case 21: return {"Vibrato Rate", true};
-    case 22: return {"Vibrato Depth", true};
-    case 23: return {"Vibrato Depth Ramp", true};
-    case 25: return {"Tremolo Delay", true};
-    case 26: return {"Tremolo Rate", true};
-    case 27: return {"Tremolo Depth", true};
-    case 28: return {"Tremolo Depth Ramp", true};
-    case 30: return {"Sequence Volume", true};
-    case 64: return {"Sustain Pedal", true};
-    case 91: return {"Reverb Routing Override", true};
-    case 98: return {"NRPN Parameter", true};
-    case 99: return {"NRPN Tone / Loop", true};
-    case 118: return {"Sequence Beat", false};
-    case 119: return {"Restore Bank ADSR", true};
-    case 120: return {"All Sound Off", true};
-    case 121: return {"Reset Channel", true};
-    case 123: return {"All Notes Off", true};
-    case 126: return {"Mono Voice Mode", false};
-    default: return {"Control Change", false};
+    case 0: return "Bank Select";
+    case 1: return "Channel Pitch LFO Depth";
+    case 2: return "Channel Pitch LFO Period";
+    case 3: return "Channel Pitch LFO Mode";
+    case 4: return "Pitch Calculation Mode";
+    case 5: return "Portamento Time";
+    case 6: return "NRPN Data Entry";
+    case 7: return "Channel Volume";
+    case 10: return "Channel Pan";
+    case 11: return "Expression";
+    case 12: return "Quadratic Volume Curve";
+    case 13: return "Random Pitch Rate";
+    case 14: return "Random Pitch Depth";
+    case 15: return "Right Channel Phase Invert";
+    case 16: return "Key Pan Scale";
+    case 20: return "Vibrato Delay";
+    case 21: return "Vibrato Rate";
+    case 22: return "Vibrato Depth";
+    case 23: return "Vibrato Depth Ramp";
+    case 25: return "Tremolo Delay";
+    case 26: return "Tremolo Rate";
+    case 27: return "Tremolo Depth";
+    case 28: return "Tremolo Depth Ramp";
+    case 30: return "Sequence Volume";
+    case 64: return "Sustain Pedal";
+    case 91: return "Reverb Routing Override";
+    case 98: return "NRPN Parameter";
+    case 99: return "NRPN Tone / Loop";
+    case 118: return "Sequence Beat";
+    case 119: return "Restore Bank ADSR";
+    case 120: return "All Sound Off";
+    case 121: return "Reset Channel";
+    case 123: return "All Notes Off";
+    case 126: return "Mono Voice Mode";
+    default: return "Control Change";
   }
   // clang-format on
 }
@@ -638,7 +633,6 @@ struct ControllerInfo {
 
   std::string_view label = "Control Change";
   SequenceSemantic semantic = SequenceSemantic::State;
-  CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback;
   switch (source.kind) {
     case EventKind::Note:
       label = source.value == 0 ? "Note Off" : "Note On";
@@ -646,7 +640,6 @@ struct ControllerInfo {
       break;
     case EventKind::SetChannel:
       label = "Set Channel";
-      playback = CommandPlaybackStatus::SourceOnly;
       break;
     case EventKind::Tempo:
       label = "Tempo";
@@ -667,25 +660,21 @@ struct ControllerInfo {
     case EventKind::End:
       label = "End of Track";
       semantic = SequenceSemantic::End;
-      playback = CommandPlaybackStatus::StopsPlayback;
       break;
     case EventKind::Controller:
       if (source.loopDestination) {
         label = "Loop End";
         semantic = SequenceSemantic::Loop;
-        playback = CommandPlaybackStatus::AffectsControlFlow;
       } else if (source.command == 99 && source.value == 20) {
         label = "Loop Start";
         semantic = SequenceSemantic::Loop;
       } else {
-        const auto info = controllerInfo(source.command);
-        label = info.label;
-        playback = info.affectsPlayback ? CommandPlaybackStatus::AffectsPlayback : CommandPlaybackStatus::SourceOnly;
+        label = controllerLabel(source.command);
       }
       break;
   }
 
-  auto event = cursor.command(label, semantic, playback);
+  auto event = cursor.command(label, semantic);
   if (source.end > source.offset + 1) {
     cursor.rawBytes("encoded_bytes", source.end - source.offset - 1);
   }

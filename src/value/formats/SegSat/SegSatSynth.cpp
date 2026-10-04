@@ -440,7 +440,8 @@ std::optional<ScanSoundBankDraft> addSegSatBank(ScanResultBuilder& builder, cons
             velocityBank.instruments[parsedInstrument.index].regions[regionIndex].referenceGain);
       }
       parsedRegion.region.modulation = parsedRegion.modulation;
-      entry.region(*sample, std::move(parsedRegion.region)).source("Region", parsedRegion.source, "segsat-region");
+      parsedRegion.region.sample = *sample;
+      entry.region(std::move(parsedRegion.region)).source("Region", parsedRegion.source, "segsat-region");
     }
   }
   bank.data(std::move(velocityBank));

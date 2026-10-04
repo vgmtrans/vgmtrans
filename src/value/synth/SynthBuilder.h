@@ -133,7 +133,7 @@ public:
     [[nodiscard]] const Instrument& value() const;
     AnnotationBuilder source(std::string_view label, SourceRange range, std::string_view kind = {}) const;
     AnnotationBuilder source(std::string_view label, const SourceRecord& record, std::string_view kind = {}) const;
-    RegionEntry region(SampleRef sample, Region region) const;
+    RegionEntry region(Region region) const;
     RegionEntry regionAt(u32 regionIndex) const;
 
   private:
@@ -183,7 +183,7 @@ private:
   [[nodiscard]] bool validInstrument(u32 index) const noexcept;
   [[nodiscard]] bool validRegion(u32 instrumentIndex, u32 regionIndex) const noexcept;
   [[nodiscard]] Entry appendAccepted(Instrument instrument);
-  [[nodiscard]] RegionEntry appendRegion(u32 instrumentIndex, SampleRef sample, Region region);
+  [[nodiscard]] RegionEntry appendRegion(u32 instrumentIndex, Region region);
   AnnotationBuilder addInstrumentSource(u32 index, std::string_view label, SourceRange range, std::string_view kind);
   AnnotationBuilder addRegionSource(u32 instrumentIndex, u32 regionIndex, std::string_view label, SourceRange range,
                                     std::string_view kind);

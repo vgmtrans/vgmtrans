@@ -43,7 +43,7 @@ void envelopeAnnotationsPreservePhysicalValues() {
   const SourceRange range{.source = SourceId{3}, .offset = 10, .size = 4};
   InstrumentSetBuilder instruments{AssetId{0}, &sourceMap};
   const auto instrument = instruments.append(Instrument{});
-  const auto empty = instrument.region({}, Region{}).source("Empty", range);
+  const auto empty = instrument.region(Region{}).source("Empty", range);
   const Envelope envelope{
       .attackSeconds = 0.0,
       .holdSeconds = std::numeric_limits<double>::infinity(),
@@ -52,7 +52,7 @@ void envelopeAnnotationsPreservePhysicalValues() {
       .releaseSeconds = 2.5,
       .sustainAmplitude = 0.0,
   };
-  const auto timed = instrument.region({}, Region{.envelope = envelope}).source("Timed", range);
+  const auto timed = instrument.region(Region{.envelope = envelope}).source("Timed", range);
   static_cast<void>(std::move(instruments).finish());
   const auto map = sourceMap.finish();
   const auto& emptyFields = map.get(empty.id()).fields;
@@ -357,8 +357,8 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
       700, Instrument{.explicitAddress = InstrumentAddress{.bank = 127, .program = 5}, .name = "Drum Kit"});
   expect(!kit.source("Invalid instrument range", SourceRange{}).id().valid(),
          "invalid source ranges must not publish instrument annotations or become region parents");
-  auto firstRegion = kit.region(SampleRef::resolved(samplesAsset, 3),
-                                Region{.keyRange = KeyRange{.low = 36, .high = 36}});
+  auto firstRegion = kit.region(Region{.keyRange = KeyRange{.low = 36, .high = 36},
+                                       .sample = SampleRef::resolved(samplesAsset, 3)});
   expect(!firstRegion.source("Invalid region range", SourceRange{}).id().valid(),
          "invalid source ranges must not publish region annotations");
   const auto firstRegionSource =
@@ -378,7 +378,7 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
       kit.source("Drum Kit", SourceRange{.source = source, .offset = 16, .size = 8}, "probe-drum-kit");
   const auto latestInstrumentSource =
       kit.source("Kit Mapping", SourceRange{.source = source, .offset = 16, .size = 8}, "probe-kit-mapping");
-  auto secondRegion = kit.region(SampleRef::resolved(samplesAsset, 4), Region{});
+  auto secondRegion = kit.region(Region{.sample = SampleRef::resolved(samplesAsset, 4)});
   const auto secondRegionSource =
       secondRegion.source("Snare", SourceRange{.source = source, .offset = 24, .size = 4}, "probe-snare");
 
@@ -482,7 +482,7 @@ void soundBankOwnsNoncontiguousSamplesWithoutInventingOneSourceRange() {
   result.warning("Scanning warning", instrumentTable);
   auto bank = result.soundBank("Noncontiguous Bank", instrumentTable);
   const auto sample = bank.localSamples().add(4, Sample{.name = "Local Sample", .encodedData = sampleData});
-  bank.instruments().add(0, Instrument{.name = "Instrument"}).region(sample.ref(), Region{});
+  bank.instruments().add(0, Instrument{.name = "Instrument"}).region(Region{.sample = sample.ref()});
 
   const ScanResult scan = result.finish();
   expect(scan.diagnostics.size() == 2 && scan.diagnostics[0].message == "Scanning warning" &&
@@ -528,7 +528,7 @@ void scanResultBuilderOwnsSynthDraftsUntilFinish() {
 
   auto instrument = instruments.add(90, Instrument{.name = "Probe Instrument"});
   instrument.source("Probe Instrument", input.reader.range(8, 4));
-  instrument.region(concreteSample, Region{}).source("Region", input.reader.range(12, 4));
+  instrument.region(Region{.sample = concreteSample}).source("Region", input.reader.range(12, 4));
 
   const ScanResult scan = result.finish();
 
@@ -617,7 +617,7 @@ void entryValuesAreReadOnlyAndInitialRangesRemainAuthoritative() {
   auto sample = samples.add(0, Sample{.name = "Sample", .encodedData = input.reader.range(32, 9)});
   auto instrument = instruments.add(0, Instrument{.name = "Instrument", .range = input.reader.range(8, 4)});
   instrument.source("Instrument", input.reader.range(8, 4));
-  auto region = instrument.region(sample.ref(), Region{.range = input.reader.range(12, 4)});
+  auto region = instrument.region(Region{.sample = sample.ref(), .range = input.reader.range(12, 4)});
   region.source("Region", input.reader.range(12, 4));
 
   static_assert(std::is_same_v<decltype(sample.value()), const Sample&>);
@@ -700,7 +700,7 @@ void detachedBuildersUseTheSameAuthoringSurface() {
   auto instrument = instruments.add(9, Instrument{.name = "Detached Instrument"});
   instrument.source("Detached Instrument", SourceRange{.source = source, .offset = 40, .size = 4})
       .derived("program", 9);
-  instrument.region(concreteSample, Region{})
+  instrument.region(Region{.sample = concreteSample})
       .source("Detached Region", SourceRange{.source = source, .offset = 44, .size = 4});
 
   const SourceRange sampleRange = samples.range();

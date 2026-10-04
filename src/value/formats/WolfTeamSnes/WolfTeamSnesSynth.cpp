@@ -101,8 +101,8 @@ void addInstruments(InstrumentSetBuilder& instruments, const std::vector<Instrum
     const double unityKey = layout.segmented() ? segmentedUnityKey(patch, layout) : lateUnityKey(patch);
     const double gain = layout.segmented() ? 1.0 : patch.volume / 16.0;
     entry
-        .region(*sample,
-                Region{
+        .region(Region{
+                    .sample = *sample,
                     .unityKey = unityKey,
                     .envelope = snesDspEnvelope(patch.adsr1, patch.adsr2, patch.gain),
                     .attenuationDb = attenuation(gain),

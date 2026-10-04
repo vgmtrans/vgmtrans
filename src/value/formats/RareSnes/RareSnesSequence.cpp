@@ -1196,7 +1196,7 @@ using Cursor = CompilerCursor<Playback>;
 [[nodiscard]] DecodedBytecodeCommand decodeNote(Cursor& cursor, Profile profile, DecodeState& state, u32 trackNumber) {
   auto event = cursor.command(cursor.opcode() == 0x80 ? "Rest" : "Note",
                               cursor.opcode() == 0x80 ? SequenceSemantic::Rest : SequenceSemantic::Note,
-                              CommandPlaybackStatus::AffectsPlayback, cursor.opcode() == 0x80 ? "rest" : "note");
+                              cursor.opcode() == 0x80 ? "rest" : "note");
   const u8 encoded = cursor.opcodeValue("key", cursor.opcode(), SourceValueDisplay::MidiNote);
   u16 duration = 0;
   if (state.defaultDuration) {
@@ -1344,7 +1344,7 @@ using Cursor = CompilerCursor<Playback>;
       return cursor.command("Master Volume", SequenceSemantic::Level).emitMasterLevel(cursor.u8("percent") / 100.0);
     case Kind::Tuning: {
       if (profile == Profile::Battlemaniacs && trackNumber == 5) {
-        auto event = cursor.noOp("Percussion Fine Tuning NOP", "percussion-tuning-nop");
+        auto event = cursor.sourceOnly("Percussion Fine Tuning NOP", "percussion-tuning-nop");
         cursor.rawBytes("reserved", 1);
         return event;
       }
@@ -1481,12 +1481,12 @@ using Cursor = CompilerCursor<Playback>;
                                                    cursor.u8("interval"), cursor.u8("delta"), cursor.u8("delay"),
                                                    cursor.s8("minimum"), cursor.s8("maximum")});
     case Kind::Nop2: {
-      auto event = cursor.noOp("NOP", "nop");
+      auto event = cursor.sourceOnly("NOP", "nop");
       cursor.rawBytes("reserved", 2);
       return event;
     }
     case Kind::Nop4: {
-      auto event = cursor.noOp("NOP", "nop");
+      auto event = cursor.sourceOnly("NOP", "nop");
       cursor.rawBytes("reserved", 4);
       return event;
     }

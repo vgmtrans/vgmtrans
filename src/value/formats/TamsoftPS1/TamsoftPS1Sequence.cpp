@@ -265,7 +265,7 @@ using Cursor = CompilerCursor<Playback>;
       return cursor.command("Instrument", SequenceSemantic::Instrument)
           .invoke<&Playback::setInstrument>({cursor.u8("program", SemanticOperandRole::InstrumentProgram)});
     case 0xe3: {
-      auto event = cursor.noOp("Reserved Tempo Word");
+      auto event = cursor.sourceOnly("Reserved Tempo Word");
       cursor.u16le("value", SourceValueDisplay::Hex);
       return event;
     }
@@ -291,7 +291,7 @@ using Cursor = CompilerCursor<Playback>;
     case 0xf0:
       return cursor.command("Key Off", SequenceSemantic::Note).invoke<&Playback::keyOff>();
     case 0xf1: {
-      auto event = cursor.command("Priority", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly);
+      auto event = cursor.command("Priority", SequenceSemantic::State);
       cursor.u8("priority");
       return event;
     }
@@ -307,8 +307,7 @@ using Cursor = CompilerCursor<Playback>;
       return event.declaredLoop(*target);
     }
     case 0xf9: {
-      auto event = cursor.command("External Channel", SequenceSemantic::State,
-                                  CommandPlaybackStatus::AffectsControlFlow);
+      auto event = cursor.command("External Channel", SequenceSemantic::State);
       const s16 relative = cursor.s16le("relative");
       const auto target = relativeTarget(reader, offset, relative);
       if (!target) {
@@ -320,7 +319,7 @@ using Cursor = CompilerCursor<Playback>;
       return event.discoverTarget(*target);
     }
     case 0xff:
-      return cursor.command("End", SequenceSemantic::End, CommandPlaybackStatus::StopsPlayback)
+      return cursor.command("End", SequenceSemantic::End)
           .invoke<&Playback::keyOff>()
           .end();
     default:
@@ -340,7 +339,7 @@ void reportWarning(std::vector<Diagnostic>* diagnostics, std::string message, So
 
 void updateInheritedState(TrackSeed& seed, ByteReader reader, u32 offset,
                           const DecodedBytecodeCommand& command) {
-  if (command.presentation.playback == CommandPlaybackStatus::Unsupported) {
+  if (command.presentation.semantic == SequenceSemantic::Unsupported) {
     return;
   }
 

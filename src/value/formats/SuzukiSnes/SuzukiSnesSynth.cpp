@@ -122,8 +122,8 @@ void addMelodicInstruments(InstrumentSetBuilder& instruments, const std::vector<
     entry.source("Tuning", patch.tuningSource, "suzuki-snes-instrument-tuning").parent(root);
 
     entry
-        .region(*sample,
-                Region{
+        .region(Region{
+                    .sample = *sample,
                     .unityKey = unityKey(patch.tuning),
                     .envelope = snesDspEnvelope(patch.adsr1, patch.adsr2, 0),
                     .attenuationDb = attenuation(patch.volume),
@@ -158,9 +158,9 @@ void addDrumKit(InstrumentSetBuilder& instruments, const std::vector<DrumSlot>& 
 
     const u8 outputKey = static_cast<u8>(drum.note + kDrumKeyBias);
     const double root = unityKey(patch->tuning) + outputKey - drum.sourceKey;
-    kit.region(*sample,
-               Region{
+    kit.region(Region{
                    .keyRange = KeyRange{.low = outputKey, .high = outputKey},
+                   .sample = *sample,
                    .unityKey = root,
                    .envelope = snesDspEnvelope(patch->adsr1, patch->adsr2, 0),
                    .pan = drum.pan / 256.0,

@@ -152,8 +152,7 @@ template <class Playback, class DecodeCommand>
                     .flow = {.continuation = Address{end}, .defaultTransition = CommandTransition::return_()},
                     .presentation = {.label = "Phrase End",
                                      .kind = "sculpt-soft-snes-phrase-end",
-                                     .semantic = SequenceSemantic::Return,
-                                     .playback = CommandPlaybackStatus::AffectsControlFlow}},
+                                     .semantic = SequenceSemantic::Return}},
     });
   }
   auto session = scope.begin(number, start);

@@ -56,53 +56,49 @@ using ProbeCompilerCursor = CompilerCursor<ProbePlayback>;
 
   switch (cursor.opcode()) {
     case 0x80: {
-      auto event = cursor.command("Program", SequenceSemantic::Program, {}, "program");
+      auto event = cursor.command("Program", SequenceSemantic::Program, "program");
       return event.invoke<&ProbePlayback::programChange>({cursor.u8("program")});
     }
     case 0x90: {
-      auto event = cursor.command("Note", SequenceSemantic::Note, {}, "note");
+      auto event = cursor.command("Note", SequenceSemantic::Note, "note");
       const u8 key = cursor.u8("key");
       const u8 duration = cursor.u8("duration");
       return event.invoke<&ProbePlayback::note>({key, duration});
     }
     case 0xfe: {
-      auto event = cursor.command("Jump", SequenceSemantic::Jump, CommandPlaybackStatus::AffectsControlFlow, "jump");
+      auto event = cursor.command("Jump", SequenceSemantic::Jump, "jump");
       return event.jump(cursor.addressLe("destination", SemanticOperandRole::JumpTarget));
     }
     case 0xfb: {
-      auto event = cursor.command("Declared Loop", SequenceSemantic::Loop, CommandPlaybackStatus::AffectsControlFlow,
-                                  "declared-loop");
+      auto event = cursor.command("Declared Loop", SequenceSemantic::Loop, "declared-loop");
       return event.declaredLoop(cursor.addressLe("destination", SemanticOperandRole::LoopTarget));
     }
     case 0xfc: {
-      auto event = cursor.command("Loop Candidate", SequenceSemantic::Loop, CommandPlaybackStatus::AffectsControlFlow,
-                                  "loop-candidate");
+      auto event = cursor.command("Loop Candidate", SequenceSemantic::Loop, "loop-candidate");
       return event.loopCandidate(cursor.addressLe("destination", SemanticOperandRole::LoopTarget));
     }
     case 0xc0: {
-      auto event = cursor.command("Call", SequenceSemantic::Call, CommandPlaybackStatus::AffectsControlFlow, "call");
+      auto event = cursor.command("Call", SequenceSemantic::Call, "call");
       return event.call(cursor.addressLe("destination", SemanticOperandRole::CallTarget));
     }
     case 0xfd:
-      return cursor.command("Return", SequenceSemantic::Return, CommandPlaybackStatus::AffectsControlFlow, "return")
+      return cursor.command("Return", SequenceSemantic::Return, "return")
           .return_();
     case 0xf0: {
-      auto event =
-          cursor.command("Repeat", SequenceSemantic::Loop, CommandPlaybackStatus::AffectsControlFlow, "repeat");
+      auto event = cursor.command("Repeat", SequenceSemantic::Loop, "repeat");
       const u8 slot = cursor.u8("slot");
       const u8 count = cursor.u8("count");
       const Address destination = cursor.addressLe("destination", SemanticOperandRole::RepeatTarget);
       return event.repeatUntil(slot, count, destination);
     }
     case 0xf1: {
-      auto event = cursor.command("Repeat Break", SequenceSemantic::Loop, CommandPlaybackStatus::AffectsControlFlow,
-                                  "repeat-break");
+      auto event = cursor.command("Repeat Break", SequenceSemantic::Loop, "repeat-break");
       const u8 slot = cursor.u8("slot");
       const Address destination = cursor.addressLe("destination", SemanticOperandRole::RepeatTarget);
       return event.invoke<&ProbePlayback::repeatBreak>({slot, destination}).discoverTarget(destination);
     }
     case 0xff:
-      return cursor.command("End", SequenceSemantic::End, CommandPlaybackStatus::AffectsControlFlow, "end").end();
+      return cursor.command("End", SequenceSemantic::End, "end").end();
     default:
       return cursor.unsupported("Unsupported Opcode").stop();
   }

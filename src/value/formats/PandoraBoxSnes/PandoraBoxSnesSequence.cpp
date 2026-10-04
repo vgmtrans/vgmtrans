@@ -512,7 +512,7 @@ using Cursor = CompilerCursor<Playback>;
     }
     case 0xef:
     case 0xf0:
-      return cursor.noOp("NOP");
+      return cursor.sourceOnly("NOP");
     case 0xf1: {
       auto event = cursor.sourceOnly("Raw DSP Write", "raw-dsp-write");
       cursor.u8("register", SourceValueDisplay::Hex);

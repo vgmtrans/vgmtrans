@@ -526,7 +526,6 @@ struct SequenceDecodeContext {
               .label = "Recovery Stop",
               .kind = "nds.recovery-stop",
               .semantic = SequenceSemantic::Unsupported,
-              .playback = CommandPlaybackStatus::StopsPlayback,
           },
   };
 }

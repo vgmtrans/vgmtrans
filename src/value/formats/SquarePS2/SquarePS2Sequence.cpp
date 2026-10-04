@@ -409,9 +409,8 @@ struct Playback : SequencePlayback<TrackState> {
 using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] Cursor::Event beginEvent(Cursor& cursor, const EventPrefix& source, std::string_view label,
-                                       SequenceSemantic semantic,
-                                       CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback) {
-  auto event = cursor.command(label, semantic, playback);
+                                       SequenceSemantic semantic) {
+  auto event = cursor.command(label, semantic);
   cursor.opcodeValue("delta_byte_0", cursor.opcode(), SourceValueDisplay::Hex);
   for (u32 i = 1; i < source.deltaSize; ++i) {
     cursor.u8("delta_byte", SourceValueDisplay::Hex);
@@ -424,7 +423,7 @@ using Cursor = CompilerCursor<Playback>;
 [[nodiscard]] DecodedBytecodeCommand sourceOnly(Cursor& cursor, const EventPrefix& source, std::string_view label,
                                                 u32 parameters = 0,
                                                 SequenceSemantic semantic = SequenceSemantic::State) {
-  auto event = beginEvent(cursor, source, label, semantic, CommandPlaybackStatus::SourceOnly);
+  auto event = beginEvent(cursor, source, label, semantic);
   if (parameters != 0) {
     cursor.rawBytes("parameters", parameters);
   }
@@ -497,7 +496,7 @@ using Cursor = CompilerCursor<Playback>;
 
   switch (source->status) {
     case 0x00:
-      return beginEvent(cursor, *source, "End of Track", SequenceSemantic::End, CommandPlaybackStatus::StopsPlayback)
+      return beginEvent(cursor, *source, "End of Track", SequenceSemantic::End)
           .end();
     case 0x01:
       return beginEvent(cursor, *source, "Section Marker", SequenceSemantic::Meta);
@@ -722,8 +721,7 @@ using Cursor = CompilerCursor<Playback>;
     case 0x58:
       return sourceOnly(cursor, *source, "Track Pitch Scale", 1, SequenceSemantic::Pitch);
     case 0x59: {
-      auto event = beginEvent(cursor, *source, "Relative Track Pitch Scale", SequenceSemantic::Pitch,
-                              CommandPlaybackStatus::SourceOnly);
+      auto event = beginEvent(cursor, *source, "Relative Track Pitch Scale", SequenceSemantic::Pitch);
       cursor.s8("amount");
       return event;
     }
@@ -830,7 +828,7 @@ using Cursor = CompilerCursor<Playback>;
     case 0x7f:
       return beginEvent(cursor, *source, "No Operation", SequenceSemantic::Meta);
     default:
-      return beginEvent(cursor, *source, "Undefined Event", SequenceSemantic::End, CommandPlaybackStatus::StopsPlayback)
+      return beginEvent(cursor, *source, "Undefined Event", SequenceSemantic::End)
           .end();
   }
 }

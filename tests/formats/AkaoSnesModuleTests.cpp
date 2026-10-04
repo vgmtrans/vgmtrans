@@ -598,9 +598,8 @@ void akaoSnesCompilerCursorCoversRemapsUnknownsAndTruncation() {
           .profile = ff6, .startAddress = start, .bytecodeEnd = start + 2, .sourceMap = &sourceMap});
   const SourceMap stateAnnotations = sourceMap.finish();
   const SourceAnnotation& slur = commandAnnotation(stateAnnotations, stateTrack.commands.front());
-  expect(slur.label == "Slur On" && slur.sequenceSemantic == SequenceSemantic::State &&
-             slur.playbackStatus == CommandPlaybackStatus::AffectsPlayback,
-         "state-changing commands should expose exact playback-affecting presentation");
+  expect(slur.label == "Slur On" && slur.sequenceSemantic == SequenceSemantic::State,
+         "state-changing commands should expose their exact label and semantic");
 
   ScanIdAllocator unknownIds;
   SourceMapBuilder unknownSourceMap([&unknownIds]() { return unknownIds.nextSourceAnnotationId(); });

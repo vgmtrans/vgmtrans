@@ -186,6 +186,7 @@ std::optional<ScanSoundBankDraft> addWd(ScanResultBuilder& result, const WdLayou
         Region region{
             .keyRange = keys,
             .velocityRange = velocities,
+            .sample = *sample,
             .range = parsedRegion.source.range,
             .unityKey = 60.0 - parsedRegion.tuning / 256.0,
             .envelope = psxSpuEnvelope(parsedRegion.adsr1, parsedRegion.adsr2, PsxSpuGeneration::Ps2),
@@ -197,7 +198,7 @@ std::optional<ScanSoundBankDraft> addWd(ScanResultBuilder& result, const WdLayou
             loop && loop->enabled && loop->length != 0) {
           region.loop = *loop;
         }
-        instrument.region(*sample, std::move(region)).source("Region", parsedRegion.source, "square-ps2-region");
+        instrument.region(std::move(region)).source("Region", parsedRegion.source, "square-ps2-region");
       }
       velocityLow = primary.velocityHigh >= 127 ? 0 : static_cast<u8>(primary.velocityHigh + 1);
       index += layers;

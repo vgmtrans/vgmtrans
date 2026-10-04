@@ -179,6 +179,7 @@ std::optional<ScanSoundBankDraft> addTriAcePs1Bank(ScanResultBuilder& result, co
       Region region{
           .keyRange = sourceRegion.keys,
           .velocityRange = sourceRegion.velocities,
+          .sample = *sample,
           .range = sourceRegion.source.range,
           .unityKey = kDriverUnityKey - sourceRegion.semitone - sourceRegion.fine / 64.0,
           .envelope = psxSpuEnvelope(source.adsr1, source.adsr2),
@@ -189,7 +190,7 @@ std::optional<ScanSoundBankDraft> addTriAcePs1Bank(ScanResultBuilder& result, co
       if (sourceRegion.loopOffset >= sourceRegion.sampleOffset) {
         region.loop = streams.at(sourceRegion.sampleOffset).loopAt(sourceRegion.loopOffset - sourceRegion.sampleOffset);
       }
-      instrument.region(*sample, std::move(region)).source("Region", sourceRegion.source, "triace-ps1-region");
+      instrument.region(std::move(region)).source("Region", sourceRegion.source, "triace-ps1-region");
     }
   }
 

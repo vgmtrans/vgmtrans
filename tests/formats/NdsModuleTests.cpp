@@ -1015,8 +1015,7 @@ void ndsSequenceExecutesCallAndReturn() {
   expect(overlapTrack.commands[1].range.offset == trackStart + 4 && overlapTrack.commands[1].range.size == 1,
          "NDS linearized overlap fixture should stop before overlapping a queued call target");
   const SourceAnnotation& recovery = commandAnnotation(overlapAnnotations, overlapTrack.commands[1]);
-  expect(recovery.kind == "nds.recovery-stop" && recovery.sequenceSemantic == SequenceSemantic::Unsupported &&
-             recovery.playbackStatus == CommandPlaybackStatus::StopsPlayback,
+  expect(recovery.kind == "nds.recovery-stop" && recovery.sequenceSemantic == SequenceSemantic::Unsupported,
          "NDS linearized overlap fixture should annotate the synthetic recovery stop command");
   expect(recovery.parent && overlapAnnotations.get(*recovery.parent).role == SourceRole::SequenceTrack,
          "NDS synthetic recovery stop command should be parented under the recovered track annotation");
