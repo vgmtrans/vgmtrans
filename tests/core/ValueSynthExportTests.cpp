@@ -635,6 +635,30 @@ void soundFontExporterWritesSfbkRiffFile() {
                soundFontGeneratorContains(saturated.bytes, "igen", 48, 1440),
            "SoundFont export should clamp large attenuation before rounding without a floating-point range error");
   }
+  const double originalUnityKey = regions.front().unityKey;
+  for (const int mode : {FE_TONEAREST, FE_DOWNWARD, FE_UPWARD, FE_TOWARDZERO}) {
+    for (const double unityKey : {-32767.5, -32767.505, -1e20, -std::numeric_limits<double>::max(),
+                                 32895.5, 32895.505, 1e20, std::numeric_limits<double>::max()}) {
+      regions.front().unityKey = unityKey;
+      expect(validateSoundBank(soundBank).empty(), "Finite unity keys should remain valid synth values");
+      std::fenv_t environment;
+      expect(std::feholdexcept(&environment) == 0 && std::fesetround(mode) == 0,
+             "Floating-point environment should be saved for tuning export");
+      const auto saturated = buildSoundFont2(
+          SynthExportInput{.name = "Tuning", .soundBanks = prepareSynthBanksForTest(soundBanks), .samplePools = samples},
+          sources);
+      const bool invalidRounding = std::fetestexcept(FE_INVALID) != 0;
+      const bool restored = std::fesetenv(&environment) == 0;
+      const bool negative = unityKey < 0.0;
+      expect(restored && !invalidRounding && saturated.diagnostics.empty() &&
+                 soundFontGeneratorContains(saturated.bytes, "igen", 58, negative ? 0 : 127) &&
+                 soundFontGeneratorContains(saturated.bytes, "igen", 51, negative ? 32767 : -32768) &&
+                 soundFontGeneratorContains(saturated.bytes, "igen", 52, negative ? 50 : -50) &&
+                 saturated.bytes[asciiOffset(saturated.bytes, "shdr") + 48] == (negative ? 0 : 127),
+             "SoundFont tuning should fit its encoded root/coarse/fine fields before rounding and narrowing");
+    }
+  }
+  regions.front().unityKey = originalUnityKey;
   const Region region = regions.front();
   regions.resize(5000, region);
   expectThrows<std::overflow_error>(

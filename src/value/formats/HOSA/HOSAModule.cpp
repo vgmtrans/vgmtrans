@@ -24,13 +24,10 @@ namespace {
 
   ScanResultBuilder result(input, std::string(kHosaFormatName));
   for (const auto& layout : layouts) {
-    std::vector<Instrument> instruments;
-    std::optional<ScanSoundBankDraft> bank;
+    std::optional<ScannedBank> bank;
     if (const auto bankLayout = findBank(input.reader, layout)) {
-      if (auto scanned = addBank(result, *bankLayout)) {
-        bank = scanned->bank;
-        instruments = std::move(scanned->instruments);
-      } else {
+      bank = addBank(result, *bankLayout);
+      if (!bank) {
         result.warning("A HOSA instrument bank was recognized, but its sample data could not be located",
                        input.reader.range(bankLayout->offset, bankLayout->length));
       }
@@ -38,11 +35,12 @@ namespace {
 
     const std::string name = fmt::format("HOSA Sequence {:X}", layout.offset);
     auto sequence = result.sequence(name, input.reader.range(layout.offset, layout.length));
-    sequence.program(parseSequence(input.reader, sequence.id(), layout, instruments, &result.sourceMap(),
-                                   &result.diagnostics()));
+    sequence.program(parseSequence(input.reader, sequence.id(), layout,
+                                   bank ? std::move(bank->instruments) : std::vector<Instrument>{},
+                                   &result.sourceMap(), &result.diagnostics()));
 
     if (bank) {
-      sequence.useBank(*bank);
+      sequence.useBank(bank->bank);
     }
   }
   return result.finish();

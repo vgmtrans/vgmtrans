@@ -529,7 +529,7 @@ const SequenceProgramConfig& sequenceConfig() {
 }
 
 SequenceProgram parseSequence(ByteReader reader, AssetId id, const SequenceLayout& layout,
-                              const std::vector<Instrument>& instruments, SourceMapBuilder* sourceMap,
+                              std::vector<Instrument> instruments, SourceMapBuilder* sourceMap,
                               std::vector<Diagnostic>* diagnostics) {
   auto config = sequenceConfig();
   constexpr double initialRight = 64.0 / 127.0;
@@ -542,7 +542,7 @@ SequenceProgram parseSequence(ByteReader reader, AssetId id, const SequenceLayou
       .leftGain = layout.leftGain,
       .rightGain = layout.rightGain,
       .reverbSend = reverbSend(layout.reverb),
-      .instruments = instruments,
+      .instruments = std::move(instruments),
   };
   SequenceDecodeSession sequence(reader, config, id, reader.range(layout.offset, 0x50), sourceMap,
                                  bytecode::kMaximumCommands);

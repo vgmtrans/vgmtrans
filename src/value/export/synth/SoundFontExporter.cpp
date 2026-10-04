@@ -114,9 +114,15 @@ struct SfLayout {
   return static_cast<s16>(std::clamp(reverb * 1000.0, -32768.0, 32767.0));
 }
 
-[[nodiscard]] std::pair<s16, s16> splitTuneCents(s32 cents) {
-  s16 coarse = static_cast<s16>(cents / 100);
-  s16 fine = static_cast<s16>(cents % 100);
+[[nodiscard]] SfRegionPitch sf2RegionPitch(const Region& region) {
+  // Signed16 coarse storage and +/-50 fine cents bound unity to [-32767.5, 127+32768.5].
+  const double unityKey = std::isfinite(region.unityKey)
+                              ? std::clamp(region.unityKey, -32767.5, 32895.5)
+                              : region.unityKey;
+  const auto rootKey = static_cast<u8>(std::clamp(std::lround(unityKey), 0l, 127l));
+  const auto cents = static_cast<s32>(std::lround((rootKey - unityKey) * 100.0));
+  s32 coarse = cents / 100;
+  s32 fine = cents % 100;
   if (fine > 50) {
     ++coarse;
     fine -= 100;
@@ -124,17 +130,10 @@ struct SfLayout {
     --coarse;
     fine += 100;
   }
-  return {coarse, fine};
-}
-
-[[nodiscard]] SfRegionPitch sf2RegionPitch(const Region& region) {
-  const auto rootKey = static_cast<u8>(std::clamp(std::lround(region.unityKey), 0l, 127l));
-  const auto tuningCents = static_cast<s32>(std::lround((rootKey - region.unityKey) * 100.0));
-  const auto [coarseTune, fineTune] = splitTuneCents(tuningCents);
   return SfRegionPitch{
       .rootKey = rootKey,
-      .coarseTune = coarseTune,
-      .fineTune = fineTune,
+      .coarseTune = static_cast<s16>(coarse),
+      .fineTune = static_cast<s16>(fine),
   };
 }
 

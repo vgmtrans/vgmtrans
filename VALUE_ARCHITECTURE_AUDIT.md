@@ -1,11 +1,11 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Forty-one validated batches remove 1,188 net production lines
+`cb9e0b766`. Forty-two validated batches remove 1,191 net production lines
 from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 40 exactly;
+cover 37 of 38 registered families. All export records match batch 41 exactly;
 all 73 expanded raw inventories match byte-for-byte. The cleanup2 records appear
 at the end of this document.
 
@@ -8434,3 +8434,166 @@ The rejected membership and prepared-bank ownership shortcuts remain documented
 in batch40, including measured repeated-placement regressions and failed-copy
 assignment hazards. SequenceVM and the separation between native formats and
 MIDI/SF2/DLS exporters remain intact.
+
+## Cleanup2 forty-second batch: preserve native ownership and bound SF2 pitch once
+
+The user resumed the architecture goal after the closing batch41 checkpoint.
+This batch removes three net production lines across four files; the existing
+synth-export fixture gains 24 lines for a reproduced numeric regression.
+
+- Value: 2,142 added/3,333 deleted across 167 paths.
+- Architecture: 1,764 added/2,830 deleted across 94 paths.
+- Formats: 378 added/503 deleted across 73 paths.
+- Tests: 1,100 added/424 deleted across 43 paths.
+
+Net production reductions are 1,191 value lines, 1,066 architecture and 125
+format lines.
+
+### Keep the HOSA bank result together until runtime owns its instruments
+
+The scanner already receives ScannedBank, coupling its bank draft with the native
+instrument records. Keep that existing result in one optional instead of splitting
+it into independently owned locals. HOSA parseSequence takes the native vector by
+value and moves it into the already immutable RuntimeConfig. The scanner consumes
+that vector once; its later bank link reads the unchanged draft view. Remove the
+redundant deep copy and two lines without a new type, helper or borrowed lifetime.
+Direct lvalue callers keep ordinary copy semantics. HeartBeat/Suzuki vectors reused
+by several sequences are deliberately outside this change.
+
+The sealed frozen41 proof is hosa-runtime-owner42/proof-summary.json, SHA256
+6c721581c326014a7bda98b5bc4d21e035e3b0dbc5e82cee40c8eca223e2ee4a;
+exact three-file patch SHA256
+8a4f00bb9e2dfbb17e9161a6f375e3bb933a3d4418eed8dc16f0601c0e02c4b2.
+All 86 actual command statuses and 36 configured Werror checks pass. The latter
+cover Layout/Lfo/Synth/Sequence/Module/full HOSA fixture before/after in Debug,
+Release and RelWithDebInfo. Whole consumer inventory finds one native call and
+five fixture sites; no function-pointer or callback use of the changed signature.
+
+Full HOSA, Registry and Session fixtures pass all four Release/focused-SAN arms.
+Their identical 41-byte stdout is assertion coverage, not serialized exports.
+A compact 38-case direct/native matrix preserves 302,598 bytes, SHA256
+6928add0fbbc2b9bf1ead153e8305711177cab258e4b0d4eb612c73e0812c92d.
+Capture complete source annotations/fields/links, metadata/diagnostics, native
+performance/automation/source values and both MIDI policies; synth cardinalities
+are captured, not a separate exhaustive synth-value serialization. Input, source,
+layout, builder and scan owners die before copied programs render; original
+programs are then cleared and heap overwritten before observing owned output.
+Cover valid/sparse/empty/unsuccessful banks and an independently decoded sequence.
+
+Scoped calls/requested bytes do not grow: the valid native case changes
+197/57,808 to 191/55,072; an extra sequence changes 255/72,000 to 249/69,264.
+Largest moved direct shape (16 instruments with 16 regions) changes
+924/125,908 to 91/19,412. Lvalue counts/content and empty/missing/rejected banks
+remain unchanged. No timing, peak/RSS or arbitrary allocation-failure equivalence
+claim. A direct lvalue copy now occurs during argument initialization, before
+function-body configuration work; native moves do not allocate. Both copy phases
+precede source/diagnostic authoring, but other-argument evaluation is not promised
+identical. The private scanner returns no partially published ScanResult on throw.
+
+Focused SAN instruments changed HOSA cpp units, HOSASynth/HOSALayout/Source.cpp,
+full fixtures and probe; remaining frozen core/formats/fmt/decompressors stay
+Release. Uniform libc++ container annotation opt-out retains ordinary ASan,
+UBSan and float-cast-overflow checks; no whole-program/cross-platform claim.
+Probe stderr intentionally contains allocation rows; fixture stderr is empty.
+
+### SF2 uses one physical-key boundary and one coarse/fine calculation
+
+Inline the private sole-use splitTuneCents responsibility into sf2RegionPitch.
+For finite unity keys, bound to [-32767.5,32895.5] before both rounds, keep the
+coarse quotient/adjustment in s32, and narrow only the final encoded values.
+The bounds follow existing MIDI root 0..127, signed16 coarse storage and the
+chosen +/-50-cent split. They describe encoded storage, not SF2 specification
+limits or a claim that every saturated extreme is a playable preset. Remove one
+net line and fix root/residual range errors, coarse wrap and endpoint adjustment
+before narrowing. Independent sample pitch correction remains independent.
+Nonfinite callback/direct values keep the original arithmetic; no new global
+NaN/Inf policy, model validation, pan/sustain policy or numeric framework.
+
+Sealed proof: synth-pitch-bounds42-draft/sf-proof-summary.json, SHA256
+b3db2ecad3d149d1e49ca5fce90d74833772dd60c4df2958616874d006216c85.
+Two-path source/test patch SHA256
+1c2e1c6d63033587f3439a4105a827ef130326786813b77232e8f972c1c59ab9.
+323,480 ordinary private root/coarse/fine/input/FENV captures under four rounding
+modes are exact across Release/focused-SAN arms, filtered SHA256
+27f0b1536d478e420e8dbc3980b03155b2a63b4f811c7c10d4a2f0f10a275d17.
+Sixty nonfinite captures include quiet/signaling/signed NaNs and +/-Inf; fields
+and flags remain exact, SHA256
+da51dc656b726db2c77f966808eb0d238891f08ed2c1377009afb45264953f23.
+This is selected nonfinite compatibility evidence, not every platform's policy.
+
+Exact unappended writers, the complete stock fixture and ordinary public/direct/
+callback captures preserve 1,144 artifacts/14,918,058 bytes in both paired modes,
+SHA256 17a143b19f8141d54c5cc58ae2eabbf716360f82dc27adda929a08b85ea0dcda.
+Separate 336 extreme captures intentionally correct 96 finite SF2 artifacts;
+72 nonfinite SF2 and 168 unchanged DLS artifacts stay exact. The durable existing
+fixture tests 32 actual exports: four FENV modes times negative/positive encoded
+endpoints, just-over coarse-wrap thresholds, 1e20 and DBL_MAX. It checks finite
+bank admission, root/coarse/fine/sample-header values and no FE_INVALID, restoring
+FENV before assertion. Old exact writers fail that regression in both modes;
+new exact writers pass. Full/regression/ordinary captures total 1,176 artifacts/
+14,942,122 bytes, SHA256
+3e2e74095308bbf732edbf8d96663e3175acd21da639768b5f291d533f606d25.
+
+All 30 final actual-source fixture/build/run/check records have their expected
+status: two deliberate old-regression failures, all others zero. Six actual
+writer and six fixture configured checks cover Debug/Release/RelWithDebInfo.
+Writer checks use no warning suppression; shared test/harness-only unused-helper
+warnings are suppressed in those temporary fixture builds, documented in the
+proof. Exact writer/probe/full fixture use focused ASan/UBSan/float-cast-overflow;
+matching remaining DLS/core/formats/fmt/decompressors stay Release with uniform
+container annotation settings. No Windows run, full extreme FENV parity, global
+heap reduction or throughput improvement is claimed.
+
+### Integrated verification and rejected DLS formulation
+
+- HOSA's initial incremental Release build finishes all 51 steps. After the
+  approved SF2 source/regression joins it, the final complete Release build
+  finishes all 48 steps without warnings; all 44 CTest suites pass.
+  Freeze full value/shared headers, all tests and four archives. Shell SHA256 is
+  `86b9677e99aedaaf6c1f6adad83a93c2028212d25cc06e3e97c0c4832d37a3aa`.
+- Against frozen41, the original corpus preserves all 252 input/policy records
+  and 3,922 artifact names/hashes.
+- The /Volumes/emu/vgm replay preserves all 894 export records: 852 successes
+  and 42 matching existing failures. All 858 artifact names/sizes/hashes and
+  218,240,549 bytes per binary match. All 73 raw inventories match exactly,
+  including five unchanged unsupported DSF failures. No inventory normalization
+  is needed. Real coverage remains 37/38 registered families; KonamiTMNT2
+  is synthetic only. See volume-coverage27/pass41-vs-pass42-summary.json.
+
+The analogous DLS single effective-key clamp is rejected. Four ordinary private
+DLS captures change under downward rounding and twelve ordinary public artifacts
+change under upward/downward rounding near half-step cancellation. Both a mutable
+key assignment and a separate const bounded key produce the same failures.
+Exact unappended production sources independently confirm twelve differences in
+48 public boundary artifacts/FENV records. Configured object arithmetic changes
+positive-100 division/subtraction to negative-100 division/addition; the changed
+rounding precedes clipping. Compilation and sanitizer success do not establish
+equivalence. Preserve source versions, objects, command statuses, raw traces and
+first differences in synth-pitch-bounds42-draft/dls-rejection.json. No normalization,
+volatile/noinline/pragma rescue, compiler-policy change or DLS patch enters42.
+A separately bounded root/residual design needs its own actual-source gate.
+
+Root read-only review keeps source-map annotations independently shared from
+indexes, annotation traversal separate from Qt field projection, reused
+SourceRecords borrowed during projection, ScanInput owned by its builder, and
+typed sample validation before cardinality errors. Export-only enum domains and
+existing callback pan/sustain guards retain their purposes. These are consumer
+observations, not new parity/performance proofs; detailed notes remain in
+pass42-read-only/retained-boundaries.md. Repeated include audit finds no exporter
+or legacy-main includes in value formats, sequence or synth code. SonyPS2's
+parseMidiSequence decodes native MIDI blocks into SequenceProgram and is not an
+export writer dependency. SequenceVM and target-independent authoring remain.
+
+Two verified task-owned original-corpus generations (29 and41) are reclaimed for
+space, each 3,922 files/1,604,324,580 bytes. Exact comparison, actual complete file
+set, task path, no symlink, size/hash and per-unlink gates precede deletion.
+Retain JSON/logs/manifests/frozen sources/libraries/executables and mismatches;
+future42 payloads remain. Receipts are pruned-verified-originals29-for42.json and
+pruned-verified-originals42.json. User archive inputs are never modified.
+
+The architecture goal continues. Rare's canonical decode-session ownership and
+SegSat's existing binding owner are under separate temporary proofs for the next
+batch. The constrained command-forwarding draft exposed an implicit Event
+conversion in the actual Wolf consumer and is superseded by concrete copy/move
+overloads; it is not applied here. No claim that all simplification avenues are
+exhausted, and no goal pause is requested.

@@ -88,7 +88,7 @@ struct ScannedBank {
 [[nodiscard]] std::optional<ScannedBank> addBank(core::ScanResultBuilder& result, const BankLayout& layout);
 [[nodiscard]] core::SequenceProgram parseSequence(core::ByteReader reader, core::AssetId id,
                                                   const SequenceLayout& layout,
-                                                  const std::vector<Instrument>& instruments = {},
+                                                  std::vector<Instrument> instruments = {},
                                                   core::SourceMapBuilder* sourceMap = nullptr,
                                                   std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
