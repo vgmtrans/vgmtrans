@@ -64,7 +64,6 @@ struct CompiledCommandRuntime {
   template <class Execute>
   [[nodiscard]] static decltype(auto) withPlayback(std::any& programState, std::any& trackState,
                                                    PerformanceEmitter& out, VmApi& vm, Execute execute) {
-    auto& typedProgramState = std::any_cast<ProgramState&>(programState);
     auto& typedTrackState = std::any_cast<TrackState&>(trackState);
     const auto context = [&] {
       if constexpr (std::is_void_v<StreamState>) {
@@ -75,8 +74,8 @@ struct CompiledCommandRuntime {
       }
     }();
     // Playback may also borrow song-wide state alongside its execution context.
-    if constexpr (requires { Playback{context, typedProgramState}; }) {
-      Playback playback{context, typedProgramState};
+    if constexpr (requires(ProgramState& state) { Playback{context, state}; }) {
+      Playback playback{context, std::any_cast<ProgramState&>(programState)};
       return execute(playback);
     } else if constexpr (requires { Playback{context}; }) {
       Playback playback{context};

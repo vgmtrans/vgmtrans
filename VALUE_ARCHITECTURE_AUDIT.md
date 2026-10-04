@@ -1,13 +1,15 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Thirty-six validated batches remove 1,180 net production lines
+`cb9e0b766`. Thirty-seven validated batches remove 1,187 net production lines
 from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records and all 73 expanded raw
-inventories match batch 35 exactly. Earlier concurrent sample-pool ID scheduling
-evidence is retained below. The cleanup2 records appear at the end of this document.
+cover 37 of 38 registered families. All export records match batch 36 exactly;
+72 expanded raw inventories match byte-for-byte. One Sony input differs only in
+previously proven concurrent sample-pool ID scheduling. Its narrowly mapped
+inventory matches retained original evidence; all raw differences are preserved.
+The cleanup2 records appear at the end of this document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
 
@@ -7527,3 +7529,224 @@ future candidates, not changes certified by this batch. Retained public owners
 include ScanResultBuilder's SourceFile, TempoMap's returned point vector, and
 copied RegionResponse callable state; replacing them with borrowed views would
 change valid lifetime or mutable-callback behavior.
+
+## Cleanup2 thirty-seventh batch: private PSF views and smaller authoring surfaces
+
+This batch removes seven net production architecture lines with no test edits.
+It simplifies private ownership and format-author operations, while keeping
+SequenceVM, typed factories, source inspection and neutral export preparation.
+Some ownership changes are LOC-neutral; region count retention adds one line.
+Cumulative value reduction is 1,187 lines (1,064 architecture/123 formats):
+2,077 additions/3,264 deletions across 162 tracked value C++/header paths.
+Architecture totals are 1,709/2,773 across 91 paths; formats remain 368/491
+across 71. Test totals remain 984 additions/424 deletions across 43 paths.
+
+### Borrow private PSF reserved bytes during synchronous extraction
+
+`PsfData.reserved` is a span into the immutable parser input rather than a
+vector copied from it. Only PSF2 unpacking consumes this section. Its private
+owner, either the extraction ByteReader or a temporary library byte vector,
+lives through the entire synchronous load/unpack call and recursive library
+loads. `load(parsePsf(readFileBytes(...)), ...)` completes before the temporary
+vector dies. Nothing returns or stores PsfData/reserved views. Executables,
+tags, filesystem entries, output bytes and metadata remain owned values.
+The two substitutions are LOC-neutral; PsfData shrinks 80 to 72 bytes here.
+
+All four before/after Release/focused sanitizer arms match 1,318 generated
+cases, 472,341 bytes, SHA-256
+`cc71714364e613e0af398d161f03ed9f6bc136c548b487c5bbc5913c30932185`.
+These exercise reserved data in all supported PSF versions, malformed sizes,
+CRC/tags, PSF2 nested/case overlays, empty files and names, INI, primary/numbered
+library ordering/gaps, recursion limits and wrong libraries. Complete existing
+SquarePS2/SonyPS2/MP2k/SegSat/NDS suites pass. Seven natural archive closures
+cover versions 1/2/0x11/0x22/0x24 and the unchanged unsupported DSF 0x12 case:
+33,743,861 exact output bytes per variant. No native 0x25 input was found;
+that version remains synthetic-only in this focused probe. Returned metadata,
+paths/attributes and payloads are examined after stores/metadata/buffers die
+or are overwritten. Forty-two actual three-configuration strict checks pass.
+
+Scoped generated allocation calls fall 19,223 to 17,402, requested bytes
+105,471,214 to 14,788,684. No request count, traffic or owned-byte peak grows;
+775 cases reduce peak, by at most 1,052,910 bytes. Retained payload is exact.
+These are scoped allocator observations, not process RSS/speed/cross-platform
+layout claims. Removed reserved-vector allocation can change injected bad_alloc
+staging; arbitrary allocation-failure equivalence is not claimed. Focused SAN
+instruments the changed extractor, probes/full fixtures and matching
+Source/Session; remaining frozen36 units are Release with consistent container
+annotation opt-out. Evidence:
+`/tmp/vgmtrans-cleanup2/psf-reserved-owner37/proof-summary.json`,
+`native-proof.json`, `proof-report.md`, and `applied.json`.
+
+### Correct the PSF executable offset's pre-existing integer-width bug
+
+This is a separate correctness patch, not part of the reserved-view equivalence
+claim. Widen `reservedSize` to size_t before adding the 16-byte header. The old
+addition occurred in 32-bit unsigned arithmetic, despite assigning to size_t;
+reserved sizes starting at 0xfffffff0 could wrap the executable offset while
+the preceding u64 file-bounds admission succeeded. It is one LOC-neutral edit.
+
+The separate ordinary borrowed-before/borrowed-fixed proof preserves all
+1,318 cases, allocation metrics and five full platform suites in Release/SAN.
+A sparse anonymous mapping exercises the actual parser: 4,294,967,401 bytes,
+reserved=0xfffffff0, real compressed executable beginning at 0x100000000.
+Only the header and executable/tag tail are touched; no owning-reserved variant,
+SourceStore copy or physical 4 GiB vector is used. The old offset is zero and
+produces `PSF executable CRC32 mismatch`; the widened offset yields the exact
+32-byte owned image, title and origin after munmap. Both Release/SAN arms agree
+per version. Six actual three-configuration strict checks pass. A separate
+55-case arithmetic grid includes 20 wraps. This is a targeted macOS parser
+boundary correction, not portable mmap/RSS or owning-4GiB-baseline evidence.
+Evidence: `/tmp/vgmtrans-cleanup2/psf-exe-offset37/proof-summary.json`,
+`proof-report.md`, `candidate.patch`, `combined-baseline.patch`, `applied.json`.
+Final PsfExtractor SHA-256:
+`38dac0f3fd16d4c2ae69777e5d59f4f0272e9bee982c5cf5353d00b2f6830da4`.
+
+### Remove unused instrument-event authoring and predicted note index scratch
+
+The emitter's event-shaped instrument overload had no external source/test
+consumer; two ordinary overloads merely forwarded to it. Remove that public
+choice and append directly from the live native identity/address overloads.
+Five lines disappear. Formats retain identity/address, forced bank selection
+for addresses, and envelope modes. Raw neutral InstrumentPerformanceEvent and
+resolved handles remain in the model/export stages. This deliberately narrows
+unused authoring of an already-prepared InstrumentHandle and identity combined
+with forceBankSelect=true; it is not a claim that the scalar overloads express
+every theoretical variant field combination. Handles belong to preparation.
+
+Separately, noteOn records the actual last event after note returns instead of
+predicting its index beforehand. Successful note appends exactly one event as
+its final operation; its automation updates append no intervening event and
+there is no callback/hook. This removes one scratch local/line. The existing
+same-key slot assignment and its batch36 failure boundary remain.
+
+Independent focused sanitizer proofs cover 1,270 generated emission/VM/pan
+cases plus all nine relevant core/five native suites, 5,298,430 successful trace
+bytes. The instrument change adds 72 identity/force/envelope/clock/binding
+cases (374,270 bytes), yielding 1,342 generated cases/5,672,700 bytes including
+fixtures. Release allocation/failure probes remain exact: instrument612/14
+cases, index180/8 cases. There are no new failure-staging differences relative
+to frozen36. Twenty-four actual configured Release strict checks pass, and
+seven unchanged consumers have identical text. Instrument alone removes 16
+emitter text bytes; last-index alone adds 16. No combined text, linked app size,
+allocation saving or speed claim is made. Changed emitter/probes/full fixtures
+are instrumented in the focused SAN replay; other matching36 archives remain
+Release with consistent annotation opt-out. Evidence:
+`/tmp/vgmtrans-cleanup2/emitter-authoring37/proof.json`,
+`instrument-final.diff`, `index-final.diff`, and `applied-files.json`.
+
+### Cast song-wide state only when playback consumes it
+
+CompiledCommandRuntime previously any_cast program state before deciding which
+Playback constructor existed. Move the cast into the constructor branch that
+actually borrows ProgramState. Context-only playback no longer validates an
+unused slot. This removes one local/line and makes the optional dependency
+visible where it is used. Constructor precedence, factories/config ownership,
+stream/track validation, typed projection and finishPrepass/finalize callbacks
+remain. Collection runtime-family checks still use execute-function identity.
+
+The focused SAN replay matches 960 valid-state lifecycle cases, including 128
+caught constructor throws; full VM/Cursor and AKAO/Mori(main+SFX)/SquarePS2/
+SegSat suites match 2,801,447 trace bytes. Release separately matches all 960
+lifecycle/family cases, including the same context-only Playback with different
+unused ProgramState types retaining distinct runtime-family identities.
+Twenty configured Release strict checks pass; six paired negative factory
+compilations retain rejection. Six actual format object text sizes sum to 560
+bytes smaller; this is not a whole-binary, heap or speed claim. Changed adapter
+instantiations, probes and full fixtures are instrumented in focused SAN;
+remaining matching36 archives are Release.
+
+Fourteen malformed-state cases and four typed-final-hook negative calls per
+version record deliberate boundaries. Context-only playback accepts bad/absent
+unused ProgramState when no later typed callback consumes it; track/stream
+casts now precede a requested program cast; direct ContextOnly,void execution
+can instantiate without an unused void reference, while makeCompiledRuntime
+with void remains rejected by its state factory. Invalid track/stream and
+requested typed state still throw before callbacks mutate state. These are
+asserted contract changes, not blanket invalid-state equivalence. Evidence:
+`/tmp/vgmtrans-cleanup2/conditional-state-cast37/proof.json`,
+`final.diff`, `strict-results.json`, and `applied-files.json`.
+
+### Move playback title to its final owner and retain the sampled region count
+
+PreparedCollection's local baseName now moves into playback.title; the later
+owning synth input copies from that final title. No public borrowed string or
+new owner is introduced; other collection export naming remains separate.
+This is LOC-neutral. All four Release/focused SAN streams match 12,386,931
+bytes, SHA-256
+`289b3e18ab0f1551fdfd986b6537b1789192fdd9e839a23fc4aae1a3455be8fb`.
+The proof includes 8,512 generated playback calls and 8,512 returned copy/move
+captures after source/snapshot destruction, full Collection/Sequence/
+ResolvedInstrument/Session suites, 8,650 public calls and 80 artifact captures.
+Among 70 scoped allocation rows, 42 save exactly one allocation and 28 remain
+unchanged; <=22-byte titles and binding failures are unchanged. A 65,554-byte
+title saves 65,568 requested bytes. Peak/RSS/timing and arbitrary title-copy
+bad_alloc-stage equivalence are not claimed.
+
+Region sampling now keeps the current count beside the step that produced it,
+rather than recomputing step1 and the final warning count. This adds one line;
+there is no new wrapper/type/policy. All four streams match 12,256
+step/budget/error/warning cases plus 56 public/full SF2/DLS captures:
+16,727,892 bytes, SHA-256
+`8d00bbd5012bb05bc596b424f26ff8531d46ac2ce9e551edce5fc9fcd3414868`.
+Budgets cover exact/over/coarsest/max0, static-only oversized banks, invalid
+ranges and existing diagnostic prefixes. Counting never invokes response
+callbacks; public exports separately do. Both changed complete TUs/probes/full
+fixtures are instrumented in focused SAN, remaining matching36 units Release.
+Each candidate passes six actual three-configuration production strict checks
+without suppression. Evidence: `/tmp/vgmtrans-playback-title-owner37/` and
+`/tmp/vgmtrans-region-count-owner37/` results/applied records.
+
+### Remove the unused scanner source-ID getter
+
+Delete the public source() convenience getter and use input_.source.id for its
+sole internal caller, preserving owning SourceFile and metadata-ID semantics.
+The initial dot/member-pointer inventory missed that bare self-call; a complete
+bare/this/qualified/chained inventory corrected the draft before compilation
+or mutation. No external consumer exists. One line disappears across two files.
+The 256-case metadata/reader identity matrix matches all four Release/SAN arms:
+18,616 bytes, SHA-256
+`fab1fdfc6bc173be2f98f000db9a5330a602d483c1eaafbbe42cd8bfba5f1fd5`.
+Full Registry/Session/SourceMap/SynthBuilder/Qt scan-inspection fixtures and 96
+configured strict consumer checks pass. Standalone Qt emits identical raw
+326-byte locale fallback/missing bundled icon warnings in all four arms; probe
+and core stderr are empty. No normalization hides these fixture warnings.
+Changed builder/probe/fixtures and matching SourceMap/Inspection/Source/
+RecordReader/Session/SynthBuilder are instrumented; other matching core/Qt
+archives/frameworks remain Release. Evidence:
+`/tmp/vgmtrans-cleanup2/scanner-source-getter37/proof-summary.json`,
+`complete-source-inventory.txt`, `proof-report.md`, and `applied.json`.
+
+### Integrated verification and next checks
+
+The exact eight-path production authority builds in 295 warning-free
+Release steps, and all 44 CTest suites pass. Complete source/header/test copies
+and four archives are frozen in `/tmp/vgmtrans-cleanup2/pass37-baseline` with
+parent `0f6e509716882b049de07bee874b74b4f60f945b`. Frozen shell SHA-256:
+`ee32d89dd8111f00817f942d2c787b261dd425925e09047e3d1ff922ddb91727`.
+Against frozen36, the original corpus preserves all 252 input/policy records
+  and 3,922 artifact names/hashes.
+The /Volumes/emu/vgm replay preserves all 894 export records: 852 successes
+  and 42 matching existing failures. All 858 artifact names/sizes/hashes and
+  218,240,549 bytes per binary match. Seventy-two raw inventories match exactly,
+  including five unchanged unsupported DSF failures. Onimusha2/053.psf2 differs
+  only in pool IDs0/1 and the matching member reference: source metadata/IDs/
+  parentage, bank/sequence IDs2/3, collection0, asset order/names/ranges, status
+  and both ordered Sony warnings are unchanged. The existing narrow declaration/
+  member-ID mapping compares four current initial/automatic-repeat records to
+  retained original scheduling evidence; canonical SHA-256 is
+  385c5d5905f4791847f2a86635c70b0aefbdcdd66dcbb488d1ff2a95a3f231a1.
+  No broader normalization or new additional repetitions are used; raw records
+  and diffs remain. Real coverage remains 37/38 families; KonamiTMNT2 is synthetic
+  only. See volume-coverage27/pass36-vs-pass37-summary.json and the matching
+  volume-35/classification.json.
+
+Next work includes private primary-library tag borrowing and a separately
+reproduced MIDI clipping-before-integer-conversion correction. The temporary
+MIDI draft preserves 873,184 ordinary helper observations and 376 public
+captures/all three existing MIDI suites; a public regression fails before and
+passes after. Its authority must refresh to frozen37 before application. Large
+finite source values currently reach unsafe integer casts; derived NaN from
+extreme interpolation/LFO arithmetic remains a distinct future scope. Existing
+LevelScale final integer clamps stay because its public inputs do not enforce
+a NaN policy. Source/tempo point owners and copied mutable RegionResponse
+callables remain; reducing them would change valid behavior.

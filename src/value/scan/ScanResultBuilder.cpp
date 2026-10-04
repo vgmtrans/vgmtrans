@@ -208,7 +208,7 @@ ScanResult ScanResultBuilder::finish() {
     auto& range = sequence->metadata.range;
     for (const auto id : result.sourceMap.annotationsForAsset(sequence->metadata.id)) {
       const auto annotated = result.sourceMap.get(id).range;
-      if (annotated.source == source()) {
+      if (annotated.source == input_.source.id) {
         range.include(annotated);
       }
     }

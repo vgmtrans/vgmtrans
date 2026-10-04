@@ -427,7 +427,7 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
   }};
 
   playback.collection = prepared.id;
-  playback.title = prepared.baseName;
+  playback.title = std::move(prepared.baseName);
   if (const auto sequence = prepared.sequenceId) {
     playback.sequence = *sequence;
     playback.assetDependencies.push_back(playback.sequence);
@@ -454,7 +454,7 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
                                : prepareSynthBanks(prepared.soundBankView(), binding.diagnostics);
   auto soundFont = !synthBanks || (performance && !performance->valid()) ? SynthExportResult{} : buildSoundFont2(
       SynthExportInput{
-          .name = prepared.baseName,
+          .name = playback.title,
           .soundBanks = std::move(*synthBanks),
           .samplePools = prepared.samplePools,
           .modulationConversion = synthConversion,

@@ -39,7 +39,7 @@ constexpr int kMaxRecursion = 10;
 
 struct PsfData {
   u8 version = 0;
-  std::vector<u8> reserved;
+  std::span<const u8> reserved;
   std::vector<u8> exe;
   std::map<std::string, std::string> tags;
 };
@@ -277,9 +277,9 @@ void parseTags(PsfData& psf, std::span<const u8> bytes, size_t offset) {
     throw std::runtime_error("PSF header sizes are invalid");
   }
 
-  const size_t exeOffset = 16 + reservedSize;
+  const size_t exeOffset = 16 + static_cast<size_t>(reservedSize);
   PsfData psf{.version = version,
-              .reserved = std::vector<u8>(bytes.begin() + 16, bytes.begin() + 16 + reservedSize)};
+              .reserved = bytes.subspan(16, reservedSize)};
   if (exeSize != 0) {
     const auto compressed = bytes.subspan(exeOffset, exeSize);
     const uLong actualCrc = crc32(crc32(0L, nullptr, 0), reinterpret_cast<const Bytef*>(compressed.data()), exeSize);

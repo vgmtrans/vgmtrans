@@ -377,11 +377,12 @@ u32 regionSamplingStep(const SoundBankAsset& bank, std::vector<Diagnostic>& diag
     return 1;
   }
   u32 step = 1;
-  while (step < 128 && countAt(step) > maxRegions) {
+  u64 sampled = exact;
+  while (step < 128 && sampled > maxRegions) {
     ++step;
+    sampled = countAt(step);
   }
   if (step != 1) {
-    const u64 sampled = countAt(step);
     diagnostics.push_back(exportWarning(
         fmt::format("Key/velocity response requires {} exact regions; using {}-step zones ({} regions), {}", exact,
                     step, sampled,

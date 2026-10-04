@@ -108,9 +108,8 @@ PerformanceNoteId PerformanceEmitter::noteOn(s32 key, double linearVelocity) {
     finishActiveNote(previous->second, tick_);
   }
 
-  const size_t eventIndex = track_.events.size();
   const PerformanceNoteId id = note(static_cast<double>(key), linearVelocity, 0);
-  state.notes[key] = detail::ActiveNoteState::Note{.eventIndex = eventIndex};
+  state.notes[key] = detail::ActiveNoteState::Note{.eventIndex = track_.events.size() - 1};
   return id;
 }
 
@@ -210,12 +209,8 @@ void PerformanceEmitter::timeSignature(u8 numerator, u8 denominator, u8 clocksPe
   });
 }
 
-void PerformanceEmitter::instrument(InstrumentPerformanceEvent event) {
-  append(std::move(event));
-}
-
 void PerformanceEmitter::instrument(InstrumentIdentity sourceInstrument, InstrumentEnvelopeMode envelopeMode) {
-  instrument(InstrumentPerformanceEvent{
+  append(InstrumentPerformanceEvent{
       .instrument = std::move(sourceInstrument),
       .envelopeMode = envelopeMode,
   });
@@ -226,7 +221,7 @@ void PerformanceEmitter::instrument(u32 bank, u32 program, InstrumentEnvelopeMod
 }
 
 void PerformanceEmitter::instrument(u32 bank, u32 program, bool forceBankSelect, InstrumentEnvelopeMode envelopeMode) {
-  instrument(InstrumentPerformanceEvent{
+  append(InstrumentPerformanceEvent{
       .instrument = InstrumentAddress{.bank = bank, .program = program},
       .forceBankSelect = forceBankSelect,
       .envelopeMode = envelopeMode,

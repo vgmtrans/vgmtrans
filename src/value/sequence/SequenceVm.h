@@ -103,7 +103,6 @@ public:
   bool setNoteEnd(PerformanceNoteId note, u64 endTick);
   void tempo(u32 microsecondsPerQuarter);
   void timeSignature(u8 numerator, u8 denominator, u8 clocksPerMetronomeClick);
-  void instrument(InstrumentPerformanceEvent event);
   void instrument(InstrumentIdentity sourceInstrument,
                   InstrumentEnvelopeMode envelopeMode = InstrumentEnvelopeMode::UseInstrumentEnvelope);
   void instrument(u32 bank, u32 program,

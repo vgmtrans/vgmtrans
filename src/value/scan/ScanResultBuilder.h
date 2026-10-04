@@ -140,7 +140,6 @@ public:
   ScanResultBuilder(const ScanResultBuilder&) = delete;
   ScanResultBuilder& operator=(const ScanResultBuilder&) = delete;
 
-  [[nodiscard]] SourceId source() const noexcept { return input_.source.id; }
   [[nodiscard]] const SourceFile& sourceFile() const noexcept { return input_.source; }
   [[nodiscard]] ByteReader reader() const noexcept { return input_.reader; }
   [[nodiscard]] std::string sourceDisplayName() const;
