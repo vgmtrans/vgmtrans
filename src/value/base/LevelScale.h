@@ -22,11 +22,6 @@ namespace vgmtrans::core::LevelScale {
   return normalized * normalized;
 }
 
-[[nodiscard]] inline double linearFromMidi14(u16 value) {
-  const double normalized = static_cast<double>(std::min<u16>(value, 16383)) / 16383.0;
-  return normalized * normalized;
-}
-
 [[nodiscard]] inline u8 midi7FromLinear(double linearGain) {
   return static_cast<u8>(
       std::clamp<int>(static_cast<int>(std::lround(std::sqrt(clamp01(linearGain)) * 127.0)), 0, 127));

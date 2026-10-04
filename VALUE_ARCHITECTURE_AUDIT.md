@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Thirty-five validated batches remove 1,160 net production lines
+`cb9e0b766`. Thirty-six validated batches remove 1,180 net production lines
 from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
 cover 37 of 38 registered families. All export records and all 73 expanded raw
-inventories match batch 34 exactly. Earlier concurrent sample-pool ID scheduling
+inventories match batch 35 exactly. Earlier concurrent sample-pool ID scheduling
 evidence is retained below. The cleanup2 records appear at the end of this document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
@@ -7345,3 +7345,185 @@ unique of the builder's set-derived requirements, keeping zero filtering after
 source annotations. Probe active-note map cell reuse, preserving sustain and
 source-span behavior, and remove the unused physical-Hz pan helper if its complete
 consumer audit confirms the live cycles-per-tick path remains sufficient.
+
+## Cleanup2 thirty-sixth batch: reuse active state and remove redundant owners
+
+The architecture continues to use SequenceVM and neutral performance/synth
+values. This batch removes unused APIs and scratch data, reuses the existing
+active-note cell, and makes one private renderer lifetime explicit. It removes
+20 net production lines: 14 architecture lines and six AKAO lines. The existing
+level fixture gains one net line to generate its own input independently.
+Cumulative production reduction is 1,180 lines (1,057 architecture, 123 formats);
+tracked C++/header totals are 2,064 additions/3,244 deletions across 162 value
+paths. Architecture totals are 1,696/2,753 across 91 paths; format totals are
+368/491 across 71. Tests have 984 additions/424 deletions across 43 paths.
+
+### Replace the existing active-note cell directly
+
+`PerformanceEmitter::noteOn` finishes a previous same-key note and assigns the
+new note into the existing map slot. It no longer erases and allocates a new
+node for a repeated key. The ordinary aggregate assignment resets release and
+source-span state; the fields and assignment are nonthrowing ordinary values.
+New keys still create their own cell. The note/span closure and new emitted
+event keep their existing successful order. No new owner/helper/protocol is
+introduced. This change removes one line.
+
+The selected implementation uses `state.notes[key] = Note{...}`. A separately
+proven `insert_or_assign` draft had the same successful traces and allocations
+but generated more emitter text. The actual configured Release emitter text is
+34,465 to 33,777 bytes after this change and the unused pan-hertz removal below
+(688 bytes smaller). Pan removal alone yields 33,809 bytes; the slot assignment
+therefore also removes 32 bytes relative to that draft. Seven unchanged
+consumer objects have identical text. This is an object-text observation, not
+a linked application size or speed claim.
+
+The temporary successful proof includes 1,270 generated cases: 486 direct
+emitter cases, 768 SequenceVM cases, and 16 neutral/clocked pan cases. It also
+runs all nine relevant core and five native suites (SonyPS1, SonyPS2,
+HeartBeatPS1, SquarePS2, KonamiPS1), including 84 fixture captures. The selected
+assignment independently reproduces 5,298,430 successful trace bytes. Generated
+traces alone are 5,042,300 bytes, SHA-256
+`abb2b037b9b3000f35b565257c85e42a7133454a77d6d3b75633225b2f07354d`.
+Twenty-six configured strict checks pass, including eight fresh selected-source
+and consumer checks. Changed units, probes, and fixtures are instrumented with
+ASan/UBSan/float-cast checks for the focused success replay; linked unchanged
+frozen archives are Release. This is not whole-application sanitizer coverage.
+
+Release allocation probes reserve output before accounting and cover 180 cases.
+Ninety-six repeated-key cases save 6,612 requests/476,064 requested bytes in
+aggregate (72 bytes per eliminated libc++ node); 84 controls are unchanged.
+Successful event/map/span snapshots match. No app RSS or timing claim follows.
+
+Eight Release fault-injection cases explicitly check partial state. Five are
+identical. Three change failure staging: invalid automation binding or a
+repeated-key output-vector allocation failure retains the already-finished old
+cell; the old repeated-key map allocation failure disappears because that
+allocation disappears. Event/span closure and consumed IDs at the surviving
+failure sites retain their order. Neither version promises transactional
+rollback or catch-and-reuse after failed emission. SequenceVM does not catch
+these errors, and native collection handling discards the failed performance.
+The failure differences are accepted and recorded; they are not described as
+arbitrary allocation-failure equivalence.
+
+Temporary evidence: `/tmp/vgmtrans-cleanup2/active-note-cell36/proof.json`,
+`report.md`, `assignment-cost-results.json`, and `applied-files.json`. The
+selected two-file diff SHA-256 is
+`126acb8825176d721c8415a9c35bb0352ee003305a151430d374fb3377fb5955`.
+
+### Remove the unused pan-hertz and inverse MIDI14 convenience APIs
+
+`PerformanceEmitter::panLfoRate(double hertz, ...)` has no consumers across
+tracked C++/ObjC++ source/tests. Remove its declaration/body (nine lines), while
+retaining the clocked pan helper used by eight native families, neutral pan
+rate/context frequency, generic modulation, and export simulation. Physical
+hertz remains expressible in the neutral model. The focused emission/VM/pan
+proof above includes this deletion.
+
+`LevelScale::linearFromMidi14` also has no production consumer. Its sole test
+use generated input for the inverse roundtrip. Remove five production lines;
+the existing exhaustive fixture now computes its normalized-square input
+itself and keeps testing `midi14FromLinear`. The 7-bit inverse and live 7/14-bit
+output conversions stay. All 16,384 valid input values produce exact matching
+input double bits and MIDI output bytes in before/after Release and focused
+sanitizer arms: 163,840 bytes, SHA-256
+`1732ec421fe76b251185de28ae45e9d62a2b30b674cc31242be4146a872d31d7`.
+All 19 existing SequenceModel fixtures pass in all four arms, and six actual
+Debug/Release/RelWithDebInfo production strict checks pass without warning
+suppression. The changed inline helper/existing inline calls and test unit are
+instrumented; linked unchanged core/fmt archives remain frozen Release.
+Evidence: `/tmp/vgmtrans-cleanup2/unused-midi14-inverse36/` and
+`/tmp/vgmtrans-cleanup2/unused-pan-hertz36/`.
+
+### Borrow immutable pitch-layer events inside the MIDI renderer
+
+The private `PitchBendLayers` map now stores pointers to the already-owned
+immutable planned events instead of copying 72-byte events into every map node.
+The planned track lives through the final pitch flush and renderer destruction;
+its vector is complete before references are taken. The sole private apply
+caller passes those const elements. Returned MIDI contains values, never these
+pointers. One lifetime comment states the owner. This adds one net production
+line and removes redundant event ownership without a public lifetime contract.
+
+Before/after Release and focused sanitizer public replays match 94,523 captures,
+164,746,078 bytes, SHA-256
+`5aa4686f3214786e4350b481ff92442a3fc54029bf9dd4cf89c0229afaa43331`.
+These include complete existing MIDI renderer/pitch/modulation suites, layered
+replacement/erasure, sensitivity reinterpretation, all three pitch policies,
+both modulation policies, copy/move/repeat/temporary owners, final flush, and
+post-activation exception exits followed by independent valid retries. Separate
+private tests compare an independent owning-map oracle: 7,776 sequences,
+933,120 observations, 26,593,920 bytes, SHA-256
+`bb63f38b59bcb26ebfb05f737a3579dc8a4b5c3db90c8d11c287333fbd3b6480`.
+They compare result bits and FENV flags in four rounding modes, including
+nonfinite values only at the private floating query (never MIDI integer casts).
+No broad public FENV parity claim is made. Six actual three-configuration strict
+checks and three final live checks pass unsuppressed; copied fixture-only unused
+helper/range-loop warnings are suppressed only in the temporary fixture arms.
+
+Actual libc++ 170006 node requests change from 112 to 48 bytes, saving 64 bytes
+per active layer with the same request count. Fourteen scoped cases cover empty,
+replacement/clear, and one through 4,096 layers; 4,096 nodes request/peak
+458,752 to 196,608 bytes. Inputs are outside accounting. This is allocator
+traffic/peak owned bytes, not RSS, timing, or cross-platform layout evidence.
+The sanitizer arms instrument the complete changed renderer plus planner,
+resolution, emitter/model, probes and full three fixtures; remaining matching
+frozen archives are Release with consistent container-annotation opt-out.
+Evidence: `/tmp/vgmtrans-renderer-pitch-layer-borrow36/results.json`, SHA-256
+`69c567a7e0d5521da7e2a9755ed66d9f6a3ca77a3858ed510e41a7ead948d6a9`.
+
+### Consume AKAO's existing sorted requirements directly
+
+Remove `AkaoSequenceAnalysis.requiredArticulations`, which parsing never fills.
+Collection construction uses `AkaoInstrumentSetBuild.requiredArticulations`
+directly, retains the module's removal of zero, and deletes another sort/unique
+pass and unused include. The sole build origin already assigns from its ordered
+set, including IDs with no bound region. Keep the build's separate binding and
+requirement outputs: they answer different questions. Source annotation counts
+remain before zero filtering. Six production lines disappear.
+
+The changed analysis struct shrinks 168 to 144 bytes; the parse result shrinks
+640 to 608 bytes on this target. All six AKAO implementation units plus format
+registration rebuild with matching headers in every overlay. All four Release
+and focused sanitizer arms match 2,688 builder plus 576 actual module-scan
+cases: 24,796,023 bytes, SHA-256
+`df9b8d476634ab967a14114cb8b2b519ec47e221ce0a5687ab96cf90fae75793`.
+The full AKAO fixture passes in all four arms, as do 48 actual configured
+three-configuration strict checks. Six FF7/FF8/FF9 native closures match
+30,366,414 bytes per variant across images/maps/collections, retained inspection,
+and both-policy MIDI/SF2/DLS outputs after original session death.
+
+Scoped allocation traffic is unchanged: all 3,264 generated cases total
+588,555 requests/133,431,900 bytes per arm. Direct native module and session
+scopes total 287,810 requests/129,884,758 bytes per variant. Struct storage and
+responsibility reductions are established; allocation/RSS/speed savings and
+arbitrary bad_alloc-stage equivalence are not claimed. Changed AKAO/registration,
+source/session, probes and full fixtures are instrumented in focused sanitizer
+arms; other linked matching frozen units are Release.
+Evidence: `/tmp/vgmtrans-cleanup2/akao-analysis-owner36/proof-summary.json`,
+`native-proof.json`, `strict-results.json`, and `applied.json`.
+
+### Integrated verification and next probes
+
+The exact seven-path source/test authority builds in 172 warning-free Release
+steps, and all 44 CTest suites pass. Complete source/header/test copies and four
+archives are frozen in `/tmp/vgmtrans-cleanup2/pass36-baseline` with parent
+`c2deaecc6907224215eb0b50079897d2c9c5e1d9`. The frozen shell SHA-256 is
+`8f5e2be50d154ef5b36234544792f09d76c8142c4f5098970cf854675c7e5c3a`.
+Against frozen35, the original corpus preserves all 252 input/policy records
+  and 3,922 artifact names/hashes.
+The /Volumes/emu/vgm replay preserves all 73 raw inventories and 894 export
+  records: 852 successes and 42 matching existing failures. All 858 artifact
+  names/sizes/hashes and 218,240,549 bytes per binary match. Five unsupported
+  DSF inventory failures retain status/diagnostics. No ID normalization or fresh
+  scheduling repetitions are needed. Real coverage remains 37/38 registered
+  families; KonamiTMNT2 has synthetic coverage only.
+
+Next isolated proofs examine private PSF reserved-data borrowing through
+recursive synchronous library loads, a separate pre-existing PSF offset-width
+bug at the 4 GiB boundary, playback title ownership, redundant region counting,
+and smaller source-author/typed-adapter surfaces. A sparse mapped parser input
+can exercise the offset boundary without physically copying 4 GiB. These are
+future candidates, not changes certified by this batch. Retained public owners
+include ScanResultBuilder's SourceFile, TempoMap's returned point vector, and
+copied RegionResponse callable state; replacing them with borrowed views would
+change valid lifetime or mutable-callback behavior.

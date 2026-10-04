@@ -106,12 +106,11 @@ PerformanceNoteId PerformanceEmitter::noteOn(s32 key, double linearVelocity) {
   auto& state = activeNotes();
   if (const auto previous = state.notes.find(key); previous != state.notes.end()) {
     finishActiveNote(previous->second, tick_);
-    state.notes.erase(previous);
   }
 
   const size_t eventIndex = track_.events.size();
   const PerformanceNoteId id = note(static_cast<double>(key), linearVelocity, 0);
-  state.notes.emplace(key, detail::ActiveNoteState::Note{.eventIndex = eventIndex});
+  state.notes[key] = detail::ActiveNoteState::Note{.eventIndex = eventIndex};
   return id;
 }
 
@@ -488,14 +487,6 @@ void PerformanceEmitter::tremoloRateCyclesPerTick(double cycles, LfoPerformanceC
 void PerformanceEmitter::panLfoDepth(double depth, LfoPerformanceContext context) {
   auto event = physicalLfoEvent(ModulationPerformanceTarget::PanDepth, std::move(context));
   event.panDepth = depth;
-  event.context.panLaw = panLaw_;
-  modulation(std::move(event));
-}
-
-void PerformanceEmitter::panLfoRate(double hertz, LfoPerformanceContext context) {
-  context.frequencyHz = hertz;
-  context.cyclesPerTick.reset();
-  auto event = physicalLfoEvent(ModulationPerformanceTarget::PanRate, std::move(context));
   event.context.panLaw = panLaw_;
   modulation(std::move(event));
 }

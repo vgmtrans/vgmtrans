@@ -8,7 +8,6 @@
 
 #include <fmt/format.h>
 
-#include <algorithm>
 #include <string>
 #include <utility>
 #include <vector>
@@ -62,15 +61,11 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
     auto parsed = parseAkaoSequence(input, sequence.id(), *layout, &result.sourceMap(), &result.diagnostics());
     auto bank = result.soundBank(akaoInstrumentSetName(parsed.analysis));
     auto built = buildAkaoInstrumentSet(input, parsed.analysis, bank.instruments());
-    parsed.analysis.requiredArticulations = std::move(built.requiredArticulations);
-    std::erase(parsed.analysis.requiredArticulations, 0);
-    std::ranges::sort(parsed.analysis.requiredArticulations);
-    parsed.analysis.requiredArticulations.erase(std::ranges::unique(parsed.analysis.requiredArticulations).begin(),
-                                                parsed.analysis.requiredArticulations.end());
+    std::erase(built.requiredArticulations, 0);
     sequence.useBank(bank).prepare(prepareAkaoSequence).program(std::move(parsed.program));
     bank.data(AkaoSoundBankData{.version = parsed.analysis.header.version, .binding = std::move(built.binding)})
         .useSamples(AkaoSamples{.sampleSetId = parsed.analysis.header.sampleSetId,
-                                .requiredArticulations = std::move(parsed.analysis.requiredArticulations)})
+                                .requiredArticulations = std::move(built.requiredArticulations)})
         .prepare<AkaoSoundBankData>(prepareAkaoBank);
   }
 }

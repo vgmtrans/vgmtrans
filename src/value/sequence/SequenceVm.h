@@ -155,7 +155,6 @@ public:
   void tremoloRate(double hertz, LfoPerformanceContext context = {});
   void tremoloRateCyclesPerTick(double cycles, LfoPerformanceContext context = {});
   void panLfoDepth(double depth, LfoPerformanceContext context = {});
-  void panLfoRate(double hertz, LfoPerformanceContext context = {});
   void panLfoRateCyclesPerTick(double cycles, LfoPerformanceContext context = {});
   void marker(std::string text);
 

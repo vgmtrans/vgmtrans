@@ -32,8 +32,9 @@ void levelScaleRoundTripsMidiValues() {
 
   for (u32 value = 0; value <= 16383; ++value) {
     const auto midiValue = static_cast<u16>(value);
-    expect(LevelScale::midi14FromLinear(LevelScale::linearFromMidi14(midiValue)) == midiValue,
-           "MIDI-shaped 14-bit levels should round-trip through linear gain");
+    const double normalized = static_cast<double>(midiValue) / 16383.0;
+    expect(LevelScale::midi14FromLinear(normalized * normalized) == midiValue,
+           "MIDI-shaped 14-bit levels should convert their squared amplitude to the original level");
   }
 }
 

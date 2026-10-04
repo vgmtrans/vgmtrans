@@ -109,7 +109,6 @@ struct AkaoSequenceReferences {
 struct AkaoSequenceAnalysis {
   AkaoSequenceHeader header;
   AkaoSequenceReferences references;
-  std::vector<u32> requiredArticulations;
 };
 
 // Parsing the header establishes that the block is a publishable sequence.

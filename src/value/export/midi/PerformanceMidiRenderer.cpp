@@ -230,19 +230,20 @@ class PitchBendLayers {
       layers.erase(bend.layer.value);
       return;
     }
-    layers.insert_or_assign(bend.layer.value, bend);
+    layers.insert_or_assign(bend.layer.value, &bend);
   }
 
   [[nodiscard]] double semitones(const PerformancePitchBendContext& context) const {
     double total = 0.0;
     for (const auto& entry : layers) {
-      total += context.semitones(entry.second);
+      total += context.semitones(*entry.second);
     }
     return total;
   }
 
  private:
-  std::map<u32, PitchBendPerformanceEvent> layers;
+  // The planned track owns these immutable events through the final pitch flush.
+  std::map<u32, const PitchBendPerformanceEvent*> layers;
 };
 
 using detail::MidiNoteBoundary;
