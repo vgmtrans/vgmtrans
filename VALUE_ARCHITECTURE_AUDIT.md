@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Sixty-four validated batches remove 1,545 net production lines
+`cb9e0b766`. Sixty-five validated batches remove 1,547 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 64 replays both corpora against its
-committed batch 63 predecessor. All 73 expanded raw inventories match exactly;
+cover 37 of 38 registered families. Batch 65 replays both corpora against its
+committed batch 64 predecessor. All 73 expanded raw inventories match exactly;
 no classification is needed. The cleanup2 records appear at the end of this
 document.
 
@@ -11218,3 +11218,43 @@ and 313 formats, plus the earlier 22 UI lines. Evidence is under
 /tmp/vgmtrans-cleanup2: cursor-opcode-query64-cold62 and its independent review,
 registration-callback64-final-cold62 and matching-line review, the root64 cold/
 application receipts, and pass64 build/test/freeze/corpus/final/postcommit records.
+
+### cleanup2 batch 65: keep waveform extraction beside observation
+
+Remove the private standardWaveform helper and compute its optional enum value
+once inside its sole caller, observeModulation. Five guarded vibrato/tremolo
+branches now pass that named local to observeWaveform. This removes two
+architecture lines and one helper name; the waveform-conflict policy, amount
+presence guards, observation order, rate/depth expressions and profile
+publication remain unchanged. No public model, callback or header changes.
+
+The extraction now also runs for ignored targets and missing depth/rate events.
+It reads the const event's owned optional shape and enum and constructs an
+optional enum. There is no callback, arithmetic, allocation or throwing user
+constructor. The observations themselves stay inside their original guards.
+This is a source simplification, with no runtime-speed, invalid-input, race or
+allocation-ordinal guarantee. Root reconstructs the complete candidate body
+and all five calls; all nine scoped inputs match committed63/frozen63 and
+committed64/frozen64/live source. The source-only four-call preparation assertion
+failed before writing any candidate or production source; its original failure
+and corrected five-call inventory remain sealed separately.
+
+The coherent Release build completes 47 warning-free steps and all
+44 CTest suites pass. Complete value/shared/test/Qt sources and four archives
+are frozen with the shell, SHA-256
+72805cfb8a9820e2f2a45a102a54b05e3cd037d450ee856829f7db0ccb994b3a.
+Because the shell differs from committed64, both archive campaigns run afresh against that immediate predecessor:
+all 252 original records and 3,922 artifacts, all 894 expanded export pairs and
+858 artifacts, and all 73 raw inventories match exactly. No inventory
+classification, new normalization or manual baseline repetition is needed.
+Root rehashes the retained artifacts and all paired records before reclaiming
+only older verified64 generated payloads; all records, frozen sources, binaries
+and user/music archives remain intact.
+
+Cumulative production removal is 1,547 value lines: 1,234 architecture
+and 313 formats, plus the earlier 22 UI lines. Evidence is under
+/tmp/vgmtrans-cleanup2: modulation-waveform-local65-cold63,
+waveform65-root-cold-review.json, the root65 application receipt and pass65
+build/test/freeze/corpus/
+final/postcommit records. Further source-only reviews continue; this modest
+change is not an exhaustion claim.

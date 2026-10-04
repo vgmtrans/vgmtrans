@@ -80,34 +80,32 @@ template <class Convert>
                               [](double value) { return synthAmountFromSeconds(synthSecondsRangeMinimum(value)); });
 }
 
-[[nodiscard]] std::optional<LfoWaveform> standardWaveform(const ModulationPerformanceEvent& event) {
-  return event.context.shape ? std::optional{event.context.shape->waveform} : std::nullopt;
-}
-
 void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& vibrato, LfoObservation& tremolo,
                        SequenceModulationProfile& profile) {
+  const auto waveform =
+      event.context.shape ? std::optional{event.context.shape->waveform} : std::nullopt;
   switch (event.target) {
     case ModulationPerformanceTarget::VibratoDepth:
       if (event.pitchDepthSemitones) {
-        vibrato.observeWaveform(standardWaveform(event));
+        vibrato.observeWaveform(waveform);
         vibrato.maxDepth = std::max(vibrato.maxDepth, std::abs(*event.pitchDepthSemitones) * 100.0);
       }
       break;
     case ModulationPerformanceTarget::VibratoRate:
       if (event.context.frequencyHz) {
-        vibrato.observeWaveform(standardWaveform(event));
+        vibrato.observeWaveform(waveform);
         observeRange(vibrato.rate, *event.context.frequencyHz);
       }
       break;
     case ModulationPerformanceTarget::TremoloDepth:
       if (event.volumeDepthDecibels) {
-        tremolo.observeWaveform(standardWaveform(event));
+        tremolo.observeWaveform(waveform);
         tremolo.maxDepth = std::max(tremolo.maxDepth, std::abs(*event.volumeDepthDecibels));
         if (std::abs(*event.volumeDepthDecibels) > 0.0) {
           tremolo.gainMode = event.context.tremoloGainMode;
         }
       } else if (event.volumeDepthLinearGain) {
-        tremolo.observeWaveform(standardWaveform(event));
+        tremolo.observeWaveform(waveform);
         const double depth = std::clamp(std::abs(*event.volumeDepthLinearGain), 0.0, 1.0 - 1e-9);
         tremolo.maxDepth = std::max(tremolo.maxDepth, -20.0 * std::log10(1.0 - depth));
         if (depth > 0.0) {
@@ -117,7 +115,7 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
       break;
     case ModulationPerformanceTarget::TremoloRate:
       if (event.context.frequencyHz) {
-        tremolo.observeWaveform(standardWaveform(event));
+        tremolo.observeWaveform(waveform);
         observeRange(tremolo.rate, *event.context.frequencyHz);
       }
       break;
