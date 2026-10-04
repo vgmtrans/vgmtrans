@@ -127,10 +127,6 @@ struct SfLayout {
   return {coarse, fine};
 }
 
-[[nodiscard]] s8 clampS8(s32 value) {
-  return static_cast<s8>(std::clamp<s32>(value, std::numeric_limits<s8>::min(), std::numeric_limits<s8>::max()));
-}
-
 [[nodiscard]] SfRegionPitch sf2RegionPitch(const Region& region) {
   const auto rootKey = static_cast<u8>(std::clamp(std::lround(region.unityKey), 0l, 127l));
   const auto tuningCents = static_cast<s32>(std::lround((rootKey - region.unityKey) * 100.0));
@@ -145,7 +141,7 @@ struct SfLayout {
 [[nodiscard]] SfSampleHeaderPitch sf2SampleHeaderPitch(u8 rootKey, s16 fineTune) {
   return SfSampleHeaderPitch{
       .originalKey = static_cast<u8>(std::clamp<s32>(static_cast<s32>(rootKey) - (fineTune / 100), 0, 127)),
-      .correction = clampS8(fineTune % 100),
+      .correction = static_cast<s8>(fineTune % 100),
   };
 }
 

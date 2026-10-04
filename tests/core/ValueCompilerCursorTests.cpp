@@ -632,6 +632,21 @@ void compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior() {
   }
 }
 
+void compilerCursorRetainsPartialIgnoredPayload() {
+  const std::array<u8, 3> bytes{0x70, 0xab, 0xcd};
+  std::vector<Diagnostic> diagnostics;
+  ProbeCursor cursor(ByteReader(SourceId{11}, bytes), 0, "compiler-probe", &diagnostics);
+  const DecodedBytecodeCommand command = cursor.ignored("Ignored", 3);
+  expect(command.fields.size() == 1 && command.fields[0].name == "bytes" &&
+             std::get<std::string>(command.fields[0].value) == "AB CD" &&
+             command.fields[0].range == SourceRange{SourceId{11}, 1, 2} &&
+             command.fields[0].display == SourceValueDisplay::Hex && !command.execution.valid() &&
+             command.flow.defaultTransition.kind == CommandTransitionKind::End &&
+             command.presentation.playback == CommandPlaybackStatus::Unsupported && diagnostics.size() == 1 &&
+             diagnostics[0].code == "truncated-record" && diagnostics[0].range == SourceRange{SourceId{11}, 3, 0},
+         "an ignored truncated payload must preserve available source bytes without executable behavior");
+}
+
 void compilerCursorKeepsExactTargetOperandRoles() {
   const std::vector<u8> bytes{0x64, 0x12, 0x34, 0x12, 0x34};
   const DecodedBytecodeCommand command =
@@ -814,6 +829,7 @@ void runValueCompilerCursorTests() {
   compilerCursorReadsRuntimeStateInsideCommandBody();
   compilerCursorExecutesEligibleCommandsDuringWaits();
   compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior();
+  compilerCursorRetainsPartialIgnoredPayload();
   compilerCursorKeepsExactTargetOperandRoles();
   compilerCursorRejectsConflictingDefaultFlowDeclarations();
   compilerCursorRejectsConflictingComposedFlow();

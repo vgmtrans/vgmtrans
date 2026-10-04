@@ -1,11 +1,11 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Forty validated batches remove 1,187 net production lines
+`cb9e0b766`. Forty-one validated batches remove 1,188 net production lines
 from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 39 exactly;
+cover 37 of 38 registered families. All export records match batch 40 exactly;
 all 73 expanded raw inventories match byte-for-byte. The cleanup2 records appear
 at the end of this document.
 
@@ -8279,3 +8279,158 @@ The latter must preserve omitted/captured-field behavior, unlike an earlier
 rejected bypass. Broad synth pitch boundary work must cover both root and residual
 tuning before narrowing; a superficial root-only change would be incomplete.
 None of those future candidates is part of this batch.
+
+## Cleanup2 forty-first batch: transfer raw capture ownership and remove an identity clamp
+
+Parent is `b486035f2`, the committed fortieth batch. This finishes the two checks
+already prepared when the user requested a stop. The cursor change adds three
+production lines; deleting the private SF2 helper removes four, for one net
+architecture line removed. One existing cursor fixture adds 16 lines for a real
+partial-payload boundary. Final cumulative counts against `cb9e0b766`:
+
+- Value: 2,121 added/3,309 deleted across 165 paths.
+- Architecture: 1,753 added/2,818 deleted across 94 paths.
+- Formats: 368 added/491 deleted across 71 paths.
+- Tests: 1,076 added/424 deleted across 43 paths.
+
+Net production reductions are 1,188 value lines, 1,065 architecture and 123
+format lines.
+
+### Give captured raw bytes one owner
+
+CompilerCursor::rawBytes returns void and moves the ranged string into its
+existing source-field capture. All 16 native calls across eight sequence units
+and the internal ignored-command helper discard the former string result.
+RecordReader's ranged-string API stays. The old cursor path copied the hex
+string into a field and returned its original buffer for immediate destruction;
+the specialized method expresses its capture-only responsibility directly.
+No new helper, type, capture phase or native call-site change.
+
+The guard remains ranged-field validity. Available partial bytes are valid even
+when RecordReader has marked the requested read as truncated; checking cursor
+success instead would lose source inspection. The existing fixture now checks
+an ignored three-byte request with two available payload bytes: exactly one
+`bytes` field containing `AB CD`, Hex display, SourceId11/offset1/size2, no
+executable body, terminal transition, unsupported playback and the exact single
+truncated-record diagnostic at offset3/size0. It passes before/after, protecting
+existing behavior rather than asserting copy mechanics.
+
+All 10,752 paired focused-SAN command/source-map projections preserve 9,259,238
+bytes, SHA-256 d04ef254e085df0dd4f0836a925dcbcf6920c125a70b5248f064bc1d6d4eb17e.
+They cover zero/partial/complete reads, maximum requests, empty/long/embedded-NUL
+names, invalid source IDs, absent source maps, prior truncation, repeated raw
+reads, following numeric fields, ignored flow and interleaved derived fields.
+Ten complete core and eight native fixture suites retain 82,438 and 336,956
+captured bytes respectively, including performance/provenance and MIDI. Both
+partial-payload regression arms pass. Eighteen actual configured/Werror checks
+pass: paired Release native objects and paired Release regression objects.
+Eight changed candidate native units, projections, full fixtures and regression
+are instrumented with address/undefined/float-cast checks; matching frozen40
+remaining archives are Release, with consistent libc++ annotation opt-out.
+No three-configuration or whole-program sanitizer claim for this cursor proof.
+
+Scoped Release new-request counters cover 168 cases: 36 save one clone allocation
+(32/48/384 requested bytes by case), 132 stay equal. Retained string capacities
+stay equal in 156; twelve retain sixteen extra bytes because the original hex
+buffer reserve now survives. This is a stated tradeoff, not a blanket retained
+memory improvement. Seventy-two constructor-failure records have 18 both
+throwing, nine old-only throws and 45 both succeeding, with no candidate-only
+throw in that matrix. Reader progress is not rolled back and request/poststate
+staging is intentionally not universally equal after removing an allocation.
+Eight configured native objects total 740,238 to 738,462 text bytes; isolated
+linked shells independently total 5,766,226 to 5,764,450, both reductions of
+1,776 bytes. Shell file lengths stay equal. No timing/global allocation claim.
+
+A separate inventory-only replay initially matches sixteen of seventeen raw
+records. Volume38 changes exactly three lines: SonyPS1/SonyPS2 sample-pool IDs
+0/1 and the selected pool reference. All source/asset metadata, ranges/order,
+other IDs, status and diagnostics stay exact. The unchanged candidate executable
+produces both schedules; its one preexisting automatic repeat matches root40
+exactly. Retained root40 initial/repeat records show only one schedule, so no
+claim of input-specific baseline variability or all-seventeen initial equality
+is made. All four raw records are preserved; no normalization or extra repeats.
+No isolated export payloads were generated. The combined final corpus below is
+an independent gate. Evidence: cursor-raw-capture40/proof.json (SHA-256
+afa22f79b6ba427427fc37e0cbdd49ca04d0a25b71663fa4ae768fa8fbddf61a),
+final-combined.diff, cost-summary.json, exact commands, captures and
+volume38-evidence.json.
+
+The API intentionally narrows the unused return from string to void; repository
+inventory finds no result/function-pointer consumer in source, tests, Qt or
+headers. Empty-name, absent-source, partial read and omitted-field semantics
+retain their existing add()/range behavior. Scoped allocation failures are not
+claimed to happen at identical ordinal requests after removing a copy.
+
+### Delete a provably redundant private signed-byte clamp
+
+SoundFontExporter removes clampS8(s32) and casts fineTune % 100 directly at its
+sole call. The containing sample-header helper accepts u8 root/s16 fineTune.
+After promotion to int, remainder by positive100 is always in [-99,99], including
+both signed16 endpoints; every value is representable in signed8. Thus the old
+clamp is an identity without relying on validation, floating-point assumptions
+or input files. Original-key saturation remains. No other helper consumer,
+callback, function pointer, public declaration or persistence contract appears
+in the full text inventory. This is not arbitrary-s32 parity for the removed
+private function.
+
+All 16,777,216 containing-helper inputs (256 roots times 65,536 fine tunes) pass
+independent root-key saturation and remainder assertions. Before/after in both
+Release and focused SAN capture identical 33,554,432-byte streams, SHA-256
+34277168d0eef9289256ea746a677b1d01bb5da74ff913c9921714552f7d7df8.
+The complete existing SynthExport entrypoint passes all four arms, with identical
+36-byte harness stdout and empty stderr. Those fixtures retain header fallback,
+first-referring-region, signed tuning, envelope/modulation and container-boundary
+assertions; the PASS text is not a full serialized export trace. All 40 recorded
+commands and six actual Debug/Release/RelWithDebInfo writer Werror checks pass.
+
+SAN instruments the exact writer, full fixture/entrypoint and Source.cpp; matching
+frozen40 remaining core/formats/fmt/decompressors are Release. libc++ container
+annotations are disabled consistently, with ordinary address/undefined/float-cast
+checks active. No whole-program, cross-platform, timing, memory or allocator-fault
+claim. No runtime owner, allocation, layout, diagnostic or error branch changes.
+Evidence: /tmp/vgmtrans-cleanup2/sf2-pitch-correction41/proof-summary.json
+(SHA-256 919382398e4f09825f81cf7dae449b9216116ac3e8e427bfc42e42d6afb37a45),
+review-manifest.json, committed40-authority.json, exact commands and raw streams.
+
+### Final integrated verification
+
+- Complete Release build: 99 steps without warnings; all 44 CTest suites pass.
+- Frozen41 holds exact sources/headers/shared companions/tests/four archives and
+  executable SHA-256 `b3f243309caa37b8bd90fda2efb440d4a8595a640da0270c5fd2bdce5ea66130`.
+- Against frozen40, the original corpus preserves all 252 input/policy records
+  and 3,922 artifact names/hashes.
+- The /Volumes/emu/vgm replay preserves all 894 export records: 852 successes
+  and 42 matching existing failures. All 858 artifact names/sizes/hashes and
+  218,240,549 bytes per binary match. All 73 raw inventories match exactly,
+  including five unchanged unsupported DSF failures. No inventory normalization
+  is needed. Real coverage remains 37/38 registered families; KonamiTMNT2
+  is synthetic only. See volume-coverage27/pass40-vs-pass41-summary.json.
+- Exact approved source/test hashes and diff remain held through build, freeze
+  and replay. Only these paths and this audit are committed; user work is untouched.
+
+Verified older task-owned original-corpus payloads were reclaimed to make room
+for final validation. The retained manifest records all 3,922 files/1,604,324,580
+bytes for each reclaimed generation; whole comparison, actual file set, path,
+no-symlink, size/hash and per-unlink gates precede deletion. JSON records, logs,
+source snapshots, libraries, executables and unmatched evidence remain. Archive
+inputs under /Volumes/emu/vgm are never modified. Final41 payloads remain.
+
+### Stop requested; follow-ups recorded
+
+All current agent work and both final checks are finished. Pause the continuing
+architecture goal at the user's explicit request. No claim that every avenue
+is exhausted, and no additional implementation is opened.
+
+Remaining numeric follow-up: synth SF2/DLS root/residual tuning rounds or narrows
+before some target bounds are applied. A coherent change must handle both root
+and residual constraints, encoded coarse/fine budgets and callback NaN policy;
+a root-only clamp would leave overflow paths. Physical modulation conversions
+also need their own zero-frequency, underflow and scaling policies before a
+change. These are read-only observations, with no behavior or fix proof supplied
+in this closing batch. Existing pan/sustain guards still protect arbitrary
+callback values and should not be removed merely from static admission checks.
+
+The rejected membership and prepared-bank ownership shortcuts remain documented
+in batch40, including measured repeated-placement regressions and failed-copy
+assignment hazards. SequenceVM and the separation between native formats and
+MIDI/SF2/DLS exporters remain intact.

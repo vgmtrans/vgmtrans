@@ -581,8 +581,11 @@ public:
     return varLen(name, SourceValueDisplay::Default, role);
   }
 
-  std::string rawBytes(std::string_view name, u32 size) {
-    return decoded(record_.rawBytes(name, size), name, SourceValueDisplay::Hex, SemanticOperandRole::Value);
+  void rawBytes(std::string_view name, u32 size) {
+    auto field = record_.rawBytes(name, size);
+    if (field) {
+      add(name, std::move(field.value), field.range, SourceValueDisplay::Hex, SemanticOperandRole::Value);
+    }
   }
 
   // Look ahead without consuming or annotating the byte. This is useful when
