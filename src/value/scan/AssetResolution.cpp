@@ -42,7 +42,7 @@ public:
       accept<SoundBankAsset>({}, banks, selectAll(selected<SoundBankAsset>()));
     }
 
-    result_.inputs = {.bankStatus = banks.status, .bankAlternatives = std::move(banks.alternatives)};
+    result_.inputs = {.bankStatus = banks.status};
     for (const auto& target : banks.targets) {
       const auto& bank = *assets_.asset<SoundBankAsset>(target.asset);
       CollectionBank input{.bank = target.asset};
@@ -127,8 +127,6 @@ private:
     }
     // A later successful request cannot hide an earlier unresolved request.
     resolved.status = std::max(resolved.status, selection.status());
-    resolved.alternatives.insert(resolved.alternatives.end(), selection.alternatives().begin(),
-                                 selection.alternatives().end());
     for (const auto& target : selection.targets()) {
       const bool correctType = assets_.asset<Provider>(target.asset) != nullptr;
       const auto& candidates = selected<Provider>();

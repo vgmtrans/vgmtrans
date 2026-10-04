@@ -71,7 +71,7 @@ DependencySelection BankRequest::operator()(const DependencyContext& context) co
     result.add(matches.front().id());
   }
   if (matches.size() > 1) {
-    result.ambiguous(dependencyTargets(matches), "Tamsoft TSQ matches multiple TVB banks equally well");
+    result.ambiguous("Tamsoft TSQ matches multiple TVB banks equally well");
   }
   return result;
 }

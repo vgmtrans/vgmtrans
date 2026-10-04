@@ -40,15 +40,6 @@ template <class T>
   return target;
 }
 
-template <class Range>
-[[nodiscard]] std::vector<DependencyTarget> dependencyTargets(const Range& candidates) {
-  std::vector<DependencyTarget> result;
-  for (const auto& candidate : candidates) {
-    result.push_back(dependencyTarget(candidate));
-  }
-  return result;
-}
-
 enum class ResolutionMode { Automatic, Manual };
 
 // Information available while choosing one asset's inputs. Manual collections
@@ -136,7 +127,7 @@ template <class Range>
   return result;
 }
 
-// A tie records alternatives and selects nothing. Use selectAll when all matches
+// A tie reports ambiguity and selects nothing. Use selectAll when all matches
 // should be used together rather than treated as competing choices.
 template <class Range>
 [[nodiscard]] DependencySelection selectOne(const Range& candidates,
@@ -145,7 +136,7 @@ template <class Range>
     return selectAll(candidates);
   }
   DependencySelection result;
-  result.ambiguous(dependencyTargets(candidates), std::move(message));
+  result.ambiguous(std::move(message));
   return result;
 }
 

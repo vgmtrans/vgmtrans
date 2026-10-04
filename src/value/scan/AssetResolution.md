@@ -52,8 +52,8 @@ bank.data(layout).useSamples(selectSamples).prepare<BankData>(prepareBank);
 
 `selectOne` records an unresolved choice when candidates tie. `selectAll` records
 an intentional ordered group. Both accept asset views or `DependencyTarget` values
-with native placement data. Sony PS1 uses the latter to retain the possible
-starting positions of a bank's sample table within one or more pools.
+with native placement data. Sony PS1 uses the latter to choose a starting
+position for a bank's sample table within one or more pools.
 
 `bestMatches(context.candidates<SoundBankAsset, BankData>(), score)` returns
 copies of the highest-scoring candidate views in input order. Negative scores
@@ -79,7 +79,7 @@ PSF2 publishes `memberPath` like other archives; no string attribute is needed.
 A selection has a typed `ResolutionStatus`: `Resolved`, `Incomplete`, `Ambiguous`,
 or `Failed`. Empty selections are incomplete. `incomplete(message)` records
 missing coverage, including when some useful providers were selected.
-`ambiguous(alternatives, message)` retains complete alternatives and any explicitly
+`ambiguous(message)` reports an unresolved choice while retaining any explicitly
 selected fallback. `DependencySelection::failed(message)` reports a fatal request
 failure. Diagnostics explain these outcomes; their code strings do not control
 export. Akao's coverage selection and Tamsoft's first-choice fallback retain their
@@ -183,8 +183,8 @@ these are the sequence and supplemental inspection assets. Manual collections al
 retain the user's ordered bank and sample choices, including unused sample pools.
 
 `Collection::inputs.banks` holds the resolved banks in order. Each `CollectionBank`
-contains its bank ID and `samples`: chosen pool uses, their placements, status,
-and alternatives. Bank-selection status and alternatives belong to `CollectionInputs`.
+contains its bank ID and `samples`: chosen pool uses, their placements, and status.
+Bank-selection status belongs to `CollectionInputs`.
 IDs refer to assets in the same immutable session snapshot as the collection.
 
 For example, a user can select pools A and B while one bank uses A twice at
@@ -207,7 +207,7 @@ resolved member list to reconcile.
   wrong-type references are omitted from membership and make the collection
   incomplete, preserving audio preparation despite their error diagnostics.
 - Multiple requests combine into one ordered selection, preserving unresolved
-  outcomes and alternatives. Bank inputs deduplicate assets; a bank's sample uses
+  outcomes. Bank inputs deduplicate assets; a bank's sample uses
   retain distinct placements within the same pool. `members()` deduplicates uses
   for display, without changing the stored relationships.
 - Preparation reads each bank's sample inputs directly. It does not join owner IDs

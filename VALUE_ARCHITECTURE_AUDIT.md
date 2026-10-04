@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Sixty-five validated batches remove 1,547 net production lines
+`cb9e0b766`. Sixty-six validated batches remove 1,564 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 65 replays both corpora against its
-committed batch 64 predecessor. All 73 expanded raw inventories match exactly;
+cover 37 of 38 registered families. Batch 66 replays both corpora against its
+committed batch 65 predecessor. All 73 expanded raw inventories match exactly;
 no classification is needed. The cleanup2 records appear at the end of this
 document.
 
@@ -11258,3 +11258,85 @@ waveform65-root-cold-review.json, the root65 application receipt and pass65
 build/test/freeze/corpus/
 final/postcommit records. Further source-only reviews continue; this modest
 change is not an exhaustion claim.
+
+### cleanup2 batch 66: remove the unread dependency alternatives protocol
+
+Keep dependency outcomes as chosen targets, resolution status and diagnostics.
+Remove DependencySelection's alternatives vector/getter, ResolvedInputs'
+alternatives vector and CollectionInputs' bankAlternatives vector. Delete the
+plural dependencyTargets projection and the resolver copies/move that only
+transported these lists into published collections. This removes three owners
+and 17 architecture lines without introducing a replacement concept.
+
+The actual endpoint review challenges the earlier broad alternatives retention:
+per-request DependencySelection and accumulated ResolvedInputs remain distinct,
+as do chosen placements, statuses and diagnostics. Their unchosen-candidate
+payload had only transport readers in production. Binding/preparation uses
+chosen banks and sample targets; members/contains and snapshot association use
+chosen membership; Qt/manual UI and shell output use members and issues. There
+is no current unresolved-choice editor or reflected/serialized payload consumer.
+Historical audit notes remain intact; this pass narrows their retention conclusion
+for the unused lists rather than collapsing the useful outcome responsibilities.
+
+The whole tracked alternative inventory has 43 rows, the broader type/helper
+inventory 124, qualified/macro/layout queries five, serializer queries nine and
+concrete boundary receiver queries 41. Root reads every row, all three actual
+native fallback authors and affected fixture bodies, reconstructs all 12 complete
+candidate files, and checks 51 scoped source pins plus the independent review's
+42 full bodies. The 1,195 tracked-file census contains 1,044 C/C++/Objective-C
+files. No token-count-only unused judgment is used. Initial strict parent gates
+stopped source-only preparation when the waveform commit advanced HEAD; those
+failures remain sealed and final input authority is freshly committed/frozen65.
+
+ambiguous(message) promotes the same status and appends the same warning.
+SonyPS2/SquarePS2 retain all deliberately selected tied banks; Tamsoft retains
+its first-match fallback. selectOne still chooses no provider for a tie, including
+two positions in one sample pool, and zero/one candidates still use selectAll.
+Affinity/compatibility scoring, source/container/manual restrictions, selected
+placement owners, target ordering/deduplication, bank-before-sample callbacks,
+request status precedence and diagnostic severity/code/message/range/object
+attribution stay unchanged on normal completed operations. Failed remains the
+resolution outcome that blocks preparation.
+
+This intentionally removes public introspection and source API/layout spellings:
+the alternative getter/fields, candidate-bearing ambiguous signature and plural
+projection helper. All current callers migrate. Unchosen placement retention,
+implicit copies/moves, candidate-ID projection and allocation/failure stages
+change; no external custom id() side-effect, destructor, allocator-ordinal,
+old-object ABI or speed equivalence is claimed. No chosen placement owner is
+removed and no new failure/cache/validation protocol is added.
+
+The existing unresolved-bank and same-pool fixtures retain ambiguity/no-choice
+and warnings; the latter additionally checks aggregate Ambiguous and the exact
+warning severity/code/message. Explicit chosen placements still pass through
+publication/preparation. Combined successful/duplicate requests still surround
+incomplete/ambiguous/failed outcomes. The obsolete alternative-specific Session
+assertion is removed instead of relabeled as an empty unknown-ID check; selected/
+resolved membership, ordering/counts and unknown99 exclusion remain. Fixtures
+shrink seven lines. Three native calls simplify arguments with no line delta.
+Three current explanatory documents are updated with no net line change; both
+external documents are explicitly scoped and frozen as matching companions.
+
+The coherent full Release consumer build completes 348 warning-free
+steps and all 44 CTest suites pass. Complete value/shared/test/Qt bodies, the two
+external document companions and four archives match the final shell, SHA-256
+cd6b12cdcbab194e7ed8c59254845d33543ce5df8c8aaab327b91ea83e951dae.
+Its changed binary is replayed afresh against committed65 in both archive
+campaigns. All 252 original records and 3,922 artifacts, all 894 expanded export
+pairs and 858 artifacts, and all 73 raw inventories match exactly. No classification,
+new normalization or manual baseline repetition is needed.
+Root independently rehashes all retained original artifacts and paired records
+before reclaiming only verified older65 generated payloads. Records, frozen
+sources/archives/shells and user music remain intact.
+
+Cumulative production removal is 1,564 value lines: 1,251 architecture
+and 313 formats, plus the earlier 22 UI lines. Evidence is under
+/tmp/vgmtrans-cleanup2: dependency-alternatives66-cold65, the separate initial64
+preparation failure, dependency-alternatives-independent66-source64 and its
+immutable candidate-review65 extension, alternatives66-root-cold-review.json,
+and pass66 application/build/test/freeze/corpus/final/postcommit records.
+The initial final-document gate omitted the two external documents when
+comparing the source diff and stopped before writing counts, the final report
+or the audit. Its script/failure account remain preserved; the resumed verifier
+includes both admitted paths. Source, test and runtime evidence is unchanged.
+Further architecture probing continues.

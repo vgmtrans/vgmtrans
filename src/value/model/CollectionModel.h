@@ -41,7 +41,6 @@ struct DependencyTarget {
 struct ResolvedInputs {
   ResolutionStatus status = ResolutionStatus::Resolved;
   std::vector<DependencyTarget> targets;
-  std::vector<DependencyTarget> alternatives;
 };
 
 struct CollectionBank {
@@ -54,7 +53,6 @@ struct CollectionBank {
 struct CollectionInputs {
   std::vector<CollectionBank> banks;
   ResolutionStatus bankStatus = ResolutionStatus::Resolved;
-  std::vector<DependencyTarget> bankAlternatives;
   ResolutionStatus inspectionStatus = ResolutionStatus::Resolved;
 };
 

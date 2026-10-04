@@ -25,15 +25,14 @@ struct SequenceRuntime;
 // Return a configured runtime, or nullopt to keep the scanned runtime.
 using SequencePreparer = std::function<std::optional<SequenceRuntime>(SequencePreparationContext&)>;
 
-// The answer to one input request. Chosen inputs are separate from alternatives
-// so an unresolved choice is never mistaken for a group that should play together.
+// The answer to one input request. A format can report ambiguity while
+// deliberately choosing fallback inputs.
 class DependencySelection {
 public:
   [[nodiscard]] ResolutionStatus status() const {
     return status_ == ResolutionStatus::Resolved && targets_.empty() ? ResolutionStatus::Incomplete : status_;
   }
   [[nodiscard]] const std::vector<DependencyTarget>& targets() const { return targets_; }
-  [[nodiscard]] const std::vector<DependencyTarget>& alternatives() const { return alternatives_; }
   [[nodiscard]] const std::vector<Diagnostic>& issues() const { return issues_; }
 
   // An empty selection is incomplete. Adding inputs resolves it unless the
@@ -49,11 +48,9 @@ public:
     return *this;
   }
 
-  // Keep any targets the format deliberately chose as a fallback. Alternatives
-  // describe the unresolved choices, including different positions in one pool.
-  DependencySelection& ambiguous(std::vector<DependencyTarget> alternatives, std::string message) {
+  // Keep any targets the format deliberately chose as a fallback.
+  DependencySelection& ambiguous(std::string message) {
     status_ = std::max(status_, ResolutionStatus::Ambiguous);
-    alternatives_ = std::move(alternatives);
     issues_.push_back({.severity = Severity::Warning, .code = "ambiguous-match", .message = std::move(message)});
     return *this;
   }
@@ -69,7 +66,6 @@ public:
 private:
   ResolutionStatus status_ = ResolutionStatus::Resolved;
   std::vector<DependencyTarget> targets_;
-  std::vector<DependencyTarget> alternatives_;
   std::vector<Diagnostic> issues_;
 };
 

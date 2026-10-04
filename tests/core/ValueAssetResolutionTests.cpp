@@ -384,7 +384,7 @@ void manualChoicesStaySeparateFromRepeatedSampleUses() {
          "automatic membership must be derived from the resolved tree without rewriting the root selection");
 }
 
-void dependencyFailuresAreLocalAndAmbiguityRetainsAlternatives() {
+void dependencyFailuresAreLocalAndAmbiguitySelectsNoProvider() {
   SourceStore sources;
   SequenceProgramAsset sequence{
       .metadata = {.id = AssetId{1}},
@@ -400,11 +400,8 @@ void dependencyFailuresAreLocalAndAmbiguityRetainsAlternatives() {
   const auto ambiguous = resolve({sequence, first, second});
   const auto& choice = ambiguous.front();
   expect(choice.members().soundBanks.empty() && choice.inputs.bankStatus == ResolutionStatus::Ambiguous &&
-             choice.inputs.bankAlternatives.size() == 2 &&
-             choice.inputs.bankAlternatives[0].asset == AssetId{2} &&
-             choice.inputs.bankAlternatives[1].asset == AssetId{3} &&
              choice.issues.front().severity == Severity::Warning,
-         "an unresolved choice must retain candidates without claiming both providers");
+         "an unresolved choice must warn without claiming either provider");
 
   sequence.bankRequests.front() = exact(first.metadata.id);
   first.sampleRequests.push_back(DependencyTarget{second.metadata.id, {}});
@@ -441,7 +438,7 @@ void automaticCandidatesRespectContainerBoundaries() {
          "explicit manual choices may intentionally cross container boundaries");
 }
 
-void resolutionStatusAndAlternativePlacementsSurvivePublication() {
+void resolutionStatusAndSamplePlacementsSurvivePublication() {
   SourceStore sources;
   const std::vector<DependencyTarget> positions{{AssetId{2}, AssetPrivateData::make(u32{4})},
                                                 {AssetId{2}, AssetPrivateData::make(u32{12})}};
@@ -455,10 +452,11 @@ void resolutionStatusAndAlternativePlacementsSurvivePublication() {
   resolveDependencies(catalog, desired);
   const auto& selection = desired.inputs.banks.front().samples;
   expect(selection.status == ResolutionStatus::Ambiguous && selection.targets.empty() &&
-             selection.alternatives.size() == 2 && selection.alternatives[0].asset == selection.alternatives[1].asset &&
-             *selection.alternatives[0].placement.get<u32>() == 4 &&
-             *selection.alternatives[1].placement.get<u32>() == 12,
-         "ambiguity must preserve distinct placements within the same provider");
+             desired.resolutionStatus() == ResolutionStatus::Ambiguous &&
+             desired.issues.front().severity == Severity::Warning &&
+             desired.issues.front().code == "ambiguous-match" &&
+             desired.issues.front().message == "Asset dependency matches multiple providers",
+         "distinct positions within one provider must remain an unresolved choice");
 
   bank.sampleRequests = {exact(AssetId{2}, 4), exact(AssetId{2}, 12)};
   bank.prepare = [](BankPreparationContext& context) {
@@ -511,7 +509,7 @@ void combinedRequestsPreserveUnresolvedOutcomes() {
               }
               DependencySelection selection;
               if (status == ResolutionStatus::Ambiguous) {
-                selection.ambiguous({{AssetId{3}, {}}}, "unresolved choice");
+                selection.ambiguous("unresolved choice");
               }
               return selection;
             },
@@ -523,8 +521,6 @@ void combinedRequestsPreserveUnresolvedOutcomes() {
     expect(
         result.inputs.banks.size() == 1 && result.inputs.bankStatus == status && !result.issues.empty(),
         "successful and duplicate requests must not hide another request's incomplete, ambiguous, or failed outcome");
-    expect(result.inputs.bankAlternatives.size() == (status == ResolutionStatus::Ambiguous ? 1 : 0),
-           "combining requests must preserve unresolved alternatives");
   }
 }
 
@@ -694,12 +690,12 @@ void runValueAssetResolutionTests() {
   singleSampleInputRejectsInvalidSelections();
   sequencePreparationValidatesOnlyTheRequestedFormat();
   combinedRequestsPreserveUnresolvedOutcomes();
-  resolutionStatusAndAlternativePlacementsSurvivePublication();
+  resolutionStatusAndSamplePlacementsSurvivePublication();
   sequencePreparationConfiguresPrivateBanksInOnePass();
   automaticCandidatesRespectContainerBoundaries();
   dependenciesPreserveSharingPlacementsAndPrivatePreparation();
   manualChoicesOverrideSequenceRequestsAndConstrainBankInputs();
-  dependencyFailuresAreLocalAndAmbiguityRetainsAlternatives();
+  dependencyFailuresAreLocalAndAmbiguitySelectsNoProvider();
   collectionStatusControlsPreparationIndependentlyOfDiagnostics();
   collectionMessagesRetainReferencesAndBindOnlyLiveOwners();
   matchingKeepsTiesAndRejectsIncompatibleCandidates();

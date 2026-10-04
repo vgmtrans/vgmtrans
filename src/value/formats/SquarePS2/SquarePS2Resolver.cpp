@@ -48,7 +48,7 @@ DependencySelection WdBankId::operator()(const DependencyContext& context) const
   });
   auto selected = selectAll(matches);
   if (matches.size() > 1) {
-    selected.ambiguous(dependencyTargets(matches), "SquarePS2 BGM matches multiple WD banks with the same driver ID");
+    selected.ambiguous("SquarePS2 BGM matches multiple WD banks with the same driver ID");
   }
   return selected;
 }

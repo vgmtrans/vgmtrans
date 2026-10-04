@@ -219,7 +219,7 @@ For example, the user can select pools A and B while the bank actually uses only
 Retain two clearly different things:
 
 1. **Collection selection:** the sequence, the user's ordered choices when manual, and supplemental inspection assets.
-2. **Resolved inputs:** the selected banks, with each bank's ordered sample uses stored directly alongside it, plus selection status and alternatives.
+2. **Resolved inputs:** the selected banks, with each bank's ordered sample uses stored directly alongside it, plus selection status.
 
 A schematic result might look like:
 
@@ -232,8 +232,8 @@ A schematic result might look like:
       sequence S
       bank X
         sample uses [A at offset p, A at offset q]
-        sample-selection status and alternatives
-      bank-selection status and alternatives
+        sample-selection status
+      bank-selection status
 
 The selection is user intent. The resolved input structure is the answer. Repetition of A here represents two real uses, not two independent records of the same relationship.
 
