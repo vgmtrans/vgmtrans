@@ -250,11 +250,6 @@ using ZipPtr = std::unique_ptr<void, decltype(&unzClose)>;
          ((bytes[2] == 3 && bytes[3] == 4) || (bytes[2] == 5 && bytes[3] == 6) || (bytes[2] == 7 && bytes[3] == 8));
 }
 
-[[nodiscard]] std::string archiveStem(const SourceFile& source) {
-  const auto path = !source.path.empty() ? source.path : std::filesystem::path(source.name);
-  return path.stem().string();
-}
-
 [[nodiscard]] std::vector<u8> readMember(unzFile archive, const std::string& memberName) {
   if (unzLocateFile(archive, memberName.c_str(), 0) != UNZ_OK) {
     throw std::runtime_error("missing ROM member '" + memberName + "'");
@@ -480,7 +475,7 @@ namespace {
   }
 
   ExtractionResult result;
-  const auto set = database.find(archiveStem(input.source));
+  const auto set = database.find(input.source.logicalPath().stem().string());
   if (set == nullptr) {
     return result;
   }

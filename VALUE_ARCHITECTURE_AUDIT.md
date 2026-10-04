@@ -1,12 +1,14 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Forty-five validated batches remove 1,217 net production lines
+`cb9e0b766`. Forty-six validated batches remove 1,225 net production lines
 from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 44 exactly;
-all 73 expanded raw inventories match byte-for-byte. The cleanup2 records appear
+cover 37 of 38 registered families. All export records match batch 45 exactly;
+72 expanded raw inventories match byte-for-byte. 1 previously proven
+Sony scheduling differences match the retained original evidence under the
+existing narrow ID mapping. The cleanup2 records appear
 at the end of this document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
@@ -9213,3 +9215,160 @@ pruned-verified-originals42-for45.json, prune-attempt25-for45.json.
 
 Next: continue simplifying shared identity handling; assess actual nested-ROM
 archive behavior before accepting that distinct change.
+
+## Cleanup2 forty-sixth batch: use the owners of identity and stop rules
+
+MAME archive recognition now uses SourceFile.logicalPath() for its database key.
+The existing owner already defines archive-member precedence, host/name fallback
+and lexical normalization. Removing the private archiveStem helper eliminates a
+second, incomplete identity rule and five production lines. A ZIP extracted from
+a real RSN/RAR archive now selects its own set rather than the outer container's
+name. Ordinary same-key assembly remains unchanged; nested and lexical cases
+are classified as an intentional behavior correction.
+
+PerformanceAutomationBinding::stop checks only that a present owner belongs to
+the supplied emitter. Its existing stopAt method handles empty bindings, index
+validation, completed motion and stop timing, as it already does for interruptAt
+and replaceWith. Remove the repeated empty-owner return while retaining the
+foreign-track exception and stop-before-clear ordering; three architecture lines
+disappear without new state, callbacks or API.
+
+- Value: 2,224 added/3,449 deleted across 170 paths.
+- Architecture: 1,809 added/2,900 deleted across 95 paths.
+- Formats: 415 added/549 deleted across 75 paths.
+- Tests: 1,270 added/424 deleted across 43 paths.
+
+Net production reductions are 1,225 value lines, 1,091 architecture and 134
+format lines.
+
+### Bounded proof and permanent regression
+
+Identity: all 83 recorded statuses match expectations: 79 successes and four
+deliberate failures of the new regression against the unchanged implementation.
+The complete existing KonamiArcade, CPS, Registry and Session suites pass in
+paired Release/focused sanitizer arms. The candidate Konami suite also passes
+the permanent 170-line regression in both member-only and valid outer-decoy
+database configurations. Compact stored ZIP/RAR4 helpers reuse the existing
+native MysticWarrior fixture; no new target or test framework is added.
+
+Thirty-two ordinary assembly/name/error/lifetime cases preserve all 74,670
+captured bytes, SHA256
+`b8427e581a49c3d547b6168dcd442d1618f2cbe2af1548285a16639d04964fa4`.
+Twenty direct identity cases record nine unchanged and eleven intentional
+changed results. Three real nested database layouts produce sources/assets/
+collections of 0/0/0, 2/0/0 with an attributed missing-member warning, and
+3/2/1 with the wrong game respectively before the change; all become correct
+3/2/1 results without diagnostics. Their candidate native captures preserve
+32,812 identical bytes, SHA256
+`fb8e3a1c203282e8591f9bb0fb3e940b33416f10374daa1fb4eb4563aaa5deaa`.
+Full source bytes, ancestry, attributes, annotations and native output are
+observed after input owners die; IR/MIDI survive binding destruction. Actual
+dot and backslash archive members exercise Session normalization without
+discarding their distinct raw display/parent metadata. Twelve actual configured
+checks pass across Debug/Release/RelWithDebInfo, with empty final compiler/link
+stderr. Initial missing direct include, copied-overlay sibling headers and
+temporary renamed-main return issues remain recorded independently.
+Proof/report/manifest SHA256 respectively:
+`02c8648509e9066878207db2e41a501c6091fe66dc70b84fe11297dab70a32ba`,
+`1c2d7b330169c72ff9c1293b00859e644cb10876d82a479489c3d53d9b183e56`,
+`23dcc46f62a80e0c47bfcb5b7cb07a853e6ca5648e0f7e9a81e619f6bd376a89`.
+
+Binding stop: complete existing ValueSequenceModel assertions pass in four
+Release/focused sanitizer arms. The 38-byte PASS marker records assertion
+success rather than serialization of every fixture value. Forty-eight compact
+API cases match 50,360 bytes exactly, SHA256
+`30b526be25cf6a23f729159702c4089c2f694e1f82d5320c4cf9209c4142662e`.
+They capture durable event/source headers, automation intent/realization, notes,
+ordered error text and all three MIDI transition policies after original owners
+die. Coverage includes empty/cleared handles, same-ID foreign physical owners,
+publicly corrupted indices, foreign-error precedence, delayed start clamp,
+natural completion, extreme ticks, replacement, stop/interrupt distinctions and
+exception-before-clear/assignment. Twelve actual configured checks pass across
+Debug/Release/RelWithDebInfo. Native configured text grows 16 bytes; no binary
+size or performance benefit is claimed. An initial mixed-width temporary
+initializer list was corrected to array<u64,6>; initial source/logs remain.
+Root gates all 86 proof files, complete project inputs and four archives.
+Proof/report/manifest SHA256 respectively:
+`979454bdb68e1d1478a7a2d7cdecd25d10c3cd99f6ca44381d2cbc5d84fcf5f0`,
+`72cbd690043dfacefbaf7ec674958da6d84797fa6a27041049c35275863e4ecd`,
+`fe568695ca51f835221fe426be1add5a539eaf5615c0e2871909a05a4fd7c8e0`.
+Root receipt: binding46-root-review.json.
+
+Both proofs use committed45 `c58dd30f0320f30cb52e38f9d8251295c2d748ca`
+with complete matching frozen45 value/shared/test trees and four archives.
+Frozen provenance records precommit parent
+`35a5d4bde4238e07e5b1fd16b089ae7a0f5b584e`, SHA256
+`5067beecd35ea6c47432582adc07e607d08dafc5f2ca8580397d183ae9aa323d`.
+Root rereads the complete reports and gates source, candidate, patch, archive
+and transcript bytes before applying. Identity proof gates include 18 listed
+files, 108 traces, 154 retained initial artifacts, all 83 stdout/stderr records
+and a separate 518-file whole-directory seal. Cached unarr/minizip/zlib
+archives are separately verified. Binding proof additionally seals all 450
+held project inputs. Root receipts are pass46-root-review.json and
+pass46-mame-root-inputs.json. Sanitizers instrument the changed owners and
+participating fixtures/native implementations; remaining matching archives
+stay Release builds.
+
+The identity correction deliberately adopts the shared logical-path policy.
+An engaged memberPath remains authoritative, including an empty direct-input
+member; it does not gain a host fallback. Session normalizes genuine derived
+members before recognition, while hand-built root sources follow their separate
+admission rules. Terminal dot/parent components may change lookup after lexical
+normalization. No filesystem canonicalization or I/O is introduced by logicalPath.
+
+The actual nested regression uses a valid generated stored RAR4 containing a
+stored ZIP and the existing MysticWarrior native ROM fixture. Correct checksums
+are required for warning-free evidence; bundled unarr may warn rather than
+reject a bad header checksum. The test uses actual RSN/MAME extractors and the
+Konami scanner, so successful native assets retain the family through Session's
+existing empty-scan policy. No synthetic extractor, scanner marker, new target
+or archive framework is introduced.
+
+Binding ownership errors still precede automation-index and timing handling.
+An exception from stop leaves interrupt's binding intact because clear follows
+successful stop. A null binding delegates to stopAt without touching its owner
+or automation index; its only additional access is the valid emitter's scalar
+tick. Dangling objects remain outside the existing lifetime contract. No speed,
+allocation or arbitrary injected-failure equivalence claim is made for either
+change. Focused instrumentation does not imply whole-program sanitizer coverage.
+
+Fresh read-only retained boundaries appear in pass46-root-retained-boundaries.md:
+source intent and realized motion, compiled typed argument ownership/construction,
+complete preset-address planning, physical sample filtering, and distinct source
+encoding vocabulary remain useful responsibilities. No new vocabulary header
+is created merely to move shared sequence types out of an include graph.
+
+### Integrated checks and publication
+
+- Complete macOS Release build: 50 warning-free steps; all 44 CTest
+  suites pass. Frozen46 holds complete value/shared/tests, four archives and
+  shell under committed45/source/diff authority c58dd30f0.
+- Shell SHA256: `c789807d2c2c7d99570df5f21b11ec4b7c849698cbe8e4ce64a03d8f94c97970`.
+- Against frozen45, the original corpus preserves all 252 input/policy records
+  and 3,922 artifact names/hashes.
+- The /Volumes/emu/vgm replay preserves all 894 export records: 852 successes
+  and 42 matching existing failures. All 858 artifact names/sizes/hashes and
+  218,240,549 bytes per binary match. 72 raw inventories match exactly.
+  One previously proven Sony scheduling difference passes the existing narrow
+  asset declaration/member-ID mapping against retained original evidence; raw
+  records/diffs remain. Five unsupported DSF failures remain unchanged. Real
+  coverage remains 37/38 registered families; KonamiTMNT2 is synthetic only. See volume-coverage27/pass45-vs-pass46-summary.json.
+
+Only the two approved production paths, the meaningful Konami regression and
+this audit are staged. User work and music archives remain untouched. No
+permanent test mirrors the binding refactor. After closed batch45 comparisons,
+task-owned after43 original artifact payloads reclaim 3,922 recorded files /
+1,604,324,580 bytes under per-record file-set/path/hash gates, retaining all logs,
+records, frozen sources, matching binaries and the then-latest44/45 payloads.
+After closed batch46 comparisons, the same gates reclaim the after44 payloads
+(3,922 files / 1,604,324,580 bytes); all evidence and latest45/46 payloads remain.
+
+Evidence: identity46-root-cold-review.json,
+mame-logical-archive-identity46-after45draft,
+binding-stop-eligibility45, pass46-root-retained-boundaries.md,
+pass46-root-review.json, build-pass46.log, ctest-pass46.log, pass46-baseline,
+comparison-pass46.json, volume-coverage27/pass45-vs-pass46-summary.json,
+pruned-verified-originals43-for46.json, pruned-verified-originals44-for47.json.
+
+Next: continue the architecture and format-authoring audit, retaining domain
+rules when a proposed reduction would merely hide them behind another protocol.

@@ -633,10 +633,7 @@ void PerformanceEmitter::append(Event&& event) {
 }
 
 void PerformanceAutomationBinding::stop(const PerformanceEmitter& out) const {
-  if (owner_ == nullptr) {
-    return;
-  }
-  if (owner_ != &out.track_) {
+  if (owner_ != nullptr && owner_ != &out.track_) {
     throw std::logic_error("Performance automation binding belongs to another track");
   }
   stopAt(out.tick_);

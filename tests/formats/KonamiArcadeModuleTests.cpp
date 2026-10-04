@@ -12,14 +12,23 @@
 #include "value/export/SequenceModulationProfile.h"
 #include "../PerformanceTestSupport.h"
 #include "value/extractors/MameRomSetExtractor.h"
+#include "value/extractors/SnesRsnExtractor.h"
+#include "value/export/CollectionBinding.h"
+#include "value/export/midi/MidiExporter.h"
+#include "value/session/Session.h"
 #include "value/formats/KonamiArcade/KonamiArcade.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/SampleDecoder.h"
 
+#include <zlib.h>
+
 #include <algorithm>
+#include <initializer_list>
 #include <array>
 #include <cmath>
+#include <span>
 #include <sstream>
+#include <string_view>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -182,6 +191,94 @@ KonamiArcadeFixture makeMysticWarriorFixture() {
   return KonamiArcadeFixture{.source = std::move(source), .bytes = std::move(bytes)};
 }
 
+void appendLe16(std::vector<u8>& bytes, u16 value) {
+  bytes.push_back(static_cast<u8>(value));
+  bytes.push_back(static_cast<u8>(value >> 8));
+}
+
+void appendLe32(std::vector<u8>& bytes, u32 value) {
+  appendLe16(bytes, static_cast<u16>(value));
+  appendLe16(bytes, static_cast<u16>(value >> 16));
+}
+
+std::vector<u8> makeStoredZip(std::initializer_list<std::pair<std::string_view, std::span<const u8>>> members) {
+  std::vector<u8> bytes;
+  std::vector<u8> directory;
+  for (const auto& [name, data] : members) {
+    const auto offset = static_cast<u32>(bytes.size());
+    const auto size = static_cast<u32>(data.size());
+    const auto crc = static_cast<u32>(crc32(0, data.data(), static_cast<uInt>(data.size())));
+    appendLe32(bytes, 0x04034b50);
+    for (u16 value : {u16{20}, u16{0}, u16{0}, u16{0}, u16{0}}) {
+      appendLe16(bytes, value);
+    }
+    appendLe32(bytes, crc);
+    appendLe32(bytes, size);
+    appendLe32(bytes, size);
+    appendLe16(bytes, static_cast<u16>(name.size()));
+    appendLe16(bytes, 0);
+    bytes.insert(bytes.end(), name.begin(), name.end());
+    bytes.insert(bytes.end(), data.begin(), data.end());
+
+    appendLe32(directory, 0x02014b50);
+    for (u16 value : {u16{20}, u16{20}, u16{0}, u16{0}, u16{0}, u16{0}}) {
+      appendLe16(directory, value);
+    }
+    appendLe32(directory, crc);
+    appendLe32(directory, size);
+    appendLe32(directory, size);
+    appendLe16(directory, static_cast<u16>(name.size()));
+    for (unsigned i = 0; i < 4; ++i) {
+      appendLe16(directory, 0);
+    }
+    appendLe32(directory, 0);
+    appendLe32(directory, offset);
+    directory.insert(directory.end(), name.begin(), name.end());
+  }
+  const auto directoryOffset = static_cast<u32>(bytes.size());
+  bytes.insert(bytes.end(), directory.begin(), directory.end());
+  appendLe32(bytes, 0x06054b50);
+  appendLe16(bytes, 0);
+  appendLe16(bytes, 0);
+  appendLe16(bytes, static_cast<u16>(members.size()));
+  appendLe16(bytes, static_cast<u16>(members.size()));
+  appendLe32(bytes, static_cast<u32>(directory.size()));
+  appendLe32(bytes, directoryOffset);
+  appendLe16(bytes, 0);
+  return bytes;
+}
+
+std::vector<u8> makeStoredRar(std::string_view name, std::span<const u8> data) {
+  std::vector<u8> bytes{'R', 'a', 'r', '!', 0x1a, 0x07, 0x00};
+  const auto header = [&](u8 type, u16 flags, std::span<const u8> body) {
+    const size_t offset = bytes.size();
+    appendLe16(bytes, 0);
+    bytes.push_back(type);
+    appendLe16(bytes, flags);
+    appendLe16(bytes, static_cast<u16>(7 + body.size()));
+    bytes.insert(bytes.end(), body.begin(), body.end());
+    writeLe16(bytes, offset, static_cast<u16>(crc32(0, bytes.data() + offset + 2,
+                                                   static_cast<uInt>(bytes.size() - offset - 2))));
+  };
+  const std::array<u8, 6> reserved{};
+  header(0x73, 0, reserved);
+  std::vector<u8> file;
+  appendLe32(file, static_cast<u32>(data.size()));
+  appendLe32(file, static_cast<u32>(data.size()));
+  file.push_back(3);  // Unix host.
+  appendLe32(file, static_cast<u32>(crc32(0, data.data(), static_cast<uInt>(data.size()))));
+  appendLe32(file, 0);
+  file.push_back(20);
+  file.push_back(0x30);  // Stored data.
+  appendLe16(file, static_cast<u16>(name.size()));
+  appendLe32(file, 0x81a4);  // Regular file, mode 0644.
+  file.insert(file.end(), name.begin(), name.end());
+  header(0x74, 0x8000, file);
+  bytes.insert(bytes.end(), data.begin(), data.end());
+  header(0x7b, 0, {});
+  return bytes;
+}
+
 }  // namespace
 
 void mameRomDatabaseAndGroupAssemblyAreValueOriented() {
@@ -238,6 +335,76 @@ void mameRomDatabaseAndGroupAssemblyAreValueOriented() {
   pairs.loadOrder = mame::RomLoadOrder::Reverse;
   expect(mame::assembleRomGroup(pairs, {{1, 2}, {3, 4}, {5}, {6}}) == std::vector<u8>({3, 1, 4, 2, 6, 5}),
          "reverse deinterlace_pairs should reverse each pair without reversing pair order");
+}
+
+void mameNestedArchiveUsesItsLogicalMemberName(bool outerDecoy) {
+  const PerformanceSequence performance = [outerDecoy] {
+    auto binding = [outerDecoy] {
+      const auto fixture = makeMysticWarriorFixture();
+      const std::span<const u8> data{fixture.bytes};
+      const auto zip = makeStoredZip({{"cpu", data.first(0x800)}, {"sound", data.subspan(0x800)}});
+      const auto rar = makeStoredRar("games/fixture.zip", zip);
+      constexpr std::string_view groups = R"json([
+        {"type":"soundcpu","load_method":"append","roms":["cpu"],"seq_table":"0x100",
+         "samp_tables":"0x200","drum_samp_table":"0x220","drum_table":"0x229"},
+        {"type":"sound","load_method":"append","roms":["sound"]}])json";
+      std::ostringstream database;
+      database << R"json({"games":[{"name":"fixture","format":"KonamiArcade",
+                    "fmt_version":"MysticWarrior","rom_groups":)json" << groups << '}';
+      if (outerDecoy) {
+        database << R"json(,{"name":"bundle","format":"KonamiArcade",
+                      "fmt_version":"MysticWarrior","rom_groups":)json" << groups << '}';
+      }
+      database << "]}";
+      std::istringstream json{database.str()};
+      Session session;
+      session.registerExtractor(mame::mameRomSetExtractor(mame::RomDatabase::parse(json)));
+      session.registerExtractor(snes_rsn::snesRsnExtractor());
+      session.registerFormat(konamiArcadeModule());
+      session.addSource({.name = "bundle.rsn", .path = "/archive/bundle.rsn"}, rar);
+      session.scanPendingSources();
+      const auto snapshot = session.snapshot();
+      expect(snapshot.sources().size() == 3 && snapshot.assets().size() == 2 &&
+                 snapshot.collections().size() == 1 && snapshot.diagnostics().empty(),
+             "A nested ZIP must select its own ROM set rather than the outer RAR's set");
+      const auto& root = snapshot.sources()[0];
+      const auto& archive = snapshot.sources()[1];
+      const auto& regions = snapshot.sources()[2];
+      expect(archive.parent == root.id && archive.path == root.path &&
+                 archive.memberPath == "games/fixture.zip" &&
+                 archive.origin == SourceRange{.source = root.id, .offset = 0, .size = rar.size()} &&
+                 regions.parent == archive.id && regions.path == root.path &&
+                 regions.origin == SourceRange{.source = archive.id, .offset = 0, .size = zip.size()},
+             "Nested archive extraction must preserve immediate parentage, host path, and origin ranges");
+      expect(regions.name == "fixture ROM regions" && regions.title == "fixture" &&
+                 regions.knownFormat == kKonamiArcadeFormatName && !regions.memberPath &&
+                 regions.attribute(mame::kMameGameAttribute) == "fixture" &&
+                 regions.attribute(mame::kMameFormatAttribute) == kKonamiArcadeFormatName &&
+                 regions.attribute(mame::kMameFormatVersionAttribute) == "MysticWarrior" &&
+                 regions.segments.size() == 2 && regions.segments[0].name == "soundcpu" &&
+                 regions.segments[0].offset == 0 && regions.segments[0].size == 0x800 &&
+                 regions.segments[0].attributes == fixture.source.segments[0].attributes &&
+                 regions.segments[1].name == "sound" && regions.segments[1].offset == 0x800 &&
+                 regions.segments[1].size == 0x100 &&
+                 std::ranges::equal(session.sources().reader(regions.id).slice(0, regions.size), fixture.bytes),
+             "The inner ROM set must retain its game identity and ordered native region bytes");
+      for (const auto& asset : snapshot.assets()) {
+        expect(metadata(asset).range.source == regions.id &&
+                   !snapshot.sourceMap().annotationsForAsset(metadata(asset).id).empty(),
+               "Native assets must retain source annotations owned by the assembled ROM source");
+      }
+      return bindCollection(snapshot, snapshot.collections().front().id);
+    }();
+    expect(binding.collection.has_value() && binding.diagnostics.empty(),
+           "Native inputs must remain preparable after the archive Session and source values die");
+    auto rendering = renderCollection(*binding.collection, {.loopPolicy = LoopPolicy::PlayOnce});
+    expect(rendering.performance.has_value() && rendering.diagnostics.empty(),
+           "Native playback must retain the nested source after its input owners die");
+    return std::move(*rendering.performance);
+  }();
+  expect(performance.tracks.size() == 1 && !performance.tracks[0].events.empty() &&
+             !encodeMidiFile(renderTestMidi(performance)).empty(),
+         "Owned performance and MIDI must survive destruction of the native collection binding");
 }
 
 void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
@@ -973,6 +1140,9 @@ void konamiArcadeAdpcmDecoderSupportsForwardAndReverseSamples() {
 
 void runKonamiArcadeModuleTests() {
   mameRomDatabaseAndGroupAssemblyAreValueOriented();
+  for (bool outerDecoy : {false, true}) {
+    mameNestedArchiveUsesItsLogicalMemberName(outerDecoy);
+  }
   konamiArcadeModuleBuildsSequencesSynthAndCollections();
   konamiArcadeGxLfosMatchDriverState();
   konamiArcadeGxDriverQuirksRemainRepresented();
