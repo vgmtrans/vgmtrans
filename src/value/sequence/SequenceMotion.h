@@ -227,12 +227,12 @@ private:
     }
     if (rounding_ == SequenceFixedPointRounding::Nearest) {
       const s32 halfScale = kScale / 2;
-      if (fraction > s32{} && fraction >= halfScale) {
-        return static_cast<s32>(whole + 1);
+      if (fraction >= halfScale) {
+        return whole + 1;
       }
-      return static_cast<s32>(whole - (fraction < s32{} && fraction <= -halfScale));
+      return whole - (fraction <= -halfScale);
     }
-    return static_cast<s32>(whole - (fraction < s32{}));
+    return whole - (fraction < 0);
   }
 
   SequenceLinearMotion<s32> value_;

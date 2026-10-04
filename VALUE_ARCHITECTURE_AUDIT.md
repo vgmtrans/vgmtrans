@@ -1,11 +1,11 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Fifty-seven validated batches remove 1,492 net production lines
+`cb9e0b766`. Fifty-eight validated batches remove 1,492 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 57 has the same shell bytes as batch 55;
+cover 37 of 38 registered families. Batch 58 has the same shell bytes as batch 55;
 its corpus evidence is reused from the executed batch 55 comparison with batch 54.
 Seventy-one expanded raw inventories match byte-for-byte; two retain the previously
 documented Sony sample-pool ID scheduling variation. The cleanup2 records appear
@@ -10742,3 +10742,38 @@ Cumulative removal against core-rewrite is 1,492 value production lines:
 1,185 architecture and 307 formats, plus the earlier 22 UI lines.
 Next: remove generic-template notation still present in the now-concrete Q8
 rounding function, retaining its straightforward branches and exact arithmetic.
+
+## Cleanup2 batch 58: state the Q8 rounding rules directly
+
+The concrete fixed-point helper still carried template-era casts and sign
+conditions. Its halfScale is always 128, so testing fraction >= halfScale already
+establishes a positive fraction; the negative threshold similarly establishes
+a negative fraction. Use those direct comparisons and ordinary arithmetic returns
+instead of repeating s32 casts and typed zero construction. Keep the existing
+TowardZero/Nearest/Floor branches, halfScale name and invalid-rounding fallback.
+
+This one-header change is line-neutral and removes redundant expressions. For
+every signed32 fixed accumulator, division by 256 produces a quotient and
+remainder whose corrections fit s32; the declared return conversion equals the
+former explicit cast. Comparisons involve only ordinary integer values. The proof
+depends on the concrete Q8 scale; it would not apply to an arbitrary former
+template specialization with a zero half-scale. Other arithmetic, retargeting,
+callbacks, layout and public authoring APIs are untouched.
+
+All 159 complete Release build steps and 44 CTest suites pass without
+diagnostics. The rebuilt shell SHA256 is 24ca21adfeb25fb8175442e1a0fce9def4a7919b615d5c284169801455ce349c, equal to executed55 and its
+rebuilt57 predecessor. Prior original/expanded corpus evidence is reused through
+actual byte identity; no new batch58 replay, numeric mirror or sanitizer campaign
+is claimed. Existing model/native rounding assertions provide the runtime checks.
+
+Root independently regenerates all four expression substitutions and verifies
+the original sealed draft, actual committed/frozen57 Before, global integer alias
+and complete rebuilt snapshot. Records are q8-rounding58-root-cold-review.json
+and pass58-final-root-review.json under /tmp/vgmtrans-cleanup2. The pending56 cold
+receipt remains unchanged, with its distinct templated55 predecessor; refreshed
+authority and frozen58 retain the true committed57 parent.
+
+Cumulative production removal is 1,492 value lines: 1,185 architecture
+and 307 formats, plus the earlier 22 UI lines. A further source-reviewed
+lead removes an unused physical-timing retarget convenience overload while
+keeping actual native tick retargeting and rich explicit pitchSlide authoring.
