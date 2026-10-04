@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Fifty-eight validated batches remove 1,492 net production lines
+`cb9e0b766`. Fifty-nine validated batches remove 1,500 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 58 has the same shell bytes as batch 55;
-its corpus evidence is reused from the executed batch 55 comparison with batch 54.
+cover 37 of 38 registered families. Batch 59 replays both corpora against the last executed batch 55;
+its rebuilt batch 58 predecessor has identical shell bytes to batch 55.
 Seventy-one expanded raw inventories match byte-for-byte; two retain the previously
 documented Sony sample-pool ID scheduling variation. The cleanup2 records appear
 at the end of this document.
@@ -10777,3 +10777,76 @@ Cumulative production removal is 1,492 value lines: 1,185 architecture
 and 307 formats, plus the earlier 22 UI lines. A further source-reviewed
 lead removes an unused physical-timing retarget convenience overload while
 keeping actual native tick retargeting and rich explicit pitchSlide authoring.
+
+## Cleanup2 batch 59: keep the retarget API to its actual use
+
+Remove the unused physical-timing retargetPitchSlide overload. Every native
+retarget caller supplies a tick duration: six calls across five families, with
+five model-fixture calls using the same form. The retained convenience resolves
+the current transition key (or its existing fallback) and calls tick-duration
+pitchSlide directly. Both ordinary and physical-timing pitchSlide authoring remain.
+
+This removes eight architecture lines across SequenceVm.h and
+PerformanceEmitter.cpp, without a format migration, new helper, owner or test.
+Current transition lookup, note/lane identity, physical slide implementation,
+sampling, interruption and timeline arithmetic retain their existing bodies.
+PitchSlideTiming::fromTicks is constexpr/noexcept aggregate construction; its
+move from before to after current-key lookup introduces no callback or allocation.
+
+The removed public signature and compiled symbol are an intentional narrowing.
+External physical-retarget calls and exact member pointers to that overload no
+longer work; arbitrary external braced-call overload ranking and ABI compatibility
+are not promised. The foundational physical slide model remains available, while
+retarget has the one duration form that current format code needs.
+
+Root revalidates the fresh cold draft against committed/frozen58, independently
+reconstructs both complete candidate bodies, rehashes 1,044 tracked source inputs,
+and checks the complete sixteen-mention retarget inventory. Unsorted rg file
+ordering varied during the first root inventory check; exact line multisets
+match. That check stopped before any edit. Original cold receipts and their line
+count erratum remain unchanged, with refreshed authority kept separate.
+
+All 159 Release rebuild steps and all 44 CTest suites pass without
+warnings. Frozen59 contains complete matching value/shared/tests/Qt sources,
+four rebuilt archives and the shell. Its true precommit parent is committed58;
+the result commit is recorded separately. Shell SHA256: c921b76908dc671e085b5868eed40318d1502bc9ae28ef322f2ca2f0f2cdec85.
+
+The new shell differs from its predecessor, so both corpora were executed again
+against last-executed55. Rebuilt56/57/58 had identical shell bytes to55; no invented
+58 execution/reference is used. Root independently checks 2,464 pinned records,
+all 3,922 retained new original payload hashes and their 1,604,324,580 bytes:
+
+- Original: all 252 input/policy records and 3,922 artifact names/hashes match.
+- Expanded: all 894 export records match, with 852 successes and the same 42
+  failures. All 858 artifact names/sizes/hashes and 218,240,549 bytes per side match.
+- Seventy-one of 73 raw inventories match exactly. The two existing Sony
+  sample-pool ID scheduling differences pass the previously established narrow
+  declaration/member-ID mapping, independently checked against retained original
+  evidence and automatic repeat records. Raw outputs/diffs remain. No additional
+  manual repeat or broader normalization was introduced. Five unsupported DSF
+  failures persist; real-input coverage is 37/38 registered families, with
+  KonamiTMNT2 covered synthetically.
+
+The exact fresh comparison and per-file hash gates permit reclaiming only the
+older55 generated original payloads. All55/59 records, logs, frozen sources,
+archives and executables remain, alongside the full59 payloads. User files and
+music archives are untouched.
+
+Further source-only review retains the expired MIDI boundary flag: a default
+no-attack boundary still releases held pitch/tremolo output before returning, so
+removing that flag would change behavior even if tick/order stayed intact.
+Decoded presentation remains one coherent replaceable value. Annotation IDs retain
+allocation history after unpublished values move out; consumed versus declared
+record ranges and valid partial bytes also have distinct native consumers. These
+are source assessments, not new runtime proofs or a claim of exhaustion.
+
+Evidence under /tmp/vgmtrans-cleanup2: retarget-pitch59-root-cold-review.json,
+pass59-application-receipt.json, build-pass59.log, ctest-pass59.log,
+pass59-baseline/provenance.json, corpora59-root-review.json,
+comparison-pass59.json, volume-coverage27/pass55-vs-pass59-summary.json,
+pruned-verified-originals55-after59-replay.json, pass59-root-retained-boundaries.json
+and pass59-final-root-review.json.
+
+Cumulative production removal is 1,500 value lines: 1,193 architecture
+and 307 formats, plus the earlier 22 UI lines. Continue looking for
+redundant adaptation and duplicated policy in MIDI planning and sequence authoring.

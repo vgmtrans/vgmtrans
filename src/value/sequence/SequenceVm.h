@@ -170,8 +170,6 @@ public:
   // fallbackStartKey if note has not slid yet.
   PitchSlideBinding retargetPitchSlide(PerformanceNoteId note, double fallbackStartKey, double targetKey,
                                        u32 durationTicks, PerformanceLaneId lane = PerformanceLaneId{0});
-  PitchSlideBinding retargetPitchSlide(PerformanceNoteId note, double fallbackStartKey, double targetKey,
-                                       PitchSlideTiming timing, PerformanceLaneId lane = PerformanceLaneId{0});
   // Returns the pitch reached by note's latest transition at this emitter's
   // tick, or no value if note has no transition.
   [[nodiscard]] std::optional<double> currentPitchTransitionKey(PerformanceNoteId note,

@@ -547,14 +547,8 @@ PitchSlideBinding PerformanceEmitter::pitchSlide(PerformanceNoteId note, double 
 
 PitchSlideBinding PerformanceEmitter::retargetPitchSlide(PerformanceNoteId note, double fallbackStartKey,
                                                          double targetKey, u32 durationTicks, PerformanceLaneId lane) {
-  return retargetPitchSlide(note, fallbackStartKey, targetKey, PitchSlideTiming::fromTicks(durationTicks), lane);
-}
-
-PitchSlideBinding PerformanceEmitter::retargetPitchSlide(PerformanceNoteId note, double fallbackStartKey,
-                                                         double targetKey, PitchSlideTiming timing,
-                                                         PerformanceLaneId lane) {
   return pitchSlide(note, currentPitchTransitionKey(note, lane).value_or(fallbackStartKey), targetKey,
-                    std::move(timing), lane);
+                    durationTicks, lane);
 }
 
 std::optional<double> PerformanceEmitter::currentPitchTransitionKey(PerformanceNoteId note,
