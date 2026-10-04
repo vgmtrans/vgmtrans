@@ -246,7 +246,7 @@ void lfoDepthFadeKeepsItsUnsignedDuration() {
 void fixedPointMotionRetargetsFromTheRoundedSourceValue() {
   for (const auto rounding : {SequenceFixedPointRounding::Floor, SequenceFixedPointRounding::TowardZero,
                               SequenceFixedPointRounding::Nearest}) {
-    SequenceFixedPointAutomation<> motion;
+    SequenceFixedPointAutomation motion;
     motion.setRounding(rounding);
     motion.begin(motion.toRawTarget(-5, 2));
     expect(motion.tick().current == -640, "fixed-point motion must retain fractional steps internally");

@@ -343,8 +343,8 @@ struct TrackState {
   PerformanceNoteId lastNote;
   std::optional<double> lastKey;
   std::array<s32, 4> repeatOctaves{};
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan{0x80};
+  PerformanceBoundValue<SequenceFixedPointAutomation> volume;
+  PerformanceBoundValue<SequenceFixedPointAutomation> pan{0x80};
 };
 
 struct Playback : SequencePlayback<TrackState> {

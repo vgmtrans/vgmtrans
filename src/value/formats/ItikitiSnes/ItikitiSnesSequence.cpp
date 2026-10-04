@@ -147,7 +147,7 @@ struct ProgramState {
     echo.delayMilliseconds = (echoDelay & 0x0fu) * 16.0;
   }
 
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> tempo{0x80};
+  PerformanceBoundValue<SequenceFixedPointAutomation> tempo{0x80};
   std::optional<u32> tempoTrack;
   ReverbPerformanceEvent echo;
   u8 masterVolume = kDefaultMasterVolume;
@@ -165,8 +165,8 @@ struct TrackState {
   u8 noteBase = 0;
   s8 transpose = 0;
   u8 channelVolume = 0xff;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume{0xff};
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan{0x80};
+  PerformanceBoundValue<SequenceFixedPointAutomation> volume{0xff};
+  PerformanceBoundValue<SequenceFixedPointAutomation> pan{0x80};
 
   PerformanceNoteId lastNote;
   std::optional<double> lastKey;

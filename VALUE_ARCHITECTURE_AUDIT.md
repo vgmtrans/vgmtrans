@@ -1,11 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Fifty-five validated batches remove 1,489 net production lines
+`cb9e0b766`. Fifty-six validated batches remove 1,491 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 54 exactly.
+cover 37 of 38 registered families. Batch 56 has the same shell bytes as batch 55;
+its corpus evidence is reused from the executed batch 55 comparison with batch 54.
 Seventy-one expanded raw inventories match byte-for-byte; two retain the previously
 documented Sony sample-pool ID scheduling variation. The cleanup2 records appear
 at the end of this document.
@@ -10641,3 +10642,67 @@ pruned-verified-originals54-after55-replay.json.
 Next: review the cold proposal to make the currently fixed s32/Q8 automation helper
 an ordinary type, regenerate it against committed55, and continue probing shared
 decode/runtime boundaries for removable responsibilities.
+
+## Cleanup2 batch 56: use one fixed Q8 automation type
+
+SequenceFixedPointAutomation now directly states the representation used by all
+25 native declarations: a signed 32-bit accumulator with eight fractional bits.
+Formats no longer select a template specialization that has no other repository
+consumer. Generic SequenceLinearMotion and SequenceMotionPlan remain available
+for the different integer and floating-point callers. All three
+rounding policies, fractional retargeting, fixed steps and callback ordering are
+unchanged. Nin's pitch tick uses the existing shouldApply() query instead of
+spelling out its status test. One extra CompilerCursor blank line is removed.
+
+This changes twelve source/test paths and removes two net production lines, both
+in architecture code; format and fixture line totals are unchanged. The main
+benefit is one fewer configuration choice and simpler format declarations.
+Alternate fixed-point template instantiations/CTAD are intentionally no longer
+public API. Nin's status equivalence applies to its actual private producer;
+manufactured invalid enum values are outside that contract.
+
+The complete Release rebuild passes all 159 steps without diagnostics and all
+44 CTest suites pass. Twelve focused executions run the complete model/Nin
+fixtures and actual helper/bound-emitter scripts before/after in Release and
+ASan+UBSan. Their four captures per suite match exactly. Full-fixture captures
+are pass markers; the assertions provide their behavioral checks. The probe covers 18
+helper scripts, six fresh terminal cases and twelve bound scripts, including
+rounding, delay, retargeting, interruption, callback suppression and durable
+track ownership. Twenty-four configured checks pass: eighteen checks of six actual
+translation units and six smoke/probe checks borrowing actual configured flags.
+Four side-matching Nin native sanitizer objects prevent old-class fallback.
+
+The first native sanitizer compile passed, then dependency recording stopped
+because Clang's ASan ignore list was absent from the original input inventory.
+The original failure is retained. Root validates the complete current dependency
+closure and reuses that successful object; the supplemental pin is not claimed
+historically. Remaining commands use the additional pin. A later successful run
+was followed by a map-reader failure: ld symbol comments contain non-UTF8 bytes,
+and temporary paths have two canonical spellings. Root missed those harness
+limitations during source review. A separate raw-byte parser verifies exact
+resolved native paths and object hashes without changing the map; five completed
+jobs are reused after full output/dependency validation. Original scripts,
+receipts and failures remain. No successful compiler/runtime is repeated.
+The earlier source-only missing Windows export-list inventory is also retained.
+Sanitizer coverage is focused: other matching libraries remain Release, libc++ container annotations
+and leak detection are disabled. No overflow-domain, allocation-fault, ABI,
+performance or standalone VM diagnostic/span guarantee is claimed.
+
+The rebuilt shell SHA256 is 24ca21adfeb25fb8175442e1a0fce9def4a7919b615d5c284169801455ce349c. Its bytes
+equal the executed batch 55 shell, so original 252 records/3,922 artifacts and
+expanded 894 exports/858 artifacts are reused. No fresh batch 56 corpus run was
+executed. Prior 71 exact inventories and two classified Sony scheduling variants
+remain the evidence; neither is relabeled as a newly executed comparison.
+
+Root source, scaffold, dependency repair, runtime/map/input and final integration
+reviews are recorded in q8-automation56-root-review.json and
+pass56-final-root-review.json under /tmp/vgmtrans-cleanup2. Frozen56 preserves
+its true precommit parent55 separately from the resulting commit. Identical
+historical temporary object/archive bytes were replaced with independent APFS
+copy-on-write clones: every path/hash remains intact and no source, capture or
+music archive was deleted.
+
+Cumulative production removal against core-rewrite is 1,491 value lines:
+1,184 architecture and 307 format lines, plus the earlier 22 UI lines. The next
+source-reviewed lead moves user sample-filtering policy out of the native-facing
+synth header and keeps its sole resolution query private to export preparation.

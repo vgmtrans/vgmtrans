@@ -140,7 +140,7 @@ struct TrackState {
   PerformanceNoteId lastNote;
   std::vector<CallFrame> calls;
   Address loopStart;
-  SequenceFixedPointAutomation<s32> volume;
+  SequenceFixedPointAutomation volume;
   u8 vibratoDelay = 0;
   u8 vibratoRate = 0;
   u8 vibratoDepth = 0;
@@ -165,7 +165,7 @@ struct TrackState {
   // DSP pitch slides interpolate the pitch register, not semitone numbers.
   double pitchScale = 1.0;
   double pitchOrigin = 1.0;
-  SequenceFixedPointAutomation<s32> pitch;
+  SequenceFixedPointAutomation pitch;
   u32 pitchDelay = 0;
   u32 pitchRemaining = 0;
   s16 pitchDelta = 0;
@@ -219,8 +219,8 @@ struct ProgramState {
   SequenceRecipes recipes;
   s8 transpose = 0;
   u8 percussionBase = 0;
-  SequenceFixedPointAutomation<s32> master;
-  SequenceFixedPointAutomation<s32> tempo{0x80};
+  SequenceFixedPointAutomation master;
+  SequenceFixedPointAutomation tempo{0x80};
   std::optional<u64> lastTick;
   ReverbPerformanceEvent reverb{.voiceMask = 0};
 };

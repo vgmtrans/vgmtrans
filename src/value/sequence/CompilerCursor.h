@@ -706,7 +706,6 @@ private:
     }
   }
 
-
   [[nodiscard]] DecodedCommandPresentation truncatedPresentation() const {
     return DecodedCommandPresentation{
         .label = "Truncated Command",

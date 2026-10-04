@@ -683,7 +683,7 @@ bool Playback::pitchMotionIdle() const { return !track.pitch.motion.active(); }
 
 void Playback::advancePitchMotion() {
   const auto tick = track.pitch.motion.tick();
-  if (tick.status == SequenceMotionStatus::Inactive || tick.status == SequenceMotionStatus::Delayed) {
+  if (!tick.shouldApply()) {
     return;
   }
   if (track.pitch.transition.valid()) {

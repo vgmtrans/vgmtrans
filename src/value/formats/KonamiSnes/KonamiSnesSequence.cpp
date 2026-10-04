@@ -431,9 +431,9 @@ struct TrackState {
 
   // These controls retain fractional fade progress between note ticks. Their
   // raw values are converted to tempo, gain, or pan only when a tick changes.
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> tempoState{kKonamiSnesDefaultTempo};
+  PerformanceBoundValue<SequenceFixedPointAutomation> pan;
+  PerformanceBoundValue<SequenceFixedPointAutomation> volume;
+  PerformanceBoundValue<SequenceFixedPointAutomation> tempoState{kKonamiSnesDefaultTempo};
   // The driver restarts this reusable depth fade for every note, independently
   // of the oscillator settings that remain active on the track.
   LfoState vibrato;

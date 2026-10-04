@@ -982,9 +982,9 @@ struct TrackState {
   u8 tempo = kDefaultTempo;
   bool pan8Bit = true;
   bool sharedTempoApplied = false;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume{0xff};
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan{0x80};
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> tempoState{kDefaultTempo};
+  PerformanceBoundValue<SequenceFixedPointAutomation> volume{0xff};
+  PerformanceBoundValue<SequenceFixedPointAutomation> pan{0x80};
+  PerformanceBoundValue<SequenceFixedPointAutomation> tempoState{kDefaultTempo};
   AkaoSnesV1EnvelopeState v1Envelope;
   std::optional<u64> lastTieableNoteTick;
   std::optional<u64> pitchAutomationStopTick;

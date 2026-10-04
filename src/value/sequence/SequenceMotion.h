@@ -167,52 +167,51 @@ enum class SequenceFixedPointRounding {
   Nearest,
 };
 
-template <typename ValueType = s32, unsigned FractionBits = 8>
+// Source motion with a signed 32-bit accumulator and eight fractional bits.
 class SequenceFixedPointAutomation {
 public:
   SequenceFixedPointAutomation() = default;
-  explicit SequenceFixedPointAutomation(ValueType rawCurrent) : value_(toFixed(rawCurrent)) {}
+  explicit SequenceFixedPointAutomation(s32 rawCurrent) : value_(toFixed(rawCurrent)) {}
 
-  static constexpr ValueType kScale = static_cast<ValueType>(1) << FractionBits;
+  static constexpr s32 kScale = 256;
 
-  static constexpr ValueType toFixed(ValueType rawValue) {
+  static constexpr s32 toFixed(s32 rawValue) {
     return rawValue * kScale;
   }
 
   // Plans use the accumulator's fixed-point units. Convert the raw target
   // here; a driver-supplied fixed step already has the correct scale.
-  [[nodiscard]] static SequenceMotionPlan<ValueType> toRawTarget(ValueType target, u32 ticks, u32 delay = 0) {
-    return SequenceMotionPlan<ValueType>::targetOverTicks(toFixed(target), ticks, delay);
+  [[nodiscard]] static SequenceMotionPlan<s32> toRawTarget(s32 target, u32 ticks, u32 delay = 0) {
+    return SequenceMotionPlan<s32>::targetOverTicks(toFixed(target), ticks, delay);
   }
 
-  [[nodiscard]] static SequenceMotionPlan<ValueType> toRawTargetByFixedStep(ValueType target, ValueType step,
-                                                                            u32 delay = 0) {
-    return SequenceMotionPlan<ValueType>::targetByStep(toFixed(target), step, delay);
+  [[nodiscard]] static SequenceMotionPlan<s32> toRawTargetByFixedStep(s32 target, s32 step, u32 delay = 0) {
+    return SequenceMotionPlan<s32>::targetByStep(toFixed(target), step, delay);
   }
 
-  void reset(ValueType rawCurrent = {}) { value_.reset(toFixed(rawCurrent)); }
+  void reset(s32 rawCurrent = {}) { value_.reset(toFixed(rawCurrent)); }
 
   [[nodiscard]] bool active() const { return value_.active(); }
-  [[nodiscard]] ValueType currentFixed() const { return value_.current(); }
-  [[nodiscard]] ValueType currentRaw() const { return rawFromFixed(value_.current()); }
+  [[nodiscard]] s32 currentFixed() const { return value_.current(); }
+  [[nodiscard]] s32 currentRaw() const { return rawFromFixed(value_.current()); }
 
   void setRounding(SequenceFixedPointRounding rounding) {
     rounding_ = rounding;
   }
 
-  SequenceMotionTick<ValueType> begin(const SequenceMotionPlan<ValueType>& plan) {
+  SequenceMotionTick<s32> begin(const SequenceMotionPlan<s32>& plan) {
     // Drivers retarget from the rounded raw value, discarding the old fraction.
     value_.reset(toFixed(currentRaw()));
     return value_.begin(plan);
   }
 
-  [[nodiscard]] SequenceMotionTick<ValueType> tick() { return value_.tick(); }
+  [[nodiscard]] SequenceMotionTick<s32> tick() { return value_.tick(); }
 
   template <typename ApplyRaw>
-  SequenceMotionTick<ValueType> tickRaw(ApplyRaw&& applyRaw) {
-    const ValueType previousRaw = currentRaw();
+  SequenceMotionTick<s32> tickRaw(ApplyRaw&& applyRaw) {
+    const s32 previousRaw = currentRaw();
     const auto motionTick = tick();
-    const ValueType nextRaw = currentRaw();
+    const s32 nextRaw = currentRaw();
     if (nextRaw != previousRaw) {
       std::forward<ApplyRaw>(applyRaw)(nextRaw);
     }
@@ -220,23 +219,23 @@ public:
   }
 
 private:
-  [[nodiscard]] ValueType rawFromFixed(ValueType fixedValue) const {
-    const ValueType whole = fixedValue / kScale;
-    const ValueType fraction = fixedValue % kScale;
+  [[nodiscard]] s32 rawFromFixed(s32 fixedValue) const {
+    const s32 whole = fixedValue / kScale;
+    const s32 fraction = fixedValue % kScale;
     if (rounding_ == SequenceFixedPointRounding::TowardZero) {
       return whole;
     }
     if (rounding_ == SequenceFixedPointRounding::Nearest) {
-      const ValueType halfScale = kScale / 2;
-      if (fraction > ValueType{} && fraction >= halfScale) {
-        return static_cast<ValueType>(whole + 1);
+      const s32 halfScale = kScale / 2;
+      if (fraction > s32{} && fraction >= halfScale) {
+        return static_cast<s32>(whole + 1);
       }
-      return static_cast<ValueType>(whole - (fraction < ValueType{} && fraction <= -halfScale));
+      return static_cast<s32>(whole - (fraction < s32{} && fraction <= -halfScale));
     }
-    return static_cast<ValueType>(whole - (fraction < ValueType{}));
+    return static_cast<s32>(whole - (fraction < s32{}));
   }
 
-  SequenceLinearMotion<ValueType> value_;
+  SequenceLinearMotion<s32> value_;
   SequenceFixedPointRounding rounding_ = SequenceFixedPointRounding::Floor;
 };
 

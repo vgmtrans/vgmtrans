@@ -193,8 +193,8 @@ private:
   [[nodiscard]] static double gain(s32 fixedVolume);
 
   ReverbPerformanceEvent event{.voiceMask = 0};
-  SequenceFixedPointAutomation<s32> leftVolume;
-  SequenceFixedPointAutomation<s32> rightVolume;
+  SequenceFixedPointAutomation leftVolume;
+  SequenceFixedPointAutomation rightVolume;
   std::optional<u64> lastAdvanceTick;
 };
 
@@ -215,11 +215,11 @@ struct ProgramState {
   std::array<u32, 256> basePrograms{};
   std::array<u32, 256> programs{};
   u8 tempo = kDefaultTempo;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> tempoState;
+  PerformanceBoundValue<SequenceFixedPointAutomation> tempoState;
   std::optional<u32> tempoAutomationTrack;
   u8 masterVolume = 0xff;
   u8 volumeMultiplier = 0xff;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> masterVolumeState;
+  PerformanceBoundValue<SequenceFixedPointAutomation> masterVolumeState;
   std::optional<u32> masterVolumeAutomationTrack;
   s8 globalTranspose = 0;
   u8 percussionBase = 0;
@@ -281,8 +281,8 @@ struct TrackState {
   u8 percussionProgram = 0;
   PerformanceNoteId lastNote;
   std::optional<double> lastKey;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume{0xff};
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan{10};
+  PerformanceBoundValue<SequenceFixedPointAutomation> volume{0xff};
+  PerformanceBoundValue<SequenceFixedPointAutomation> pan{10};
   SequenceLfoDepthFadeState vibratoDepth;
 };
 
