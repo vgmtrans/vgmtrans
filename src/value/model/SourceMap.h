@@ -183,9 +183,8 @@ struct SourceAnnotation {
   std::string label;
   std::string description;
   std::optional<SequenceSemantic> sequenceSemantic;
-  // Qualified identity used by inspectors and format-specific behavior. The
-  // final segment remains the format-neutral category used for coloring and
-  // grouping (for example, "capcom-snes.note" -> "note").
+  // Qualified source identity used by inspectors (for example, "capcom-snes.note").
+  // category() returns its format-neutral final segment ("note").
   std::string kind;
   [[nodiscard]] std::string_view category() const noexcept {
     const std::string_view qualified{kind};

@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Sixty-six validated batches remove 1,564 net production lines
+`cb9e0b766`. Sixty-seven validated batches remove 1,570 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 66 replays both corpora against its
-committed batch 65 predecessor. All 73 expanded raw inventories match exactly;
+cover 37 of 38 registered families. Batch 67 replays both corpora against its
+committed batch 66 predecessor. All 73 expanded raw inventories match exactly;
 no classification is needed. The cleanup2 records appear at the end of this
 document.
 
@@ -11340,3 +11340,70 @@ comparing the source diff and stopped before writing counts, the final report
 or the audit. Its script/failure account remain preserved; the resumed verifier
 includes both admitted paths. Source, test and runtime evidence is unchanged.
 Further architecture probing continues.
+
+### cleanup2 batch 67: keep local decode and timing decisions together
+
+Move the single-use PSF2 unpack wrapper into overlayPsf2. The helper accepts
+reserved bytes, completely decodes one library into its local overlay, then
+merges that overlay into the accumulated filesystem in the same ordered pass.
+The whole-library staging boundary remains: a corrupt later member cannot
+publish an earlier successfully decoded member. Previously loaded dependencies
+are not rolled back. Library precedence, normalized paths, owned members and
+warning order remain unchanged. Borrowed bytes are consumed synchronously.
+
+Extend the existing SquarePS2 mini-library fixture with a valid music.bgm followed
+by a bank.wd entry with zero block size. Check the diagnostic-only referring
+source, no leaked assets/collections, both ordered warning messages and exact
+root attribution after the temporary Session and files are destroyed. The entire
+extended fixture first compiles, links and passes against frozen committed66.
+The initial standalone compile lacked the relative TestSupport.h and ran no
+fixture; its failure is preserved. The corrected isolated layout supplies the
+unchanged pinned header and passes with the actual Release compiler and matching
+frozen66 engine archives. The integrated67 fixture also passes through CTest.
+
+Track the presence of source tempo-relative modulation while removing stale
+derived events from each track. This removes a separate outer track traversal
+without changing the short-circuit event query. Every track still undergoes
+cleanup, including tracks after a positive result; timeline borrowing and
+resolution begin only after all cleanup. Empty, fixed-only and derived-only
+performances retain their early return without constructing the timing map.
+
+In the public by-value ADSR projection, handle zero first-stage drop before
+reading or validating first-stage duration. The remaining path needs one direct
+finite/nonnegative duration guard. Release fallback, second-stage reset and
+validation, full-drop return and all floating-point formulas remain unchanged.
+The review includes direct callers and region responses rather than assuming
+prevalidated input. This pass does not claim arbitrary floating-environment,
+allocator-failure, cross-platform or measured-speed equivalence.
+
+Correct SourceAnnotation.kind's comment to describe qualified source identity
+and category()'s final-segment query. Keep the useful derived getter: 27 fixture
+calls use it, shell inspection reads the full identity and Qt presentation uses
+semantic/role fields. Its old coloring/grouping claim was misleading. No category
+cache, registry, public API or model layout is introduced or removed.
+
+Root reconstructs all five complete candidate bodies from their immutable cold
+patches and checks the scoped source authority and independent reviews. The
+comment draft's original65 census remains labeled65; its affected bodies are
+separately checked against committed/frozen66. Four architecture paths remove
+six lines, including one comment line; the existing fixture gains 19 lines.
+No format implementation changes in this batch.
+
+The complete Release build completes 353 warning-free steps and all
+44 CTest suites pass. Full value/shared/test/Qt snapshots and four engine archives
+are frozen with the final shell, SHA-256 f2323654c0716df28bcdc890a6016919bff462aba645bfe2208219d735c3931c. Both archive campaigns execute
+that changed shell afresh against committed66: 252 original comparisons and
+3,922 artifacts match, as do 894 expanded export pairs and 858 artifacts. All
+73 raw expanded inventories match; no classification or new normalization is
+needed. Root rechecks retained records and original payloads before removing
+only verified older66 generated payloads. Music and all execution/source proof
+remain intact.
+
+Cumulative production removal is 1,570 value lines: 1,257 architecture
+and 313 formats, plus the earlier 22 UI lines. Evidence under
+/tmp/vgmtrans-cleanup2 includes the PSF2 overlay/fixture, tempo-relative scan,
+ADSR and source-kind cold records, independent peer records,
+local-controlflow67-root-cold-review.json, the preserved initial fixture failure
+and resumed baseline result, and pass67 application/build/test/freeze/corpus/
+final/postcommit records. No sanitizer or separate numerical campaign is claimed.
+Further simplification review continues.

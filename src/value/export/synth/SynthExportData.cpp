@@ -327,15 +327,15 @@ Envelope approximateEnvelopeAsAdsr(Envelope envelope, double attenuationRangeDb)
     return envelope;
   }
 
-  const double firstDecay = envelope.decaySeconds.value_or(0.0);
-  if (firstFraction > 0.0 && (!std::isfinite(firstDecay) || firstDecay < 0.0)) {
-    // An endless or invalid first stage cannot lead into a finite second one.
-    return envelope;
-  }
-
   if (firstFraction == 0.0) {
     envelope.decaySeconds = secondDecay;
     envelope.sustainAmplitude = 0.0;
+    return envelope;
+  }
+
+  const double firstDecay = envelope.decaySeconds.value_or(0.0);
+  if (!std::isfinite(firstDecay) || firstDecay < 0.0) {
+    // An endless or invalid first stage cannot lead into a finite second one.
     return envelope;
   }
 

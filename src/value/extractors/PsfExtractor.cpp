@@ -204,13 +204,9 @@ void unpackPsf2Directory(std::span<const u8> bytes, size_t tableOffset, u32 coun
   }
 }
 
-[[nodiscard]] Psf2Filesystem unpackPsf2(std::span<const u8> bytes) {
-  Psf2Filesystem filesystem;
-  unpackPsf2Directory(bytes, 4, le32(bytes, 0), {}, filesystem);
-  return filesystem;
-}
-
-void overlayPsf2(Psf2Filesystem& filesystem, Psf2Filesystem overlay) {
+void overlayPsf2(Psf2Filesystem& filesystem, std::span<const u8> bytes) {
+  Psf2Filesystem overlay;
+  unpackPsf2Directory(bytes, 4, le32(bytes, 0), {}, overlay);
   for (auto& [path, member] : overlay) {
     filesystem.insert_or_assign(path, std::move(member));
   }
@@ -402,7 +398,7 @@ void loadPsf2WithLibs(const PsfData& psf, const std::filesystem::path& basePath,
 
   // PSF2 libraries form a case-insensitive filesystem overlay: every library
   // is loaded first, then the referring mini replaces conflicting members.
-  overlayPsf2(filesystem, unpackPsf2(psf.reserved));
+  overlayPsf2(filesystem, psf.reserved);
 }
 
 void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Image& image,

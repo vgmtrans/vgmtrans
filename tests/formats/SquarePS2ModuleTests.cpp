@@ -379,7 +379,7 @@ void miniArchiveLoadsLibraryFilesystem() {
   const auto directory = std::filesystem::temp_directory_path() / ("vgmtrans-psf2-" + std::to_string(unique));
   std::filesystem::create_directories(directory);
   const auto libraryPath = directory / "fixture.psf2lib";
-  const auto library = psf2Fixture();
+  auto library = psf2Fixture();
   {
     std::ofstream stream(libraryPath, std::ios::binary);
     stream.write(reinterpret_cast<const char*>(library.data()), static_cast<std::streamsize>(library.size()));
@@ -387,9 +387,28 @@ void miniArchiveLoadsLibraryFilesystem() {
 
   const SessionSnapshot snapshot =
       scan("selected.minipsf2", directory / "selected.minipsf2", miniPsf2(libraryPath.filename().string())).snapshot();
+  // Leave the first music.bgm member valid and give the later bank.wd member a zero block size.
+  le32(library, 20 + 48 + 44, 0);
+  {
+    std::ofstream stream(libraryPath, std::ios::binary);
+    stream.write(reinterpret_cast<const char*>(library.data()), static_cast<std::streamsize>(library.size()));
+  }
+  const SessionSnapshot rejected =
+      scan("partial.minipsf2", directory / "partial.minipsf2", miniPsf2(libraryPath.filename().string())).snapshot();
   std::filesystem::remove_all(directory);
   expect(snapshot.sources().size() == 3 && squareCollection(snapshot) != nullptr,
          "MiniPSF2 should expose the recursively imported library filesystem");
+  expect(rejected.sources().size() == 1 && rejected.assets().empty() && rejected.collections().empty(),
+         "a corrupt library must not publish its earlier successfully decoded members");
+  expect(rejected.diagnostics().size() == 2 &&
+             rejected.diagnostics()[0].message ==
+                 "PSF2 library could not be loaded: " + libraryPath.string() + ": PSF2 file has a zero block size" &&
+             rejected.diagnostics()[1].message == "PSF2 filesystem did not contain any files",
+         "the library failure must be retained while extraction continues with the referring mini's filesystem");
+  expect(std::ranges::all_of(rejected.diagnostics(), [&](const Diagnostic& diagnostic) {
+    return diagnostic.severity == Severity::Warning &&
+           diagnostic.range == SourceRange{.source = rejected.sources().front().id, .size = rejected.sources().front().size};
+  }), "library warnings must remain attributed to the referring mini after its Session and files are destroyed");
 }
 
 std::vector<u8> readFile(const std::filesystem::path& path) {
