@@ -56,8 +56,6 @@ struct CollectionInputs {
   ResolutionStatus bankStatus = ResolutionStatus::Resolved;
   std::vector<DependencyTarget> bankAlternatives;
   ResolutionStatus inspectionStatus = ResolutionStatus::Resolved;
-
-  [[nodiscard]] ResolutionStatus status() const noexcept;
 };
 
 // Published sequences produce collections by default. Identity is always the
@@ -93,7 +91,7 @@ struct Collection {
   [[nodiscard]] bool contains(AssetId asset) const noexcept;
 
   [[nodiscard]] bool isDiscovered() const noexcept { return origin == CollectionOrigin::Discovered; }
-  [[nodiscard]] ResolutionStatus resolutionStatus() const noexcept { return inputs.status(); }
+  [[nodiscard]] ResolutionStatus resolutionStatus() const noexcept;
 };
 
 }  // namespace vgmtrans::core

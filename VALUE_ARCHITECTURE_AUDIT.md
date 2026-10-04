@@ -1,13 +1,13 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Forty-six validated batches remove 1,225 net production lines
+`cb9e0b766`. Forty-seven validated batches remove 1,241 net production lines
 from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 45 exactly;
-72 expanded raw inventories match byte-for-byte. 1 previously proven
-Sony scheduling differences match the retained original evidence under the
+cover 37 of 38 registered families. All export records match batch 46 exactly;
+72 expanded raw inventories match byte-for-byte. One previously proven
+Sony scheduling difference matches the retained original evidence under the
 existing narrow ID mapping. The cleanup2 records appear
 at the end of this document.
 
@@ -9372,3 +9372,196 @@ pruned-verified-originals43-for46.json, pruned-verified-originals44-for47.json.
 
 Next: continue the architecture and format-authoring audit, retaining domain
 rules when a proposed reduction would merely hide them behind another protocol.
+
+## Cleanup2 forty-seventh batch: use final owners for queries and output
+
+Collection::resolutionStatus now owns its existing aggregation directly. Remove
+CollectionInputs::status and the Collection forwarder; the relationship container
+retains all bank, sample and inspection outcomes. One exposed query protocol and
+two production lines disappear. The max-priority calculation and noexcept
+contract remain unchanged; actual linked consumers are rebuilt for the moved
+out-of-line symbol.
+
+The MIDI renderer applies external-preset warnings where it already applies
+instrument selection. Removing the separate instrument-warning pre-pass also
+removes a second recognition rule for note/instrument alternatives. Private
+renderer references borrow the existing enclosing diagnostics and dedup owners;
+no public context or state type is added. Channel assignment uses one usable
+channel count, quotient/remainder and result construction, retaining the named
+16-channel limit and channel-nine exclusion rule. Together these remove eight
+architecture lines.
+
+SegSat removes the extra final-channel vector: after moving the tempo record out,
+its existing performance owner retains and remaps all sixteen channel records
+before merging tempo events. TriAce removes the staging harmony vector: a fixed
+original-track count lets each completed local harmony append to the final owner
+in original source order, reacquiring the next source by index. The local tempo
+and harmony copies retain their necessary responsibilities. These remove six
+format lines without changing the public runtime/finalizer interfaces.
+
+- Value: 2,251 added/3,492 deleted across 170 paths.
+- Architecture: 1,830 added/2,931 deleted across 95 paths.
+- Formats: 421 added/561 deleted across 75 paths.
+- Tests: 1,270 added/424 deleted across 43 paths.
+
+Net production reductions are 1,241 value lines, 1,101 architecture and 140
+format lines.
+
+### Paired proof and boundaries
+
+Collection query: complete ValueAssetResolution, ValueSession, SquarePS2 and
+SonyPS1 suites pass in paired Release/focused sanitizer arms. All 78 commands,
+including 42 actual configured checks, succeed with empty stderr. Four 104-byte
+completion records match, SHA256
+`9e2263eb0dce0738e1763e69cdf131aa5c4ab00e5e756a67230db7211c0250a9`;
+these record assertion success, not serialization of every fixture state.
+Model/Binding and all fixture TUs are rebuilt. Each candidate executable defines
+Collection::resolutionStatus and has no old input-status symbol or fallback.
+Root gates all 214 manifest files and reviews the exact body transformation.
+Proof/report/manifest SHA256:
+`2805dd155d5c9f215af0b6b50366f3ae797c6b07d01e442b90590752b2ee0369`,
+`e692cafd96a460dc3e5cb15b9553c0cc8a8c6993a9bb6a96e10d6e520b0903ec`,
+`bf9ce785fa1163807a0367d4e509313dbd54b0ea4af5417b40ed2db2c41b59b3`.
+Receipt: collection47-root-review.json.
+
+MIDI: full Renderer/ResolvedInstrument suites pass in paired Release/focused
+sanitizer arms. Seventy-two actual fixture render calls plus 150 public rows and
+64 actual private-helper boundary rows preserve 1,407,929 bytes per arm without
+normalization. Public typed MIDI, complete ordered diagnostics and encoded bytes
+preserve 1,406,740 bytes, SHA256
+`b8864bb8e7f06babe5c1968aa0438ec69cd3ab8de20f77fc88a663b54a591e44`;
+private channel/port/SIZE_MAX boundaries preserve 1,189 bytes, SHA256
+`01c5347061e246c36d4bafd577e63c04c89b9b5147f01a32891ba6b8925dc328`.
+The matrix includes 144 successful scenario/options rows with repeat checks,
+separate port-overflow sequences, two defined tuning errors, empty and invalid
+preparation, dead input owners, full-address aliases, selection/control ties,
+expired/continued notes, owned presets and global reverb. The public writer is
+exact unappended production; only direct fixture calls use the capture wrapper.
+The private probe calls the actual source helper, with no copied formula.
+All 38 commands pass on the first attempt, including 12 actual configured
+checks. Root gates 87 proof files and 478 authority inputs.
+Proof/report/manifest SHA256:
+`9452d097737e2e7cf1e0d141be0c76ce63e4ae7c8c56b9e80279b98ba395da18`,
+`453da94f9b811b5815de1a3bb7d4a68442be074fd9f164638a499258755a12d0`,
+`9e276d8a80462df52cb6daab918eb39c42a60083e265b798255c6e74d2c0b0ce`.
+
+Tracks: both full native suites pass in paired optimized Release/focused
+sanitizer arms. SegSat adds six native and 30 raw callback cases; TriAce adds
+four native and 32 raw cases. Durable captured neutral values, double bits,
+headers, automation, source spans, ordered neutral diagnostics and three-policy
+encoded MIDI remain exact. SegSat preserves 686,826 bytes per arm, SHA256
+`5700e13d081b13ccb6aaead0eb4ffa4ed55b0b3bfefe30ae33917e729ff00032`;
+TriAce preserves 549,776 bytes, SHA256
+`b0e06e2609b0de36e8ab2c742d04725c0c4b9db9a28c17c7d7d9617d7fa2892a`.
+Native graphs/annotations are additionally captured; library-internal binding
+is assertion-checked. Structured MIDI diagnostics are not separately serialized
+by these native probes. Saturated Saturn raw cases capture IR only.
+Each proof's 35 commands succeed, including 12 actual configured checks.
+Cost logs deliberately send numeric request/capacity tables to stderr; compiler,
+link and ordinary fixture stderr are empty. SegSat's 12 scoped cases each remove
+one request/1,408 bytes, retaining capacity17/32/64 versus16. TriAce's 64 cases
+save 74 requests/20,064 bytes across 28 reduced and 36 unchanged cases, with no
+final-capacity increase. Native configured text changes by −1,024/−352 bytes;
+these are object-text observations, not whole-binary or speed claims.
+Three bounded raw denials per format retain actual differences. Saturn denial2
+throws before but succeeds after via stable_sort's nothrow scratch fallback;
+denial3 reaches no third request after and returns exact neutral output.
+TriAce denial8 retains one earlier completed companion after; denials1/4 retain
+identical partial output. No failed-state normalization is applied. A defined
+throwing wrapper independently verifies normal VM propagation and public
+renderSequence's error-only result. Initial zero-tempo Saturn generator geometry
+was corrected in the temporary harness; baseline failure/source/logs remain.
+Root reads both reports/capture harnesses and gates 80/76 manifest files.
+SegSat proof/report/manifest SHA256:
+`a7c007a6654d17994ded24571a2a4cf3d4270cc24d97f995bb18b87e124d7e93`,
+`d664c77a0cae3e66a6fb19252b2b329b5a6f118f8f43bd9156e30598fe943b72`,
+`b2b419725cc7c024f53df3793be3f7db2be754635472fb437e7656d0dcd42a03`.
+TriAce proof/report/manifest SHA256:
+`173e381a8633d0e97f140af0144baff0866ec5953e2670ff182f92957458e46a`,
+`27ed9943d2a64609d57e1e501df589ca718a430883f52bb69909351c6ba7c9ea`,
+`063383c5ea383e7aef50cd78d9cc4756dc5ea2f90401fb2f31e938c3394acd8a`.
+Its final report only removes a copied unrelated Saturn sentence; no evidence,
+source or runner changes accompany that report correction.
+
+All four proofs use committed46
+`a2ff1aca9c561e1376efed379e3577da07400648` and complete matching frozen46
+value/shared/tests plus four archives. Frozen provenance names precommit45
+`c58dd30f0320f30cb52e38f9d8251295c2d748ca`, SHA256
+`0112a1c90c8536e3ebe02245027ddc83a0358d12278051a5463348e942f978a4`.
+Cold45 inputs remain separately retained and hash-gated. Root compares complete
+live/held trees, all source/patch/archive/project/transcript bytes and declared
+status/capture scopes before applying five exact approved production paths.
+Together the sealed proofs cover 457 files, 186 successful commands and 78
+actual configured checks. Root's initial empty-stderr gate stopped before any
+patch because the cost tables intentionally used stderr; the refined gate
+accepts only those structured cost logs. The separate gate record remains.
+Changed implementations and participating full fixtures/probes are instrumented
+under ASan/UBSan/float-cast-overflow; remaining frozen archives stay Release.
+Root receipt: pass47-root-review.json.
+
+The collection query changes an internal value-core method, not data layout.
+Prepared/native consumers use Collection's existing public query; no alias or
+fallback for stale old symbols is introduced. Diagnostics remain independent of
+resolution priority; incomplete/ambiguous choices remain useful unless Failed
+blocks preparation. No permanent test mirrors this unchanged calculation.
+
+MIDI warning collection now interleaves with private event rendering rather
+than preceding every allocation. Defined thrown errors return no partial result;
+arbitrary bad_alloc ordinals or private diagnostic prefixes are not equivalent
+and are not claimed. The outer vector/set objects outlive every renderer, even
+when their element buffers grow. Full-address dedup still occurs before bank/
+program encoding and before cache early decisions; owned presets stay excluded.
+
+Successful final track values/order/source attribution remain equivalent. For
+normal SegSat VM output the final vector retains capacity17 rather than16 while
+removing the additional16-record allocation; an oversized raw callback input
+can retain larger capacity. TriAce appends earlier companions before later
+source copies, changing partial output if a later copy fails. SequenceVm owns
+and discards a failed render, and collection rendering returns error-only output.
+The public erased finalizer can also be called directly; raw callers can observe
+different partial state after catch. Neither path gains rollback or catch/reuse
+support. No universal retained-memory, timing, allocator-ordinal or fault-prefix
+claim is made. Focused sanitizer coverage is explicitly scoped.
+
+Fresh root retained-boundary assessment appears in
+pass47-root-retained-boundaries.md. Typed command/state ownership, independent
+source/physical track identities, sparse-versus-dense synth identities,
+inspection graph ownership, family/manual dependency rules and validation stages
+remain useful. Removing them would either change supported semantics or require
+another protocol. No new architecture framework is added.
+
+### Integrated checks and publication
+
+- Complete macOS Release build: 348 warning-free steps; all 44 CTest
+  suites pass. Frozen47 holds complete value/shared/tests, four archives and
+  shell under committed46/source/diff authority a2ff1aca9.
+- Shell SHA256: `2234961dcd6a82cd1c9e8d3f2b7ef5c4974f6a91e9abe3e187ef2457b6706eee`.
+- Against frozen46, the original corpus preserves all 252 input/policy records
+  and 3,922 artifact names/hashes.
+- The /Volumes/emu/vgm replay preserves all 894 export records: 852 successes
+  and 42 matching existing failures. All 858 artifact names/sizes/hashes and
+  218,240,549 bytes per binary match. 72 raw inventories match exactly.
+  One previously proven Sony scheduling difference passes the existing narrow
+  asset declaration/member-ID mapping against retained original evidence; raw
+  records/diffs remain. Five unsupported DSF failures remain unchanged. Real
+  coverage remains 37/38 registered families; KonamiTMNT2 is synthetic only.
+  See volume-coverage27/pass46-vs-pass47-summary.json.
+
+Only the five approved production paths and this audit are staged. User work and
+music archives remain untouched. Temporary proof sources, exact logs, matching
+frozen sources/archives/binaries and raw classification evidence are retained.
+No new permanent mirror test or exporter API is added. Closed batch46 original
+comparisons and per-file gates permit reclaiming after45 payloads before the47
+replay (3,922 files / 1,604,324,580 bytes); all records/evidence and latest46/47
+payloads remain.
+
+Evidence: pass47-root-cold-release.json, pass47-root-retained-boundaries.md,
+collection-owned-status47, midi-warning-channel-owner47,
+segsat-final-owner47, triace-final-owner47, pass47-root-review.json,
+build-pass47.log, ctest-pass47.log,
+pass47-baseline, comparison-pass47.json,
+volume-coverage27/pass46-vs-pass47-summary.json,
+pruned-verified-originals45-before47-replay.json, pass47-initial-root-gate.json.
+
+Next: keep probing architecture responsibilities and format authoring, retaining
+explicit supported behavior when a reduction would hide it behind a new policy.

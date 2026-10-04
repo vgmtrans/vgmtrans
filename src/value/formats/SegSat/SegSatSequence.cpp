@@ -224,10 +224,9 @@ struct ProgramState {
     // the independent tempo stream; merge it into channel zero only after both
     // timelines have executed.
     PerformanceTrack tempo = std::move(performance.tracks.front());
-    std::vector<PerformanceTrack> channels;
-    channels.reserve(16);
+    performance.tracks.erase(performance.tracks.begin());
     for (u32 channel = 0; channel < 16; ++channel) {
-      PerformanceTrack track = std::move(performance.tracks[channel + 1]);
+      auto& track = performance.tracks[channel];
       track.id = TrackId{channel};
       track.sourceTrackNumber = channel;
       for (auto& event : track.events) {
@@ -245,10 +244,9 @@ struct ProgramState {
         }
         track.endTick = std::max(track.endTick, end);
       }
-      channels.push_back(std::move(track));
     }
 
-    auto& first = channels.front();
+    auto& first = performance.tracks.front();
     for (auto& event : tempo.events) {
       std::visit([](auto& typed) { typed.header.track = TrackId{0}; }, event);
       first.events.push_back(std::move(event));
@@ -259,7 +257,6 @@ struct ProgramState {
       const auto& b = performanceEventHeader(right);
       return std::pair{a.tick, a.sequence} < std::pair{b.tick, b.sequence};
     });
-    performance.tracks = std::move(channels);
     if (config) {
       finalizeSegSatPerformance(performance, config->velocityBanks, config->volumeModel, config->controllerChanges);
     }

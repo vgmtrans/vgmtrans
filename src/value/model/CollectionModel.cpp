@@ -19,9 +19,9 @@ bool Collection::contains(AssetId asset) const noexcept {
          });
 }
 
-ResolutionStatus CollectionInputs::status() const noexcept {
-  auto result = std::max(bankStatus, inspectionStatus);
-  for (const auto& bank : banks) {
+ResolutionStatus Collection::resolutionStatus() const noexcept {
+  auto result = std::max(inputs.bankStatus, inputs.inspectionStatus);
+  for (const auto& bank : inputs.banks) {
     result = std::max(result, bank.samples.status);
   }
   return result;

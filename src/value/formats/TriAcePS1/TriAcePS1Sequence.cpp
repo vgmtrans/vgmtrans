@@ -160,8 +160,9 @@ struct ProgramState {
       }
       return false;
     };
-    std::vector<PerformanceTrack> harmonyTracks;
-    for (auto& source : performance.tracks) {
+    const size_t sourceTrackCount = performance.tracks.size();
+    for (size_t i = 0; i < sourceTrackCount; ++i) {
+      auto& source = performance.tracks[i];
       const bool hasHarmony = std::ranges::any_of(source.events, [](const PerformanceEvent& event) {
         const auto* note = std::get_if<NotePerformanceEvent>(&event);
         return note != nullptr && note->lane == kHarmonyLane;
@@ -185,10 +186,6 @@ struct ProgramState {
           pan->lane = PerformanceLaneId{0};
         }
       }
-      harmonyTracks.push_back(std::move(harmony));
-    }
-
-    for (auto& harmony : harmonyTracks) {
       harmony.id = TrackId{static_cast<u32>(performance.tracks.size())};
       for (auto& event : harmony.events) {
         std::visit([&](auto& typed) { typed.header.track = harmony.id; }, event);

@@ -64,19 +64,11 @@ struct MidiChannelAssignment {
 [[nodiscard]] MidiChannelAssignment midiChannelAssignment(size_t trackIndex, const MidiExportOptions& options) {
   constexpr size_t channelsPerPort = 16;
   constexpr size_t skippedDrumChannel = 9;
-  if (options.skipChannel10) {
-    constexpr size_t usableChannelsPerPort = channelsPerPort - 1;
-    const size_t port = trackIndex / usableChannelsPerPort;
-    const size_t slot = trackIndex % usableChannelsPerPort;
-    return MidiChannelAssignment{
-        .port = port,
-        .channel = static_cast<u8>(slot < skippedDrumChannel ? slot : slot + 1),
-    };
-  }
-
+  const size_t usableChannelsPerPort = options.skipChannel10 ? channelsPerPort - 1 : channelsPerPort;
+  const size_t slot = trackIndex % usableChannelsPerPort;
   return MidiChannelAssignment{
-      .port = trackIndex / channelsPerPort,
-      .channel = static_cast<u8>(trackIndex % channelsPerPort),
+      .port = trackIndex / usableChannelsPerPort,
+      .channel = static_cast<u8>(options.skipChannel10 && slot >= skippedDrumChannel ? slot + 1 : slot),
   };
 }
 
@@ -641,9 +633,11 @@ class MidiTrackRenderer {
 public:
   MidiTrackRenderer(MidiTrack& track, u8 channel, const PerformanceTempoMap& tempos,
                     const MidiExportOptions& options, ModulationConversionPolicy modulationConversion,
-                    double headroom)
+                    double headroom, std::vector<Diagnostic>& diagnostics,
+                    std::set<InstrumentAddress>& reportedExternal)
       : track(track), channel(channel), options(options), tempos(tempos),
-        modulationConversion(modulationConversion), levelHeadroom(headroom) {}
+        modulationConversion(modulationConversion), diagnostics(diagnostics),
+        reportedExternal(reportedExternal), levelHeadroom(headroom) {}
 
   void render(const PerformanceTrack& source, const MidiTimeline& timeline,
               std::span<const GlobalTransposePerformanceEvent* const> globalTransposes,
@@ -680,6 +674,8 @@ private:
   const MidiExportOptions& options;
   const PerformanceTempoMap& tempos;
   const ModulationConversionPolicy modulationConversion;
+  std::vector<Diagnostic>& diagnostics;
+  std::set<InstrumentAddress>& reportedExternal;
   bool hasNote = false;
   // MIDI starts in bank/program zero.
   u16 midiBank = 0;
@@ -788,6 +784,15 @@ private:
   void applyInstrumentSelection(u64 tick, const ResolvedInstrument& selection, bool forceProgramChange,
                                 bool forceBankSelect = false,
                                 bool selectsSourceInstrument = true) {
+    if (!selection.instrument &&
+        (selection.address.program >= 128 || selection.address.bank >=
+            (options.bankSelectStyle == MidiBankSelectStyle::MsbOnly ? 128u : 16384u)) &&
+        reportedExternal.insert(selection.address).second) {
+      diagnostics.push_back({
+          .severity = Severity::Warning, .code = "external-instrument-address-out-of-range",
+          .message = "External preset cannot be represented exactly by the selected MIDI bank/program encoding",
+      });
+    }
     const u16 bank = static_cast<u16>(selection.address.bank & 0x3fff);
     const u16 emittedBank =
         options.bankSelectStyle == MidiBankSelectStyle::MsbOnly ? static_cast<u16>(bank & 0x7f) : bank;
@@ -1279,20 +1284,6 @@ MidiSequence renderMidiSequence(const ResolvedPerformance& resolved,
   for (size_t trackIndex = 0; trackIndex < performance.tracks.size(); ++trackIndex) {
     const auto& performanceTrack = performance.tracks[trackIndex];
     const auto events = detail::planMidiTrack(resolved, trackIndex, options, globalTempos, sequence.diagnostics);
-    for (const auto& event : events) {
-      const ResolvedInstrument* selection = nullptr;
-      if (const auto* change = std::get_if<MidiInstrumentEvent>(&event)) selection = &change->selection;
-      if (const auto* note = std::get_if<MidiNoteBoundary>(&event); note && note->instrument) selection = &*note->instrument;
-      if (selection && !selection->instrument &&
-          (selection->address.program >= 128 || selection->address.bank >=
-              (options.bankSelectStyle == MidiBankSelectStyle::MsbOnly ? 128u : 16384u)) &&
-          reportedExternal.insert(selection->address).second) {
-        sequence.diagnostics.push_back({
-            .severity = Severity::Warning, .code = "external-instrument-address-out-of-range",
-            .message = "External preset cannot be represented exactly by the selected MIDI bank/program encoding",
-        });
-      }
-    }
     const auto timeline = midiTimeline(events, globalReverb);
     MidiTrack midiTrack{
         .name = performanceTrack.name.empty() ? "Track " + std::to_string(performanceTrack.sourceTrackNumber)
@@ -1300,7 +1291,8 @@ MidiSequence renderMidiSequence(const ResolvedPerformance& resolved,
     };
     const auto assignment = midiChannelAssignment(trackIndex, options);
     MidiTrackRenderer renderer{midiTrack, assignment.channel,
-                               globalTempos, options, modulationConversion, levelHeadroom};
+                               globalTempos, options, modulationConversion, levelHeadroom,
+                               sequence.diagnostics, reportedExternal};
     if (options.writePortMetaEvents) {
       midiTrack.events.push_back(midi::meta(0, 0x21, {midiPortByte(assignment.port)}, -5));
     }
