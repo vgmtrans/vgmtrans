@@ -12,7 +12,6 @@
 #include <limits>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -70,7 +69,7 @@ struct DecodedBytecodeCommand {
 // records both display forms without making playback know about source bytes.
 template <class T>
 struct EncodedSemanticField : RangedValue<T> {
-  std::string_view name;
+  std::string name;
   SourceValueDisplay display = SourceValueDisplay::Default;
 };
 

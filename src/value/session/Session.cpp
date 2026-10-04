@@ -434,9 +434,8 @@ void Session::scanOneSource(const SourceFile& source, std::vector<SourceId>& que
         continue;
       }
 
-      const bool consumed = !result.sources.empty();
       state_->addDiagnostics(std::move(result.diagnostics));
-      if (consumed) {
+      if (!result.sources.empty()) {
         for (auto& extracted : result.sources) {
           queue.push_back(sources_.addDerived(std::move(extracted.file), std::move(extracted.bytes), source.id));
         }

@@ -1,11 +1,11 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Thirty-nine validated batches remove 1,184 net production lines
+`cb9e0b766`. Forty validated batches remove 1,187 net production lines
 from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 38 exactly;
+cover 37 of 38 registered families. All export records match batch 39 exactly;
 all 73 expanded raw inventories match byte-for-byte. The cleanup2 records appear
 at the end of this document.
 
@@ -8069,3 +8069,213 @@ so that approach is retained as a rejection. Neither draft is in this batch.
 Required snapshot/sample owners, repeated stitched-part sharing, source command
 flow and typed runtime factories remain; removing them would introduce new
 lifetime protocols or change genuine behavior.
+
+## Cleanup2 fortieth batch: own delayed field names and remove unused vocabulary
+
+Parent is `583b7067f`, the committed thirty-ninth batch. Four production paths
+remove three net architecture lines. The existing cursor fixture adds 16 lines;
+three source-map fixture role substitutions are LOC-neutral. Cumulative counts
+below are computed from the final diff against `cb9e0b766`, rather than summing
+per-batch additions/deletions whose diff contexts can overlap:
+
+- Value: 2,115 added/3,302 deleted across 165 paths.
+- Architecture: 1,747 added/2,811 deleted across 94 paths.
+- Formats: 368 added/491 deleted across 71 paths.
+- Tests: 1,060 added/424 deleted across 43 paths.
+
+Net production reductions are 1,187 value lines, 1,064 architecture and 123
+format lines.
+
+### Give deferred encoded field names an ordinary owner
+
+EncodedSemanticField now stores its existing name member as std::string.
+The six raw-reader returns explicitly construct that string; their string_view
+parameters remain. BytecodeDecode's unused string_view include disappears.
+This removes a caller-lifetime requirement without adding a type, helper,
+constructor, capture phase or public method. Immediate capture was rejected:
+it would change omitted/repeated resolutions and field order.
+
+The old valid call rawU8(std::string(64, 'n')) leaves its delayed name dangling
+before the next statement. A standalone focused-ASan repro and the permanent
+existing-cursor regression expose heap-use-after-free before; both pass after.
+The regression also fails the old ordinary assertion and passes the candidate
+ordinary run. It retains a decoded command after label/cursor/input destruction
+and checks both encoded and interpreted names, ranges and values.
+
+All 24,192 paired field/annotation cases preserve 15,361,970 captured bytes,
+SHA-256 58a5475c44a8b1ea36a51869796dec9bc9be6e72d40016e0b1ef254a181852f3.
+The matrix exercises all six reads, empty/short/long/embedded-NUL names, two
+specified displays and operand roles, truncated reads, invalid source IDs,
+source-map absence, omitted/repeated resolutions and intervening fields.
+Nine complete core and eleven native suites preserve 82,438 and 590,043 bytes
+respectively in paired focused-SAN captures, including IR/provenance/automation/
+MIDI. The raw projection matrix itself is a paired focused-SAN capture, not four
+Release/SAN streams. Twenty-four actual configured/Werror checks pass: paired
+native units and the proposed regression test; all eleven changed candidate
+native sequence units and probes/fixtures are instrumented. Remaining matching
+frozen39 archives are Release, with consistent libc++ annotations disabled.
+No whole-program or cross-platform sanitizer claim.
+
+The isolated candidate shell preserves all 252 original records/3,922 artifacts,
+all 73 expanded raw inventories, and 894 exports/858 artifacts/218,240,549 bytes
+per variant. No normalization/classification is needed. Equal duplicate original
+payloads (3,922 files/1,604,324,580 bytes) were reclaimed only after whole-record,
+actual-fileset/path/no-symlink/size/SHA and per-unlink gates; JSON, raw traces,
+logs, frozen dependencies and shells remain. The integrated combined replay below
+is a separate gate.
+
+Costs are explicit: wrappers for u8/s8/u16/u32 grow from 64 to 72 bytes; Cursor
+stays 192. Among 588 scoped Release allocation records, native labels (39 calls
+in eleven units, all literal names at most 20 characters) add no raw-name heap
+request on this libc++ build. Names beyond its 22-character inline capacity add
+one raw-read allocation and one wrapper-copy allocation; move and resolve counts
+stay. Eleven configured native objects total 1,101,631 to 1,103,551 text bytes;
+the isolated linked shells total 5,764,322 to 5,766,242 (+1,920 bytes), with file
+lengths growing 1,296. No timing/global allocation gain is claimed.
+
+Owned names snapshot caller contents instead of reflecting later caller edits;
+copied names are independent and moved-from labels follow string semantics.
+Long-name allocation can fail after consuming bytes, before resolution, without
+rollback. A manually aggregate-initialized wrapper now needs explicit string
+construction from string_view; no native/test caller used that spelling.
+Evidence: /tmp/vgmtrans-cleanup2/encoded-field-name39/proof.json (SHA-256
+4c9d350a8d1768a52ebe4a97996330de06db43644ebd47ec48a82e57ddae071c),
+final.diff, projection/fixture/contract/cost results and pruned-original-artifacts.json.
+
+### Remove a source role with no native producer or query
+
+SourceRole::Source had no production writer, query, cast, generated reflection
+or persistence contract; only three parent/owner/cycle fixture markers used it.
+Remove that member and substitute Payload in those three assertions. No new role
+or presentation branch is added. Unknown remains zero and the u8 width/layouts
+remain; sixteen retained ordinals shift internally from Section 2 to 1 through
+Sample 17 to 16. Numeric ordinal compatibility is not claimed. Both former
+Source and Payload used the same generic presentation.
+
+All 240 actual configured strict checks pass across Debug, Release and
+RelWithDebInfo, with empty compiler diagnostics. Before/after in both Release
+and focused SAN pass complete SourceMap/Session, AKAO/NinSnes, SonyPS2 and Qt
+model suites. The retained-role UI/source-map matrix captures 4,860 cases in
+1,295,118 identical bytes, SHA-256
+532ed3d5a3b643eb0ad9b5555b532ff6ff34b50398b88f0b88cde9e16302bac1.
+Native captures retain 1,626,863 bytes across 178 VM captures, including all three
+MIDI pitch policies. Ninety-six Before-only Source/Payload presentation assertions
+pass both build modes. All five capture streams match within both candidate
+pairs and the baseline cross-build; raw ordinal changes are separately recorded.
+
+The proof rebuilds all 44 core units, every 26 native literal-role producer and
+complete AKAO/NinSnes/SonyPS2 families (44 native units), three Qt value units
+including generated moc, helpers/probes and selected complete fixtures. No shifted
+inline literal remains in reused public headers; 137 enum-independent native units
+and external dependencies remain matching frozen39 Release. SAN uses address,
+undefined and float-cast checks with consistent libc++ container annotations
+disabled; it is not whole-program instrumentation. Initial temporary driver
+repairs for the frozen shared include layout, moc mapping and QGuiApplication
+precondition remain in their original logs; the unchanged production draft's
+final driver passes 485 commands. No allocation/speed claim. Evidence:
+/tmp/vgmtrans-source-role-vocabulary40/results.json (SHA-256
+a8777863bed61854964cb67063d6bbaf825b0e5e271f9eb58628a4a299053c1b),
+authority-frozen39.json, configured-werror.json, commands.json and ordinals.json.
+
+### Test extraction consumption directly
+
+Session now tests result.sources.empty after appending the distinct diagnostics
+member, removing the single-use consumed boolean. addDiagnostics has no callback
+and cannot mutate or borrow the source vector. Admission, diagnostics, child
+publication, early return and exception phases remain in their existing order;
+vector::empty is noexcept. No extra helper, flag, allocation or failure stage.
+
+The complete runValueSessionTests entrypoint passes before/after in Release and
+focused SAN: four runs with identical 32-byte harness stdout and empty stderr.
+Existing assertions cover consuming/empty extractors, diagnostic ordering,
+malformed admission, standard/nonstandard failures, source families, retained
+lifetimes and snapshot/copy-move behavior. These are assertion checks, not a new
+serialized raw scan trace. Six actual three-configuration Session Werror checks
+and all 30 compile/link/run records pass. SAN instruments Session, Source, State
+and the existing fixture; other frozen39 dependencies remain Release, with the
+same container annotation opt-out. No new permanent mirror test, giant matrix,
+timing, allocation-fault or isolated export claim. Evidence:
+/tmp/vgmtrans-cleanup2/extraction-condition40/proof-summary.json (SHA-256
+b6243257635c0952e49a6c26c4bc311a46e71293a52d7496c3b01aedc4a43afc),
+proof-report.md, commands/strict results and review-manifest.json.
+
+### Rejected shortcuts and retained boundaries
+
+A private removal query over Collection's selected/resolved views would avoid
+constructing and deduplicating members() for a boolean. The temporary draft adds
+four lines and preserves 8,192 queries/2,048 removal scenarios in four paired
+Release/SAN traces: 2,317,005 bytes, SHA-256
+7f059f1108507bb13cc32e3db97362a70a0d077f842fd8df47957c022f47f4a8.
+All four complete Session/AssetResolution/CollectionExport/SourceMap entrypoints
+and all 36 configured checks pass. Scoped pure-query allocations fall from
+1,720 requests/765,040 bytes to zero; actual removal scopes fall from 11,798 to
+8,785 requests and 1,264,708 to 1,216,384 requested bytes. Nine old query-copy
+throw sites disappear; arbitrary State failure/retry equivalence is not claimed.
+
+A clean window with five shuffled sequential pairs exposes a real cost:
+valid repeated uses of one pool at 64/256/1,024/4,096 placements take about
+2.05/4.50/6.90/7.56 times baseline in representative absent-match rows; the
+worst row is 7.79 times. The current deduplicated membership avoids repeated
+hash probes. Unique and small cases improve, but those cannot erase the valid
+repeated-placement regression. The draft is rejected; no cache/dedup framework
+is added. Separately, checking removed IDs via contains can multiply removal-set
+and membership work. Evidence: collection-removal-view40/proof-summary.json,
+proof-report.md, timing-results.json and sealed-manifest.json; no live change.
+
+Direct iteration of manually selected IDs through AssetCatalog's lookup would
+lose invalid rows and same-ID typed entries that the existing eligible view
+retains, including first-wrong-type/format/data cases. It would also duplicate
+results for repeated choices; current stable ordering retains each catalog entry
+at its first selected position. The existing filter/sort remains.
+
+Replacing Session::removeAssets' initial asset-existence pass with an empty
+source-root check is rejected. Successful admission makes every live asset's
+primary source active, but source removal deactivates SourceStore entries before
+State removal can allocate/throw. The existing method can then remove retained
+assets whose source is inactive; the proposed guard would prevent that recovery.
+No new foundAny/cache flag is introduced. Hand-built State contracts stay.
+
+A proposed PreparedCollection getter could delegate banks to its existing
+ResolvedPerformance, remove the second shared-owner alias and eliminate friend
+access. Ordinary successful copies/moves appear sound. Default failed copy
+assignment exposes a new unsafe state: copying a rendered source into a bank-only
+destination first copies the proposed null fallback, then optional performance
+construction can throw, leaving neither owner. Baseline copies a nonnull alias
+before that potentially throwing operation. The shortcut is rejected before
+implementation; no custom assignment/recovery protocol is added for a net-zero
+line change. Successful-path ownership alone was insufficient evidence.
+
+PSF2's small owning INI text remains rather than borrowing through the move of
+its byte-buffer member into growing returned sources. Synth builders keep
+per-entry annotation/range state until finalization; grouping it with public
+value vectors would introduce projection moves and another allocation phase.
+Resolved dependency status, inspection status and the annotation admission index
+encode distinct outcomes and work, rather than redundant flags. Read-only notes:
+/tmp/vgmtrans-cleanup2/pass40-read-only/retained-boundaries.md and the name probe's
+prepared-banks40/rejection.json.
+
+### Integrated verification
+
+- Complete Release build: 352 steps without warnings; all 44 CTest suites pass.
+- Frozen40 holds exact sources/headers/shared companions/tests/four archives and
+  the executable with SHA-256 `c67fca0296abd2ade26302fea95cf66629cc62c321ac205ab33c05f78fea849f`.
+- Against frozen39, the original corpus preserves all 252 input/policy records
+  and 3,922 artifact names/hashes.
+- The /Volumes/emu/vgm replay preserves all 894 export records: 852 successes
+  and 42 matching existing failures. All 858 artifact names/sizes/hashes and
+  218,240,549 bytes per binary match. All 73 raw inventories match exactly,
+  including five unchanged unsupported DSF failures. No inventory normalization
+  is needed. Real coverage remains 37/38 registered families; KonamiTMNT2
+  is synthetic only. See volume-coverage27/pass39-vs-pass40-summary.json.
+- Approved source/test hashes and exact diff remain held through build, freeze
+  and replay. User work stays outside the staged paths.
+
+### Closing the current work
+
+At the user's request, finish only the two already prepared final checks, then
+pause this goal. Those temporary candidates remove a provably redundant private
+SF2 signed-byte clamp and move an ignored cursor raw-byte string into its existing captured field.
+The latter must preserve omitted/captured-field behavior, unlike an earlier
+rejected bypass. Broad synth pitch boundary work must cover both root and residual
+tuning before narrowing; a superficial root-only change would be incomplete.
+None of those future candidates is part of this batch.

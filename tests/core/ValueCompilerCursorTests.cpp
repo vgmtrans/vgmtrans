@@ -408,6 +408,21 @@ void compilerCursorPreservesEncodedAndResolvedSourceFields() {
          "decoded source fields must preserve booleans, enum signedness, strings, fractions, and signed reads");
 }
 
+void compilerCursorOwnsDelayedEncodedFieldNames() {
+  const DecodedBytecodeCommand command = []() -> DecodedBytecodeCommand {
+    const std::array<u8, 2> bytes{0x70, 0x7f};
+    ProbeCursor cursor(ByteReader(SourceId{7}, bytes), 0, "compiler-probe");
+    const auto raw = cursor.rawU8(std::string(64, 'n'));
+    cursor.resolvedValue("interpreted", raw, u32{raw.value});
+    return cursor.sourceOnly("Owned Raw Label").stop();
+  }();
+  expect(command.fields.size() == 2 && command.fields[0].name == std::string(64, 'n') &&
+             command.fields[0].range == SourceRange{SourceId{7}, 1, 1} &&
+             std::get<u64>(command.fields[0].value) == 0x7f && command.fields[1].name == "interpreted" &&
+             !command.fields[1].range.valid() && std::get<u64>(command.fields[1].value) == 0x7f,
+         "delayed raw reads must own temporary labels and preserve both fields after decoding ends");
+}
+
 void compilerCursorCompilesControlFlow() {
   const std::vector<u8> bytes{
       0x62, 0x00, 0x08,  // call subroutine
@@ -792,6 +807,7 @@ void runValueCompilerCursorTests() {
   compilerCursorOwnsOutputValuesAfterDecoding();
   compilerCursorEmitsIndividualEnvelopeStages();
   compilerCursorPreservesEncodedAndResolvedSourceFields();
+  compilerCursorOwnsDelayedEncodedFieldNames();
   compilerCursorCompilesControlFlow();
   compilerCursorCompilesRepeatsAndConditionalFields();
   compilerCursorComposesOperationsIntoOneBody();

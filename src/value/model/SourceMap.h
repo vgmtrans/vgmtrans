@@ -28,7 +28,6 @@ class SessionState;
 
 enum class SourceRole : u8 {
   Unknown,
-  Source,
   Section,
   Header,
   Sequence,

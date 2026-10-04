@@ -507,7 +507,7 @@ public:
 
   [[nodiscard]] EncodedSemanticField<::u8> rawU8(std::string_view name,
                                                  SourceValueDisplay display = SourceValueDisplay::Default) {
-    return {record_.u8(name, display), name, display};
+    return {record_.u8(name, display), std::string(name), display};
   }
 
   ::s8 s8(std::string_view name, SourceValueDisplay display = SourceValueDisplay::SignedDecimal,
@@ -519,7 +519,7 @@ public:
 
   [[nodiscard]] EncodedSemanticField<::s8> rawS8(std::string_view name,
                                                  SourceValueDisplay display = SourceValueDisplay::SignedDecimal) {
-    return {record_.s8(name, display), name, display};
+    return {record_.s8(name, display), std::string(name), display};
   }
 
   u16 u16be(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
@@ -529,7 +529,7 @@ public:
 
   [[nodiscard]] EncodedSemanticField<u16> rawU16be(std::string_view name,
                                                    SourceValueDisplay display = SourceValueDisplay::Default) {
-    return {record_.u16be(name, display), name, display};
+    return {record_.u16be(name, display), std::string(name), display};
   }
 
   u16 u16le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
@@ -539,7 +539,7 @@ public:
 
   [[nodiscard]] EncodedSemanticField<u16> rawU16le(std::string_view name,
                                                    SourceValueDisplay display = SourceValueDisplay::Default) {
-    return {record_.u16le(name, display), name, display};
+    return {record_.u16le(name, display), std::string(name), display};
   }
 
   s16 s16le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::SignedDecimal,
@@ -559,7 +559,7 @@ public:
 
   [[nodiscard]] EncodedSemanticField<u32> rawU32be(std::string_view name,
                                                    SourceValueDisplay display = SourceValueDisplay::Default) {
-    return {record_.u32be(name, display), name, display};
+    return {record_.u32be(name, display), std::string(name), display};
   }
 
   u32 u32le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
@@ -569,7 +569,7 @@ public:
 
   [[nodiscard]] EncodedSemanticField<u32> rawU32le(std::string_view name,
                                                    SourceValueDisplay display = SourceValueDisplay::Default) {
-    return {record_.u32le(name, display), name, display};
+    return {record_.u32le(name, display), std::string(name), display};
   }
 
   u32 varLen(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
