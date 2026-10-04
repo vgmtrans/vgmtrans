@@ -380,7 +380,7 @@ struct SequencePlayback : SequencePlayback<TrackStateType> {
 };
 
 struct SequenceVmOptions {
-  LoopPolicy loopPolicy = LoopPolicy::Default;
+  LoopPolicy loopPolicy = LoopPolicy::PlayOnce;
   // Extra runtime loop repeats after the first pass through an infinite loop.
   u32 sequenceLoops = 0;
 };

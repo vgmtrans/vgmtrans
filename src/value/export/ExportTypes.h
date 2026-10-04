@@ -67,7 +67,7 @@ struct MidiExportOptions {
 // Options shared by standalone sequence export, collection export, and
 // collection playback.
 struct SequenceRenderOptions {
-  LoopPolicy loopPolicy = LoopPolicy::Default;
+  LoopPolicy loopPolicy = LoopPolicy::PlayOnce;
   // Extra repeats after the initial playthrough. This is the user-facing
   // "Sequence Loops" setting: 0 means stop at the first infinite-loop point.
   u32 sequenceLoops = 1;

@@ -849,10 +849,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
       .preferredPitchTransitionRendering = behavior.preferredPitchTransitionRendering,
   };
 
-  const SequenceVmOptions options{
-      .loopPolicy = options_.loopPolicy == LoopPolicy::Default ? LoopPolicy::PlayOnce : options_.loopPolicy,
-      .sequenceLoops = options_.sequenceLoops,
-  };
+  const SequenceVmOptions options = options_;
 
   if (!runtime.valid()) {
     sequence.diagnostics.push_back(Diagnostic{

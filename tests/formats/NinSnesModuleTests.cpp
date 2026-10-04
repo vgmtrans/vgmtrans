@@ -2312,10 +2312,102 @@ void ninSnesQuestSupportsOgreBattle() {
   }
 }
 
+void ninSnesOptionalNoteSuffixesRespectAramEnd() {
+  const auto parseAtEnd = [](const std::vector<u8>& commands, const Layout& layout,
+                             SourceMapBuilder* sourceMap, std::vector<Diagnostic>& diagnostics) {
+    auto bytes = sequenceBytes({});
+    const auto start = static_cast<u16>(kAramSize - commands.size());
+    writeSection(bytes, 0x200, {{0, start}});
+    std::ranges::copy(commands, bytes.begin() + start);
+    return decodeSequence(ByteReader(SourceId{7}, bytes), layout, AssetId{1}, sourceMap, &diagnostics);
+  };
+
+  for (const auto id : {ProfileId::Standard, ProfileId::Lemmings, ProfileId::IntelliFe3,
+                        ProfileId::IntelliTa, ProfileId::IntelliFe4}) {
+    auto layout = standardLayout();
+    layout.profile = id;
+    const auto noteParameters = profile(id).noteParameters;
+    std::vector<std::vector<u8>> cases{{4}, {4, 0}, {4, 0x7f}, {4, 0x80, 0}};
+    if (noteParameters == NoteParameterModel::Lemmings) {
+      cases.insert(cases.end(), {{4, 0, 0}, {4, 0x7f, 0x7f}});
+    }
+    for (const auto& bytes : cases) {
+      SourceMapBuilder sourceMap;
+      std::vector<Diagnostic> diagnostics;
+      const auto parsed = parseAtEnd(bytes, layout, &sourceMap, diagnostics);
+      expect(!parsed.program.tracks.empty() && !parsed.program.tracks[0].commands.empty(),
+             "ARAM-end track should retain its first decoded command");
+      const auto& command = parsed.program.tracks[0].commands.front();
+      const bool followedByNote = bytes.size() > 1 && bytes[1] == 0x80;
+      const auto consumed = static_cast<u32>(followedByNote ? 1 : bytes.size());
+      const auto start = static_cast<u32>(kAramSize - bytes.size());
+      expect(command.semantic == SequenceSemantic::State && command.execution.body,
+             "optional note suffix absence must not discard a valid duration command at ARAM end");
+      expect(command.range == SourceRange{SourceId{7}, start, consumed} &&
+                 command.flow.continuation.value == start + consumed &&
+                 command.flow.defaultTransition.kind == CommandTransitionKind::Fallthrough,
+             "note parameter decoding must consume only the available optional suffix");
+      expect(std::ranges::none_of(diagnostics, [](const auto& diagnostic) {
+        return diagnostic.code == "truncated-record";
+      }), "an absent optional suffix must not report a missing required field");
+      expect(followedByNote ? diagnostics.empty()
+                            : diagnostics.size() == 1 && diagnostics[0].message.find("not decoded") != std::string::npos,
+             "a genuinely missing next command must retain its VM continuation warning");
+
+      const auto annotations = sourceMap.finish();
+      const auto& fields = annotations.get(command.annotation).fields;
+      std::vector<const SourceField*> encoded;
+      for (const auto& field : fields) {
+        if (field.range.size != 0) {
+          encoded.push_back(&field);
+        }
+      }
+      std::vector<std::string> names{"opcode", "duration"};
+      for (u32 index = 1; index < consumed; ++index) {
+        names.push_back(noteParameters == NoteParameterModel::Standard ? "quantize_velocity"
+                        : noteParameters == NoteParameterModel::Lemmings ? (index == 1 ? "duration_rate" : "velocity")
+                                                   : "parameter_" + std::to_string(index));
+      }
+      expect(encoded.size() == names.size(), "note parameters must retain only real encoded fields");
+      for (size_t index = 0; index < encoded.size(); ++index) {
+        const u32 byteIndex = index == 0 ? 0 : static_cast<u32>(index - 1);
+        const auto* value = std::get_if<u64>(&encoded[index]->value);
+        const auto display = index == 0 ? SourceValueDisplay::Hex
+                             : index == 1 ? SourceValueDisplay::Decimal
+                             : noteParameters == NoteParameterModel::Lemmings ? SourceValueDisplay::Default : SourceValueDisplay::Hex;
+        expect(encoded[index]->name == names[index] && value && *value == bytes[byteIndex] &&
+                   encoded[index]->range == SourceRange{SourceId{7}, start + byteIndex, 1} &&
+                   encoded[index]->display == display,
+               "optional suffix fields must preserve encoded names, values, ranges, displays and order: profile=" +
+                   std::to_string(static_cast<unsigned>(id)) + " bytes=" + std::to_string(bytes.size()) +
+                   " field=" + encoded[index]->name + " display=" +
+                   std::to_string(static_cast<unsigned>(encoded[index]->display)));
+      }
+    }
+  }
+
+  std::vector<Diagnostic> diagnostics;
+  const auto required = parseAtEnd({0xe0}, standardLayout(), nullptr, diagnostics);
+  const auto& program = required.program.tracks[0].commands.front();
+  expect(program.semantic == SequenceSemantic::Unsupported && !program.execution.body &&
+             program.flow.defaultTransition.kind == CommandTransitionKind::End &&
+             diagnostics.size() == 1 && diagnostics[0].code == "truncated-record",
+         "a missing mandatory program operand must still truncate and stop its command");
+
+  diagnostics.clear();
+  const auto remote = parseAtEnd({0xd9, 0}, questLayout(), nullptr, diagnostics);
+  const auto& command = remote.program.tracks[0].commands.front();
+  expect(command.range == SourceRange{SourceId{7}, 0xfffe, 2} && !command.execution.body &&
+             command.flow.defaultTransition.kind == CommandTransitionKind::End && diagnostics.size() == 1 &&
+             diagnostics[0].message == "Invalid Quest remote voice command",
+         "a missing required Quest embedded opcode must remain an invalid remote command");
+}
+
 }  // namespace
 
 void runNinSnesTests() {
   ninSnesProfilesDescribeEverySupportedDriverFamily();
+  ninSnesOptionalNoteSuffixesRespectAramEnd();
   ninSnesKonamiClockControlsTempo();
   ninSnesScannerFindsRequestedSongAcrossSparseTable();
   ninSnesKoeiUsesSixBgmTracksAndPendingRequest();

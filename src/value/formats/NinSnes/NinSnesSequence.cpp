@@ -1087,12 +1087,12 @@ void Playback::adsr(u8 adsr1, u8 adsr2) {
     bool hasVelocity = false;
     u8 durationRate = 0;
     u8 velocity = 0;
-    if (cursor.peekU8() <= 0x7f) {
+    if (cursor.peekU8().value_or(0xff) <= 0x7f) {
       hasDuration = true;
       const u8 raw = cursor.u8("duration_rate");
       durationRate = static_cast<u8>((raw << 1) + (raw >> 1) + (raw & 1));
       cursor.derived("resolved_duration_rate", durationRate);
-      if (cursor.peekU8() <= 0x7f) {
+      if (cursor.peekU8().value_or(0xff) <= 0x7f) {
         hasVelocity = true;
         velocity = static_cast<u8>(cursor.u8("velocity") << 1);
         cursor.derived("resolved_velocity", velocity);
@@ -1104,7 +1104,7 @@ void Playback::adsr(u8 adsr1, u8 adsr2) {
   bool present = false;
   u8 durationRate = 0;
   u8 velocity = 0;
-  if (cursor.peekU8() <= 0x7f) {
+  if (cursor.peekU8().value_or(0xff) <= 0x7f) {
     present = true;
     const u8 packed = cursor.u8("quantize_velocity", SourceValueDisplay::Hex);
     durationRate = context.definition.duration[(packed >> 4) & 7];

@@ -326,7 +326,7 @@ DecodedBytecodeCommand decodeIntelligentNoteParameters(Cursor& cursor, const Dec
   const u8 duration = cursor.opcodeValue("duration", cursor.opcode(), SourceValueDisplay::Decimal);
   event.set<&TrackState::noteLength>(duration);
   std::vector<std::pair<u8, u8>> parameters;
-  while (cursor.peekU8() <= 0x7f && parameters.size() < 0x80) {
+  while (cursor.peekU8().value_or(0xff) <= 0x7f && parameters.size() < 0x80) {
     const u8 raw = cursor.u8(fmt::format("parameter_{}", parameters.size() + 1), SourceValueDisplay::Hex);
     const auto& table = raw < 0x40 ? context.definition.intelliDuration : context.definition.intelliVolume;
     const u8 resolved = table[raw & 0x3f];

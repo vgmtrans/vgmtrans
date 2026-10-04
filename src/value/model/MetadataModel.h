@@ -75,9 +75,8 @@ struct Timebase {
 // How export should treat source loops. The parsed sequence still keeps the
 // original loop commands for formats that can represent them directly.
 enum class LoopPolicy {
-  Default,
-  PlayOnce,
-  Preserve,
+  PlayOnce = 1,
+  Preserve = 2,
 };
 
 }  // namespace vgmtrans::core

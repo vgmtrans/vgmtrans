@@ -333,15 +333,12 @@ void writeModulatorConnection(std::vector<u8>& bytes, const SynthModulator& modu
   return list;
 }
 
-[[nodiscard]] Chunk fmtChunk(const DecodedSynthSample& sample) {
-  std::vector<u8> payload;
-  writePcm16WaveFormat(payload, sample.decoded);
-  writeLe16(payload, 0);
-  return Chunk{"fmt ", std::move(payload)};
-}
-
 [[nodiscard]] Chunk waveList(const DecodedSynthSample& sample) {
-  auto wave = makeListChunk("wave", std::array{fmtChunk(sample)});
+  auto wave = makeListChunk("wave", {});
+  writeAscii(wave.payload, "fmt ");
+  writeLe32(wave.payload, 18);
+  writePcm16WaveFormat(wave.payload, sample.decoded);
+  writeLe16(wave.payload, 0);
   if (sample.decoded.pcm.size() > std::numeric_limits<u32>::max() / 2) {
     throw std::overflow_error("RIFF chunk is too large");
   }

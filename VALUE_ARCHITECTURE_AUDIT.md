@@ -1,15 +1,14 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Sixty-two validated batches remove 1,532 net production lines
+`cb9e0b766`. Sixty-three validated batches remove 1,539 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 62 replays both corpora against executed batch 60;
-its rebuilt batch 61 predecessor has identical shell bytes to batch 60.
-72 expanded raw inventories match byte-for-byte; 1 retains previously
-proved Sony sample-pool ID scheduling variation. The cleanup2 records appear
-at the end of this document.
+cover 37 of 38 registered families. Batch 63 replays both corpora against its
+committed batch 62 predecessor. All 73 expanded raw inventories match exactly;
+no classification is needed. The cleanup2 records appear at the end of this
+document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
 
@@ -11068,3 +11067,91 @@ pruned-verified-originals60-after62-replay.json and pass62-final-root-review.jso
 Cumulative production removal is 1,532 value lines: 1,219 architecture
 and 313 formats, plus the earlier 22 UI lines. Continue with unused
 source-map authoring and the independently identified Nin optional-EOF bug.
+
+### cleanup2 batch 63: explicit loop policy, direct DLS format ownership, and optional suffix EOF correction
+
+Batch 63 removes seven architecture lines: four from the redundant Default
+loop sentinel and its normalization, and three from a temporary DLS fmt chunk.
+The Nin parser correction changes four expressions without changing line count.
+An existing Nin test file gains a 92-line behavioral regression. Cumulative
+production reduction is 1,539 lines: 1,226 architecture and 313
+format lines; the earlier 22 UI lines remain separate.
+
+LoopPolicy now states its two actual choices, PlayOnce and Preserve. Both option
+defaults select PlayOnce directly. Their existing repeat defaults remain
+different, zero for the VM and one for public rendering. Explicit enum values
+retain PlayOnce=1 and Preserve=2. The immutable render-local options copy remains
+at its original point before runtime validation/state factories. Borrowing the
+VM's member instead would expose an active render to a callback that reassigns
+the VM; that proposed simplification was rejected on source evidence. External
+Default spelling and bare numeric-zero normalization intentionally disappear.
+No invalid-enum behavior or external source compatibility is claimed.
+
+DLS writes its fixed 18-byte PCM fmt body into the existing wave LIST owner.
+The unchanged shared PCM writer produces the same 16 bytes, followed by cbSize=0.
+The logical fmt size, data checks, PCM bytes, INFO rules and pool offsets remain
+unchanged. A private temporary chunk/factory and its immediate copy disappear.
+Allocation staging changes: the fixed wave/fmt prefix exists before rate
+validation. Explicit rate/data error order is preserved, but arbitrary allocator
+failure ordinals and partial local buffers are not promised equivalent. No
+measured allocation or speed claim is made.
+
+Four Nin optional suffix decisions compared optional<u8> directly with 0x7f.
+A disengaged optional satisfies that ordering, so EOF incorrectly initiated a
+required read and discarded an otherwise valid duration command. Using the
+existing native value_or(0xff) lookahead idiom preserves every present-byte
+decision and treats absence as a suffix boundary. Standard, Lemmings and
+Intelligent prefixes now retain real duration/parameter behavior. Actual fields
+and required reads retain their existing contracts. Quest's required embedded
+opcode guard remains unchanged; missing continuation/runtime targets still warn.
+The prior Intelligent zero pairs were transient; failed reads did not produce
+fabricated durable source fields.
+
+The new public-parser fixture covers 22 ARAM-end/present-byte cases across
+Standard, Lemmings, FE3, TA and FE4, with two mandatory-operand negative controls.
+It checks executable semantic/body, consumed range, continuation/flow, diagnostic
+boundary, and ordered real encoded field names/values/ranges/display. On unchanged
+committed62 production, the fixture fails exactly the valid-duration-body
+assertion. The full integrated Nin suite passes after the four-expression fix.
+An initial fixture-only compile failure used an unsupported Address equality
+operator; its source/log/status are preserved, and the assertion was corrected
+to compare Address::value before establishing the meaningful failing baseline.
+The first candidate run passed the body assertion but failed a later TA field
+expectation: TA uses the standard packed note model, unlike FE3/FE4. That expected
+name was corrected to follow the declared profile; context was added to field
+failures. Both fixture mistakes and the first 43-pass/one-failure CTest record
+remain preserved. The first Standard duration-body assertion is unchanged;
+its captured failing baseline remains the regression evidence.
+
+The proposed SourceMapBuilder::field deletion was rejected and fully reverted.
+The first integrated build exposed a Konami TMNT2 caller; the complete inventory
+also contains native Rare, SoftCreat, Square PS2 and WolfTeam callers,
+with six direct factory calls across five families. The original
+sealed inventory already contained them. The unused-method source judgment was
+incorrect, and root accepted it before inspecting those receivers adequately.
+The failed build, initial application/approved diff and cold evidence remain
+preserved, with a separate receiver correction. The final source restores both
+SourceMap files exactly to committed62. Generic annotation/field expansion would
+add format authoring work; this helper remains useful.
+
+Validation: the coherent Release build completes 357 steps without warnings, followed
+by two incremental steps for the final fixture expectation correction. All 44
+CTest suites pass. Complete frozen sources cover value,
+shared, tests and Qt, with four matching archives and the resulting shell.
+Shell SHA-256: 48c3fc5c62476e0411548f8ce98bc21dc4cbdf04efc7f605f77ea4b5bdc7430b. The shell differs from committed62, so both archive
+campaigns run afresh against that immediate predecessor. All 252 original
+records and 3,922 original artifacts match exactly; all 894 expanded export
+records and 858 artifacts match exactly, including identical supported and
+unsupported statuses and diagnostics. All 73 raw inventories match exactly;
+no scheduling classification is applied to this pair. Raw records and prior
+unchanged-binary proof remain preserved. No broader normalization or new
+manual baseline repetition is introduced. This confirms the sampled corpus,
+covering 37 of 38 real families; Konami TMNT2 remains synthetic coverage.
+
+Root independently rehashes the complete corpus records and new retained
+payloads before reclaiming only the older verified62 generated payloads. Music
+archives, JSON/logs, frozen sources, binaries and prior proof records remain.
+Evidence lives under /tmp/vgmtrans-cleanup2: the cold candidate directories,
+nin-eof63-root-baseline, field63-build-rejection, pass63 application/build/test/
+freeze/final/postcommit records and corpora63-root-review.json. Temporary receipt
+paths are local verification evidence rather than repository dependencies.
