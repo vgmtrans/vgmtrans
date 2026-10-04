@@ -95,14 +95,17 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
   // Rates and delays are independent controls. Keep source events by target
   // and pitch layer; their storage stays stable until derived events are appended.
   using ActiveModulation = std::map<std::pair<ModulationPerformanceTarget, u32>, const ModulationPerformanceEvent*>;
-  std::vector<ActiveModulation> states(performance.tracks.size());
-  std::vector<std::vector<ModulationPerformanceEvent>> derived(performance.tracks.size());
+  struct TrackModulation {
+    ActiveModulation active;
+    std::vector<ModulationPerformanceEvent> derived;
+  };
+  std::vector<TrackModulation> trackModulation(performance.tracks.size());
   u32 currentTempo = performance.initialTempoMicrosecondsPerQuarter;
   double secondsPerTick = tickSeconds(performance, currentTempo);
 
   for (const EventRef& ref : timeline) {
     auto& event = *ref.event;
-    auto& state = states[ref.trackIndex];
+    auto& state = trackModulation[ref.trackIndex].active;
 
     if (auto* tempo = std::get_if<TempoPerformanceEvent>(&event)) {
       if (tempo->microsecondsPerQuarter == currentTempo) {
@@ -116,7 +119,7 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
         if (tempo->header.tick > track.endTick && track.endTick != 0) {
           continue;
         }
-        for (const auto& [key, modulation] : states[trackIndex]) {
+        for (const auto& [key, modulation] : trackModulation[trackIndex].active) {
           auto update = *modulation;
           update.header = PerformanceEventHeader{
               .sourceAnnotation = tempo->header.sourceAnnotation,
@@ -126,7 +129,7 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
           };
           update.tempoDerived = true;
           resolveContext(update, secondsPerTick);
-          derived[trackIndex].emplace_back(std::move(update));
+          trackModulation[trackIndex].derived.emplace_back(std::move(update));
         }
       }
       continue;
@@ -156,7 +159,7 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
 
   for (size_t trackIndex = 0; trackIndex < performance.tracks.size(); ++trackIndex) {
     auto& track = performance.tracks[trackIndex];
-    auto& additions = derived[trackIndex];
+    auto& additions = trackModulation[trackIndex].derived;
     if (additions.empty()) {
       continue;
     }

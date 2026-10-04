@@ -61,8 +61,11 @@ double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elaps
     return upper == samples.begin() ? samples.front().value : std::prev(upper)->value;
   }
 
-  if (duration == 0) {
+  if (clampedElapsed == duration) {
     return transition.targetKey;
+  }
+  if (clampedElapsed == 0) {
+    return transition.startKey;
   }
   const double position = static_cast<double>(clampedElapsed) / static_cast<double>(duration);
   return transition.startKey + ((transition.targetKey - transition.startKey) * position);

@@ -293,13 +293,6 @@ void parseTags(PsfData& psf, std::span<const u8> bytes, size_t offset) {
   return psf;
 }
 
-[[nodiscard]] const std::string* primaryLibName(const PsfData& psf) {
-  if (auto it = psf.tags.find("_lib"); it != psf.tags.end()) {
-    return &it->second;
-  }
-  return nullptr;
-}
-
 void overlay(Image& image, u32 address, std::span<const u8> data, size_t imageSize) {
   // Libraries can extend the image before or after previous payloads. Resize and zero-fill
   // so later overlays land at their emulated addresses. Some containers omit a zero-filled
@@ -402,8 +395,8 @@ void loadPsf2WithLibs(const PsfData& psf, const std::filesystem::path& basePath,
                      loadPsf2WithLibs(library, libraryBase, filesystem, diagnostics, range, depth + 1);
                    });
   };
-  if (const auto lib = primaryLibName(psf)) {
-    loadLibrary(*lib);
+  if (const auto lib = psf.tags.find("_lib"); lib != psf.tags.end()) {
+    loadLibrary(lib->second);
   }
   loadNumberedLibraries(psf, loadLibrary);
 
@@ -427,8 +420,8 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
                      loadWithLibs(library, libraryBase, image, diagnostics, range, depth + 1);
                    });
   };
-  if (const auto lib = primaryLibName(psf)) {
-    loadLibrary(*lib);
+  if (const auto lib = psf.tags.find("_lib"); lib != psf.tags.end()) {
+    loadLibrary(lib->second);
   }
 
   overlayPsfExe(psf, image);

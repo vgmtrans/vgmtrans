@@ -318,6 +318,30 @@ void performanceEmitterResolvesDeclaredPanLawIntoEvents() {
                                  "positional pan should reject a format that did not declare its pan law");
 }
 
+void pitchTransitionInterpolationKeepsEndpointsAndSamplePrecedence() {
+  PitchTransitionIntent transition{
+      .startKey = 64.5, .targetKey = 30.01, .timing = PitchSlideTiming::fromTicks(3)};
+  expect(pitchTransitionValueAt(transition, 3) == transition.targetKey &&
+             pitchTransitionValueAt(transition, 5) == transition.targetKey,
+         "a completed slide must reach its declared pitch without cancellation roundoff");
+
+  transition.startKey = -std::numeric_limits<double>::max();
+  transition.targetKey = std::numeric_limits<double>::max();
+  expect(pitchTransitionValueAt(transition, 0) == transition.startKey &&
+             pitchTransitionValueAt(transition, 3) == transition.targetKey,
+         "finite slide endpoints must not depend on overflowing interior arithmetic");
+
+  transition.samples = std::vector<AutomationSample>{{0, 12.0}, {2, 24.0}};
+  expect(pitchTransitionValueAt(transition, 0) == 12.0 && pitchTransitionValueAt(transition, 3) == 24.0,
+         "staircase samples must retain priority over linear endpoints");
+  transition.timing = PitchSlideTiming::fromTicks(0);
+  expect(pitchTransitionValueAt(transition, 0) == 12.0,
+         "a zero-duration sampled transition must still use its sample at tick zero");
+  transition.samples = std::vector<AutomationSample>{};
+  expect(pitchTransitionValueAt(transition, 0) == transition.targetKey,
+         "an empty sample list must retain immediate linear completion");
+}
+
 void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
   PerformanceTrack track{.id = TrackId{5}};
   u64 nextSequence = 0;
@@ -635,6 +659,7 @@ void runValueSequenceModelTests() {
   lfoDepthFadeKeepsItsUnsignedDuration();
   performanceBoundValueOwnsReplacementLifecycle();
   performanceEmitterResolvesDeclaredPanLawIntoEvents();
+  pitchTransitionInterpolationKeepsEndpointsAndSamplePrecedence();
   pitchTransitionApiPreservesSamplesAndRealizedLifecycle();
   continuedVoiceResolvesPriorPitchMotion();
   explicitTiesPreserveUnfinishedMotionOnTheirOwnLane();

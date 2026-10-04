@@ -1,15 +1,13 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Thirty-eight validated batches remove 1,183 net production lines
+`cb9e0b766`. Thirty-nine validated batches remove 1,184 net production lines
 from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 37 exactly;
-72 expanded raw inventories match byte-for-byte. One Sony input differs only in
-previously proven concurrent sample-pool ID scheduling. Its narrowly mapped
-inventory matches retained original evidence; all raw differences are preserved.
-The cleanup2 records appear at the end of this document.
+cover 37 of 38 registered families. All export records match batch 38 exactly;
+all 73 expanded raw inventories match byte-for-byte. The cleanup2 records appear
+at the end of this document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
 
@@ -7904,3 +7902,170 @@ correction is being drafted separately; it is excluded from this batch. Public N
 source/tempo owners, mutable RegionResponse copies, used-instrument filtering and
 source command flow remain distinct responsibilities; their guards or owners are
 not deleted solely to reduce lines.
+
+## Cleanup2 thirty-ninth batch: direct library lookup, one modulation scratch owner, exact pitch endpoints
+
+Parent is `86d8d3ea5`, the committed thirty-eighth batch. Three production paths
+add 17 lines and delete 18: net **one architecture line removed**. The existing
+sequence-model fixture adds 25 lines. Cumulative production reduction is
+**1,184 lines**: 1,061 architecture and 123 format lines. Cumulative C++/header
+totals: 2,107 additions/3,291 deletions across 165 value paths; architecture
+1,739/2,800 across 94 paths; formats 368/491 across 71. Tests are 1,044 additions/
+424 deletions across 43 paths. This batch removes a shallow helper and a parallel
+scratch-owner invariant while explicitly honoring a declared pitch's endpoints;
+its value is greater than the modest physical line reduction.
+
+### Put primary-library presence at its two actual load boundaries
+
+Delete the seven-line private primaryLibName map-lookup/pointer-projection
+helper. Each of two loaders now uses an ordinary const-map if-initializer for
+`_lib` and loads its value when found. Only end() skips loading; present-empty
+still follows the actual load path. Local iterators remain in their if scope;
+parent tags stay immutable and alive through synchronous nested parsing.
+tryOpenLibrary keeps its mutable normalization copy. No owner, helper, public
+API, target policy or lifetime protocol is added. The unrelated legacy
+PSFFile member function is unchanged. An independent export review agrees.
+
+All 1,942 actual extraction/library cases preserve four Release/focused-SAN
+traces of 1,465,371 bytes, SHA-256
+aa5cbc8eb082da1bf3586b0e358d91e59d3912f50febd480e0b213b43efd3cb4.
+Absent/empty/short/SSO-boundary/long, slashes, NUL/UTF-8/spaces, duplicate/numbered/
+gapped tags, path presence, recursive loading, immutable normalization inputs
+and returned output after source/input destruction are covered. A pathful-empty
+assertion checks the actual load-failure branch. Five complete platform suites
+and 42 actual configured Werror checks pass in all three configurations. Eight
+natural closures preserve 34,798,705 captured bytes per variant and all scoped
+allocation metrics after SourceStore destruction; this includes the unchanged
+unsupported DSF case, not a new supported conversion.
+
+Ordinary per-case calls/requested/peak/retained payloads are exact in both modes:
+29,970 requests and 20,126,556 requested bytes per variant. PsfData stays 72 bytes.
+The temporary directory's different length changes path diagnostics compared
+with the earlier harness; each before/after39 pair uses the same paths. Only
+helper-call/return-size assertions were removed from the temporary harness;
+all actual behavior checks remain. Instrumented extractor/probes/native/five
+fixture TUs plus Source/Session link matching frozen38 Release dependencies,
+with consistent libc++ annotation opt-out. No exhaustive injected bad_alloc,
+whole-program/cross-platform, timing, RSS or focused export-equivalence claim.
+Evidence: /tmp/vgmtrans-cleanup2/primary-lib-lookup39/proof-summary.json,
+proof-report.md and applied.json.
+
+### Keep a track's active and derived modulation scratch together
+
+TempoRelativeModulation now has one local TrackModulation containing its ordered
+active source-event map and derived-event vector. One vector owns these records
+in the track-index domain, replacing two independently allocated outer vectors.
+The four indexed accesses use the same local owner. Rate/delay/layer selection,
+source borrows, deferred append, sorting, recomputation and public types stay.
+Three lines are added; the parallel-owner size/index invariant disappears.
+
+A 34,560-input matrix captures 103,680 resolver results: four rounding modes,
+zero/extreme ppqn and tempo, nonfinite/negative/signed-zero/huge rates, samples,
+target/layer replacement, ordering and track-end boundaries, stale derived
+removal, idempotence and revised/reversed tempo maps. Release O2 before/after
+are raw-exact at 539,958,117 bytes, SHA-256
+768cb17e13fcfcee732da05f3dea60475c5695f06535f0c1642923acb5f7f511;
+focused SAN O1 before/after are independently raw-exact at the same size, SHA
+35df1abb43a7699ec717693893411a352951e6210fea5b4db98ef14d3c7bd7e9.
+All field bits also match across builds. However, 51,840 captured flag records
+differ by FE_INVALID between Release and SAN, identically before and after;
+the baseline compiler variation is retained in raw traces and classified
+separately. There is no claim that all four raw matrices or cross-build flags
+match. The initial overstrict cross-build assertion failed and is retained.
+
+864 generated finite performance inputs produce 15,552 MIDI/event/diagnostic
+captures over policies and recomputation/revision/order cases. All four streams
+match at 40,004,208 bytes, SHA-256
+0574eda7fda8995b7f7794fd1ae1c5e735d55f880ce9cc2313a45791556e022b.
+All six complete model/VM/modulation/MIDI suites pass, including 72,765 identical
+captured VM bytes; assertion-only branches retain their existing expectations.
+All 40 final compile/run records and six actual three-configuration Werror checks
+pass. Initial temporary emitter spelling errors were corrected before application;
+no production draft changes or new warning suppressions were needed.
+
+Among 512 scoped resolver allocation rows, 288 save one request and 224 fast
+paths are equal: 146,804 to 146,516 requests, with requested bytes unchanged at
+420,106,880. Maps/vectors are 24 bytes each; the combined record remains 48 per
+track while the two outer vector owners become one 24-byte owner. The seven-track
+fault probe records scratch requests 168,168 becoming one 336-byte allocation; throwing at each
+old/new scratch site propagates after stale-derived erasure and before source
+context resolution. Arbitrary allocation-failure order is not equivalent.
+No peak/heap-byte/RSS/timing gain is claimed. Focused SAN instruments the resolver,
+probes and six fixture TUs; unchanged matching core/fmt implementations stay
+Release, with consistent container annotation opt-out. Evidence:
+/tmp/vgmtrans-tempo-modulation-scratch39/results.json, trace-results.json,
+fenv-classification.json, cost-results.json and application records. Two equal
+candidate matrix copies are reclaimed only after complete SHA/fileset manifest
+gates; both raw baseline matrices, all flag differences and other proof remain.
+
+### Return declared linear pitches at their endpoints
+
+The existing immediate-completion branch now returns targetKey when elapsed time
+has reached duration, and an explicit start branch returns startKey at tick zero.
+The interior expression is unchanged. Nonempty staircase samples are checked
+first, including zero duration; engaged-empty samples keep linear behavior.
+Three lines make these semantics direct and avoid endpoint cancellation or
+an overflowing difference multiplied by zero.
+
+Of 119,624 arithmetic cases, all 37,790 interior, 49,812 sampled and 7,116 immediate
+cases preserve bits and scoped floating flags. All 24,906 linear endpoint cases
+copy the intended endpoint bits. There are 3,658 intentional bit corrections and
+5,000 flag differences, including signed zero and nonfinite endpoints; ordinary
+finite missed-target cases account for 234 corrections. The arithmetic/raw
+classification is retained. This does not fix overflowing interior arithmetic,
+define a general NaN policy or claim unchanged flags at corrected endpoints.
+
+The public MIDI lifecycle matrix (1,008 cases), dyadic boundary matrix (9,288),
+and nine core/five native fixture suites remain exact, with 3,697,392 captured
+fixture/lifecycle bytes and 13,327,810 dyadic boundary bytes. Among 13,932 adjacent
+boundary cases, 399 cases/798 PreserveFormat and PitchBend outputs correct one
+final-tick wheel step, agreeing with an independent exact rational target-value
+oracle; Portamento stays. The 1,974 mixed-sign interior matrix preserves its
+outputs: all 93 regressions exposed by unrestricted lerp disappear. All these
+public matrices cover three pitch policies. The permanent existing-file
+regression fails before and passes after: ordinary exact target, finite extreme
+start/completion, sample precedence at endpoints/zero duration and engaged-empty
+immediate completion. The full candidate sequence-model suite and focused SAN
+pass; four configured Werror objects are clean, and model text grows 16 bytes
+(9,933 to 9,949). No timing or broad accuracy gain is claimed.
+
+The isolated endpoint shell already preserves the original 252 records/3,922
+artifacts and expanded 894 exports/858 artifacts/218,240,549 bytes. Seventy-two
+raw inventories match; the known Onimusha pool0/1 variability remains, including
+a non-equal repeat pair. Four initial/automatic records match the existing narrow
+classification against retained originals; metadata, ordered diagnostics,
+relationships and six exports stay, raw differences retained. This isolated
+proof precedes the combined integrated replay below. Modified model/probes/
+fixtures are instrumented; linked matching frozen38 dependencies are Release.
+Evidence: /tmp/vgmtrans-cleanup2/pitch-transition-endpoints38/proof.json,
+arithmetic-comparison.json, adjacent/interior-midi-classification.json and
+applied-files.json. The unrestricted lerp rejection remains recorded in batch38.
+
+### Integrated verification
+
+- Complete Release build: 51 steps without warnings; all 44 CTest suites pass.
+- Frozen39 holds exact sources/headers/tests/four archives and the executable
+  with SHA-256 `d5d6c0ab932022841b14b538efb43df130212b7fd61bd4ee08035341a23c7071`.
+- Against frozen38, the original corpus preserves all 252 input/policy records
+  and 3,922 artifact names/hashes.
+- The /Volumes/emu/vgm replay preserves all 894 export records: 852 successes
+  and 42 matching existing failures. All 858 artifact names/sizes/hashes and
+  218,240,549 bytes per binary match. All 73 raw inventories match exactly,
+  including five unchanged unsupported DSF failures. No inventory normalization
+  or additional repetitions are needed for this integrated pair. Real coverage
+  remains 37/38 families; KonamiTMNT2 is synthetic only. See
+  volume-coverage27/pass38-vs-pass39-summary.json.
+- All four approved source/test hashes and their exact diff remain held through
+  build, freeze and replay. User work stays outside the staged paths.
+
+### Continuing audit
+
+A future private collection-removal helper can traverse selected/resolved member
+views directly instead of allocating a flat membership projection for a boolean.
+That draft adds four lines and keeps hash-probe scaling; duplicate-heavy and bulk
+cases still need cost and failure-stage assessment. Scanning removed IDs through
+contains would reduce lines but can multiply removal-set and membership work,
+so that approach is retained as a rejection. Neither draft is in this batch.
+Required snapshot/sample owners, repeated stitched-part sharing, source command
+flow and typed runtime factories remain; removing them would introduce new
+lifetime protocols or change genuine behavior.
