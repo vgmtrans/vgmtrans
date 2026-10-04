@@ -1,11 +1,11 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Fifty-six validated batches remove 1,491 net production lines
+`cb9e0b766`. Fifty-seven validated batches remove 1,492 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 56 has the same shell bytes as batch 55;
+cover 37 of 38 registered families. Batch 57 has the same shell bytes as batch 55;
 its corpus evidence is reused from the executed batch 55 comparison with batch 54.
 Seventy-one expanded raw inventories match byte-for-byte; two retain the previously
 documented Sony sample-pool ID scheduling variation. The cleanup2 records appear
@@ -10706,3 +10706,39 @@ Cumulative production removal against core-rewrite is 1,491 value lines:
 1,184 architecture and 307 format lines, plus the earlier 22 UI lines. The next
 source-reviewed lead moves user sample-filtering policy out of the native-facing
 synth header and keeps its sole resolution query private to export preparation.
+
+## Cleanup2 batch 57: keep sample-filtering policy in export
+
+Native format modules recommend a concrete SampleFilter. User selection among
+automatic/disabled/SNES/PlayStation filtering belongs to export policy, so move
+SampleFilteringPolicy into ExportPolicy.h. Keep the sole resolveSampleFilter
+query beside decodeSynthPool in its private export implementation. ExportTypes.h
+no longer imports the neutral sample-filtering header. This removes one public
+helper and an unnecessary native-facing policy dependency without another layer.
+
+The four-path change removes one net architecture line. The enum name, namespace
+and stored ordinals 0/1/2/3 are unchanged. The resolver declaration/body is copied
+exactly, including invalid-policy fallback, and the decoder call/order is intact.
+All 32 native module preferences remain concrete filters. Repository UI/shell/
+export fixtures already import the policy through existing export facades.
+External clients importing SampleFiltering.h alone must now import export policy
+to name the preference; the resolver is intentionally private.
+
+The complete 343-step Release rebuild has no diagnostics, and all 44 CTest
+suites pass. The frozen shell SHA256 is 24ca21adfeb25fb8175442e1a0fce9def4a7919b615d5c284169801455ce349c, identical to the executed55
+shell and rebuilt56 predecessor. Prior original 252 records/3,922 artifacts and
+expanded 894 exports/858 artifacts are reused by actual binary identity. No new
+batch57 corpus replay or numerical/sanitizer mirror campaign was needed. Prior
+71 raw inventories and two classified Sony scheduling variants remain unchanged
+evidence; no new all73 raw-equality claim is made.
+
+Root verifies the fresh committed/frozen56 source authority, exact old/new bodies,
+enum and resolver relocation, header routes, complete rebuilt snapshot/libraries
+and corpus authority. Records are filtering-policy57-root-cold-review.json and
+pass57-final-root-review.json under /tmp/vgmtrans-cleanup2. The original55 cold
+draft remains sealed; frozen57 records its true precommit parent56 separately.
+
+Cumulative removal against core-rewrite is 1,492 value production lines:
+1,185 architecture and 307 formats, plus the earlier 22 UI lines.
+Next: remove generic-template notation still present in the now-concrete Q8
+rounding function, retaining its straightforward branches and exact arithmetic.

@@ -31,4 +31,12 @@ enum class DynamicEnvelopePolicy {
   InstrumentVariants,
 };
 
+// User-facing policy; FormatPreferred resolves to a SampleFilter per collection.
+enum class SampleFilteringPolicy {
+  FormatPreferred,
+  None,
+  SnesDspLowPass,
+  PsxSpuLowPass,
+};
+
 }  // namespace vgmtrans::core

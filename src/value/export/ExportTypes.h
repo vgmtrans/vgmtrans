@@ -8,7 +8,6 @@
 
 #include "value/model/MetadataModel.h"
 #include "value/export/ExportPolicy.h"
-#include "value/synth/SampleFiltering.h"
 
 #include <string>
 #include <vector>

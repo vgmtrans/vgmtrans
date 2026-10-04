@@ -53,6 +53,21 @@ constexpr double kPerceivedHalfLoudnessDb = 10.0;
           .startFrame = region.sampleStartFrame};
 }
 
+[[nodiscard]] constexpr SampleFilter resolveSampleFilter(SampleFilteringPolicy policy,
+                                                         SampleFilter formatPreferred) noexcept {
+  switch (policy) {
+    case SampleFilteringPolicy::FormatPreferred:
+      return formatPreferred;
+    case SampleFilteringPolicy::None:
+      return SampleFilter::None;
+    case SampleFilteringPolicy::SnesDspLowPass:
+      return SampleFilter::SnesDspLowPass;
+    case SampleFilteringPolicy::PsxSpuLowPass:
+      return SampleFilter::PsxSpuLowPass;
+  }
+  return SampleFilter::None;
+}
+
 void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, SampleOwner owner,
                      const SamplePool& pool, const SynthExportInput& input, const SourceStore& sources,
                      const SynthSampleDecodeOptions& options) {
