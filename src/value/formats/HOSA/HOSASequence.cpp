@@ -354,7 +354,7 @@ using Cursor = CompilerCursor<Playback>;
                                                    const RuntimeConfig& config,
                                                    std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, begin, end, kHosaCommandKindPrefix, diagnostics);
-  if (!cursor.hasOpcode()) return cursor.truncated();
+  if (!cursor.ok()) return cursor.truncated();
   const u8 status = cursor.opcode();
 
   auto readVariable = [&](std::string_view name) -> u16 {

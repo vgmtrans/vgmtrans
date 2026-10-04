@@ -473,7 +473,7 @@ using Cursor = CompilerCursor<Playback>;
                                                          const std::vector<s8>& transposes,
                                                          std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, offset, "cps.cps1-v1", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const u8 opcode = cursor.opcode();
@@ -576,7 +576,7 @@ using Cursor = CompilerCursor<Playback>;
                                                         u32 programBase, const std::vector<s8>& transposes,
                                                         std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, offset, "cps.early", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const u8 opcode = cursor.opcode();
@@ -778,7 +778,7 @@ using Cursor = CompilerCursor<Playback>;
                                                        std::array<Address, 4>& loopStarts,
                                                        std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, offset, "cps.late", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const u8 opcode = cursor.opcode();

@@ -331,7 +331,7 @@ using CapcomCursor = CompilerCursor<Playback>;
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, CapcomSnesEngineVersion version,
                                                    std::vector<Diagnostic>* diagnostics) {
   CapcomCursor cursor(reader, begin, "capcom-snes", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
 

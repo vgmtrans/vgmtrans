@@ -658,7 +658,7 @@ using Cursor = CompilerCursor<Playback>;
 [[nodiscard]] DecodedBytecodeCommand decodeLateCommand(ByteReader reader, u32 begin, const Layout& layout,
                                                        std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, begin, "wolf-team-snes", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const u8 opcode = cursor.opcode();
@@ -756,7 +756,7 @@ using Cursor = CompilerCursor<Playback>;
 [[nodiscard]] DecodedBytecodeCommand decodeSegmentedCommand(ByteReader reader, u32 begin, const Layout& layout,
                                                             std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, begin, "wolf-team-snes", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const bool middle = layout.middleSegmented();

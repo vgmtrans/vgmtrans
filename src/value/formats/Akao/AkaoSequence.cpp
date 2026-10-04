@@ -604,7 +604,7 @@ u32 relativePointer(AkaoCursor& cursor, const AkaoProfile& profile, u32 operandO
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end, const AkaoProfile& profile,
                                                    RepeatStack& repeats, std::vector<Diagnostic>* diagnostics) {
   AkaoCursor cursor(reader, begin, end, commandKindPrefix(profile.version), diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
 

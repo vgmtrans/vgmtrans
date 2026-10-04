@@ -239,7 +239,7 @@ using Cursor = CompilerCursor<Playback>;
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 offset,
                                                     std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, offset, std::string(kCommandKindPrefix), diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const u8 opcode = cursor.opcode();

@@ -649,7 +649,7 @@ using Cursor = CompilerCursor<Playback>;
 [[nodiscard]] DecodedBytecodeCommand decodeMidiEvent(ByteReader reader, u32 bytecodeEnd, const MidiEvent& source,
                                                      std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, source.offset, bytecodeEnd, kCommandKindPrefix, diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const u8 family = source.status & 0xf0;
@@ -893,7 +893,7 @@ struct SeEvent {
 [[nodiscard]] DecodedBytecodeCommand decodeSeEvent(ByteReader reader, u32 bytecodeEnd, const SeEvent& source,
                                                    std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, source.offset, bytecodeEnd, kCommandKindPrefix, diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const u8 family = source.opcode & 0xf0;

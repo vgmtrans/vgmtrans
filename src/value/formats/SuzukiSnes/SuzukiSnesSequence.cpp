@@ -619,7 +619,7 @@ using Cursor = CompilerCursor<Playback>;
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, Version version,
                                                    const TrackLayout& layout, std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, begin, "suzuki-snes", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const u8 opcode = cursor.opcode();

@@ -1176,7 +1176,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, KonamiSnesVersion version,
                                                    std::vector<Diagnostic>* diagnostics) {
   KonamiCursor cursor(reader, begin, "konami-snes", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
 

@@ -31,19 +31,16 @@ struct ExtractionResult {
 // sources. Producing at least one valid child consumes the input; an empty
 // result leaves it available to later extractors and format modules.
 struct SourceExtractor {
-  using Extract = std::function<ExtractionResult(const ExtractionInput& input)>;
   using FileExists = std::function<bool(const std::filesystem::path&)>;
-  using ResolvePath = std::function<std::optional<SourceFile>(const std::filesystem::path& path,
-                                                            const FileExists& exists)>;
 
   std::string name;
   std::vector<std::string> acceptedFormats;
-  Extract extract;
+  std::function<ExtractionResult(const ExtractionInput& input)> extract;
   // Optional hook for disk files and archive members. Paths and exists use the
   // same namespace. Return a path and metadata, or nullopt to decline. The first
   // match wins. Disk files resolve before I/O; archive redirects reuse a member
   // source, which is scanned at most once.
-  ResolvePath resolvePath;
+  std::function<std::optional<SourceFile>(const std::filesystem::path& path, const FileExists& exists)> resolvePath;
 };
 
 }  // namespace vgmtrans::core

@@ -461,7 +461,7 @@ using SegSatCursor = CompilerCursor<Playback>;
 [[nodiscard]] DecodedBytecodeCommand decodeTempo(ByteReader reader, u32 begin, u32 end, bool final,
                                                  std::vector<Diagnostic>* diagnostics) {
   SegSatCursor cursor(reader, begin, end, "segsat", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
@@ -479,7 +479,7 @@ using SegSatCursor = CompilerCursor<Playback>;
 [[nodiscard]] DecodedBytecodeCommand decodeNormal(ByteReader reader, u32 begin, u32 end, u32 normalStart,
                                                   std::vector<Diagnostic>* diagnostics) {
   SegSatCursor cursor(reader, begin, end, "segsat", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
 

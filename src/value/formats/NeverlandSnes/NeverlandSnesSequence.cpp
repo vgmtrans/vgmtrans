@@ -604,7 +604,7 @@ using Cursor = CompilerCursor<Playback>;
 [[nodiscard]] DecodedBytecodeCommand decodePlaylist(ByteReader reader, u32 begin, const Layout& layout,
                                                     std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, begin, "neverland-snes", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const u8 opcode = cursor.opcode();
@@ -750,7 +750,7 @@ template <auto Handler, class... Args>
                                                    std::vector<Diagnostic>* diagnostics,
                                                    ReferencedPrograms* references = nullptr) {
   Cursor cursor(reader, begin, "neverland-snes", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const u8 opcode = cursor.opcode();

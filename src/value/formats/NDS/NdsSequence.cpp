@@ -316,7 +316,7 @@ struct SequenceDecodeContext {
 // second opcode profile or execution switch.
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(const SequenceDecodeContext& context, u32 begin) {
   NdsCompilerCursor cursor(context.reader(), begin, context.range.sequenceEnd, "nds", context.diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
 

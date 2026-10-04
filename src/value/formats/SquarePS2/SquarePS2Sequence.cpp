@@ -483,7 +483,7 @@ using Cursor = CompilerCursor<Playback>;
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end, const TrackLayout& layout,
                                                    u32 trackIndex, std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, begin, end, kSquarePs2CommandKindPrefix, diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const auto source = readEventPrefix(reader, begin, end);

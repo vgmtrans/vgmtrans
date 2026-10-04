@@ -197,7 +197,7 @@ using Cursor = CompilerCursor<Playback>;
                                                  const SonyPs1EventLayout& source,
                                                  std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, begin, end, kSonyPs1CommandKindPrefix, diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const u8 family = source.status & 0xf0;

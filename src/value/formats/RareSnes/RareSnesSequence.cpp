@@ -1239,7 +1239,7 @@ using Cursor = CompilerCursor<Playback>;
                                                    u32 sequenceDataFloor, DecodeState& state,
                                                    std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, begin, kAramSize, "rare-snes", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const u8 opcode = cursor.opcode();

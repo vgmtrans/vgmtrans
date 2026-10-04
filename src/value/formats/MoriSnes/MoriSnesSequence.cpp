@@ -1014,7 +1014,7 @@ void consumeTiming(Cursor& cursor, u8 first, const InspectedEvent& inspected) {
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, const Layout& layout, u32 begin,
                                                    std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, begin, "mori-snes", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const InspectedEvent inspected = inspectEvent(reader, begin);

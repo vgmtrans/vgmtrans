@@ -688,7 +688,7 @@ Cursor::Event& selectInstrument(Cursor::Event& event, u8 program) {
                                                    std::vector<Diagnostic>* diagnostics,
                                                    std::set<u8>* programs = nullptr) {
   Cursor cursor(reader, begin, kFormatId, diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const u8 opcode = cursor.opcode();

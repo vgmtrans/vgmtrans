@@ -1279,7 +1279,7 @@ using Cursor = CompilerCursor<Playback>;
 [[nodiscard]] DecodedBytecodeCommand decodeCommandImpl(ByteReader reader, const Layout& layout, u32 begin,
                                                    std::vector<Diagnostic>* diagnostics, u8 forwardingDepth = 0) {
   Cursor cursor(reader, begin, "nin-snes-quest", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const u8 opcode = cursor.opcode();

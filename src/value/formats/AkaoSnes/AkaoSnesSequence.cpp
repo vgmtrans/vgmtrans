@@ -1554,7 +1554,7 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
                                                    u32 romRelocBase, u32 apuRelocBase,
                                                    std::vector<Diagnostic>* diagnostics) {
   AkaoSnesCursor cursor(reader, begin, end, "akao-snes", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
 

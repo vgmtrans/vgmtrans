@@ -71,7 +71,7 @@ static_assert(!AcceptsEmptyNoteArguments<ProbeCursor::Event>);
 DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
                                           std::vector<Diagnostic>* diagnostics = nullptr) {
   ProbeCursor cursor(reader, begin, end, "compiler-probe", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
 

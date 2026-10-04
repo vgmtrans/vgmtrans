@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Sixty-three validated batches remove 1,539 net production lines
+`cb9e0b766`. Sixty-four validated batches remove 1,545 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 63 replays both corpora against its
-committed batch 62 predecessor. All 73 expanded raw inventories match exactly;
+cover 37 of 38 registered families. Batch 64 replays both corpora against its
+committed batch 63 predecessor. All 73 expanded raw inventories match exactly;
 no classification is needed. The cleanup2 records appear at the end of this
 document.
 
@@ -11155,3 +11155,66 @@ Evidence lives under /tmp/vgmtrans-cleanup2: the cold candidate directories,
 nin-eof63-root-baseline, field63-build-rejection, pass63 application/build/test/
 freeze/final/postcommit records and corpora63-root-review.json. Temporary receipt
 paths are local verification evidence rather than repository dependencies.
+
+### cleanup2 batch 64: one cursor health query and direct callback signatures
+
+Use the existing ok() query for each guard immediately after CompilerCursor
+construction and remove hasOpcode(). The constructor performs exactly one
+fresh one-byte read. A successful read, including opcode zero, advances the
+consumed range by one and leaves the reader healthy. A failed read has zero
+available bytes, leaves the consumed range empty and marks failure. At these
+45 call sites the two queries therefore express the same initial health fact.
+Early returns and truncated() handling remain unchanged.
+
+The complete committed-source inventory has one getter and 45 guards: 43 native
+calls in 37 CPPs across 36 family directories, and two test-support calls.
+Root reconstructs every concrete cursor alias, constructor statement and guard
+against committed source and current source, with no intervening read or
+operation. The complete 1,045-file C/C++/Objective-C census and macro/type/
+member-pointer inventory are pinned. All 40 whole candidate bodies are freshly
+reconstructed against committed63/frozen63. In particular, Nin's four optional
+EOF fixes and the 92-line boundary fixture remain intact.
+
+This removes one architecture line and one public query choice. A later-phase
+opcode-presence query is intentionally removed: after a successful opcode and
+failed mandatory operand, the former getter could still be true while ok() is
+false. No late-query equivalence or external member-pointer/source compatibility
+is claimed. Neither getter used callbacks or mutation; constructor exceptions
+retain their existing path. The change adds no stored flag or new health rule.
+
+FormatModule::Scan, SourceExtractor::Extract and SourceExtractor::ResolvePath
+each named only its own stored callback type. Declare those unchanged
+std::function signatures on scan, extract and resolvePath directly, removing
+three names and five architecture lines. FileExists remains a shared parameter
+type with native Cue and fixture consumers. Field order, aggregate structure,
+callback signatures and ownership stay unchanged. External nested-alias
+spellings intentionally disappear.
+
+All 67 callback inventory rows were inspected: six alias declaration/own-field
+uses, eight retained FileExists uses and 53 unrelated text/comment occurrences.
+The separate full matching-line review also checks the six broad qualified/
+dependent rows and the expected empty macro query. Original query preparation
+errors and corrections remain sealed. Root's first application preparation
+also stopped on a dictionary/list manifest schema mismatch before any production
+write or compiler; its script and failure account remain separately preserved.
+The resumed source gates normalize that metadata shape and close before applying
+the 42-path candidate. Production reduction is six architecture lines, with
+line-neutral native/support guard replacements and no new fixture.
+
+The coherent Release build completes 305 steps without warnings; all
+44 CTest suites pass. Complete frozen value/shared/test/Qt bodies and four
+archives match the final shell, SHA-256 3b9e7d8538b8bb202ef1ea4d7bb5863c95fdbd602591ecab77d480cf39bb7e9c. Because that shell differs
+from committed63, the original and expanded archive campaigns run afresh against
+the immediate predecessor. All 252 original records and 3,922 artifacts match;
+all 894 expanded export records, 858 artifacts and 73 raw inventories match.
+No scheduling classification, new normalization or manual unchanged-baseline
+repetition is used for this pair. Complete evidence is in corpora64-root-review.
+Root rehashes every new retained original artifact and all paired records before
+reclaiming only older verified63 generated payloads. User/music inputs and all
+recorded evidence remain untouched.
+
+Cumulative production removal is 1,545 value lines: 1,232 architecture
+and 313 formats, plus the earlier 22 UI lines. Evidence is under
+/tmp/vgmtrans-cleanup2: cursor-opcode-query64-cold62 and its independent review,
+registration-callback64-final-cold62 and matching-line review, the root64 cold/
+application receipts, and pass64 build/test/freeze/corpus/final/postcommit records.

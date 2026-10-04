@@ -627,7 +627,7 @@ using Cursor = CompilerCursor<Playback>;
 [[nodiscard]] DecodedBytecodeCommand decodeEvent(ByteReader reader, u32 trackEnd, const EventLayout& source,
                                                  const DriverTiming& timing, std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, source.offset, trackEnd, kKonamiPs1CommandKindPrefix, diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
 

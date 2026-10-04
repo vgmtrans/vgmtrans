@@ -490,7 +490,7 @@ using Cursor = CompilerCursor<Playback>;
                                                    std::vector<Diagnostic>* diagnostics,
                                                    std::set<u8>* programs = nullptr) {
   Cursor cursor(reader, begin, "falcom-snes", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const u8 opcode = cursor.opcode();

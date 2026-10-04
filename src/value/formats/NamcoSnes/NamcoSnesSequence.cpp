@@ -685,7 +685,7 @@ struct SequenceReferences {
                                                    std::vector<Diagnostic>* diagnostics,
                                                    SequenceReferences& references) {
   Cursor cursor(reader, begin, kFormatId, diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
 

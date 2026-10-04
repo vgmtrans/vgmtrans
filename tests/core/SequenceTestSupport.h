@@ -50,7 +50,7 @@ using ProbeCompilerCursor = CompilerCursor<ProbePlayback>;
 
 [[nodiscard]] DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin) {
   ProbeCompilerCursor cursor(reader, begin, "probe");
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
 

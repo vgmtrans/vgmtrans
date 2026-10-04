@@ -805,7 +805,7 @@ using KonamiArcadeCursor = CompilerCursor<Playback>;
                                                    Address& discoveredSubroutine,
                                                    std::vector<Diagnostic>* diagnostics) {
   KonamiArcadeCursor cursor(reader, begin, static_cast<u32>(layout.code.endOffset()), "konami-arcade", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
 

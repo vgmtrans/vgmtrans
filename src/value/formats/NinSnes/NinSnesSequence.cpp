@@ -1117,7 +1117,7 @@ void Playback::adsr(u8 adsr1, u8 adsr2) {
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(const DecodeContext& context, u32 begin) {
   Cursor cursor(context.reader, begin, "nin-snes", context.diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
 

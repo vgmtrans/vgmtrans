@@ -343,7 +343,7 @@ using Cursor = CompilerCursor<Playback>;
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end, const TrackLayout& layout,
                                                    std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, begin, end, kSuzukiPs1CommandKindPrefix, diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const u8 status = cursor.opcode();

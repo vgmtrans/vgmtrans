@@ -1108,7 +1108,7 @@ using Cursor = CompilerCursor<Playback>;
                                                    std::vector<Diagnostic>* diagnostics,
                                                    SequenceReferences* references = nullptr) {
   Cursor cursor(reader, begin, "hudson-snes", diagnostics);
-  if (!cursor.hasOpcode()) {
+  if (!cursor.ok()) {
     return cursor.truncated();
   }
   const u8 opcode = cursor.opcode();

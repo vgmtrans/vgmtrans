@@ -450,7 +450,6 @@ public:
       : CompilerCursor(reader, begin, static_cast<u32>(std::min<u64>(reader.size(), std::numeric_limits<u32>::max())),
                        kindPrefix, diagnostics) {}
 
-  [[nodiscard]] bool hasOpcode() const noexcept { return record_.range().size != 0; }
   [[nodiscard]] bool ok() const noexcept { return record_.ok(); }
   [[nodiscard]] ::u8 opcode() const noexcept { return opcode_; }
 
