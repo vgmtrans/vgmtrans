@@ -826,13 +826,6 @@ struct DecodeState {
   return layout.noteAliasTableAddress && dialect(layout.version).noteAliasOpcode == opcode;
 }
 
-[[nodiscard]] GainRow readGainRow(Cursor& cursor) {
-  return {
-      cursor.u8("interval"),    cursor.u8("attack_start"), cursor.u8("attack_steps"),  cursor.u8("attack_peak"),
-      cursor.u8("decay_steps"), cursor.u8("sustain"),      cursor.u8("release_steps"),
-  };
-}
-
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, const Layout& layout, u32 begin,
                                                    DecodeState& state, std::vector<Diagnostic>* diagnostics,
                                                    std::set<u8>* referencedInstruments) {
@@ -981,7 +974,11 @@ struct DecodeState {
       return cursor.sourceOnly("Load Song 1 / Driver Reset", "driver-reset").end();
     case 0xa2:
       return cursor.command("Dynamic GAIN Envelope", SequenceSemantic::Envelope)
-          .invoke<&Playback::setEnvelope>({readGainRow(cursor)});
+          .invoke<&Playback::setEnvelope>({GainRow{
+              cursor.u8("interval"), cursor.u8("attack_start"), cursor.u8("attack_steps"),
+              cursor.u8("attack_peak"), cursor.u8("decay_steps"), cursor.u8("sustain"),
+              cursor.u8("release_steps"),
+          }});
     case 0xa3:
     case 0xa4: {
       const bool isCall = command == 0xa4;

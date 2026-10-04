@@ -163,12 +163,11 @@ struct MasterFade {
 };
 
 struct ProgramState {
-  explicit ProgramState(const RuntimeConfig& config) : version(config.layout.version), data(config) {
+  explicit ProgramState(const RuntimeConfig& config) : data(config) {
     echo.delay = data.layout.echoDelay;
     echo.filter = data.layout.echoFilter;
   }
 
-  Version version = Version::Modern;
   const RuntimeConfig& data;
   bool condition = false;
   u8 masterVolume = 0xff;

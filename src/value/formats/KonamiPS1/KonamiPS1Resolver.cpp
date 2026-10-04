@@ -18,16 +18,13 @@ namespace vgmtrans::formats::konami_ps1 {
 using namespace core;
 
 DependencySelection selectKonamiPs1Banks(const DependencyContext& context) {
-  const auto banks = context.candidates<SoundBankAsset>(sony_ps1::kSonyPs1FormatName);
+  auto selected = context.candidates<SoundBankAsset>(sony_ps1::kSonyPs1FormatName);
   const auto source = context.metadata().range.source;
-  std::vector<const SoundBankAsset*> selected;
-  for (const auto* bank : banks) {
-    if (source.valid() && bank->metadata.range.source == source) {
-      selected.push_back(bank);
-    }
-  }
-  if (selected.empty() && banks.size() == 1) {
-    selected.push_back(banks.front());
+  // Keep a lone bank as a fallback; otherwise require the sequence's source.
+  if (selected.size() != 1) {
+    std::erase_if(selected, [&](const SoundBankAsset* bank) {
+      return !source.valid() || bank->metadata.range.source != source;
+    });
   }
   std::ranges::sort(selected, {}, [](const SoundBankAsset* bank) { return bank->metadata.range.offset; });
   return selectAll(selected);

@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Sixty-seven validated batches remove 1,570 net production lines
+`cb9e0b766`. Sixty-eight validated batches remove 1,577 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 67 replays both corpora against its
-committed batch 66 predecessor. All 73 expanded raw inventories match exactly;
+cover 37 of 38 registered families. Batch 68 replays both corpora against its
+committed batch 67 predecessor. All 73 expanded raw inventories match exactly;
 no classification is needed. The cleanup2 records appear at the end of this
 document.
 
@@ -11407,3 +11407,64 @@ local-controlflow67-root-cold-review.json, the preserved initial fixture failure
 and resumed baseline result, and pass67 application/build/test/freeze/corpus/
 final/postcommit records. No sanitizer or separate numerical campaign is claimed.
 Further simplification review continues.
+
+### cleanup2 batch 68: remove unnecessary native authoring steps
+
+Inline SoftCreat's single-caller readGainRow helper into opcode0xa2 as a readable
+GainRow aggregate. The seven named byte fields now appear beside the native
+command. Keep command creation before argument reads and retain their exact
+left-to-right order, including sticky-truncation behavior. GainRow remains the
+hardware row type used by track state and preset loading; setEnvelope, captured
+argument ownership and playback math do not change. This removes three lines
+and a needless decoder lookup without inventing a shared row-reader framework.
+
+Remove Prism ProgramState's unused version field and constructor initializer.
+That private song state already borrows RuntimeConfig; no consumer reads its
+version copy. Keep TrackState.version's five real runtime reads, layout version
+selection and the song's mutable echo/master/condition state. The internal state
+layout can change and is rebuilt with its matching runtime; no old-object ABI,
+sizeof, small-object storage or measured-allocation equivalence is claimed.
+The actual source reduction is one line.
+
+KonamiPS1 now filters the core's freshly owned candidate pointer vector instead
+of copying survivors into another vector. Retain the original singleton fallback
+regardless of source. For zero or multiple candidates, keep only matching valid
+source IDs, including valid source zero. Surviving row order and the unchanged
+offset sort/selectAll preserve ties, duplicate/invalid asset-ID rows and chosen
+target order. Catalog admission/manual ordering and extracted-source root rules
+run before this callback unchanged. No asset owner escapes differently. Removed
+temporary allocations and their failure ordinals are deliberately not represented
+as equivalent. The concise fallback comment leaves a net three-line reduction.
+
+Root reads the affected native/runtime/resolver and existing fixture contracts,
+reconstructs all three complete cold candidate files and rechecks the 21 scoped
+source pins against committed/frozen67. Original cold66 provenance stays
+labeled66; equality with67 is established separately for affected bodies. The
+independent SoftCreat and Konami source reviews support the read-order, fallback
+and owner boundaries. Existing native fixtures cover dynamic GAIN, Prism's
+runtime scripts and Konami/Sony VAB matching; no private-field or implementation-
+mirror fixture is added. All seven removed production lines are in formats.
+
+The shared-helper sweep retains bestMatches because its ordered callback-once
+walk returns all tied winners. The placement adapters keep selectAll's author
+loop simple, and AssetWithData.sourceId cannot be derived from its nullable
+source pointer: the existing resolution fixture retains a valid unmatched source
+ID with no source metadata pointer. This is a bounded retention finding rather
+than a claim that shared architecture is exhausted.
+
+The Release consumer build completes 48 warning-free steps and all
+44 CTest suites pass. Complete value/shared/test/Qt bodies and four archives
+match the frozen final shell, SHA-256 6db904cad3ffaba28b8618c5fb4e99f5df58ea5a22997552022463c1467bb8b1. Fresh comparisons against67
+match all 252 original records and 3,922 artifacts, all 894 expanded export pairs
+and 858 artifacts, and all 73 raw inventories. No new classification, normalization,
+manual repetition, sanitizer or separate numerical campaign is claimed. Root
+rehashes retained proof before reclaiming only older67 generated payloads.
+
+Cumulative production removal is 1,577 value lines: 1,257 architecture
+and 320 formats, plus the earlier 22 UI lines. Evidence under
+/tmp/vgmtrans-cleanup2 includes native-author-steps68-cold66,
+konami-ps1-banks68-cold66, native-local68-root-cold-review.json, the bounded
+model-helper-retentions68-source67 review and pass68 application/build/test/
+freeze/corpus/final/postcommit records. Source-only setup failures and count/prose
+errata remain in the original cold records; none is reported as runtime validation.
+Further architecture and exporter review continues.
