@@ -54,10 +54,10 @@ bool hasMidiModulationUsage(const MidiModulationUsage& usage) noexcept {
 
 MidiModulationUsage analyzePerformanceModulationUsage(const PerformanceSequence& sequence,
                                                       const SequenceModulationProfile* modulationProfile) {
-  std::optional<SequenceModulationProfile> derivedModulationProfile;
+  SequenceModulationProfile derivedModulationProfile;
   if (modulationProfile == nullptr) {
     derivedModulationProfile = analyzeSequenceModulation(sequence);
-    modulationProfile = &*derivedModulationProfile;
+    modulationProfile = &derivedModulationProfile;
   }
 
   MidiModulationUsage result;

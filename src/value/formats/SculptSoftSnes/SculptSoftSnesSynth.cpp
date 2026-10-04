@@ -196,7 +196,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
                                               .codecParameter = u64(data.sampleFlags[srcn] & 31)})
                    .ref();
     }
-    if (!sample) {
+    if (sample.empty()) {
       continue;
     }
     const auto range = reader.range(start - 3, 3);
@@ -211,7 +211,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .name = fmt::format("Sample {}", srcn),
     });
     // The sequence performs the sample tuning and software GAIN envelopes.
-    instrument.region(Region{.sample = *sample, .unityKey = 72.0,
+    instrument.region(Region{.sample = sample, .unityKey = 72.0,
                              .envelope = Envelope{.attackSeconds = 0.0,
                                                   .decaySeconds = std::numeric_limits<double>::infinity(),
                                                   .releaseSeconds = 0.0,

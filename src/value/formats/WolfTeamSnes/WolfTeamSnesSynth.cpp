@@ -59,7 +59,7 @@ void addInstruments(InstrumentSetBuilder& instruments, const std::vector<Instrum
                     const SnesBrrSampleRefs& samples, const Layout& layout) {
   for (const InstrumentInfo& patch : patches) {
     const auto sample = samples.findSrcn(patch.program);
-    if (!sample) {
+    if (sample.empty()) {
       continue;
     }
     Instrument instrument{
@@ -102,7 +102,7 @@ void addInstruments(InstrumentSetBuilder& instruments, const std::vector<Instrum
     const double gain = layout.segmented() ? 1.0 : patch.volume / 16.0;
     entry
         .region(Region{
-                    .sample = *sample,
+                    .sample = sample,
                     .unityKey = unityKey,
                     .envelope = snesDspEnvelope(patch.adsr1, patch.adsr2, patch.gain),
                     .attenuationDb = attenuation(gain),

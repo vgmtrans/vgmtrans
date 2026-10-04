@@ -93,7 +93,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   const SnesBrrSampleRefs samples = addSnesBrrSamples(samplePool, reader, catalog);
   for (const Patch& patch : patches) {
     const auto sample = samples.findSrcn(patch.srcn);
-    if (!sample) {
+    if (sample.empty()) {
       continue;
     }
     Instrument instrument{
@@ -111,7 +111,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     envelope.releaseSeconds = snesDspAdsrSustainSeconds(defaultReleaseRate(layout.version));
     entry
         .region(Region{
-                    .sample = *sample,
+                    .sample = sample,
                     .unityKey = unityKey(layout, patch.pitchScale),
                     .envelope = envelope,
                 })

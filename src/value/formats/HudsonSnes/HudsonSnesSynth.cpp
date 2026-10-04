@@ -80,7 +80,7 @@ void addMelodic(InstrumentSetBuilder& instruments, const std::vector<Patch>& pat
                 const SnesBrrSampleRefs& samples) {
   for (const Patch& patch : patches) {
     const auto sample = samples.findSrcn(patch.row.srcn);
-    if (!sample) {
+    if (sample.empty()) {
       continue;
     }
     auto entry = instruments.append(Instrument{
@@ -94,7 +94,7 @@ void addMelodic(InstrumentSetBuilder& instruments, const std::vector<Patch>& pat
     entry.source("Sample tuning", patch.tuningSource, "hudson-snes-tuning").parent(root);
     entry
         .region(Region{
-                    .sample = *sample,
+                    .sample = sample,
                     .unityKey = patch.unityKey,
                     .envelope = snesDspEnvelope(patch.row.adsr1, patch.row.adsr2, patch.row.gain),
                 })
@@ -111,8 +111,8 @@ void addDrums(InstrumentSetBuilder& instruments, const SequenceRecipes& recipes,
       continue;
     }
     const Patch* patch = patchForProgram(patches, drum.sourceProgram);
-    const auto sample = patch ? samples.findSrcn(patch->row.srcn) : std::nullopt;
-    if (!patch || !sample) {
+    const auto sample = patch ? samples.findSrcn(patch->row.srcn) : SampleRef{};
+    if (!patch || sample.empty()) {
       continue;
     }
     if (!kit) {
@@ -126,7 +126,7 @@ void addDrums(InstrumentSetBuilder& instruments, const SequenceRecipes& recipes,
     const u8 key = static_cast<u8>(drum.note + kDrumKeyBias);
     kit.region(Region{
                    .keyRange = KeyRange{.low = key, .high = key},
-                   .sample = *sample,
+                   .sample = sample,
                    .unityKey = patch->unityKey + key - drum.sourceKey,
                    .envelope = snesDspEnvelope(patch->row.adsr1, patch->row.adsr2, patch->row.gain),
                })

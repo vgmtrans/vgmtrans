@@ -1,13 +1,13 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Seventy validated batches remove 1,583 net production lines
+`cb9e0b766`. Seventy-one validated batches remove 1,583 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 70 replays both corpora against its
-committed batch 69 predecessor. All 73 expanded raw inventories match exactly;
-no classification is needed. The cleanup2 records appear at the end of this
+cover 37 of 38 registered families. Batch 71 replays both corpora against its
+committed batch 70 predecessor. 71 expanded raw inventories match exactly; 2 retain the previously
+proved Sony asset-ID scheduling variation. The cleanup2 records appear at the end of this
 document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
@@ -11617,3 +11617,105 @@ generated original-corpus payloads were pruned to reclaim disk space. All music,
 result records, frozen source trees, libraries and shell generations are kept.
 `corpora70-root-review.json`, `pass70-final-root-review.json` and the matching
 postcommit receipt close the root proof. User-owned changes remain untouched.
+
+### cleanup2 batch 71: remove optional states from reference assembly and local ownership
+
+`SnesBrrSampleRefs::findSrcn` returns the existing `SampleRef` value directly.
+Its copied array cell and `valid()` normalization remain: missing, unbound or
+invalid-index catalog references still become absence, now expressed as an
+empty reference. Formats use `empty()` and pass the reference directly into a
+region. This follows batch70's generic lookup simplification without weakening
+the SNES getter's stronger admission rule. No boolean conversion, new lookup
+helper, cache or borrow is added. All 25 native calls across 22 families and
+16 existing fixture calls across two files are migrated, including index
+annotations, both Mori region arguments and references queried after finalizing
+the sample builder. Parser/directory/tuning optionals and their warning phases
+remain separate.
+
+Hudson and Suzuki still skip lookup on a missing patch and preserve their
+short-circuit checks, warnings and kit creation. Nin selects the same noise-map
+`at()` call or BRR lookup. Sculpt performs the same initial BRR lookup before
+conditional noise creation and replacement. Noise guards use `empty()`, not
+`valid()`: the actual fresh private producers add at most 256 BRR entries plus
+32 Nin rates or 256 Sculpt keys, so returned dense indexes are non-sentinel.
+An invalid-owner reference in assertion-disabled code remains nonempty and
+retains the old engaged-optional acceptance. Fabricated empty-valued private
+noise maps are outside that actual producer contract; their old engaged-empty
+behavior is not claimed equivalent. Table alias selection, ordered samples,
+source records, annotations, ranges and finalization are untouched.
+
+The second change replaces two private `optional<SequenceModulationProfile>`
+holders with ordinary local profile values. Nullable supplied-profile pointers
+stay part of the existing API. Each function still analyzes only in the null
+branch, then borrows its local owner synchronously; no returned MIDI or usage
+value retains the pointer. Invalid resolved rendering still returns before the
+holder is constructed. The profile has only scalar aggregates and optional
+scalar aggregates with no custom lifecycle, dynamic owner or callback. The
+supplied-profile path now initializes inert default scalar state; it does not
+analyze or copy the supplied profile. Physical values, timing, normalization,
+waveform-conflict state and diagnostic/event order are unchanged. Retain the
+public profile `empty()` query: the actual chained temporary-result assertion
+in ValueModulationTests checks that normalized-only events do not create a
+physical plan. No new mirror fixture is added.
+
+There are 28 changed source/fixture paths. Both changes are line-neutral in
+production and fixtures: the getter comment adds one architecture line, Nin
+loses one native line, and the two local holder replacements have zero line
+delta. Cumulative removal remains 1,583 value lines, now 1,259
+architecture and 324 native-format lines, plus the prior 22 UI lines.
+The benefit is eliminating optional engagement rules that carried no independent
+fact. The public SRCN return API/ABI intentionally changes: external optional
+boolean/arrow/dereference/value-or callers must migrate, and optional assignment
+must explicitly preserve missing references. Root uses a complete consistent
+consumer rebuild. No old-object, arbitrary external-client, object-size, speed,
+allocation, sanitizer or failure-ordinal guarantee is asserted.
+
+Source review is pinned separately from runtime proof. Original69 SNES and
+profile draft seals remain immutable. The final SNES refresh70 has all 30 scoped
+complete input bodies equal to Git70/frozen70/live and preserves all seven
+accepted generic70 fixture migration groups in both complete fixture bodies.
+The patch stays `7439369fe93476f4c17bf9b5b5b24a30d1c4f84f4489d93d9b8c78967f4a2ee3`;
+whole Before/Candidate bodies are separately refreshed. Both independent peers
+reconstruct the complete 26-path draft. The profile's final70 authority checks
+all 22 scoped bodies; an independent peer reconstructs both complete CPPs and
+reviews all result uses. Its patch is
+`f0bf73bad26d142982b4102d4c473495fb2d8cb809013416683fbb093c6d8af2`.
+The profile cold directories include `72` in their names; those are draft labels,
+not a claim that an integration batch72 was executed.
+
+The original profile authority's blanket live69 prose was overbroad after adding
+supplemental pins. Its NDS row correctly recorded observed live70 divergence;
+a separate wording erratum withdraws the blanket admission claim. Final70 source
+admission instead checks every complete current body. Original HEAD-race,
+manifest-filename and inventory-checker setup failures, and the refresh's guessed
+missing-key9 assertion corrected to actual key99, remain preserved as source-only
+metadata failures. An unexecuted pruning script's receipt filename was corrected
+from generation69 to the actual deleted generation70; its payload plan was
+unchanged and the original script was preserved. No failed read/setup is runtime
+validation. Root rechecks the
+full matching value/shared/tests/Qt trees, all sealed records, all scoped original
+and current bodies, independently reconstructs all 28 candidates and applies
+only the exact accepted sources. Evidence includes
+`reference-owners71-root-cold-review.json`, both SNES peers, the profile peer and
+erratum annex, and `pass71-application-receipt.json`.
+
+The Release build completes 79 warning-free steps and all 44 CTest
+suites pass. Complete source/fixture/Qt trees and all four archives match the
+frozen shell `3523a1361e0996be8ba6ef44deab11d030b524b2eb5017ce81156fe0d8701917`. Its bytes differ from committed70's shell, so both
+real corpora are freshly replayed against that immediate predecessor. All 252
+original result records and 3,922 artifacts match; all 894 expanded export
+pairs and 858 artifacts match. 71 of 73 expanded raw inventories match,
+with 2 existing Sony scheduling classifications and no new manual
+repetitions or broader normalization. The established real archive coverage
+remains 37 of 38 registered families; these checks do not establish every input
+or add a sanitizer result. The first expanded run fails with errno28 while writing inventory stdout
+after temporary disk space fills. Its log and all 548 partial files remain
+preserved; it is rejected as runtime proof. After the already successful
+original comparison and full retained71 payload rehash close independently,
+only recorded old70 generated original-corpus payloads are removed for disk
+space. A complete expanded retry starts in a fresh directory and closes the
+comparisons above; no partial result is reused. Music, all result/diagnostic records, frozen sources, archives and shells
+remain. `corpora71-root-review.json`, final review and postcommit receipts close
+root integration. User-owned changes remain untouched. Further architecture
+review continues, including a separate catalog adapter and private PSF signature
+duplication cleanup; neither is part of this batch.

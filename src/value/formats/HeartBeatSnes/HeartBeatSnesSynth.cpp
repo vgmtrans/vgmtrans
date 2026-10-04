@@ -100,7 +100,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
 
   for (const Patch& patch : patches) {
     const auto sample = samples.findSrcn(patch.srcn);
-    if (!sample) {
+    if (sample.empty()) {
       continue;
     }
     auto entry = instruments.append(Instrument{
@@ -116,7 +116,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .description(fmt::format("sample index {} -> SRCN {}", patch.sampleIndex, patch.srcn));
     entry
         .region(Region{
-                    .sample = *sample,
+                    .sample = sample,
                     .unityKey = unityKey(layout.version, patch.pitchScale),
                     .envelope = driverEnvelope(patch.adsr1, patch.adsr2),
                 })

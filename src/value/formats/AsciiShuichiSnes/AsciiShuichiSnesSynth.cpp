@@ -97,7 +97,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
 
   for (const Patch& patch : patches) {
     const auto sample = samples.findSrcn(patch.srcn);
-    if (!sample) {
+    if (sample.empty()) {
       continue;
     }
     auto entry = bank.instruments().append(Instrument{
@@ -113,7 +113,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .description(fmt::format("SRCN {} tuning {:+d}/4096", patch.srcn, patch.tuning));
     entry
         .region(Region{
-                    .sample = *sample,
+                    .sample = sample,
                     .unityKey = 81.0 - driverTuningCents(patch.tuning) / 100.0,
                     .envelope = driverEnvelope(patch.adsr1, patch.adsr2, patch.gain),
                 })

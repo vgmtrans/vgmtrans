@@ -218,7 +218,7 @@ void brrCatalogProjectsInstrumentsInSampleOrder() {
   SamplePoolBuilder samples(AssetId{40}, &sourceMap);
   const auto refs = addSnesBrrSamples(samples, ByteReader(source, bytes), filtered);
   const auto annotations = sourceMap.finish();
-  expect(!refs.findSrcn(1) && refs.findSrcn(2) &&
+  expect(refs.findSrcn(1).empty() && !refs.findSrcn(2).empty() &&
              annotations.annotations().front().range == SourceRange{.source = source, .offset = 8, .size = 4},
          "the directory annotation must cover the retained entries after a format filters samples");
 }
@@ -240,9 +240,9 @@ void brrAliasesRetainLoopIdentityAndSeparateSourceRecords() {
   const auto refs = addSnesBrrSamples(samples, reader, catalog);
   const auto built = std::move(samples).finish();
   const auto annotations = sourceMap.finish();
-  expect(refs.findSrcn(1) && refs.findSrcn(2) && refs.findSrcn(3) && !refs.findSrcn(4) &&
-             refs.findSrcn(1)->index() == 0 && refs.findSrcn(2)->index() == 1 && refs.findSrcn(3)->index() == 1 &&
-             refs.findSrcn(3)->owner() == asset,
+  expect(!refs.findSrcn(1).empty() && !refs.findSrcn(2).empty() && !refs.findSrcn(3).empty() &&
+             refs.findSrcn(4).empty() && refs.findSrcn(1).index() == 0 && refs.findSrcn(2).index() == 1 &&
+             refs.findSrcn(3).index() == 1 && refs.findSrcn(3).owner() == asset,
          "aliases must share a concrete reference only when both BRR data and loop position match");
   expect(built.samples.size() == 3 && built.samples[0].loop.start == 0 &&
              built.samples[0].loop.length == 32 && built.samples[1].loop.start == 16 &&

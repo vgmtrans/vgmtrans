@@ -63,9 +63,9 @@ std::optional<SnesSampleDirectoryEntry> readSnesSampleDirectoryEntry(ByteReader 
   return result;
 }
 
-std::optional<SampleRef> SnesBrrSampleRefs::findSrcn(u8 srcn) const {
+SampleRef SnesBrrSampleRefs::findSrcn(u8 srcn) const {
   const auto sample = samples_[srcn];
-  return sample.valid() ? std::optional{sample} : std::nullopt;
+  return sample.valid() ? sample : SampleRef{};
 }
 
 SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reader,

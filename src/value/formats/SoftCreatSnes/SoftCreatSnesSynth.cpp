@@ -71,7 +71,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     const auto sample = samples.findSrcn(srcn);
     const u32 coarseAddress = layout.coarseTableAddress + srcn;
     const u32 fineAddress = layout.fineTableAddress + srcn;
-    if (!sample || srcn >= tableSize) {
+    if (sample.empty() || srcn >= tableSize) {
       continue;
     }
     const SourceRange coarseSource = reader.range(coarseAddress, 1);
@@ -91,7 +91,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .field("fine_tuning", fineSource, fineTuningCents(fine), SourceValueDisplay::Cents)
         .description(fmt::format("Bank {}, program {}; selects SRCN {}", srcn >> 7, srcn & 0x7f, srcn));
     entry.region(Region{
-                     .sample = *sample,
+                     .sample = sample,
                      // The pitch table reaches $1000 at internal note 62.
                      // Source note zero is exported as MIDI key 24.
                      .unityKey = 86.0 - tuning,

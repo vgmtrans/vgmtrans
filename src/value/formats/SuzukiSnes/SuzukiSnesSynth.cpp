@@ -105,7 +105,7 @@ void addMelodicInstruments(InstrumentSetBuilder& instruments, const std::vector<
                            const SnesBrrSampleRefs& samples) {
   for (const Patch& patch : patches) {
     const auto sample = samples.findSrcn(patch.srcn);
-    if (!sample) {
+    if (sample.empty()) {
       continue;
     }
     Instrument instrument{
@@ -123,7 +123,7 @@ void addMelodicInstruments(InstrumentSetBuilder& instruments, const std::vector<
 
     entry
         .region(Region{
-                    .sample = *sample,
+                    .sample = sample,
                     .unityKey = unityKey(patch.tuning),
                     .envelope = snesDspEnvelope(patch.adsr1, patch.adsr2, 0),
                     .attenuationDb = attenuation(patch.volume),
@@ -142,8 +142,8 @@ void addDrumKit(InstrumentSetBuilder& instruments, const std::vector<DrumSlot>& 
       continue;
     }
     const Patch* patch = patchForProgram(patches, drum.sourceProgram);
-    const auto sample = patch ? samples.findSrcn(patch->srcn) : std::nullopt;
-    if (!patch || !sample) {
+    const auto sample = patch ? samples.findSrcn(patch->srcn) : SampleRef{};
+    if (!patch || sample.empty()) {
       instruments.warning("Drum row refers to an unavailable source instrument", drum.source);
       continue;
     }
@@ -160,7 +160,7 @@ void addDrumKit(InstrumentSetBuilder& instruments, const std::vector<DrumSlot>& 
     const double root = unityKey(patch->tuning) + outputKey - drum.sourceKey;
     kit.region(Region{
                    .keyRange = KeyRange{.low = outputKey, .high = outputKey},
-                   .sample = *sample,
+                   .sample = sample,
                    .unityKey = root,
                    .envelope = snesDspEnvelope(patch->adsr1, patch->adsr2, 0),
                    .pan = drum.pan / 256.0,

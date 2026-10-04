@@ -236,7 +236,7 @@ void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader read
 
   for (const auto& info : instrumentInfos) {
     const auto sample = sampleRefs.findSrcn(info.srcn);
-    if (!sample) {
+    if (sample.empty()) {
       instruments.warning("Instrument sample was not found", info.source.range);
       continue;
     }
@@ -260,7 +260,7 @@ void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader read
 
     const double unityKey = konamiUnityKey(info);
     Region region{
-        .sample = *sample,
+        .sample = sample,
         .unityKey = unityKey,
         // The shared DSP conversion understands both ADSR and GAIN modes.
         .envelope = snesDspEnvelope(info.adsr1, info.adsr2, info.gain),
@@ -270,7 +270,7 @@ void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader read
     }
     instrument.region(std::move(region))
         .source("Region", entryRange, "konami-snes-region")
-        .description(fmt::format("Sample {}", sample->index()));
+        .description(fmt::format("Sample {}", sample.index()));
   }
 }
 

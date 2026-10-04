@@ -47,7 +47,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   const SnesBrrSampleRefs samples = addSnesBrrSamples(samplePool, reader, catalog);
   for (const InstrumentInfo& info : instrumentInfo) {
     const auto sample = samples.findSrcn(info.program);
-    if (!sample) {
+    if (sample.empty()) {
       continue;
     }
     const double unityKey = instrumentUnityKey(reader, info);
@@ -64,7 +64,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .description(fmt::format("transpose {}, pitch table {}", info.transpose, info.pitchTable));
     entry
         .region(Region{
-                    .sample = *sample,
+                    .sample = sample,
                     .range = info.source,
                     .unityKey = unityKey,
                     // Compile owns ADSR in track state; this is merely a safe

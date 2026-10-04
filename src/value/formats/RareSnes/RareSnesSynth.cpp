@@ -45,7 +45,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
 
   for (const PatchRecipe& patch : patches) {
     const auto sample = samples.findSrcn(patch.srcn);
-    if (!sample) {
+    if (sample.empty()) {
       continue;
     }
     Instrument instrument{
@@ -63,7 +63,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     }
 
     Region region{
-        .sample = *sample,
+        .sample = sample,
         .range = patch.source,
         // Rare's pitch table reaches $1000 at source note 72. Fine tuning
         // multiplies that DSP pitch by (1024+tuning)/1024.

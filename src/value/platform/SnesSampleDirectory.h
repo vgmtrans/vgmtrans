@@ -96,7 +96,8 @@ template <std::ranges::input_range Entries, class Srcn = std::identity>
 // equivalent BRR data and loop behavior resolve to the first matching sample.
 class SnesBrrSampleRefs {
 public:
-  [[nodiscard]] std::optional<SampleRef> findSrcn(u8 srcn) const;
+  // Returns an empty reference for an absent or invalid catalog entry.
+  [[nodiscard]] SampleRef findSrcn(u8 srcn) const;
 
 private:
   friend SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder&, ByteReader, std::span<const SnesBrrSample>,

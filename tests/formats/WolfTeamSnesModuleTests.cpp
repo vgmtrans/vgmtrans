@@ -502,8 +502,8 @@ void brrAliasesIncludeLoopPosition() {
   const auto catalog = readSnesBrrCatalog(reader, 0x4000, srcns);
   SamplePoolBuilder samples(AssetId{1});
   const auto refs = addSnesBrrSamples(samples, reader, catalog);
-  expect(refs.findSrcn(18) && refs.findSrcn(49) && refs.findSrcn(53) && refs.findSrcn(18)->index() == 0 &&
-             refs.findSrcn(49)->index() == 1 && refs.findSrcn(53)->index() == 1,
+  expect(!refs.findSrcn(18).empty() && !refs.findSrcn(49).empty() && !refs.findSrcn(53).empty() &&
+             refs.findSrcn(18).index() == 0 && refs.findSrcn(49).index() == 1 && refs.findSrcn(53).index() == 1,
          "BRR aliases must include the Tales sample's loop position in their identity");
 }
 

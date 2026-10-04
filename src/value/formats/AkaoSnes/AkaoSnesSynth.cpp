@@ -247,7 +247,7 @@ void addAkaoSnesInstruments(InstrumentSetBuilder& instruments, ByteReader reader
 
   for (const auto& info : instrumentInfos) {
     const auto sample = sampleRefs.findSrcn(info.srcn);
-    if (!sample) {
+    if (sample.empty()) {
       instruments.warning("Instrument sample was not found", info.tuning.range);
       continue;
     }
@@ -275,7 +275,7 @@ void addAkaoSnesInstruments(InstrumentSetBuilder& instruments, ByteReader reader
 
     const double unityKey = akaoUnityKey(info);
     Region region{
-        .sample = *sample,
+        .sample = sample,
         .range = info.tuning.range,
         .unityKey = unityKey,
         .envelope = (info.adsr1 & 0x80) != 0 ? snesDspEnvelope(info.adsr1, info.adsr2, 0xa0) : Envelope{},

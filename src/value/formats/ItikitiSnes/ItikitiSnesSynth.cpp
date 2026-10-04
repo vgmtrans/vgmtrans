@@ -77,7 +77,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
 
   for (const Patch& patch : patches) {
     const auto sample = samples.findSrcn(patch.program);
-    if (!sample) {
+    if (sample.empty()) {
       continue;
     }
     auto entry = instruments.append(Instrument{
@@ -93,7 +93,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .description(fmt::format("scale ${:04X}", patch.tuning));
     entry
         .region(Region{
-                    .sample = *sample,
+                    .sample = sample,
                     .unityKey = 72.0 - std::log2(pitchScale(patch.tuning)) * 12.0,
                     .envelope = driverEnvelope(patch.adsr1, patch.adsr2),
                 })

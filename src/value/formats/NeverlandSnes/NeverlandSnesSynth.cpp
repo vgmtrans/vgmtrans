@@ -72,7 +72,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   const SnesBrrSampleRefs samples = addSnesBrrSamples(samplePool, reader, catalog);
   for (const Patch& patch : patches) {
     const auto sample = samples.findSrcn(patch.program);
-    if (!sample) {
+    if (sample.empty()) {
       continue;
     }
     auto instrument = instruments.append(Instrument{
@@ -88,7 +88,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .description(fmt::format("scale ${:04X}", patch.tuning));
     instrument
         .region(Region{
-                    .sample = *sample,
+                    .sample = sample,
                     .unityKey = instrumentUnityKey(patch.tuning),
                     .envelope = driverEnvelope(patch.adsr1, patch.adsr2),
                 })

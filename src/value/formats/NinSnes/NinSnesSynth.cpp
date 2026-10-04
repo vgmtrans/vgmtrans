@@ -331,15 +331,14 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
     const bool noise = isNoise(selected, info);
     const u16 pitchScale = selected.instruments == InstrumentLayout::KonamiTuningTable
                                ? u16{0} : readPitchScale(selected, info);
-    const auto sample = noise ? std::optional<SampleRef>{noiseSamples.at(info.srcn & 0x1f)}
-                              : samples.findSrcn(info.srcn);
-    if (!sample) {
+    const auto sample = noise ? noiseSamples.at(info.srcn & 0x1f) : samples.findSrcn(info.srcn);
+    if (sample.empty()) {
       builder.warning(fmt::format("Instrument {} sample {} was not found", info.program, info.srcn), info.source.range);
       continue;
     }
     const bool rateBasedGain = (info.adsr1 & 0x80) == 0 && (info.gain & 0x80) != 0;
     Region region{
-        .sample = *sample,
+        .sample = sample,
         .unityKey = unityKey(reader, layout, info),
         // Direct GAIN is fully described by the header. Rate-based GAIN starts
         // from the DSP's live envelope, so a static region cannot infer it.
@@ -380,7 +379,7 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
       const auto addRegion = [&](const Region& zone) {
         instrument.region(zone)
             .source("Region", info.source, "nin-snes-region")
-            .description(fmt::format("Sample {}", sample->index()));
+            .description(fmt::format("Sample {}", sample.index()));
       };
       Region zone = region;
       for (int key = 0; key < 128; ++key) {

@@ -37,7 +37,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     const u8 program = sampleInfo.srcn;
     const SourceRange source = sampleInfo.directoryEntry;
     const auto sample = samples.findSrcn(program);
-    if (!sample) {
+    if (sample.empty()) {
       continue;
     }
     auto entry = instruments.append(Instrument{
@@ -49,7 +49,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         entry.source(fmt::format("Instrument {}", program), source, "graph-res-snes-instrument").id();
     entry
         .region(Region{
-                    .sample = *sample,
+                    .sample = sample,
                     .unityKey = kUnityKey,
                     // Regular instruments use ADSR; the chip's GAIN
                     // mode is unused here.

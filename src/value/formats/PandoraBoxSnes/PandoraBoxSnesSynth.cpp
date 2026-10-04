@@ -72,7 +72,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
 
   for (const Patch& patch : patches) {
     const auto sample = samples.findSrcn(patch.srcn);
-    if (!sample) {
+    if (sample.empty()) {
       continue;
     }
     auto entry = instruments.append(Instrument{
@@ -88,7 +88,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
                                  patch.globalInstrument, patch.srcn));
     entry
         .region(Region{
-                    .sample = *sample,
+                    .sample = sample,
                     // The audited pitch table reaches the DSP's $1000 unity
                     // ratio at sequence octave 3, A (exported key 45).
                     .unityKey = 45.0,

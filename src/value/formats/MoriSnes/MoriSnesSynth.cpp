@@ -328,7 +328,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
       const u16 row = *patch.script.rowAddress;
       const u8 srcn = reader.u8At(row);
       const auto sample = samples.findSrcn(srcn);
-      if (!sample) {
+      if (sample.empty()) {
         continue;
       }
       instrument.source(patch.rawKey ? fmt::format("Voice script (key {})", *patch.rawKey) : "Voice script",
@@ -339,7 +339,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
       const bool fixedPitch = patch.script.attackAbsolutePitch || patch.rawKey.has_value();
       if (!fixedPitch) {
         instrument
-            .region(makeRegion(reader, layout, patch, *sample, std::nullopt))
+            .region(makeRegion(reader, layout, patch, sample, std::nullopt))
             .source("Region", reader.range(row, 7), "mori-snes-region")
             .parent(root)
             .description(fmt::format("SRCN {}, DSP voice row ${:04X}", srcn, row));
@@ -347,7 +347,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
       }
       for (const u8 key : patch.outputKeys) {
         instrument
-            .region(makeRegion(reader, layout, patch, *sample, key))
+            .region(makeRegion(reader, layout, patch, sample, key))
             .source(fmt::format("Region (key {})", key), reader.range(row, 7), "mori-snes-region")
             .parent(root)
             .description(fmt::format("SRCN {}, DSP voice row ${:04X}", srcn, row));

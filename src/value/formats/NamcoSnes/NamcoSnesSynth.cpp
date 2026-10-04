@@ -243,14 +243,14 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   for (const u8 srcn : melodic) {
     const auto sample = samples.findSrcn(srcn);
     const auto scale = tuning(reader, layout, srcn);
-    if (!sample || !scale) {
+    if (sample.empty() || !scale) {
       continue;
     }
     auto instrument = instruments.append(Instrument{
         .identity = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = srcn},
         .name = fmt::format("Instrument {}", static_cast<unsigned>(srcn)),
     });
-    instrument.region(Region{.sample = *sample, .unityKey = unityKey(layout.version, *scale),
+    instrument.region(Region{.sample = sample, .unityKey = unityKey(layout.version, *scale),
                              .envelope = neutral});
   }
 
@@ -284,12 +284,12 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
       }
       const auto sample = samples.findSrcn(drum.srcn);
       const auto scale = tuning(reader, layout, drum.srcn);
-      if (!sample || !scale) {
+      if (sample.empty() || !scale) {
         continue;
       }
       Region region{
           .keyRange = KeyRange{.low = drum.index, .high = drum.index},
-          .sample = *sample,
+          .sample = sample,
           .unityKey = unityKey(layout.version, *scale) + drum.index - drum.sourceKey,
           .envelope = neutral,
       };

@@ -39,7 +39,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   for (const SnesBrrSample& sampleInfo : catalog) {
     const u8 program = sampleInfo.srcn;
     const auto sample = samples.findSrcn(program);
-    if (!sample) {
+    if (sample.empty()) {
       continue;
     }
     const u32 adsr1 = layout.adsr1TableAddress + program;
@@ -62,7 +62,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     entry.source("Fine Tuning", reader.range(tuningLow, 1), "prism-snes-tuning-low").parent(root);
     entry
         .region(Region{
-                    .sample = *sample,
+                    .sample = sample,
                     .unityKey = 93.0 - semitones,
                     .envelope = driverEnvelope(reader.u8At(adsr1), reader.u8At(adsr2)),
                 })

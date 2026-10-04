@@ -1260,10 +1260,10 @@ MidiSequence renderMidiSequence(const ResolvedPerformance& resolved,
                           const SequenceModulationProfile* modulationProfile) {
   const auto& performance = resolved.performance();
   if (!resolved.valid()) return MidiSequence{.diagnostics = performance.diagnostics};
-  std::optional<SequenceModulationProfile> derivedModulationProfile;
+  SequenceModulationProfile derivedModulationProfile;
   if (modulationProfile == nullptr) {
     derivedModulationProfile = analyzeSequenceModulation(performance);
-    modulationProfile = &*derivedModulationProfile;
+    modulationProfile = &derivedModulationProfile;
   }
 
   const PerformanceTempoMap globalTempos{performance};

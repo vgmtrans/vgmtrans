@@ -125,7 +125,7 @@ std::optional<ScanSoundBankDraft> addCapcomSnesSynth(ScanResultBuilder& builder,
 
   for (const auto& info : instrumentInfos) {
     const auto sample = sampleRefs.findSrcn(info.srcn);
-    if (!sample) {
+    if (sample.empty()) {
       continue;
     }
     const double unityKey = capcomInstrumentUnityKey(info.pitchScale);
@@ -145,12 +145,12 @@ std::optional<ScanSoundBankDraft> addCapcomSnesSynth(ScanResultBuilder& builder,
 
     instrument
         .region(Region{
-                    .sample = *sample,
+                    .sample = sample,
                     .unityKey = unityKey,
                     .envelope = capcomInstrumentEnvelope(info.adsr1, info.adsr2, info.gain),
                 })
         .source("Region", range, "capcom-snes-region")
-        .description(fmt::format("Sample {}", sample->index()));
+        .description(fmt::format("Sample {}", sample.index()));
 
     auto envelopeAnnotation = builder.sourceMap()
                                   .annotation(SourceRole::DataBlock, "ADSR/Gain", reader.range(range.offset + 1, 3))
