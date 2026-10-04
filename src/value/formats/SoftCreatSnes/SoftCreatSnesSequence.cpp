@@ -889,12 +889,12 @@ struct DecodeState {
       return cursor.command("Call", SequenceSemantic::Call)
           .call(cursor.addressLe("destination", SemanticOperandRole::CallTarget));
     case 0x83:
-      return cursor.command("Return", SequenceSemantic::Return).invokeFlow<&Playback::return_>().return_();
+      return cursor.command("Return", SequenceSemantic::Return).invoke<&Playback::return_>().return_();
     case 0x84:
       return cursor.command("Repeat Start", SequenceSemantic::Repeat)
-          .invokeFlow<&Playback::repeatStart>({cursor.u8("count"), cursor.nextAddress()});
+          .invoke<&Playback::repeatStart>({cursor.u8("count"), cursor.nextAddress()});
     case 0x85:
-      return cursor.command("Repeat End", SequenceSemantic::Repeat).invokeFlow<&Playback::repeatEnd>();
+      return cursor.command("Repeat End", SequenceSemantic::Repeat).invoke<&Playback::repeatEnd>();
     case 0x86: {
       auto event = cursor.command("Default Duration", SequenceSemantic::State);
       state.defaultDuration = cursor.u8("duration");
@@ -1020,7 +1020,7 @@ struct DecodeState {
       auto event = cursor.command(command == 0xa9 ? "Wait Until Flag Set" : "Wait Until Flag Clear",
                                   SequenceSemantic::Wait);
       const u8 flag = cursor.u8("flag");
-      return event.invokeFlow<&Playback::waitFlag>({flag, command == 0xa9, Address{begin}})
+      return event.invoke<&Playback::waitFlag>({flag, command == 0xa9, Address{begin}})
           .discoverTarget(Address{begin});
     }
     case 0xaa:

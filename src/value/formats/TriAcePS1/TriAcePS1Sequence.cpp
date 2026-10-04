@@ -496,10 +496,7 @@ struct Playback : SequencePlayback<TrackState> {
     if (track.harmony.enabled) {
       const HarmonyParameters& harmony = track.harmony.active;
       out.at(vm.tick() + harmony.delay)
-          .channelPan(ChannelPanPerformanceEvent{
-              .position = panController(combinedVoicePan(value, harmony.pan)),
-              .lane = kHarmonyLane,
-          });
+          .channelPan(panController(combinedVoicePan(value, harmony.pan)), kHarmonyLane);
     }
   }
 
@@ -519,10 +516,7 @@ struct Playback : SequencePlayback<TrackState> {
       track.harmony.active = track.harmony.parameters;
       const HarmonyParameters& harmony = track.harmony.active;
       out.at(vm.tick() + harmony.delay)
-          .channelPan(ChannelPanPerformanceEvent{
-              .position = panController(combinedVoicePan(track.channelPan, harmony.pan)),
-              .lane = kHarmonyLane,
-          });
+          .channelPan(panController(combinedVoicePan(track.channelPan, harmony.pan)), kHarmonyLane);
     }
     track.harmony.enabled = enabled;
   }
@@ -572,7 +566,7 @@ using Cursor = CompilerCursor<Playback>;
       for (const u32 pattern : layout.patternAddresses) {
         event.discoverTarget(Address{pattern});
       }
-      return event.invokeFlow<&Playback::patternEnd>().end();
+      return event.invoke<&Playback::patternEnd>().end();
     }
     case 0x81: {
       auto event = cursor.command("Voice Priority", SequenceSemantic::State);
@@ -645,7 +639,7 @@ using Cursor = CompilerCursor<Playback>;
                      SemanticOperandRole::RepeatTarget);
       cursor.derived("playlist_index", found->second.patternIndex);
       event.discoverTarget(found->second.destination);
-      return event.invokeFlow<&Playback::repeatEnd>({count, found->second.destination, found->second.patternIndex});
+      return event.invoke<&Playback::repeatEnd>({count, found->second.destination, found->second.patternIndex});
     }
     case 0x8f:
       return cursor.command("Rest", SequenceSemantic::Rest).wait(cursor.u8("delta"));

@@ -715,7 +715,7 @@ using Cursor = CompilerCursor<Playback>;
         const Address destination{*source.loopDestination};
         cursor.derived("repeat_count", source.loopCount);
         cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
-        return event.invokeFlow<&Playback::loopEnd>({source.loopCount, destination}).discoverTarget(destination);
+        return event.invoke<&Playback::loopEnd>({source.loopCount, destination}).discoverTarget(destination);
       }
       if (source.command == 99 && source.value == 20) {
         cursor.derived("loop_start", Address{source.end}, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);

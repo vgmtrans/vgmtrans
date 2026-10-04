@@ -841,10 +841,10 @@ using Cursor = CompilerCursor<Playback>;
           .invoke<&Playback::latePortamento>({cursor.u8("rate")});
     case 0xca:
       return cursor.command("Conditional Restart", SequenceSemantic::Jump)
-          .invokeFlow<&Playback::conditionalStartRepeat>();
+          .invoke<&Playback::conditionalStartRepeat>();
     case 0xcb:
       return cursor.command("Conditional End", SequenceSemantic::End)
-          .invokeFlow<&Playback::conditionalEnd>();
+          .invoke<&Playback::conditionalEnd>();
     case 0xcc:
     case 0xcd: {
       auto event = cursor.command(opcode == 0xcc ? "Branch On First Pass" : "Branch On Repeat", SequenceSemantic::Jump);

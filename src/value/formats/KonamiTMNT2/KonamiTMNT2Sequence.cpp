@@ -639,7 +639,7 @@ struct DecodeState {
     return cursor
         .command((opcode & 0xf0) == 0 ? "Rest" : "Note",
                  (opcode & 0xf0) == 0 ? SequenceSemantic::Rest : SequenceSemantic::Note)
-        .invokeFlow<&Playback::note>({opcode});
+        .invoke<&Playback::note>({opcode});
   }
   if (opcode <= 0xd7) {
     return cursor.command("Attenuation Step", SequenceSemantic::Level)
@@ -843,7 +843,7 @@ struct DecodeState {
       cursor.derived("destination", target, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
       event.discoverTarget(target);
       state.loops[slot] = {};
-      return event.invokeFlow<&Playback::loopEnd>({slot, plays, target});
+      return event.invoke<&Playback::loopEnd>({slot, plays, target});
     }
     case 0xfc:
     case 0xfd: {
@@ -869,7 +869,7 @@ struct DecodeState {
         auto event = cursor.command("Warp", SequenceSemantic::Repeat);
         const bool followedByWarp =
             reader.has(cursor.nextAddress().value, 1) && reader.u8At(cursor.nextAddress().value) == 0xfe;
-        return event.invokeFlow<&Playback::warp>({cursor.nextAddress(), followedByWarp});
+        return event.invoke<&Playback::warp>({cursor.nextAddress(), followedByWarp});
       }
     case 0xff:
       return cursor.command("End", SequenceSemantic::End).end();

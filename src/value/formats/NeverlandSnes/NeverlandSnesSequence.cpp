@@ -762,7 +762,7 @@ template <auto Handler, class... Args>
     const u8 wait = save ? cursor.u8("wait") : 0;
     const u8 duration = save ? cursor.u8("duration") : 0;
     const u8 velocity = save ? cursor.u8("volume") : 0;
-    return event.invokeFlow<&Playback::note>({key, wait, duration, velocity, save});
+    return event.invoke<&Playback::note>({key, wait, duration, velocity, save});
   }
 
   switch (opcode) {
@@ -772,24 +772,24 @@ template <auto Handler, class... Args>
                                                                     : SequenceSemantic::Rest);
       const u8 wait = cursor.u8("wait");
       const u8 value = cursor.u8(layout.version == Version::Modern ? "strength" : "unused");
-      return layout.version == Version::Modern ? event.invokeFlow<&Playback::modulation>({wait, value})
-                                               : event.invokeFlow<&Playback::delay>({wait});
+      return layout.version == Version::Modern ? event.invoke<&Playback::modulation>({wait, value})
+                                               : event.invoke<&Playback::delay>({wait});
     }
     case 0xf1:
       return cursor.command("Volume", SequenceSemantic::Level)
-          .invokeFlow<&Playback::volume>({cursor.u8("wait"), cursor.u8("volume")});
+          .invoke<&Playback::volume>({cursor.u8("wait"), cursor.u8("volume")});
     case 0xf2:
       return cursor.command("Pan", SequenceSemantic::Pan)
-          .invokeFlow<&Playback::pan>({cursor.u8("wait"), cursor.u8("pan")});
+          .invoke<&Playback::pan>({cursor.u8("wait"), cursor.u8("pan")});
     case 0xf3:
       if (layout.version == Version::Modern) {
-        return cursor.command("Delay", SequenceSemantic::Rest).invokeFlow<&Playback::delay>({cursor.u8("wait")});
+        return cursor.command("Delay", SequenceSemantic::Rest).invoke<&Playback::delay>({cursor.u8("wait")});
       }
       return cursor.ignored("Reserved", 1, "reserved");
     case 0xf4:
       if (layout.version == Version::Modern) {
         return cursor.command("Tempo", SequenceSemantic::Tempo)
-            .invokeFlow<&Playback::tempo>({cursor.u8("wait"), cursor.u8("timer_target")});
+            .invoke<&Playback::tempo>({cursor.u8("wait"), cursor.u8("timer_target")});
       }
       return cursor.ignored("Reserved", 1, "reserved");
     case 0xf5:
@@ -804,7 +804,7 @@ template <auto Handler, class... Args>
       if (layout.version == Version::Original) {
         cursor.u8("unused");
       }
-      return event.invokeFlow<&Playback::tuning>({wait, scale});
+      return event.invoke<&Playback::tuning>({wait, scale});
     }
     case 0xf7: {
       auto event = cursor.command("Program Change", SequenceSemantic::Program);
@@ -813,14 +813,14 @@ template <auto Handler, class... Args>
       if (references != nullptr) {
         references->insert(program);
       }
-      return event.invokeFlow<&Playback::programChange>({wait, program});
+      return event.invoke<&Playback::programChange>({wait, program});
     }
     case 0xfb:
       return cursor.command("Repeat Start", SequenceSemantic::Repeat)
-          .invokeFlow<&Playback::repeatStart>({Address{static_cast<u16>(begin + 1)}});
+          .invoke<&Playback::repeatStart>({Address{static_cast<u16>(begin + 1)}});
     case 0xfc:
       return cursor.command("Repeat End", SequenceSemantic::Repeat)
-          .invokeFlow<&Playback::repeatEnd>({cursor.u8("count")});
+          .invoke<&Playback::repeatEnd>({cursor.u8("count")});
     case 0xfd:
       return cursor.command("Section End", SequenceSemantic::Return)
           .invoke<&Playback::sectionEnd>()

@@ -331,24 +331,24 @@ DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 offset, Address star
     auto event = cursor.command(opcode == 1 ? "Fine Pitch Wait" : "Fine Pitch", SequenceSemantic::Pitch);
     if (opcode == 1) {
       const u8 duration = cursor.u8("duration (0 = 256)");
-      return event.invokeFlow<&Playback::timed>({TimedEvent::Wait, s16{0}, u16(duration == 0 ? 256 : duration)});
+      return event.invoke<&Playback::timed>({TimedEvent::Wait, s16{0}, u16(duration == 0 ? 256 : duration)});
     }
     const s16 delta = opcode < 16 ? cursor.s8("pitch delta (1/20 semitone)") : s16((opcode >> 4) - 8);
     // Extended fine commands reuse the now-zero wait counter and are immediate.
-    return event.invokeFlow<&Playback::timed>({TimedEvent::FinePitch, delta, u16(opcode < 16 ? 0 : opcode & 15)});
+    return event.invoke<&Playback::timed>({TimedEvent::FinePitch, delta, u16(opcode < 16 ? 0 : opcode & 15)});
   }
   if (opcode < 0xe0) {
     if (opcode >= 0xc0) {
       return cursor.command("Rest", SequenceSemantic::Rest)
-          .invokeFlow<&Playback::timed>({TimedEvent::Rest, s16{0}, u16(opcode - 0xbf)});
+          .invoke<&Playback::timed>({TimedEvent::Rest, s16{0}, u16(opcode - 0xbf)});
     }
     auto event = cursor.command("Note", SequenceSemantic::Note);
     if (opcode < 0x80) {
-      return event.invokeFlow<&Playback::timed>(
+      return event.invoke<&Playback::timed>(
           {TimedEvent::RelativeNote, s16((opcode >> 3) - 8), u16((opcode & 7) + 1)});
     }
     const u8 duration = cursor.u8("duration (0 = 256)");
-    return event.invokeFlow<&Playback::timed>(
+    return event.invoke<&Playback::timed>(
         {TimedEvent::AbsoluteNote, s16(opcode - 0x60), u16(duration == 0 ? 256 : duration)});
   }
   switch (opcode) {
@@ -409,11 +409,11 @@ DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 offset, Address star
       auto event = cursor.command("Absolute Note", SequenceSemantic::Note);
       const u8 note = cursor.u8("note");
       const u8 duration = cursor.u8("duration (0 = 256)");
-      return event.invokeFlow<&Playback::timed>(
+      return event.invoke<&Playback::timed>(
           {TimedEvent::AbsoluteNote, s16(note), u16(duration == 0 ? 256 : duration)});
     }
     case 0xf0:
-      return cursor.command("End", SequenceSemantic::End).invokeFlow<&Playback::end>().end();
+      return cursor.command("End", SequenceSemantic::End).invoke<&Playback::end>().end();
     case 0xf1:
       return cursor.command("Scale Volume", SequenceSemantic::Level)
           .invoke<&Playback::scaleVolume>({cursor.u16le("multiplier (8.8)")});
@@ -439,7 +439,7 @@ DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 offset, Address star
         return event.label("Invalid Phrase").stop();
       }
       phrases.push_back(phrase);
-      return event.invokeFlow<&Playback::call>({phrase}).call(phrase.start);
+      return event.invoke<&Playback::call>({phrase}).call(phrase.start);
     }
 
     case 0xf8:
@@ -447,10 +447,10 @@ DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 offset, Address star
     case 0xfe:
     case 0xff:
       return cursor.command("Wait", SequenceSemantic::Rest)
-          .invokeFlow<&Playback::timed>({TimedEvent::Wait, s16{0}, u16(opcode == 0xf8 ? 32 : 64u << (opcode - 0xfd))});
+          .invoke<&Playback::timed>({TimedEvent::Wait, s16{0}, u16(opcode == 0xf8 ? 32 : 64u << (opcode - 0xfd))});
     case 0xf9:
       return cursor.command("Restart Track", SequenceSemantic::Loop)
-          .invokeFlow<&Playback::restart>({start})
+          .invoke<&Playback::restart>({start})
           .loopCandidate(start);
     default:
       break;

@@ -719,7 +719,7 @@ using Cursor = CompilerCursor<Playback>;
       cursor.derived("loop_id", source.loopId);
       cursor.derived("repeat_count", source.loopCount);
       cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
-      return event.invokeFlow<&Playback::loop>({source.loopId, source.loopCount, destination})
+      return event.invoke<&Playback::loop>({source.loopId, source.loopCount, destination})
           .discoverTarget(destination);
     }
     return event.channel(source.channel).invoke<&Playback::controller>({source.data1, source.data2});
@@ -934,7 +934,7 @@ struct SeEvent {
     cursor.derived("loop_id", source.loopId);
     cursor.derived("repeat_count", source.loopCount);
     cursor.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
-    return event.invokeFlow<&Playback::loop>({source.loopId, source.loopCount, destination})
+    return event.invoke<&Playback::loop>({source.loopId, source.loopCount, destination})
         .discoverTarget(destination);
   }
   if (source.endEvent) {

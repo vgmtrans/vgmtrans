@@ -1096,9 +1096,9 @@ void consumeTiming(Cursor& cursor, u8 first, const InspectedEvent& inspected) {
     case 0xcd:
       return event.invoke<&Playback::wait>({inspected.timing}).return_();
     case 0xce:
-      return event.invokeFlow<&Playback::repeatStart>({inspected.timing, cursor.u8("count"), cursor.nextAddress()});
+      return event.invoke<&Playback::repeatStart>({inspected.timing, cursor.u8("count"), cursor.nextAddress()});
     case 0xcf:
-      return event.invokeFlow<&Playback::repeatEnd>({inspected.timing});
+      return event.invoke<&Playback::repeatEnd>({inspected.timing});
     case 0xd0:
       return event.end();
     case 0xd1:

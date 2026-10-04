@@ -156,11 +156,11 @@ using Cursor = CompilerCursor<Playback>;
   const u8 opcode = cursor.opcode();
   if (opcode < 0xf0) {
     return cursor.command((opcode & 0x20) ? "Note" : "Pitch / Tie", SequenceSemantic::Note)
-        .invokeFlow<&Playback::timed>({opcode, u16{0}, cursor.u8("duration")});
+        .invoke<&Playback::timed>({opcode, u16{0}, cursor.u8("duration")});
   }
   switch (opcode) {
     case 0xf0:
-      return cursor.command("End", SequenceSemantic::End).invokeFlow<&Playback::end>().end();
+      return cursor.command("End", SequenceSemantic::End).invoke<&Playback::end>().end();
     case 0xf1:
       return cursor.command("Scale Volume", SequenceSemantic::Level)
           .invoke<&Playback::scaleVolume>({cursor.u16le("multiplier (8.8)")});
@@ -169,7 +169,7 @@ using Cursor = CompilerCursor<Playback>;
     case 0xf3:
     case 0xf4:
       return cursor.command(opcode == 0xf3 ? "Rest" : "Wait", SequenceSemantic::Rest)
-          .invokeFlow<&Playback::timed>({opcode, u16{0}, cursor.u8("duration")});
+          .invoke<&Playback::timed>({opcode, u16{0}, cursor.u8("duration")});
     case 0xf5: {
       auto event = cursor.command("Instrument", SequenceSemantic::Instrument);
       const u8 instrument = cursor.u8("instrument", SemanticOperandRole::Instrument);
@@ -186,15 +186,15 @@ using Cursor = CompilerCursor<Playback>;
         return event.label("Invalid Phrase").stop();
       }
       phrases.push_back(phrase);
-      return event.invokeFlow<&Playback::call>({phrase}).call(phrase.start);
+      return event.invoke<&Playback::call>({phrase}).call(phrase.start);
     }
     case 0xf7:
     case 0xf8:
       return cursor.command(opcode == 0xf7 ? "Absolute Note" : "Absolute Pitch / Tie", SequenceSemantic::Note)
-          .invokeFlow<&Playback::timed>({opcode, cursor.u16le("pitch (1/20 semitone)"), cursor.u8("duration")});
+          .invoke<&Playback::timed>({opcode, cursor.u16le("pitch (1/20 semitone)"), cursor.u8("duration")});
     case 0xf9:
       return cursor.command("Restart Track", SequenceSemantic::Loop)
-          .invokeFlow<&Playback::restart>({start})
+          .invoke<&Playback::restart>({start})
           .loopCandidate(start);
     case 0xfa:
       return cursor.command("Tempo / Articulation", SequenceSemantic::Tempo)

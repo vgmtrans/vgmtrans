@@ -1285,7 +1285,7 @@ void Playback::adsr(u8 adsr1, u8 adsr2) {
       const u8 times = cursor.u8("times");
       const s8 volumeDelta = cursor.s8("volume_delta");
       const s8 pitchDelta = cursor.s8("pitch_delta");
-      event.invokeFlow([times, volumeDelta, pitchDelta](Playback& playback) {
+      event.invoke([times, volumeDelta, pitchDelta](Playback& playback) {
         return playback.konamiLoop(times, volumeDelta, pitchDelta, playback.track.konamiLoop.start);
       });
       return event;

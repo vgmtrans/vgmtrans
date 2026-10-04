@@ -272,13 +272,10 @@ void PerformanceEmitter::pan(double stereoPosition, double linearGain) {
   });
 }
 
-void PerformanceEmitter::channelPan(ChannelPanPerformanceEvent event) {
-  append(std::move(event));
-}
-
-void PerformanceEmitter::channelPan(double position) {
-  channelPan(ChannelPanPerformanceEvent{
+void PerformanceEmitter::channelPan(double position, PerformanceLaneId lane) {
+  append(ChannelPanPerformanceEvent{
       .position = position,
+      .lane = lane,
   });
 }
 

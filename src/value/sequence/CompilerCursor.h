@@ -296,39 +296,24 @@ public:
       });
     }
 
+    // Handlers return void or Effects; Effects can advance time or override flow.
     // Braces sequence source reads before binding. There is deliberately no
     // loose argument-pack overload: invoke({read1(), read2()}) preserves order.
     template <auto Method>
     Event& invoke(decltype(detail::commandArguments(Method)) arguments = {}) {
-      return appendInvocation<false>(Method, std::move(arguments));
+      return appendInvocation(Method, std::move(arguments));
     }
 
     // Captures must own anything that needs to outlive decoding. Explicit
     // arguments are copied into the command body using the same rules as methods.
     template <class Handler>
     Event& invoke(Handler handler, detail::HandlerArguments<Handler> arguments) {
-      return appendInvocation<false>(std::move(handler), std::move(arguments));
+      return appendInvocation(std::move(handler), std::move(arguments));
     }
 
     template <class Handler>
     Event& invoke(Handler handler) {
       return appendCallable(std::move(handler));
-    }
-
-    // Runtime control flow may override the command's decoded default path.
-    template <auto Method>
-    Event& invokeFlow(decltype(detail::commandArguments(Method)) arguments = {}) {
-      return appendInvocation<true>(Method, std::move(arguments));
-    }
-
-    template <class Handler>
-    Event& invokeFlow(Handler handler, detail::HandlerArguments<Handler> arguments) {
-      return appendInvocation<true>(std::move(handler), std::move(arguments));
-    }
-
-    template <class Handler>
-    Event& invokeFlow(Handler handler) {
-      return appendInvocation<true>(std::move(handler), detail::CommandArguments<>{});
     }
 
     // The VM may execute this command while the preceding command's wait is
@@ -392,7 +377,7 @@ public:
     }
 
     // Decode an additional reachable block without changing the default path.
-    // Conditional branches supply their runtime decision through invokeFlow().
+    // Conditional branches return their runtime decision from invoke().
     Event& discoverTarget(Address destination) {
       discoveryTargets_.push_back(destination);
       return *this;
@@ -406,12 +391,8 @@ public:
     Event(CompilerCursor& cursor, DecodedCommandPresentation presentation)
         : cursor_(cursor), presentation_(std::move(presentation)) {}
 
-    template <bool ControlFlow, class Callable, class... Arguments>
+    template <class Callable, class... Arguments>
     Event& appendInvocation(Callable callable, detail::CommandArguments<Arguments...> arguments) {
-      if constexpr (ControlFlow) {
-        static_assert(std::is_same_v<detail::CommandResult<Playback, Callable, Arguments...>, Effects>,
-                      "A runtime control-flow handler must return Effects");
-      }
       return std::apply(
           [&](auto... values) -> Event& { return appendCallable(std::move(callable), std::move(values)...); },
           std::move(arguments.values));

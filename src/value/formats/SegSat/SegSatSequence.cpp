@@ -494,7 +494,7 @@ using SegSatCursor = CompilerCursor<Playback>;
     const u8 velocity = cursor.u8("velocity");
     const u16 duration = durationHigh | cursor.u8("duration_low");
     const u16 delta = deltaHigh | cursor.u8("delta_low");
-    return event.channel(channel).delay(delta).invokeFlow<&Playback::note>({key, velocity, duration});
+    return event.channel(channel).delay(delta).invoke<&Playback::note>({key, velocity, duration});
   }
 
   if ((status & 0xf0) == 0xb0) {
@@ -505,7 +505,7 @@ using SegSatCursor = CompilerCursor<Playback>;
     const auto valueRole = controller == 32 ? SemanticOperandRole::InstrumentBank : SemanticOperandRole::Value;
     const u8 value = cursor.derived("value", static_cast<u8>(encoded & 0x7f), valueRole);
     const u16 delta = cursor.u8("delta");
-    return event.channel(channel).delay(delta).invokeFlow<&Playback::controller>({controller, value});
+    return event.channel(channel).delay(delta).invoke<&Playback::controller>({controller, value});
   }
 
   if ((status & 0xf0) == 0xc0) {
@@ -514,7 +514,7 @@ using SegSatCursor = CompilerCursor<Playback>;
     const u8 encodedProgram = cursor.u8("encoded_program");
     cursor.derived("program", static_cast<u8>(encodedProgram & 0x7f), SemanticOperandRole::InstrumentProgram);
     const u16 delta = cursor.u8("delta");
-    return event.channel(channel).delay(delta).invokeFlow<&Playback::programChange>({encodedProgram});
+    return event.channel(channel).delay(delta).invoke<&Playback::programChange>({encodedProgram});
   }
 
   if ((status & 0xf0) == 0xd0) {
@@ -522,7 +522,7 @@ using SegSatCursor = CompilerCursor<Playback>;
     cursor.opcodeBits<0, 4>("channel", SemanticOperandRole::Channel);
     cursor.u8("pressure");
     const u16 delta = cursor.u8("delta");
-    return event.delay(delta).invokeFlow<&Playback::afterEvent>({});
+    return event.delay(delta).invoke<&Playback::afterEvent>({});
   }
 
   if ((status & 0xf0) == 0xe0) {
@@ -531,7 +531,7 @@ using SegSatCursor = CompilerCursor<Playback>;
     const u8 encodedBend = cursor.u8("encoded_bend");
     cursor.derived("bend", static_cast<u8>(encodedBend & 0x7f));
     const u16 delta = cursor.u8("delta");
-    return event.channel(channel).delay(delta).invokeFlow<&Playback::pitchBend>({encodedBend});
+    return event.channel(channel).delay(delta).invoke<&Playback::pitchBend>({encodedBend});
   }
 
   switch (status) {
@@ -548,7 +548,7 @@ using SegSatCursor = CompilerCursor<Playback>;
       auto event = cursor.command("Forever Loop", SequenceSemantic::Loop);
       const u8 delta = cursor.u8("delta");
       const Address continuation = cursor.nextAddress();
-      return event.delay(delta).invokeFlow<&Playback::foreverLoop>({continuation});
+      return event.delay(delta).invoke<&Playback::foreverLoop>({continuation});
     }
     case 0x83:
       return cursor.command("End", SequenceSemantic::End).end();

@@ -1,14 +1,14 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Sixty-one validated batches remove 1,502 net production lines
+`cb9e0b766`. Sixty-two validated batches remove 1,532 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 61 has identical shell bytes to executed batch 60;
-its corpus evidence is reused from that comparison.
-Seventy-two expanded raw inventories match byte-for-byte; one shows Sony
-sample-pool ID scheduling variation, independently reproduced in unchanged59. The cleanup2 records appear
+cover 37 of 38 registered families. Batch 62 replays both corpora against executed batch 60;
+its rebuilt batch 61 predecessor has identical shell bytes to batch 60.
+72 expanded raw inventories match byte-for-byte; 1 retains previously
+proved Sony sample-pool ID scheduling variation. The cleanup2 records appear
 at the end of this document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
@@ -10948,8 +10948,10 @@ disappear; this is a small API simplification, not an ABI guarantee.
 
 Root verifies all sixteen scoped cold inputs against committed60, frozen60 and
 the original59 authority, reconstructs the six complete changed files, and
-checks nineteen assertion replacements. The sealed original type search had
-double-escaped word boundaries and returned no matches. Its initial applier
+checks nineteen assertion replacements. The sealed original type search used a boundary regex that returned no matches.
+Its decoded argument has one literal backslash per boundary; the initial
+"double-escaped" explanation was inaccurate. A separate erratum preserves
+the observed command bytes/status and corrects that account. Its initial applier
 stopped before mutation. Root mistakenly dispatched the dependent integration
 request anyway; it stopped on the absent expected-source receipt before any
 compiler ran. Both failures remain recorded. A separate corrected source check
@@ -10983,3 +10985,86 @@ pass61-final-root-review.json.
 Cumulative production removal is 1,502 value lines: 1,195 architecture
 and 307 formats, plus the earlier 22 UI lines. Continue reviewing unused
 source-level policy channels and optional-operand boundary semantics.
+
+## Cleanup2 batch 62: remove three redundant authoring choices
+
+Use one Event::invoke spelling for playback handlers. Its existing void-or-Effects
+contract already represents output, time advancement and runtime flow overrides.
+invokeFlow added only an Effects-only static assertion before that same path;
+formats even used it for ordinary notes/controllers and empty Effects. Remove
+its three overloads and the private ControlFlow template branch. The eighty-eight
+native uses in twenty-four files across twenty-one families keep every argument,
+read, capture, handler body, delay/channel setting and discovery/default flow.
+CommandArguments still requires all braced arguments and owns string_view values;
+three existing empty-argument rejection probes and conflicting-flow tests remain.
+
+Typed methods and explicit-argument handlers retain their staging. Eleven actual
+Nin no-argument handlers now use invoke's direct appendCallable path, dropping
+one empty-tuple layer/callable move. All capture trivial scalars/Address or nothing.
+The common void/Effects restriction and combineCommandEffects checks remain.
+Arbitrary external callable move/destructor/exception staging and template symbol
+identity are not promised; the public invokeFlow spelling intentionally disappears.
+The initial cold assessment overstated family/handler counts; a separate erratum
+retains that original seal and records the exact twenty-one/eleven inventory.
+
+Channel pan now has one channelPan(position, lane=0) method. Its raw neutral event
+still has exactly header, position and lane. Eight scalar callers are unchanged;
+TriAce's two delayed harmony writes supply the existing lane directly. append
+still stamps source/track/tick/order and automation attribution. Position arithmetic,
+companion-track split and lane handling remain; the complete existing TriAce fixture
+checks those delayed pan values and ticks. The event-shaped overload and original
+scalar member-pointer type intentionally narrow; no repository consumer relies on
+them. Rich note, reverb and pitch-range inputs retain their actual native semantics.
+
+Remove SequenceProgramBehavior::loopPolicy, which has no native writer. Render
+callers already select loop policy; Default now resolves directly to PlayOnce.
+Explicit policies, enum values, repeats, loop inference, delays, coordinator/playlist
+scheduling and diagnostics remain. Remove only Capcom's default-field mirror check;
+actual finite-loop event/tick checks stay. External program-specific defaults and
+that aggregate/layout slot intentionally disappear. Root checks 1,009 committed
+inventory inputs and fifty-five complete live/committed61/frozen61 scoped bodies,
+reconstructing all thirty-one changed files. The single TriAce overlap combines
+only independent invocation-name and channel-pan transformations.
+
+The combined change removes thirty production lines: twenty-four architecture
+and six native; fixture code shrinks by three. All 339 matching Release
+steps and all 44 CTest suites pass without warnings. Frozen62 holds the complete
+matching value/shared/tests/Qt sources and four rebuilt archives, with committed61
+as its true precommit parent. Shell SHA256: f5ec92805da5646cf69ecaa129c91b7ab785f6b6aee5fcbabaf25a25323e0044.
+
+Both fresh archive campaigns compare with last-executed60; rebuilt61 had identical
+shell bytes to60. All 252 original records/3,922 artifact names/hashes and all894
+expanded exports/858 artifacts match. Root rehashes the retained62 original payloads
+(1,604,324,580 bytes) and checks 2,469 pinned records. Expanded bytes remain
+218,240,549 per side, with852 successes/the same42 failures. Seventy-two inventories
+are raw-exact; sole volume-38 uses the unchanged narrow mapping and its already
+proven six unchanged59 inventory checks. A separate classifier fork admits only
+the three previously proven inputs35/36/38, without broadening normalization or
+adding manual repetitions. Five unsupported DSF inventories and37/38 real-family
+coverage remain; KonamiTMNT2 has synthetic coverage.
+
+Root's first postreplay verifier assumed the case ID also lived inside the separate
+classification file; the generic classifier puts it only in the summary envelope.
+A subsequent evidence-path check distinguished lexical /tmp from /private/tmp.
+Both stopped after the successful exports; preserved corrected verifiers compare
+the exact remaining classification fields and resolved filesystem evidence identity,
+including its hash. No compiler/export campaign was rerun for these metadata fixes.
+The prior61 search erratum also corrects the inaccurate double-escape explanation
+using actual argument bytes/status; all original seals and successful receipts remain.
+
+Old60 task-generated original payloads are reclaimed only after exact62 comparison
+and every old-file hash gate. All JSON/logs/manifests, frozen sources, archives,
+shells and latest62 payloads remain; user and music files stay untouched. No extra
+numerical mirror or sanitizer matrix is attributed to these authoring simplifications.
+
+Evidence under /tmp/vgmtrans-cleanup2: authoring62-root-cold-review.json,
+invoke-unified62-independent-review.json, invoke-unified62-count-erratum.json,
+pass62-application-receipt.json, build-pass62.log, ctest-pass62.log,
+pass62-baseline/provenance.json, corpora62-root-review.json,
+volume-coverage27/pass60-vs-pass62-summary.json,
+corpora62-review-schema-failure/, command-body61-inventory-erratum/,
+pruned-verified-originals60-after62-replay.json and pass62-final-root-review.json.
+
+Cumulative production removal is 1,532 value lines: 1,219 architecture
+and 313 formats, plus the earlier 22 UI lines. Continue with unused
+source-map authoring and the independently identified Nin optional-EOF bug.

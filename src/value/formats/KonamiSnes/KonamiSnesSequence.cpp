@@ -1359,7 +1359,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       const u8 times = cursor.u8("times");
       const s8 volumeDelta = cursor.s8("volume_delta");
       const s8 pitchDelta = cursor.s8("pitch_delta");
-      return event.invokeFlow<&Playback::loopEnd>({slot, times, volumeDelta, pitchDelta});
+      return event.invoke<&Playback::loopEnd>({slot, times, volumeDelta, pitchDelta});
     }
     case 0xe8: {
       auto event = cursor.command("Loop Start #2", SequenceSemantic::Loop);
@@ -1445,7 +1445,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     }
     case 0xf7:
       return cursor.command("Loop With Volta End", SequenceSemantic::Repeat)
-          .invokeFlow<&Playback::voltaEnd>({cursor.nextAddress()});
+          .invoke<&Playback::voltaEnd>({cursor.nextAddress()});
     case 0xf9:
       return cursor.command("Vibrato Fade", SequenceSemantic::Modulation)
           .invoke<&Playback::setVibratoFade>({cursor.u8("length")});

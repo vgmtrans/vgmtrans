@@ -708,7 +708,7 @@ using Cursor = CompilerCursor<Playback>;
           .invoke<&Playback::pitchSlide>({cursor.u8("length"), cursor.s8("semitones")});
     case 0x2a:
       return cursor.command("Repeat Start", SequenceSemantic::Repeat)
-          .invokeFlow<&Playback::repeatStart>({cursor.u8("count"), Address{static_cast<u16>(begin + 2)}});
+          .invoke<&Playback::repeatStart>({cursor.u8("count"), Address{static_cast<u16>(begin + 2)}});
     case 0x2b: {
       auto event = cursor.sourceOnly("Main CPU Output Cursor", "cpu-output-cursor");
       cursor.u16le("cursor", SourceValueDisplay::Address);
@@ -729,7 +729,7 @@ using Cursor = CompilerCursor<Playback>;
       return event.invoke<&Playback::conditionalSignalJump>({destination}).discoverTarget(destination);
     }
     case 0x2e:
-      return cursor.command("Repeat End", SequenceSemantic::Repeat).invokeFlow<&Playback::repeatEnd>();
+      return cursor.command("Repeat End", SequenceSemantic::Repeat).invoke<&Playback::repeatEnd>();
     case 0x2f: {
       auto event = cursor.command("Repeat Break", SequenceSemantic::RepeatBreak);
       const u8 count = cursor.u8("count");

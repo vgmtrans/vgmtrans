@@ -174,7 +174,7 @@ struct Decoder {
       if (opcode < 0xf0 || opcode == 0xf3 || opcode == 0xf4) {
         const auto label = opcode == 0xf3 ? "Rest" : opcode == 0xf4 ? "Wait" : (opcode & 0x20) ? "Note" : "Pitch / Tie";
         return cursor.command(label, opcode < 0xf0 ? SequenceSemantic::Note : SequenceSemantic::Rest)
-            .invokeFlow<&Playback::timed>({opcode, cursor.u8("duration")});
+            .invoke<&Playback::timed>({opcode, cursor.u8("duration")});
       }
       if (opcode == 0xf0) {
         return cursor.command("End Pattern", SequenceSemantic::Return).return_();
@@ -186,7 +186,7 @@ struct Decoder {
     } else if (layer == Layer::Track) {
       switch (opcode) {
         case 0x00:
-          return cursor.command("End Track", SequenceSemantic::End).invokeFlow<&Playback::end>().end();
+          return cursor.command("End Track", SequenceSemantic::End).invoke<&Playback::end>().end();
         case 0x02:
           return cursor.command("Restart Track", SequenceSemantic::Loop).loopCandidate(start);
         case 0x04: {
@@ -203,7 +203,7 @@ struct Decoder {
           auto event = cursor.command("Voice Assignment", SequenceSemantic::Unknown);
           const u8 voice = cursor.u8("voice (255 = allocate)");
           const u8 mask = voice == 0xff ? cursor.u8("allowed voices") : 0;
-          return event.invokeFlow<&Playback::assignVoice>({voice, mask});
+          return event.invoke<&Playback::assignVoice>({voice, mask});
         }
       }
     } else if (layer == Layer::List) {

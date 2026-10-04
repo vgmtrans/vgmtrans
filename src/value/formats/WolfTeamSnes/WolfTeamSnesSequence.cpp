@@ -676,7 +676,7 @@ using Cursor = CompilerCursor<Playback>;
       return cursor.command("Wait", SequenceSemantic::Rest).wait(cursor.u8("delay"));
     case 0x91:
     case 0xfd:
-      return cursor.command("Phrase Boundary", SequenceSemantic::End).invokeFlow<&Playback::advancePhrase>();
+      return cursor.command("Phrase Boundary", SequenceSemantic::End).invoke<&Playback::advancePhrase>();
     case 0x92: {
       auto event = cursor.command("Loop Marker", SequenceSemantic::Repeat);
       const Address destination{begin + 1};
@@ -685,7 +685,7 @@ using Cursor = CompilerCursor<Playback>;
     }
     case 0x93:
       return cursor.command("Loop End", SequenceSemantic::Repeat)
-          .invokeFlow<&Playback::endRepeat>({cursor.u8("count")});
+          .invoke<&Playback::endRepeat>({cursor.u8("count")});
     case 0x94:
       return cursor.command("Pitch Bend", SequenceSemantic::Pitch)
           .invoke<&Playback::delayedPitchBend>({cursor.u8("delay"), cursor.u8("bend")});
@@ -779,7 +779,7 @@ using Cursor = CompilerCursor<Playback>;
     }
     case 0xfd: {
       auto event = command("Segment Boundary", SequenceSemantic::End);
-      return event.invokeFlow<&Playback::advanceSegment>();
+      return event.invoke<&Playback::advanceSegment>();
     }
     case 0xf1:
       if (middle) {
@@ -852,7 +852,7 @@ using Cursor = CompilerCursor<Playback>;
       return cursor.sourceOnly("No Operation", "nop");
     case 0xf8: {
       auto event = command("Return to Saved Segment", SequenceSemantic::Repeat);
-      return event.invokeFlow<&Playback::returnSaved>();
+      return event.invoke<&Playback::returnSaved>();
     }
     case 0xf9: {
       auto event = command("Save Segment", SequenceSemantic::Repeat);

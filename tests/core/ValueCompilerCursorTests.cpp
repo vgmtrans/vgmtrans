@@ -64,9 +64,8 @@ static_assert(!AcceptsUnorderedNoteArguments<ProbeCursor::Event>);
 template <class Event>
 concept AcceptsEmptyNoteArguments =
     requires(Event& event) { event.template invoke<&CompilerProbePlayback::note>({}); } ||
-    requires(Event& event) { event.template invokeFlow<&CompilerProbePlayback::note>({}); } ||
     requires(Event& event) { event.invoke([](CompilerProbePlayback&, u8) {}, {}); } ||
-    requires(Event& event) { event.invokeFlow([](CompilerProbePlayback&, u8) { return Effects{}; }, {}); };
+    requires(Event& event) { event.invoke([](CompilerProbePlayback&, u8) { return Effects{}; }, {}); };
 static_assert(!AcceptsEmptyNoteArguments<ProbeCursor::Event>);
 
 DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
@@ -111,7 +110,7 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
     }
     case 0x26: {
       auto event = cursor.command("Conflicting Flow", SequenceSemantic::State);
-      return event.invokeFlow([](CompilerProbePlayback& playback) { return playback.vm.end(); })
+      return event.invoke([](CompilerProbePlayback& playback) { return playback.vm.end(); })
           .invoke([](CompilerProbePlayback& playback) { return playback.vm.return_(); });
     }
     case 0x27: {

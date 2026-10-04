@@ -637,7 +637,7 @@ using Cursor = CompilerCursor<Playback>;
     case 0xe8:
       return cursor.command("Octave Up", SequenceSemantic::Pitch).invoke<&Playback::octaveAdd>({1});
     case 0xe9:
-      return cursor.command("Loop Break", SequenceSemantic::RepeatBreak).invokeFlow<&Playback::loopBreak>();
+      return cursor.command("Loop Break", SequenceSemantic::RepeatBreak).invoke<&Playback::loopBreak>();
     case 0xea:
       return cursor.command("Loop Start", SequenceSemantic::Repeat).invoke<&Playback::loopStart>();
     case 0xeb: {
@@ -645,7 +645,7 @@ using Cursor = CompilerCursor<Playback>;
       const u8 count = cursor.u8("count");
       const Address destination = relativeTarget(cursor, begin, SemanticOperandRole::RepeatTarget);
       const Address exit{static_cast<u16>(begin + 4)};
-      return event.invokeFlow<&Playback::loopEnd>({count, destination, exit}).discoverTarget(destination);
+      return event.invoke<&Playback::loopEnd>({count, destination, exit}).discoverTarget(destination);
     }
     case 0xec:
       return cursor.command("Duration Rate", SequenceSemantic::State)
@@ -659,7 +659,7 @@ using Cursor = CompilerCursor<Playback>;
       const u8 count = cursor.u8("count");
       const Address destination = relativeTarget(cursor, begin, SemanticOperandRole::RepeatTarget);
       const Address exit{static_cast<u16>(begin + 4)};
-      return event.invokeFlow<&Playback::unstackedLoop>({count, destination, exit}).discoverTarget(destination);
+      return event.invoke<&Playback::unstackedLoop>({count, destination, exit}).discoverTarget(destination);
     }
     case 0xef:
       return cursor.command("Pitch Offset", SequenceSemantic::Pitch)

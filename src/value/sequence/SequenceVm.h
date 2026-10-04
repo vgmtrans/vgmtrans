@@ -119,8 +119,7 @@ public:
   void level(double linearGain, u32 sourceLevels = 0);
   void expression(double linearGain, u32 sourceLevels = 0);
   void pan(double stereoPosition, double linearGain = 1.0);
-  void channelPan(ChannelPanPerformanceEvent event);
-  void channelPan(double position);
+  void channelPan(double position, PerformanceLaneId lane = PerformanceLaneId{0});
   void stereoBalance(double leftGain, double rightGain);
   void masterLevel(double linearGain);
   void reverb(ReverbPerformanceEvent event);

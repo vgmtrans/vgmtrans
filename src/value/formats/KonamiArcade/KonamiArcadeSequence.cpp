@@ -986,7 +986,7 @@ using KonamiArcadeCursor = CompilerCursor<Playback>;
                        SemanticOperandRole::RepeatTarget);
         event.discoverTarget(discoveredLoops[slot]);
       }
-      return event.invokeFlow<&Playback::loopEnd>({slot, count, attenuation, transpose});
+      return event.invoke<&Playback::loopEnd>({slot, count, attenuation, transpose});
     }
     case 0xea: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
@@ -1053,7 +1053,7 @@ using KonamiArcadeCursor = CompilerCursor<Playback>;
                        SemanticOperandRole::CallTarget);
         event.discoverTarget(discoveredSubroutine);
       }
-      return event.invokeFlow<&Playback::subroutineBoundary>({cursor.nextAddress()});
+      return event.invoke<&Playback::subroutineBoundary>({cursor.nextAddress()});
     }
     case 0xf8:
       return cursor.command("Pan Slide", SequenceSemantic::Pan)

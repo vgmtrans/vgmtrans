@@ -985,13 +985,13 @@ using Cursor = CompilerCursor<Playback>;
       const u8 delay = cursor.u8("delay");
       const u8 rate = cursor.u8("rate");
       const u8 depth = cursor.u8("depth");
-      return event.invokeFlow([delay, rate, depth](Playback& p) {
+      return event.invoke([delay, rate, depth](Playback& p) {
         p.ogreBattleModulation(p.track.ogreBattleTremolo, delay, rate, depth, true);
         return Effects{};
       });
     }
     case 0xec:
-      return cursor.command("Tremolo Off", SequenceSemantic::Modulation).invokeFlow([](Playback& p) {
+      return cursor.command("Tremolo Off", SequenceSemantic::Modulation).invoke([](Playback& p) {
         p.track.ogreBattleTremolo.enabled = false;
         p.out.expression(1.0);
         return Effects{};
@@ -1012,7 +1012,7 @@ using Cursor = CompilerCursor<Playback>;
       auto event = cursor.command("Conditional Pan", SequenceSemantic::Pan);
       const u8 first = cursor.u8("pan_if_set");
       const u8 second = cursor.u8("pan_if_clear");
-      return event.invokeFlow([first, second](Playback& p) {
+      return event.invoke([first, second](Playback& p) {
         p.pan(p.program.conditions[p.out.sourceTrackNumber() / 4] ? first : second);
         return Effects{};
       });
@@ -1022,7 +1022,7 @@ using Cursor = CompilerCursor<Playback>;
       const Address first{cursor.u16le("pattern_if_set", SourceValueDisplay::Address, SemanticOperandRole::CallTarget)};
       const Address second{
           cursor.u16le("pattern_if_clear", SourceValueDisplay::Address, SemanticOperandRole::CallTarget)};
-      return event.invokeFlow([first, second](Playback& p) {
+      return event.invoke([first, second](Playback& p) {
         return p.call(1, p.program.conditions[p.out.sourceTrackNumber() / 4] ? first : second);
       }).call(first).discoverTarget(second);
     }
@@ -1031,7 +1031,7 @@ using Cursor = CompilerCursor<Playback>;
       const u8 address = cursor.u8("address", SourceValueDisplay::Address);
       const u8 value = cursor.u8("value", SourceValueDisplay::Hex);
       if (address == 0xa5 || address == 0xa6) {
-        return event.invokeFlow([address, value](Playback& p) {
+        return event.invoke([address, value](Playback& p) {
           p.program.conditions[address - 0xa5] = value;
           return Effects{};
         });
@@ -1039,7 +1039,7 @@ using Cursor = CompilerCursor<Playback>;
       return event;
     }
     case 0xff:
-      return cursor.command("Mute Music", SequenceSemantic::Level).invokeFlow([](Playback& p) {
+      return cursor.command("Mute Music", SequenceSemantic::Level).invoke([](Playback& p) {
         if (!p.program.config.sfx) {
           p.master(0);
         }
@@ -1089,7 +1089,7 @@ using Cursor = CompilerCursor<Playback>;
       auto event = cursor.command("Conditional Jump", SequenceSemantic::Jump);
       const Address destination{
           cursor.u16le("destination", SourceValueDisplay::Address, SemanticOperandRole::JumpTarget)};
-      return event.invokeFlow<&Playback::conditionalJump>({destination}).discoverTarget(destination);
+      return event.invoke<&Playback::conditionalJump>({destination}).discoverTarget(destination);
     }
     case 0xdb:
     case 0xdc:
@@ -1100,13 +1100,13 @@ using Cursor = CompilerCursor<Playback>;
                                   SequenceSemantic::State);
       if (opcode == 0xdb) {
         const u8 gain = cursor.u8("gain", SourceValueDisplay::Hex);
-        event.invokeFlow([gain](Playback& p) {
+        event.invoke([gain](Playback& p) {
           p.envelope(0, p.track.instrument[2], gain);
           return Effects{};
         });
       } else if (opcode == 0xdc) {
         const u16 pitch = cursor.u16le("pitch", SourceValueDisplay::Hex);
-        event.invokeFlow([pitch](Playback& p) {
+        event.invoke([pitch](Playback& p) {
           if (p.track.lastNote.valid()) {
             p.out.pitchBend(12.0 * std::log2(std::max<u16>(1, pitch) / p.track.pitchOrigin));
           }
@@ -1135,7 +1135,7 @@ using Cursor = CompilerCursor<Playback>;
       }
       // A deterministic export chooses the first alternative. The driver
       // replaces its entire call stack with one return after the table.
-      event.invokeFlow([first](Playback& p) {
+      event.invoke([first](Playback& p) {
         p.track.calls.clear();
         return p.call(1, first);
       });
@@ -1261,7 +1261,7 @@ using Cursor = CompilerCursor<Playback>;
       const u8 address = cursor.u8("address", SourceValueDisplay::Address);
       const u8 value = cursor.u8("value", SourceValueDisplay::Hex);
       if (address == 0xdf) {
-        return event.invokeFlow([value](Playback& p) {
+        return event.invoke([value](Playback& p) {
           p.program.condition = value;
           return Effects{};
         });

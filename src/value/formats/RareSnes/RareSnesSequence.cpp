@@ -1441,7 +1441,7 @@ using Cursor = CompilerCursor<Playback>;
         event.discoverTarget(destination);
         destinations.push_back(destination);
       }
-      return event.invokeFlow<&Playback::conditional>({std::move(destinations)});
+      return event.invoke<&Playback::conditional>({std::move(destinations)});
     }
     case Kind::SetCondition: {
       return cursor.command("Set Conditional Index", SequenceSemantic::State)

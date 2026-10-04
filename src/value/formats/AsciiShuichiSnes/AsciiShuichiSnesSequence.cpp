@@ -539,15 +539,15 @@ Cursor::Event& selectInstrument(Cursor::Event& event, u8 program) {
       return cursor.command("Infinite Loop Point", SequenceSemantic::Repeat)
           .set<&TrackState::loopPoint>(cursor.nextAddress());
     case 0x82:
-      return cursor.command("Infinite Loop", SequenceSemantic::Jump).invokeFlow<&Playback::loopForever>();
+      return cursor.command("Infinite Loop", SequenceSemantic::Jump).invoke<&Playback::loopForever>();
     case 0x83:
       return cursor.command("Repeat Start", SequenceSemantic::Repeat)
           .invoke<&Playback::repeatStart>({cursor.nextAddress()});
     case 0x84:
       return cursor.command("Repeat End", SequenceSemantic::Repeat)
-          .invokeFlow<&Playback::repeatEnd>({cursor.u8("count"), cursor.nextAddress()});
+          .invoke<&Playback::repeatEnd>({cursor.u8("count"), cursor.nextAddress()});
     case 0x85:
-      return cursor.command("Repeat Break", SequenceSemantic::RepeatBreak).invokeFlow<&Playback::repeatBreak>();
+      return cursor.command("Repeat Break", SequenceSemantic::RepeatBreak).invoke<&Playback::repeatBreak>();
     case 0x86:
       return cursor.command("Call", SequenceSemantic::Call)
           .call(cursor.addressLe("destination", SemanticOperandRole::CallTarget));

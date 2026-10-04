@@ -270,7 +270,6 @@ struct StereoBalance {
 // Program-level playback and rendering policy that is not an individual source
 // command, such as loop handling, lowering preferences, or initial channel state.
 struct SequenceProgramBehavior {
-  LoopPolicy loopPolicy = LoopPolicy::PlayOnce;
   u32 commandLimit = 100'000;
   // Detect a loop when a jump returns to the same command with the same nested calls and repeat counts.
   // Disable this when a format keeps other state that can make playback continue differently from that command.

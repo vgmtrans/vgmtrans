@@ -365,8 +365,6 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(sequence->metadata.range.offset == 0x2001, "sequence range should point at fixed BGM header body");
   expect(sequence->program.runtime.valid(), "sequence should carry its executable runtime");
   expect(sequence->program.timebase.ppqn == 48, "sequence should use CapcomSnes PPQN");
-  expect(sequence->program.behavior.loopPolicy == LoopPolicy::PlayOnce,
-         "sequence should carry CapcomSnes default loop policy");
   expect(sequence->program.tracks.size() == 8, "sequence should decode all nonzero track pointers");
   const auto sequenceInspection = session.inspect(sequence->metadata.id);
   expect(sequenceInspection && sequenceInspection->range().offset == 0x2001 &&

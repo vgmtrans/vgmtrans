@@ -850,7 +850,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
   };
 
   const SequenceVmOptions options{
-      .loopPolicy = options_.loopPolicy == LoopPolicy::Default ? behavior.loopPolicy : options_.loopPolicy,
+      .loopPolicy = options_.loopPolicy == LoopPolicy::Default ? LoopPolicy::PlayOnce : options_.loopPolicy,
       .sequenceLoops = options_.sequenceLoops,
   };
 
