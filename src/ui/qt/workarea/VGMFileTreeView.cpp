@@ -253,18 +253,7 @@ VGMFileTreeView::VGMFileTreeView(std::shared_ptr<const vgmtrans::core::SourceIns
 
     vgmtrans::core::SourceRange span;
     for (const auto& object : objects) {
-      const auto range = rangeOf(object);
-      if (!range.valid() || (span.valid() && range.source != span.source)) {
-        continue;
-      }
-      if (!span.valid()) {
-        span = range;
-      } else {
-        const u64 begin = std::min(span.offset, range.offset);
-        const u64 end = std::max(span.endOffset(), range.endOffset());
-        span.offset = begin;
-        span.size = end - begin;
-      }
+      span.include(rangeOf(object));
     }
     if (!span.valid()) {
       return;

@@ -1,11 +1,11 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Forty-seven validated batches remove 1,241 net production lines
-from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
+`cb9e0b766`. Forty-eight validated batches remove 1,308 net production lines
+from `src/value`, plus 23 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 46 exactly;
+cover 37 of 38 registered families. All export records match batch 47 exactly;
 72 expanded raw inventories match byte-for-byte. One previously proven
 Sony scheduling difference matches the retained original evidence under the
 existing narrow ID mapping. The cleanup2 records appear
@@ -9565,3 +9565,185 @@ pruned-verified-originals45-before47-replay.json, pass47-initial-root-gate.json.
 
 Next: keep probing architecture responsibilities and format authoring, retaining
 explicit supported behavior when a reduction would hide it behind a new policy.
+
+## Cleanup2 forty-eighth batch: interpret Saturn gain at its source
+
+The largest reduction removes SegSat's second interpretation of its own
+commands. Two small changes also reuse responsibilities already owned by the
+range model and MIDI rendering traversal. SequenceVM and source/export
+separation remain intact; no shared architecture framework is introduced.
+
+### Changes and intent
+
+- SegSat's typed Playback now interprets controllers 7/11 and note velocity
+  with its bound volume model. Remove the decoded controller-address vector,
+  its command-ID projection, copies through binding/runtime configuration, and
+  the final performance traversal that reconstructed driver state. The parser
+  returns SequenceProgram directly. Finalization retains tempo/channel merging.
+  Three production paths remove 68 net lines.
+- Preserve initial emitted instrument identity independently of the driver's
+  zeroed bank/program registers. Later native instrument emission selects the
+  complete register pair. Keep configured-empty versus unconfigured behavior,
+  sole-bank fallback, missing selections, exact source-velocity roundtrip,
+  initial level/expression and denominator rules. These are real supported
+  distinctions, rather than reasons to restore the controller replay.
+- VGMFileTreeView groups source ranges with SourceRange::include. Its existing
+  invalid/foreign-source, adoption, zero-anchor and unsigned wrapping behavior
+  replaces eleven duplicated UI lines. Grouping, labels and selection remain.
+- CollectionStitch discovers a later part's rendered channel while retiming its
+  events. Remove the separate std::set and second traversal. Locally rendered
+  tracks have one fixed assigned channel; the query retains channel zero and
+  empty/meta/SysEx cases. Keep the named reset-prefix stage, ordering and bank
+  lookup. The invariant comment makes this change one net line larger.
+
+Together these changes remove 67 net value production lines and eleven UI
+lines. The existing SegSat fixture gains 53 net lines, including one meaningful
+scanner/binding/playback regression and migration to the simpler parser result.
+
+- Value: 2,337 added/3,645 deleted across 171 paths.
+- Architecture: 1,836 added/2,936 deleted across 95 paths.
+- Formats: 501 added/709 deleted across 76 paths.
+- Tests: 1,327 added/428 deleted across 43 paths.
+
+Net production reductions are 1,308 value lines, 1,100 architecture and 208
+format lines.
+
+### Native defect and deliberate boundary changes
+
+A preserved loop's Loop Start marker carries its destination command's source
+reference. If that destination is a controller, the old post-hoc replay replaced
+the marker with a gain event on all sixteen channels and changed note gain on
+channels where the controller never ran. Typed command execution updates only
+the actual controller channel and leaves both loop markers intact.
+
+Eight generated cases across four hardware volume models retain their raw
+Before/After differences. Each corrects sixteen phantom gain events; twelve
+note-velocity payloads also change across the set. All 24 encoded MIDI policy
+captures change as expected. Source projection, event headers/order, track
+geometry, spans and diagnostics stay exact. Root independently checks every
+typed event change; this correction is not counted as byte parity.
+
+The new public scanner/binding fixture checks both controller destinations,
+all sixteen marker pairs, source provenance, actual level-event counts and
+physical note gain. Old Release/focused-SAN fixture runs fail first on the gain
+assertion; the separate generated old runs fail the marker assertion. Both
+candidate versions pass. The four old SIGABRT outcomes are expected uncaught
+std::runtime_error assertions, not sanitizer findings or suppressed failures.
+Root corrected a report that initially conflated these two assertions; original
+sealed metadata remains under report-precision-correction. No source, command,
+trace or archive changed with that report correction.
+
+The obsolete public free gain finalizer and controller-map configuration types
+are deliberately removed. No repository caller needs arbitrary post-hoc gain
+authoring. A defined raw erased-finalizer example separately demonstrates the
+narrowing: expected geometry still flattens, while supplied gains remain as
+authored. Custom replacement bodies, floating-key raw events, external floating
+environment changes, malformed erased-state exception timing and arbitrary
+allocator failure ordinals are outside the native equivalence claim.
+
+### Verification and costs
+
+All proofs use committed47 08b94905024457b1598c61bb50be25f427daaa81 and matching
+frozen47 value/shared/tests and archives. Its provenance retains precommit46
+a2ff1aca9c561e1376efed379e3577da07400648. GUI proof additionally pins the actual
+committed GUI/legacy/generated-MOC context. Root reads exact sources, reports,
+runners and capture scopes and gates 1,408 sealed file entries. The final proofs
+record 242 commands: 238 successes and four expected old regression failures,
+including 66 actual checks under all three configured compiler modes.
+
+- SegSat: full existing suite plus 43 bounded generated cases produce identical
+  1,751,246-byte ordinary streams across four Release/focused-SAN arms. Complete
+  command/source-map/IR/span/double-bit/MIDI captures cover all source velocity
+  bytes, four volume models, bank/region fallbacks, initial selections,
+  registers, channels, budgets, malformed streams and ordinary loops. All four
+  family TUs are rebuilt consistently; old archive members and obsolete erased
+  state/type symbols are excluded. Generated returned performances are observed
+  after their initial parser/runtime/configuration owners die; ordinary fixture captures
+  execute with their usual owners. See segsat-gain48-root-review.json.
+- Natural Preserve: eleven original SSF closures and 25 selected outcomes yield
+  24 successful retained prepared collections and one unchanged missing-bank
+  failure. All 250 files/11,012,789 bytes per side match raw, including 24 neutral
+  IR, 24 resolved IR and 72 structured/encoded MIDI pairs across three pitch
+  policies. Initial Session/snapshot/binding owners die before observation.
+  This independent public-API proof is Release only, without normalization.
+  See natural-ssf48-root-review.json and natural-ssf-preserve48/report.md.
+- Range grouping: 36 extracted-loop cases plus complete SourceMap/UI-model
+  fixtures match four arms. Actual TreeView syntax passes three configured modes.
+  UI fixtures do not instantiate TreeView, so no native widget/visual runtime
+  claim is made. Matching locale/icon fixture stderr and three corrected TEMP
+  harness setup failures remain recorded. See inspection48-root-review.json.
+- Stitching: all three complete CollectionStitch/CollectionExport/SequenceExport
+  suites and 41 compact public cases produce identical 185,778-byte streams
+  across four arms, including 46 public captures and 32 repeated/dead-owner
+  checks. The first synthetic overflow harness also enabled unbounded LFO
+  generation and was terminated (-15); corrected bounded overflow cases remove
+  those controls. Its original source/logs/authority remain. No production
+  regression is inferred from that harness mistake. See
+  stitched-channel48-root-review.json.
+
+SegSat's new ProgramState grows 8 to 40 bytes and exceeds the local std::any
+buffer. Every measured complete render adds one 40-byte allocation. Configured
+runtime-owner requests shrink 80 to 56 bytes, and parsing 0/1/16/64 controllers
+saves respectively 0/2/6/8 requests and 0/24/624/2,544 requested bytes. These
+parser samples omit SourceMap/diagnostic sinks. Calibration allocations move
+from finalization to state construction. TrackState grows 2
+to 16 bytes, Playback 32 to 40, and configuration/binding payloads shrink 56 to
+32. Measured Module/Sequence text shrinks 9,552 bytes. These scoped observations
+support the ownership tradeoff, not a blanket speed, memory or binary-size claim.
+
+Focused sanitizer arms recompile the changed implementations and participating
+full fixtures/runners with ASan/UBSan/float-cast-overflow. Remaining matching
+archives stay Release and libc++ annotations consistently opt out. This is
+focused coverage, not whole-program instrumentation. Removed/reordered work can
+change allocator-failure staging; no rollback or failed-state reuse is added.
+
+SegSat corrected report/summary/manifest SHA256:
+`c7ad0241542cbe401656c6a1f6beb71c3a587bcd904b78c41c769f7f7c95a706`,
+`be4721dc3b089fe2385a39995ee7409cadcbafcd2f179ee5d0d73edffd5b6848`,
+`a688478363edd11530d6ee797b7aa4675e8c2716070096abdb273a5a1894c5a8`.
+The other reports/manifests and complete sources are pinned by their root
+receipts and pass48-root-review.json.
+
+### Integrated checks and retained boundaries
+
+- Complete macOS Release build: 56 warning-free steps; all 44 CTest
+  suites pass. Frozen48 holds complete value/shared/tests, the changed GUI source,
+  four archives and the shell under committed47/source/diff authority.
+- Shell SHA256: `7a5bfc999004ae2512804c60bc8d58004e71dae7833e934eedea4ff5957f53f3`.
+- Against frozen47, the original corpus preserves all 252 input/policy records
+  and 3,922 artifact names/hashes.
+- The /Volumes/emu/vgm replay preserves all 894 export records: 852 successes
+  and 42 matching existing failures. All 858 artifact names/sizes/hashes and
+  218,240,549 bytes per binary match. 72 raw inventories match exactly.
+  One previously proven Sony scheduling difference passes the existing narrow
+  asset declaration/member-ID mapping against retained original evidence; raw
+  records/diffs remain. Five unsupported DSF failures remain unchanged. Real
+  coverage remains 37/38 registered families; KonamiTMNT2 is synthetic only. See volume-coverage27/pass47-vs-pass48-summary.json.
+
+Append/rotate and move-aside alternatives to MIDI prefix staging were rejected:
+they add bookkeeping/copies or lose capacity reuse without making prepend order
+clearer. Tempo-relative cleanup versus source discovery, VM clocks/coordinator
+state, physical versus source attribution, immutable inspection identity and
+wire alignment retain their separate responsibilities. BankInput local samples
+have a live chained mutation fixture; metadata enables precise bank-specific
+diagnostics. Both remain. Full-range MIDI scaling still has defined public raw
+controller narrowing behavior. See pass48-root-retained-boundaries.md.
+
+Only the six reviewed paths and this audit are staged. User work and music
+archives remain untouched. Closed original comparisons and per-file hashes
+permit reclaiming old46, old47 and endpoint38 generated payloads (3,922 files
+each), plus 97 reproducible endpoint38 object/debug intermediates. All records,
+sources, logs, classifications, archives/executables and latest48 payloads
+remain. Exact pruning receipts stay below /tmp/vgmtrans-cleanup2.
+
+Evidence: pass48-root-review.json, the four root proof receipts,
+build-pass48.log, ctest-pass48.log, pass48-baseline,
+comparison-pass48.json, volume-coverage27/pass47-vs-pass48-summary.json,
+pruned-verified-originals46-before48-replay.json,
+pruned-verified-originals47-after48-replay.json,
+pruned-verified-endpoint38-before48.json,
+pruned-closed-endpoint38-intermediates-before48.json.
+
+Next: continue probing format-authoring and architecture ownership. Two cold
+follow-ups simplify a pure discovery query and validate sample trims before
+cloning PCM; neither is treated as proven or applied in this batch.

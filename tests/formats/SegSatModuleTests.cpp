@@ -316,8 +316,7 @@ void segSatTempoDeltaBytesPreserveSourceOrder() {
                                                           .normalTrack = 16,
                                                           .normalTrackEnd = 17,
                                                           .tempoLoop = 0,
-                                                      })
-                                      .program;
+                                                      });
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
   const auto tempo = std::ranges::find_if(performance.tracks.front().events, [](const PerformanceEvent& event) {
     return std::holds_alternative<TempoPerformanceEvent>(event);
@@ -647,7 +646,7 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
   auto parsedSequence = parseSegSatSequence(sequenceReader, AssetId{0}, sequenceLayouts.front());
   SequenceProgramAsset sequence{
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "SegSat", .name = "Sequence"},
-      .program = std::move(parsedSequence.program),
+      .program = std::move(parsedSequence),
   };
   sequence.prepare = [](SequencePreparationContext& context) {
     return prepareSegSatSequence(context, *context.sequence.privateData.get<SegSatSequenceBindingData>());
@@ -655,7 +654,6 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
   sequence.privateData = AssetPrivateData::make(SegSatSequenceBindingData{
       .volumeModel = SegSatVolumeModel::V1_33,
       .referencedBanks = {4, 6},
-      .controllerChanges = std::move(parsedSequence.controllerChanges),
   });
   const auto bank5Layout = readSegSatBankLayout(sources.reader(bank5Source), 0x100);
   const auto bank6Layout = readSegSatBankLayout(sources.reader(bank6Source), 0x100);
@@ -825,7 +823,62 @@ void segSatPublishesSharedSequenceTableEntriesOnce() {
          "the first table entry must preserve the shared sequence's canonical name and collection");
 }
 
+void segSatPreservesLoopMarkersWhenTheDestinationIsAController() {
+  for (const u8 controller : {u8{7}, u8{11}}) {
+    auto bytes = segSatFixture();
+    const std::vector<u8> loop{
+        0x82, 0,                                      // Start the forever-loop body.
+        0xb0, controller, 64, 0,
+        0xb0, static_cast<u8>(controller == 7 ? 11 : 7), 80, 0,
+        0x00, 60, 64, 4, 1,
+        0x01, 60, 64, 4, 1,
+        0x82, 1, 0x83,
+    };
+    std::ranges::copy(loop, bytes.begin() + 0x416);
+    Session session;
+    session.registerFormat(segSatModule());
+    session.addSource(SourceFile{.name = "controller-loop.bin"}, std::move(bytes));
+    session.scanPendingSources();
+    const auto snapshot = session.snapshot();
+    const auto& collection = snapshot.collections().front();
+    const auto* bank = snapshot.asset<SoundBankAsset>(collection.members().soundBanks.front());
+    const auto* velocityBank = bank->privateData.get<SegSatVelocityBank>();
+    const auto& instrument = velocityBank->instruments.front();
+    const auto& region = instrument.regions.front();
+    const auto playback = session.preparePlayback(
+        collection.id, PlaybackRequest{.sequence = {.loopPolicy = LoopPolicy::Preserve}});
+    expect(playback.playable() && playback.performance.tracks.size() == 16,
+           "controller-destination loops should retain sixteen playable Saturn channels");
+    for (size_t channel = 0; channel < playback.performance.tracks.size(); ++channel) {
+      size_t starts = 0, ends = 0, levels = 0;
+      double gain = 1.0;
+      for (const auto& event : playback.performance.tracks[channel].events) {
+        if (const auto* marker = std::get_if<MarkerPerformanceEvent>(&event)) {
+          starts += marker->text == "Loop Start";
+          ends += marker->text == "Loop End";
+          expect(marker->header.sourceCommand.track == TrackId{1},
+                 "loop markers should retain the normal source stream's provenance");
+        } else if (const auto* level = std::get_if<LevelPerformanceEvent>(&event)) {
+          ++levels;
+          gain = level->linearGain;
+        } else if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+          const double expected = segSatLinearGain(SegSatVolumeModel::V1_33, 64,
+              velocityBank->tables[region.table], region.totalLevel, instrument.volumeBias,
+              channel == 0 ? 80 : 127, 127);
+          expect(std::abs(note->linearVelocity * gain * region.referenceGain - expected) < 1e-12,
+                 "notes should use actual channel controls without synthetic marker updates");
+        }
+      }
+      expect(starts == 1 && ends == 1,
+             "every preserved Saturn channel should keep both loop markers");
+      expect(levels == (channel == 0 ? 2u : 0u),
+             "a controller destination must not create phantom level events on other channels");
+    }
+  }
+}
+
 void runSegSatModuleTests() {
+  segSatPreservesLoopMarkersWhenTheDestinationIsAController();
   segSatPublishesSharedSequenceTableEntriesOnce();
   segSatVlCurveMatchesMm8Saturation();
   segSatTempoDeltaBytesPreserveSourceOrder();

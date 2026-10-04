@@ -66,7 +66,6 @@ struct BankAssets {
     SegSatSequenceBindingData binding{
         .volumeModel = volumeModel,
         .referencedBanks = sequence.referencedBanks.empty() ? std::vector<u8>{0} : sequence.referencedBanks,
-        .controllerChanges = std::move(parsed.controllerChanges),
     };
 
     if (banks.size() == 1) {
@@ -89,7 +88,7 @@ struct BankAssets {
     }
     sequenceDraft.prepare<SegSatSequenceBindingData>(prepareSegSatSequence)
         .data(std::move(binding))
-        .program(std::move(parsed.program));
+        .program(std::move(parsed));
   }
   return result.finish();
 }
@@ -138,8 +137,7 @@ std::optional<SequenceRuntime> prepareSegSatSequence(SequencePreparationContext&
     velocityBanks.push_back(std::move(runtime));
   }
   return segSatSequenceRuntime(SegSatRuntimeConfig{.velocityBanks = std::move(velocityBanks),
-                                                   .volumeModel = sequence.volumeModel,
-                                                   .controllerChanges = sequence.controllerChanges});
+                                                   .volumeModel = sequence.volumeModel});
 }
 
 FormatModule segSatModule() {

@@ -181,31 +181,32 @@ void appendInitialChannelState(MidiTrack& track, u64 tick, u8 channel, u16 bank,
     const u32 sourcePpqn = normalizedPpqn(partMidi.timebase.ppqn);
     u64 end = 0;
     for (auto& track : partMidi.tracks) {
+      // A rendered track uses at most one MIDI channel.
+      std::optional<u8> channel;
       end = std::max(end, track.endTick);
       for (auto& event : track.events) {
         end = std::max(end, eventEnd(event));
         if (!retime(event, sourcePpqn, midi.timebase.ppqn, cursor)) {
           return std::nullopt;
         }
-      }
-      if (partIndex != 0) {
-        // Each source MIDI assumes fresh channel state. Add the boundary after
-        // retiming so controller values that happen to use ticks stay unscaled.
-        std::set<u8> channels;
-        for (const auto& event : track.events) {
+        if (partIndex != 0 && !channel) {
           std::visit(
-              [&channels](const auto& typed) {
+              [&channel](const auto& typed) {
                 if constexpr (requires { typed.channel; }) {
-                  channels.insert(typed.channel);
+                  channel = typed.channel;
                 }
               },
               event.payload);
         }
+      }
+      if (partIndex != 0) {
+        // Each source MIDI assumes fresh channel state. Add the boundary after
+        // retiming so controller values that happen to use ticks stay unscaled.
         MidiTrack initialState;
-        initialState.events.reserve(channels.size() * 32);
+        initialState.events.reserve(channel ? 32 : 0);
         const u16 bank = static_cast<u16>(part.prepared->performance()->bankMapping().at(0));
-        for (const u8 channel : channels) {
-          appendInitialChannelState(initialState, cursor, channel, bank,
+        if (channel) {
+          appendInitialChannelState(initialState, cursor, *channel, bank,
                                     request.sequence.midi.bankSelectStyle == MidiBankSelectStyle::MsbAndLsb);
         }
         track.events.insert(track.events.begin(), initialState.events.begin(), initialState.events.end());

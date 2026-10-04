@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <iterator>
 #include <optional>
 #include <string_view>
 #include <utility>
@@ -157,16 +156,6 @@ void updateChannelLevel(SegSatVolumeModel model, ChannelLevel& channel, u8 contr
   }
 }
 
-[[nodiscard]] const SegSatControllerChange* controllerChange(std::span<const SegSatControllerChange> changes,
-                                                             SourceCommandRef command) {
-  // Source track zero is the independent tempo stream, which has its own command IDs.
-  if (!command.valid() || command.track == TrackId{0}) {
-    return nullptr;
-  }
-  const auto found = std::ranges::lower_bound(changes, command.id.value, {}, &SegSatControllerChange::command);
-  return found != changes.end() && found->command == command.id.value ? &*found : nullptr;
-}
-
 [[nodiscard]] std::vector<VoiceLevel> possibleVoices(std::span<const SegSatVelocityBank> banks) {
   std::vector<VoiceLevel> voices;
   for (const auto& bank : banks) {
@@ -211,8 +200,16 @@ void updateChannelLevel(SegSatVolumeModel model, ChannelLevel& channel, u8 contr
 }
 
 struct ProgramState {
-  ProgramState() = default;
-  explicit ProgramState(const SegSatRuntimeConfig& config) : config(&config) {}
+  explicit ProgramState(const SequenceProgram& program) {
+    if (program.behavior.initialSourceInstrument) {
+      initialSelection = decodeSegSatInstrumentIdentity(*program.behavior.initialSourceInstrument).value_or(
+          SegSatInstrumentAddress{});
+    }
+  }
+  ProgramState(const SequenceProgram& program, const SegSatRuntimeConfig& config) : ProgramState(program) {
+    this->config = &config;
+    voices = possibleVoices(config.velocityBanks);
+  }
 
   void finalizePerformance(PerformanceSequence& performance) {
     if (performance.tracks.size() != 17) {
@@ -257,17 +254,20 @@ struct ProgramState {
       const auto& b = performanceEventHeader(right);
       return std::pair{a.tick, a.sequence} < std::pair{b.tick, b.sequence};
     });
-    if (config) {
-      finalizeSegSatPerformance(performance, config->velocityBanks, config->volumeModel, config->controllerChanges);
-    }
   }
 
   const SegSatRuntimeConfig* config = nullptr;  // Owned by the runtime's state factory.
+  std::vector<VoiceLevel> voices;
+  SegSatInstrumentAddress initialSelection;
 };
 
 struct TrackState {
   u8 bank = 0;
   u8 program = 0;
+  // An initial emitted instrument need not match the driver's zeroed registers.
+  std::optional<SegSatInstrumentAddress> gainSelection;
+  ChannelLevel level;
+  double exportedChannelGain = 1.0;
 };
 
 struct StreamState {
@@ -278,6 +278,55 @@ struct StreamState {
 };
 
 struct Playback : SequencePlayback<TrackState, StreamState> {
+  Playback(SequencePlayback<TrackState, StreamState> context, ProgramState& program)
+      : SequencePlayback(context), program(program) {}
+
+  [[nodiscard]] double noteVelocity(u8 key, u8 velocity) const {
+    const double linearVelocity = LevelScale::linearFromMidi7(velocity);
+    if (program.config == nullptr) {
+      return linearVelocity;
+    }
+
+    const auto& banks = program.config->velocityBanks;
+    const auto selection = track.gainSelection.value_or(program.initialSelection);
+    const SegSatVelocityBank* bank = nullptr;
+    const auto selected = std::ranges::find(banks, selection.sourceBank, &SegSatVelocityBank::sourceBank);
+    if (selected != banks.end()) {
+      bank = &*selected;
+    } else if (banks.size() == 1) {
+      // The driver and legacy matcher fall back to the sole loaded bank when
+      // the sequence names a bank that is not present in the SSF image.
+      bank = &banks.front();
+    }
+    if (bank == nullptr || selection.program >= bank->instruments.size()) {
+      return linearVelocity;
+    }
+
+    const auto& instrument = bank->instruments[selection.program];
+    const u8 regionKey = std::min<u8>(key, 127);
+    const auto region = std::ranges::find_if(instrument.regions, [&](const SegSatVelocityRegion& candidate) {
+      return regionKey >= candidate.keyLow && regionKey <= candidate.keyHigh;
+    });
+    if (region == instrument.regions.end() || region->table >= bank->tables.size()) {
+      return linearVelocity;
+    }
+
+    const u8 sourceVelocity = LevelScale::midi7FromLinear(linearVelocity);
+    const double exactGain = segSatLinearGain(program.config->volumeModel, sourceVelocity, bank->tables[region->table],
+                                             region->totalLevel, instrument.volumeBias, track.level.volume,
+                                             track.level.expression);
+    // Each region already stores its maximum level. Note velocity describes
+    // how far this attack is below that maximum and the current channel gain.
+    return LevelScale::clamp01(track.exportedChannelGain == 0.0 || region->referenceGain == 0.0
+                                  ? 0.0
+                                  : exactGain / (region->referenceGain * track.exportedChannelGain));
+  }
+
+  void emitInstrument() {
+    track.gainSelection = SegSatInstrumentAddress{track.bank, track.program};
+    out.instrument(segSatInstrumentIdentity(track.bank, track.program));
+  }
+
   void extendDuration(u32 ticks) { stream.durationExtension += ticks; }
 
   [[nodiscard]] Effects afterEvent() {
@@ -296,7 +345,7 @@ struct Playback : SequencePlayback<TrackState, StreamState> {
   Effects note(u8 key, u8 velocity, u16 duration) {
     duration = static_cast<u16>(duration + stream.durationExtension);
     stream.durationExtension = 0;
-    out.note(key, LevelScale::linearFromMidi7(velocity), duration);
+    out.note(key, noteVelocity(key, velocity), duration);
     return afterEvent();
   }
 
@@ -307,6 +356,12 @@ struct Playback : SequencePlayback<TrackState, StreamState> {
         break;
       case 7:
       case 11: {
+        if (program.config != nullptr) {
+          updateChannelLevel(program.config->volumeModel, track.level, controller, value);
+          track.exportedChannelGain = channelGain(program.config->volumeModel, track.level, program.voices);
+          out.level(track.exportedChannelGain, 128);
+          break;
+        }
         u8 attenuation = static_cast<u8>(std::max(0, 254 - 2 * value));
         if (attenuation != 0) {
           --attenuation;
@@ -338,7 +393,7 @@ struct Playback : SequencePlayback<TrackState, StreamState> {
         // The source command changes one register, but downstream targets
         // need the complete effective selection. Emitting it atomically also
         // activates the new bank when the program number itself is unchanged.
-        out.instrument(segSatInstrumentIdentity(track.bank, track.program));
+        emitInstrument();
         break;
       case 91:
         out.reverb(value / 127.0);
@@ -358,7 +413,7 @@ struct Playback : SequencePlayback<TrackState, StreamState> {
     // streams and must not change the active instrument.
     if ((encodedProgram & 0x80) == 0) {
       track.program = encodedProgram;
-      out.instrument(segSatInstrumentIdentity(track.bank, track.program));
+      emitInstrument();
     }
     return afterEvent();
   }
@@ -397,15 +452,11 @@ struct Playback : SequencePlayback<TrackState, StreamState> {
     effects.flowOverride = vm.declaredLoop(*stream.foreverLoopStart).flowOverride;
     return effects;
   }
+
+  ProgramState& program;
 };
 
 using SegSatCursor = CompilerCursor<Playback>;
-
-struct DecodedControllerChange {
-  Address address;
-  u8 controller = 0;
-  u8 value = 0;
-};
 
 [[nodiscard]] DecodedBytecodeCommand decodeTempo(ByteReader reader, u32 begin, u32 end, bool final,
                                                  std::vector<Diagnostic>* diagnostics) {
@@ -426,7 +477,6 @@ struct DecodedControllerChange {
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeNormal(ByteReader reader, u32 begin, u32 end, u32 normalStart,
-                                                  std::vector<DecodedControllerChange>& controllerChanges,
                                                   std::vector<Diagnostic>* diagnostics) {
   SegSatCursor cursor(reader, begin, end, "segsat", diagnostics);
   if (!cursor.hasOpcode()) {
@@ -455,13 +505,6 @@ struct DecodedControllerChange {
     const auto valueRole = controller == 32 ? SemanticOperandRole::InstrumentBank : SemanticOperandRole::Value;
     const u8 value = cursor.derived("value", static_cast<u8>(encoded & 0x7f), valueRole);
     const u16 delta = cursor.u8("delta");
-    if (controller == 7 || controller == 11) {
-      controllerChanges.push_back(DecodedControllerChange{
-          .address = Address{begin},
-          .controller = controller,
-          .value = value,
-      });
-    }
     return event.channel(channel).delay(delta).invokeFlow<&Playback::controller>({controller, value});
   }
 
@@ -565,78 +608,6 @@ double segSatRegionReferenceGain(SegSatVolumeModel model, const SegSatVlTable& t
   return gain;
 }
 
-void finalizeSegSatPerformance(PerformanceSequence& performance, std::span<const SegSatVelocityBank> banks,
-                               SegSatVolumeModel model, std::span<const SegSatControllerChange> controllerChanges) {
-  const std::vector<VoiceLevel> voices = possibleVoices(banks);
-  for (auto& track : performance.tracks) {
-    u8 selectedBank = 0;
-    u8 selectedProgram = 0;
-    ChannelLevel channel;
-    double exportedChannelGain = 1.0;
-    for (auto& event : track.events) {
-      const PerformanceEventHeader header = performanceEventHeader(event);
-      if (const auto* change = controllerChange(controllerChanges, header.sourceCommand);
-          change != nullptr && (change->controller == 7 || change->controller == 11)) {
-        updateChannelLevel(model, channel, change->controller, change->value);
-        exportedChannelGain = channelGain(model, channel, voices);
-        event = LevelPerformanceEvent{
-            .header = header,
-            .linearGain = exportedChannelGain,
-            .sourceLevels = 128,
-        };
-        continue;
-      }
-
-      const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event);
-      if (const auto* identity = selection ? std::get_if<InstrumentIdentity>(&selection->instrument) : nullptr) {
-        if (const auto address = decodeSegSatInstrumentIdentity(*identity)) {
-          selectedBank = address->sourceBank;
-          selectedProgram = address->program;
-          continue;
-        }
-      }
-
-      auto* note = std::get_if<NotePerformanceEvent>(&event);
-      if (note == nullptr) {
-        continue;
-      }
-
-      const SegSatVelocityBank* bank = nullptr;
-      const auto selected = std::ranges::find(banks, selectedBank, &SegSatVelocityBank::sourceBank);
-      if (selected != banks.end()) {
-        bank = &*selected;
-      } else if (banks.size() == 1) {
-        // The driver and legacy matcher both fall back to the sole loaded bank
-        // when the sequence names a bank that is not present in the SSF image.
-        bank = &banks.front();
-      }
-      if (bank == nullptr || selectedProgram >= bank->instruments.size()) {
-        continue;
-      }
-
-      const auto& instrument = bank->instruments[selectedProgram];
-      const u8 key = static_cast<u8>(std::clamp<long>(std::lround(note->key), 0, 127));
-      const auto region = std::ranges::find_if(instrument.regions, [&](const SegSatVelocityRegion& candidate) {
-        return key >= candidate.keyLow && key <= candidate.keyHigh;
-      });
-      if (region == instrument.regions.end() || region->table >= bank->tables.size()) {
-        continue;
-      }
-
-      const u8 sourceVelocity = LevelScale::midi7FromLinear(note->linearVelocity);
-      const double exactGain = segSatLinearGain(model, sourceVelocity, bank->tables[region->table], region->totalLevel,
-                                                instrument.volumeBias, channel.volume, channel.expression);
-      // MIDI has one velocity for all of an instrument's layers. Each region
-      // already stores its own maximum level, so velocity only describes how
-      // far the note is below that maximum.
-      note->linearVelocity =
-          LevelScale::clamp01(exportedChannelGain == 0.0 || region->referenceGain == 0.0
-                                           ? 0.0
-                                           : exactGain / (region->referenceGain * exportedChannelGain));
-    }
-  }
-}
-
 const SequenceProgramConfig& segSatSequenceConfig() {
   static const SequenceProgramConfig config = SequenceProgramConfig{
       .commandKindPrefix = "segsat",
@@ -649,10 +620,9 @@ const SequenceProgramConfig& segSatSequenceConfig() {
   return config;
 }
 
-SegSatSequenceParse parseSegSatSequence(ByteReader reader, AssetId id, const SegSatSequenceLayout& layout,
-                                        SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+SequenceProgram parseSegSatSequence(ByteReader reader, AssetId id, const SegSatSequenceLayout& layout,
+                                      SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   SequenceProgram program = segSatSequenceConfig().makeProgram();
-  std::vector<DecodedControllerChange> decodedControllerChanges;
   program.timebase.ppqn = layout.ppqn;
 
   std::optional<SourceAnnotationId> header;
@@ -695,26 +665,8 @@ SegSatSequenceParse parseSegSatSequence(ByteReader reader, AssetId id, const Seg
 
   const u32 normalStart = layout.offset + layout.normalTrack;
   auto normal = tracks.decode(1, normalStart, [&](u32 offset) {
-    return decodeNormal(reader, offset, layout.end, normalStart, decodedControllerChanges, diagnostics);
+    return decodeNormal(reader, offset, layout.end, normalStart, diagnostics);
   });
-  std::vector<SegSatControllerChange> controllerChanges;
-  controllerChanges.reserve(decodedControllerChanges.size());
-  for (const auto& decoded : decodedControllerChanges) {
-    const auto command = std::ranges::find_if(normal.commands, [&](const SourceCommand& candidate) {
-      return candidate.address.value == decoded.address.value;
-    });
-    if (command == normal.commands.end()) {
-      continue;
-    }
-    controllerChanges.push_back(SegSatControllerChange{
-        .command = static_cast<u32>(std::distance(normal.commands.begin(), command)),
-        .controller = decoded.controller,
-        .value = decoded.value,
-    });
-  }
-  std::ranges::sort(controllerChanges, {}, &SegSatControllerChange::command);
-  const auto duplicate = std::ranges::unique(controllerChanges, {}, &SegSatControllerChange::command);
-  controllerChanges.erase(duplicate.begin(), duplicate.end());
   normal.streams.front().channels = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
   program.tracks.push_back(std::move(normal));
   program.runtime = makeCompiledRuntime<Playback, ProgramState>();
@@ -729,10 +681,7 @@ SegSatSequenceParse parseSegSatSequence(ByteReader reader, AssetId id, const Seg
         .derived("destination", normalStart, SourceValueDisplay::Address)
         .parent(*header);
   }
-  return SegSatSequenceParse{
-      .program = std::move(program),
-      .controllerChanges = std::move(controllerChanges),
-  };
+  return program;
 }
 
 }  // namespace vgmtrans::formats::segsat

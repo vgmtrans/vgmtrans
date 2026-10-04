@@ -123,21 +123,9 @@ struct SegSatVelocityBank {
   std::vector<SegSatVelocityInstrument> instruments;
 };
 
-struct SegSatControllerChange {
-  u32 command = 0;
-  u8 controller = 0;
-  u8 value = 0;
-};
-
-struct SegSatSequenceParse {
-  core::SequenceProgram program;
-  std::vector<SegSatControllerChange> controllerChanges;
-};
-
 struct SegSatSequenceBindingData {
   SegSatVolumeModel volumeModel = SegSatVolumeModel::V1_33;
   std::vector<u8> referencedBanks;
-  std::vector<SegSatControllerChange> controllerChanges;
 };
 
 using SegSatBankBindingData = SegSatVelocityBank;
@@ -146,7 +134,6 @@ using SegSatBankBindingData = SegSatVelocityBank;
 struct SegSatRuntimeConfig {
   std::vector<SegSatVelocityBank> velocityBanks;
   SegSatVolumeModel volumeModel = SegSatVolumeModel::V1_33;
-  std::vector<SegSatControllerChange> controllerChanges;
 };
 
 [[nodiscard]] double segSatLinearGain(SegSatVolumeModel model, u8 velocity, const SegSatVlTable& table, u8 totalLevel,
@@ -165,14 +152,12 @@ struct SegSatRuntimeConfig {
                                                                     SegSatVolumeModel volumeModel, u8 exportBank);
 [[nodiscard]] SegSatVelocityBank readSegSatVelocityBank(core::ByteReader reader, const SegSatBankLayout& layout,
                                                         u8 sourceBank, SegSatVolumeModel volumeModel);
-void finalizeSegSatPerformance(core::PerformanceSequence& performance, std::span<const SegSatVelocityBank> banks,
-                               SegSatVolumeModel model, std::span<const SegSatControllerChange> controllerChanges);
 [[nodiscard]] core::SequenceRuntime segSatSequenceRuntime(SegSatRuntimeConfig config);
 
-[[nodiscard]] SegSatSequenceParse parseSegSatSequence(core::ByteReader reader, core::AssetId id,
-                                                      const SegSatSequenceLayout& layout,
-                                                      core::SourceMapBuilder* sourceMap = nullptr,
-                                                      std::vector<core::Diagnostic>* diagnostics = nullptr);
+[[nodiscard]] core::SequenceProgram parseSegSatSequence(core::ByteReader reader, core::AssetId id,
+                                                     const SegSatSequenceLayout& layout,
+                                                     core::SourceMapBuilder* sourceMap = nullptr,
+                                                     std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& segSatSequenceConfig();
 std::optional<core::SequenceRuntime> prepareSegSatSequence(core::SequencePreparationContext& context,
                                                            const SegSatSequenceBindingData& sequence);
