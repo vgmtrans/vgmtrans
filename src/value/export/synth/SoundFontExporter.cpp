@@ -71,11 +71,6 @@ struct SfRegionPitch {
   s16 fineTune = 0;
 };
 
-struct SfSampleHeaderPitch {
-  u8 originalKey = kDefaultRootKey;
-  s8 correction = 0;
-};
-
 using SfEnvelope = std::array<s16, kSfEnvelopeGenerators.size()>;
 
 struct SfPreset {
@@ -134,13 +129,6 @@ struct SfLayout {
       .rootKey = rootKey,
       .coarseTune = static_cast<s16>(coarse),
       .fineTune = static_cast<s16>(fine),
-  };
-}
-
-[[nodiscard]] SfSampleHeaderPitch sf2SampleHeaderPitch(u8 rootKey, s16 fineTune) {
-  return SfSampleHeaderPitch{
-      .originalKey = static_cast<u8>(std::clamp<s32>(static_cast<s32>(rootKey) - (fineTune / 100), 0, 127)),
-      .correction = static_cast<s8>(fineTune % 100),
   };
 }
 
@@ -482,8 +470,8 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
   for (size_t i = 0; i < samples.size(); ++i) {
     const auto& sample = samples[i];
     const auto* region = firstRegions[i];
-    const auto pitch = region ? sf2SampleHeaderPitch(sf2RegionPitch(*region).rootKey, clampS16(sample.pitchCents))
-                              : SfSampleHeaderPitch{};
+    const u8 rootKey = region ? sf2RegionPitch(*region).rootKey : kDefaultRootKey;
+    const s16 correctionCents = region ? clampS16(sample.pitchCents) : 0;
     const auto loop = region ? region->loop.value_or(sample.decoded.loop) : sample.decoded.loop;
     // Offsets include each preceding sample's required silence padding.
     const u64 end = static_cast<u64>(startFrame) + sample.decoded.pcm.size();
@@ -499,8 +487,8 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
     writeLe32(payload, loopStart);
     writeLe32(payload, std::min(loopEnd, endFrame));
     writeLe32(payload, sample.decoded.sampleRate == 0 ? 32000 : sample.decoded.sampleRate);
-    payload.push_back(pitch.originalKey);
-    payload.push_back(static_cast<u8>(pitch.correction));
+    payload.push_back(static_cast<u8>(std::clamp<s32>(rootKey - correctionCents / 100, 0, 127)));
+    payload.push_back(static_cast<u8>(correctionCents % 100));
     writeLe16(payload, 0);
     writeLe16(payload, 1);
     startFrame = endFrame + kSf2SamplePaddingFrames;

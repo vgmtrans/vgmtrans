@@ -494,20 +494,21 @@ namespace {
     return result;
   }
 
-  SourceFile assembledFile{
-      .name = set->name + " ROM regions",
-      .title = set->name,
-      .path = input.source.path,
-      .origin = archiveRange,
-      .knownFormat = set->format,
-      .attributes =
-          {
-              {std::string(kMameGameAttribute), set->name},
-              {std::string(kMameFormatAttribute), set->format},
-              {std::string(kMameFormatVersionAttribute), set->formatVersion},
-          },
+  ExtractedSource assembled{
+      .file = {
+          .name = set->name + " ROM regions",
+          .title = set->name,
+          .path = input.source.path,
+          .origin = archiveRange,
+          .knownFormat = set->format,
+          .attributes =
+              {
+                  {std::string(kMameGameAttribute), set->name},
+                  {std::string(kMameFormatAttribute), set->format},
+                  {std::string(kMameFormatVersionAttribute), set->formatVersion},
+              },
+      },
   };
-  std::vector<u8> assembledBytes;
   try {
     for (const auto& group : set->groups) {
       std::vector<std::vector<u8>> buffers;
@@ -516,14 +517,14 @@ namespace {
         buffers.push_back(readMember(archive.get(), member));
       }
       auto bytes = assembleRomGroup(group, std::move(buffers));
-      assembledFile.segments.push_back(SourceSegment{
+      assembled.file.segments.push_back(SourceSegment{
           .name = group.name,
-          .offset = assembledBytes.size(),
+          .offset = assembled.bytes.size(),
           .size = bytes.size(),
           .attributes = group.attributes,
       });
-      assembledBytes.insert(assembledBytes.end(), std::make_move_iterator(bytes.begin()),
-                            std::make_move_iterator(bytes.end()));
+      assembled.bytes.insert(assembled.bytes.end(), std::make_move_iterator(bytes.begin()),
+                             std::make_move_iterator(bytes.end()));
     }
   } catch (const std::exception& error) {
     result.diagnostics.push_back(
@@ -531,10 +532,7 @@ namespace {
     return result;
   }
 
-  result.sources.push_back(ExtractedSource{
-      .file = std::move(assembledFile),
-      .bytes = std::move(assembledBytes),
-  });
+  result.sources.push_back(std::move(assembled));
   return result;
 }
 

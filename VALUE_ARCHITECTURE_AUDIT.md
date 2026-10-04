@@ -1,11 +1,11 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Forty-three validated batches remove 1,197 net production lines
+`cb9e0b766`. Forty-four validated batches remove 1,215 net production lines
 from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 42 exactly;
+cover 37 of 38 registered families. All export records match batch 43 exactly;
 all 73 expanded raw inventories match byte-for-byte. The cleanup2 records appear
 at the end of this document.
 
@@ -8822,3 +8822,177 @@ comparison-pass43.json and volume-coverage27/pass42-vs-pass43-summary.json.
 Next: continue reviewing authoring/result responsibilities, starting with ROM-set
 assembly in its existing coupled ExtractedSource owner. Preserve canonical source
 ownership, callback failure order and native identity.
+
+## Cleanup2 forty-fourth batch: use existing final and ordered values
+
+This batch removes one private result type/helper and two redundant staging
+representations. Source formats continue to describe native behavior through
+SequenceVM and neutral synth values. No new public API, owner protocol, cache,
+numeric policy or format concept is introduced.
+
+- MAME ROM-set extraction assembles directly into its existing ExtractedSource,
+  accumulating segments under file and final bytes under bytes. Publish that
+  value once instead of reconstructing it from separate SourceFile/vector
+  locals. Keep assembleRomGroup and its group-local decryption/length rules;
+  member-read, group-assemble, segment and byte-append order stay visible.
+  Two architecture lines disappear.
+- SonyPS2 MIDI lookup uses lower_bound and an exact-offset check on the existing
+  strictly ordered inspected event vector. Remove the second map of event
+  pointers and its construction loop; four format lines disappear. Inspection
+  always advances a bounded cursor for admitted ordinary/running/meta/sysex
+  events, malformed paths terminate, and NRPN loop targets do not change that
+  cursor. Keep the SE event map: its different arithmetic has no corresponding
+  all-input sortedness proof.
+- SF2 sample-header serialization keeps named rootKey/correctionCents locals
+  beside its actual fields. Remove the single-use SfSampleHeaderPitch record and
+  helper; twelve architecture lines disappear. Region root selection, bounded
+  sample-cent input, first-reference precedence and unreferenced 60/0 defaults
+  stay unchanged. Quotient is within -327..327, pre-clamp key within -327..454,
+  and remainder within -99..99; narrowing directly to the output unsigned byte
+  preserves the former signed8 intermediate's encoded value. The shared region
+  pitch helper and floating arithmetic remain intact before the overflow guard.
+
+- Value: 2,207 added/3,422 deleted across 170 paths.
+- Architecture: 1,795 added/2,877 deleted across 95 paths.
+- Formats: 412 added/545 deleted across 75 paths.
+- Tests: 1,100 added/424 deleted across 43 paths.
+
+Net production reductions are 1,215 value lines, 1,082 architecture and 133
+format lines.
+
+### Paired proof and ordinary-output gates
+
+MAME: all 60 final commands pass, including six actual configured Debug/Release/
+RelWithDebInfo Werror checks. Full KonamiArcade/Cps/Registry/Session fixtures
+pass in paired Release and focused sanitizer arms (four identical 53-byte
+stdout captures). Four 23-case traces match 71,087 bytes, SHA256
+4170c5e2e380afb011df2d131a891dd15747f958b6a87a73e9795fda673fb44b.
+The stored-ZIP cases cover group transforms/load orders/decryption, complete
+owned metadata/segments/bytes, missing or malformed members/attributes and a
+later failed group. One native segmented Konami case keeps source-map/IR/two
+MIDI-policy observations valid after the relevant input/database/session owners
+die. Remaining CPS/archive objects stay Release. Initial harness missing
+includes and an eight-byte Kabuki generator correctly rejected by the baseline
+minimum remain separately retained; only that generator was repaired to 0x8000.
+Summary c4581acf and manifest 02425ed5 identify the final sealed proof; complete
+root hashes appear in pass44-root-review.json (98 retained manifest files).
+
+Sony MIDI: the full existing Sony fixture passes paired focused sanitizers,
+with 2,119 identical stdout bytes. The final 648-case matrix matches 11,249,365
+bytes, SHA256 5b4ebc4dcbffd72e53cb42ec52e7e10a1550bb1a001e4697ec4470a1da39527c.
+It covers native running/compressed/dictionary/NRPN/meta/SysEx streams,
+truncation, three source-map modes and loop policies, actual address misses,
+a separate linear address oracle, durable annotations/diagnostics/performance
+and all three MIDI transition policies after parser owners die. Three actual
+configured consumer entries per side pass Werror. Twenty-four scoped Release
+allocation cases retain all result cardinalities and save exactly one allocation/
+48 requested bytes per inspected event: total calls 202,395 to 183,647 and
+requested bytes 56,179,684 to 55,279,780. A mapped 4,096-controller-event case
+saves 4,097 calls/196,656 bytes, including the terminal event. Configured native
+object text decreases 89,017 to 88,745 bytes. No timing, peak-live or whole-binary
+claim. Proof SHA256 34e573555a3989bdbea60b4b6fd956ddf605d77b15ac84089c19852ef59b5ef3;
+manifest 31e398cb28f744a53565b4b84b5371656021c03662c4cee274da04b3d31cb47c
+contains 79 files; root gates each.
+
+SF2: the first actual unappended public-writer gate matches 512 captures/
+413,088 bytes, SHA256 06993d08cc7eea8670c98b44807b586d672166fc4c5476a03ebcc900806ba4a0,
+including floating-point flags/callback counts in all four rounding modes and
+independent serialized field/default/precedence checks. Retain finite adjacent/
+huge roots, nonfinite original/callback inputs and signed-cent endpoint/modulo
+cases; no new input policy. The full existing SynthExport fixture passes all
+assertions and captures 56 artifacts/14,335,138 bytes, SHA256
+5d66c385f62ef81081f6cc49cd96730393fefaea08bb690e97aa8f5cf0acb2c0.
+Both streams match all four paired Release/focused sanitizer arms. Seven first
+gate and 22 focused commands pass with empty stderr, including six actual
+three-configuration writer Werror checks. An initial mixed float/double infinity
+initializer compiler failure remains retained; its typed-double harness repair
+never changed production code. Authority SHA256
+547d360b359ef26e4d7b65ec9eccf7d856c57345c4b5f4637e6717ffae4fedde
+seals all 71 files; focused results
+2aa0c227186e38742d9a90a8c4ef9c8bde7b0561b7687e50957a9893af4a67b3.
+No allocation/performance claim or permanent mirror fixture.
+
+All proofs use matching frozen43 value/shared headers, tests and archives.
+Distinguish its precommit provenance parent77cbec8e4 from current committed43
+HEAD1ee8857130c7f0d9ee5a7491baf76733aba66295. Initial cold metadata and failed
+harness assumptions remain evidence, not accepted production changes. Root
+cold-reads each exact diff and gates source/patch/command/trace/archive hashes.
+Focused ASan/UBSan/float-cast-overflow arms instrument changed units and their
+complete fixtures/harnesses; remaining frozen archive objects stay Release.
+Uniform libc++ container-annotation settings preserve ordinary sanitizer checks
+without claiming whole-program or Windows coverage.
+
+### Failure, ownership and retained responsibilities
+
+MAME file metadata allocation stays outside its try block; each group retains
+its existing read/decrypt/append diagnostic order. A later group failure returns
+its warning without a partially assembled source. Final publication now moves
+an existing aggregate rather than first moving separate locals into a temporary;
+no arbitrary allocation/internal move-phase equivalence or performance benefit
+is claimed. Final metadata, segments and bytes remain owned after inputs and
+extractor database owners die.
+
+Sony's removed map allocation sites and later allocator ordinals differ; no
+arbitrary bad_alloc equivalence is claimed. The immutable inspected vector stays
+alive through synchronous decode, and finished commands/diagnostics own their
+data. Exact-address validation retains the Unsupported path. Keep the SE map:
+its cursor arithmetic has a separate wrap/sortedness boundary. Keep decode-state
+maps in SculptSoft, SoftCreat and Prism, where incoming physical state is not
+fully represented by durable commands. Keep VM loop tracking for candidates/
+declarations even when inference is disabled, and stream positions for delayed
+command provenance.
+
+SF2 conversion drops only a private record; both serialized operations are
+bounded integer arithmetic. The early actual unappended-writer gate remains
+mandatory after the preceding rejected DLS compiler rearrangements. Do not infer
+portable nonfinite policy, timing improvements or target-spec limit compliance
+from byte-equivalent existing behavior.
+
+Fresh root reread retains SourceInspection's private validated construction:
+Session supplies active shared bytes and admitted acyclic asset graphs. Generic
+cycle/null-byte guards would duplicate that boundary. Keep selected asset graph
+ownership instead of resurrecting previously measured alias/projection schemes.
+Physical modulation remains in the source model, while controller routing and
+MIDI usage remain export policy. Keep distinct output domains and source-aware
+musical emitters rather than transferring their responsibilities into formats.
+Keep renderSequence's plainly named sequence during its narrow VM exception
+boundary: forcing a final RenderedCollection owner would introduce optional
+unwrapping during analysis and change elision/failure staging for no removed
+responsibility. Retain sequenceSourceRange's source filter for invalid/empty
+base ranges, where include alone could accept a foreign first command.
+
+### Integrated publication gate
+
+- Complete macOS Release build: 50 warning-free steps; all 44 CTest
+  suites pass. Frozen44 holds complete value/shared/tests, matching archives and
+  shell, with committed43/source/diff authority1ee885713.
+- Shell SHA256: `3259ff07c206fc6e42049761eacbf02d4af2acca972af8cef245f9eb96f712d3`.
+- Against frozen43, the original corpus preserves all 252 input/policy records
+  and 3,922 artifact names/hashes.
+- The /Volumes/emu/vgm replay preserves all 894 export records: 852 successes
+  and 42 matching existing failures. All 858 artifact names/sizes/hashes and
+  218,240,549 bytes per binary match. All 73 raw inventories match exactly,
+  including five unchanged unsupported DSF failures. No inventory normalization
+  is needed. Real coverage remains 37/38 registered families; KonamiTMNT2
+  is synthetic only. See volume-coverage27/pass43-vs-pass44-summary.json.
+
+Only the three approved production paths and this audit are staged. Existing
+user work and archive inputs remain untouched. No permanent mirror test is
+added for these refactors; full existing fixtures and temporary paired probes
+check observable preparation, metadata, diagnostics and encoded results.
+
+Verified task-owned original payload pruning retains all manifests/logs/frozen
+sources/archives/binaries/mismatch evidence. The additional after27 receipt
+reclaims 3,922 exact-matched files/1,604,324,580 bytes after both closed43
+comparisons, with full path/size/hash gates before unlink; user archives are
+never deletion candidates. A second matching after26 receipt reclaims another
+3,922 files/1,604,324,580 bytes under the same recorded hash/path gates.
+
+Evidence: mame-final-source-owner44, sony-midi-index43 (final frozen43 proof),
+sf-header-pitch-record44, pass44-read-only, build-pass44.log, ctest-pass44.log,
+pass44-baseline, comparison-pass44.json,
+volume-coverage27/pass43-vs-pass44-summary.json,
+pruned-verified-originals27-for44.json, pruned-verified-originals26-for44.json.
+
+Next: continue probing shared authoring and preparation for redundant
+responsibilities while preserving real ownership, discovery and failure phases.

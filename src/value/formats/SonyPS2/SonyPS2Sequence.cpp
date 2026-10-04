@@ -1032,10 +1032,6 @@ SequenceProgram parseMidiSequence(ByteReader reader, AssetId id, const MidiBlock
         .field("division", reader.range(layout.offset + 4, 2), layout.ppqn);
   }
   const auto events = inspectMidiEvents(reader, layout);
-  std::map<u32, const MidiEvent*> byOffset;
-  for (const auto& event : events) {
-    byOffset.emplace(event.offset, &event);
-  }
   TrackDecodeScope tracks{
       .reader = reader,
       .bytecodeEnd = layout.dataEnd,
@@ -1045,12 +1041,12 @@ SequenceProgram parseMidiSequence(ByteReader reader, AssetId id, const MidiBlock
       .sourceMap = sourceMap,
   };
   auto track = tracks.decode(0, layout.dataOffset, [&](u32 eventOffset) -> DecodedBytecodeCommand {
-    const auto found = byOffset.find(eventOffset);
-    if (found == byOffset.end()) {
+    const auto found = std::ranges::lower_bound(events, eventOffset, {}, &MidiEvent::offset);
+    if (found == events.end() || found->offset != eventOffset) {
       Cursor cursor(reader, eventOffset, layout.dataEnd, kCommandKindPrefix, diagnostics);
       return cursor.unsupported("Invalid SonyPS2 MIDI event address").stop();
     }
-    return decodeMidiEvent(reader, layout.dataEnd, *found->second, diagnostics);
+    return decodeMidiEvent(reader, layout.dataEnd, *found, diagnostics);
   });
   track.streams.front().channels = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
   program.tracks.push_back(std::move(track));
