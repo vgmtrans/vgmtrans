@@ -213,13 +213,12 @@ void addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLayout& layout, 
 
 bool addSonyPs1RawSampleBody(ScanResultBuilder& result) {
   const ByteReader reader = result.reader();
-  const auto layout = readSonyPs1RawSampleBody(reader);
+  auto layout = readSonyPs1RawSampleBody(reader);
   if (!layout) {
     return false;
   }
 
   auto pool = result.samplePool(result.sourceDisplayName() + " PSX Sample Collection");
-  pool.data(*layout);
   auto& samples = pool.samples();
   const SourceRange body = reader.range(layout->offset, layout->length);
   const SourceAnnotationId root =
@@ -237,6 +236,7 @@ bool addSonyPs1RawSampleBody(ScanResultBuilder& result) {
                                     });
     entry.source(fmt::format("VAG {}", index + 1), stream.encodedData, "sony-ps1-vag").parent(root);
   }
+  pool.data(std::move(*layout));
   return true;
 }
 

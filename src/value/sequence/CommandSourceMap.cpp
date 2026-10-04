@@ -114,10 +114,6 @@ TrackDecodeSession::TrackDecodeSession(const TrackDecodeScope& scope, u32 trackI
   commandParent_ = annotation_;
 }
 
-const DecodedBytecodeCommand& TrackDecodeSession::findOrAppend(DecodedBytecodeCommand command, u64 offset) {
-  return commands_.try_emplace(offset, std::move(command)).first->second;
-}
-
 TrackProgram TrackDecodeSession::finish() {
   TrackProgram track{
       .startAddress = Address{startRange_.offset},

@@ -137,8 +137,8 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
   return samples;
 }
 
-[[nodiscard]] std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
-    const SynthSampleIndexMap& samples, const SynthExportInput& input, std::vector<Diagnostic>& diagnostics) {
+void resolveSynthInstruments(PreparedSynthData& prepared, const SynthSampleIndexMap& samples,
+                             const SynthExportInput& input) {
   const auto lowerModulation = [&](const InstrumentModulation& modulation) {
     auto lowered = lowerSynthModulation(modulation, input.modulationConversion);
     for (auto& modulator : lowered.modulators) {
@@ -148,9 +148,8 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
   };
   // Drop only regions whose samples cannot be resolved. The rest of the instrument can
   // still produce a useful partial export.
-  std::vector<ResolvedSynthInstrument> instruments;
   for (const auto& selectedBank : input.soundBanks) {
-    const u32 step = regionSamplingStep(*selectedBank.bank, diagnostics);
+    const u32 step = regionSamplingStep(*selectedBank.bank, prepared.diagnostics);
     for (const auto& selected : selectedBank.instruments) {
       const auto& instrument = *selected.instrument;
       ResolvedSynthInstrument resolvedInstrument{
@@ -161,7 +160,7 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
       for (auto& region : sampleRegionResponses(instrument.regions, step)) {
         const auto sample = samples.at(sampleKey(region, selectedBank));
         if (!sample) {
-          diagnostics.push_back(exportError("Region sample reference was not found", region.range));
+          prepared.diagnostics.push_back(exportError("Region sample reference was not found", region.range));
           continue;
         }
 
@@ -174,12 +173,10 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
       }
 
       if (!resolvedInstrument.regions.empty()) {
-        instruments.push_back(std::move(resolvedInstrument));
+        prepared.instruments.push_back(std::move(resolvedInstrument));
       }
     }
   }
-
-  return instruments;
 }
 
 [[nodiscard]] double smoothstep(double low, double high, double value) {
@@ -445,7 +442,7 @@ PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceSt
       decodeSynthPool(prepared, samplesByReference, pool->metadata.id.value, pool->pool, input, sources, options);
     }
   }
-  prepared.instruments = resolveSynthInstruments(samplesByReference, input, prepared.diagnostics);
+  resolveSynthInstruments(prepared, samplesByReference, input);
   return prepared;
 }
 

@@ -31,7 +31,12 @@ class TrackDecodeSession {
 public:
   [[nodiscard]] bool hasCommand(u64 offset) const { return commands_.contains(offset); }
   // Revisited offsets retain their first decoded interpretation.
-  const DecodedBytecodeCommand& findOrAppend(DecodedBytecodeCommand command, u64 offset);
+  const DecodedBytecodeCommand& findOrAppend(const DecodedBytecodeCommand& command, u64 offset) {
+    return commands_.try_emplace(offset, command).first->second;
+  }
+  const DecodedBytecodeCommand& findOrAppend(DecodedBytecodeCommand&& command, u64 offset) {
+    return commands_.try_emplace(offset, std::move(command)).first->second;
+  }
   [[nodiscard]] TrackProgram finish();
 
 private:

@@ -14,7 +14,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <map>
 #include <optional>
 #include <set>
 #include <span>
@@ -1609,7 +1608,6 @@ using Cursor = CompilerCursor<Playback>;
 
   std::vector<DiscoveryPoint> pending{{.offset = startAddress}};
   std::set<DiscoveryPoint> visited;
-  std::map<u32, DecodedBytecodeCommand> commands;
   while (!pending.empty() && visited.size() < kMaxTrackCommands) {
     DiscoveryPoint point = std::move(pending.back());
     pending.pop_back();
@@ -1621,8 +1619,8 @@ using Cursor = CompilerCursor<Playback>;
     DecodedBytecodeCommand decoded =
         decodeCommand(reader, profile, trackNumber, point.offset, sequenceDataFloor, nextState, nullptr);
     const Kind selected = kind(profile, decoded.opcode);
-    const auto [existing, inserted] = commands.try_emplace(point.offset, decoded);
-    if (!inserted && existing->second.range.size != decoded.range.size) {
+    const auto& existing = session.findOrAppend(decoded, point.offset);
+    if (existing.range.size != decoded.range.size) {
       if (diagnostics != nullptr) {
         diagnostics->push_back(Diagnostic{
             .severity = Severity::Warning,
@@ -1685,17 +1683,17 @@ using Cursor = CompilerCursor<Playback>;
     }
   }
 
-  for (auto& [offset, command] : commands) {
-    if (command.presentation.semantic == SequenceSemantic::Unsupported && diagnostics != nullptr) {
+  auto track = session.finish();
+  for (const auto& command : track.commands) {
+    if (command.semantic == SequenceSemantic::Unsupported && diagnostics != nullptr) {
       diagnostics->push_back(Diagnostic{
           .severity = Severity::Warning,
-          .message = fmt::format("RareSnes unsupported opcode ${:02X} at ${:04X}", command.opcode, offset),
+          .message = fmt::format("RareSnes unsupported opcode ${:02X} at ${:04X}", command.opcode, command.address.value),
           .range = command.range,
       });
     }
-    session.findOrAppend(std::move(command), offset);
   }
-  return session.finish();
+  return track;
 }
 
 [[nodiscard]] SequenceProgramConfig makeSequenceConfig() {

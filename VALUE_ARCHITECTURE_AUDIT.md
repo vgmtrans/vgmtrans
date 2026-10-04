@@ -1,11 +1,11 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Forty-two validated batches remove 1,191 net production lines
+`cb9e0b766`. Forty-three validated batches remove 1,197 net production lines
 from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 41 exactly;
+cover 37 of 38 registered families. All export records match batch 42 exactly;
 all 73 expanded raw inventories match byte-for-byte. The cleanup2 records appear
 at the end of this document.
 
@@ -8597,3 +8597,228 @@ batch. The constrained command-forwarding draft exposed an implicit Event
 conversion in the actual Wolf consumer and is superseded by concrete copy/move
 overloads; it is not applied here. No claim that all simplification avenues are
 exhausted, and no goal pause is requested.
+
+## Cleanup2 forty-third batch: canonical command and final export owners
+
+This batch retains SequenceVM and the native/export boundary while eliminating
+redundant decoded-command and output-vector ownership. No new public model,
+selector protocol, cache, or format-facing concept is introduced.
+
+- Rare's exceptional walker inserts discovered commands directly into the
+  existing TrackDecodeSession map. Revisited offsets retain the first decoded
+  interpretation and size. Remove the second decoded-command map and transfer
+  pass. Unsupported warnings read the completed SourceCommand values in address
+  order after duration warnings.
+- Give findOrAppend two ordinary const-reference/rvalue-reference overloads.
+  std::map::try_emplace copies or moves only for a first insertion. Keep implicit
+  CompilerCursor::Event conversions accepted by the native WolfTeam call.
+  The three-path combined change removes one net production line.
+- SegSat constructs its existing binding value once, selects requests from that
+  value's references, then shares the final prepare/data/program chain across
+  single-bank and multi-bank paths. Remove the intermediate reference vector
+  and the single-bank early continue; two net production lines disappear.
+- The private synth instrument resolver appends instruments and diagnostics to
+  its caller's existing PreparedSynthData, matching sample decoding. Remove the
+  local returned instrument vector and move assignment; three net architecture
+  lines disappear. Keep each local ResolvedSynthInstrument until its playable
+  regions are complete, preserving empty-result and throwing-callback behavior.
+- SonyPS1 raw-sample authoring consumes the recognized optional layout only
+  after its final sample/source use, moving it into the existing immutable pool
+  data. Remove the second owned layout-vector copy; the one-file change is
+  LOC-neutral. Native private-data readers and embedded VAB parsing stay intact.
+
+- Value: 2,185 added/3,382 deleted across 169 paths.
+- Architecture: 1,776 added/2,844 deleted across 94 paths.
+- Formats: 409 added/538 deleted across 75 paths.
+- Tests: 1,100 added/424 deleted across 43 paths.
+
+Net production reductions are 1,197 value lines, 1,068 architecture and 129
+format lines.
+
+### Concrete copy/move API and Rare proof
+
+The final concrete source/patch authority uses frozen42/current HEAD77cbec8e4.
+Full Rare/SoftCreat/Cursor focused SAN fixtures preserve 332,350 bytes, SHA256
+ffb2bb804446ce8eff339dfff52e31d37bceaccdfcdd629728ce6f0178eea9ae;
+432 generated discovery/projection/playback/MIDI cases preserve 1,905,782 bytes,
+SHA256 0a568f76ac750aae332f0e046dbeafe84bfb984c481f8e15217004f4b1b24fe7.
+All 59 actual candidate consumer Werror checks, four refreshed baseline checks
+and six optimized object builds pass. Broad includes use frozen42; the one parity
+syntax entry redirects 11 legacy paths to 252 frozen unchanged headers/542,131
+bytes, retaining the original log. No live src fallback remains in those checks.
+
+All 48 scoped Release cost cases keep canonical command/diagnostic counts and
+never increase allocations/requested bytes: totals 954,738 to 950,298 allocations
+and 123,551,064 to 122,853,592 requested bytes. Compatible 128-call cases improve
+Rare from 3,220/294,488 to 3,087/249,800 and SoftCreat from 3,856/306,056 to
+2,967/243,064. Three configured object text sections total 1,584 bytes smaller
+(Rare -608, mapper -1,120, SoftCreat +144). No whole-binary or speed claim.
+All 192 one-shot early allocation-fault ordinals per side throw without returning
+partial TrackProgram values; later faults and exact ordinal equivalence are not
+promised. Concrete overloads change pointer-to-member signatures, with no actual
+workspace member-pointer consumer found. Final diff SHA256
+0709e9cb36aa02e380b6a34674aa1da68500f9e694600f1412960a79f20dd848;
+manifest SHA256 94202ba33c11400a776f50c001892d2f44bedde8130e892157aae14346d58755.
+Root verifies all 274 manifest files and matching before/source/archive hashes.
+
+The warning collection now runs after command source projection. A successful
+command-ID callback sees one prior unsupported warning before versus zero after;
+if that callback throws, no TrackProgram is returned and the existing diagnostic
+vector has one versus zero unsupported warnings. Native module paths do not
+catch and publish a partial track. This private projection phase is a deliberate
+tradeoff, not arbitrary callback/failure-state equivalence.
+
+Duplicate rvalue insertion now leaves the caller's decoded value unconsumed
+rather than moving it into a discarded by-value parameter. Native callers
+already discard those values; the explicit owned-capture probe records that
+behavior separately. std::function small-buffer move state is implementation
+dependent: retain the failed stateless-move assumption and use an actually owned
+capture to prove output ownership, without claiming every moved function empties.
+
+Reject two alternatives before application. Keeping a by-value command argument
+made 128 compatible return-stack revisits allocate 3,595 times versus 3,220 before,
+despite reducing total requested bytes. The constrained forwarding overload
+broke the actual configured WolfTeam consumer because its Event conversion is
+implicit, not an exact DecodedBytecodeCommand type. Keep both drafts and failure
+logs; the concrete overloads preserve the call without explicit format casts.
+
+### SegSat binding and final synth assembly proof
+
+SegSat's sealed proof has 88 successful command/execution records, including 12
+corrected actual configured Werror checks for module and full fixture across
+Debug/Release/RelWithDebInfo. The original 12 checks retained a broad live src
+include; their logs remain but final authority uses frozen42/headers explicitly.
+Four full SegSat/AssetResolution/Registry/Session executions pass, and 12 asserted
+native module shapes preserve complete source maps, typed binding references,
+controller changes, request order, resolved relationships, prepared bank order,
+native IR and both MIDI policies. Four Release/focused SAN traces are identical:
+110,158 bytes, SHA256 27b0ebee829328510c2dad6bb95b7cc4d1223180acc36157914be8b9a86301cf.
+
+Every published sequence removes one vector allocation (one/two requested bytes
+for one/two references); three published sequences remove three calls/three
+bytes. Empty/unrecognized cases stay at one call/24 bytes. Binding/config owners
+die before final output observation; BoundCollection keeps its existing snapshot
+owner. No speed, peak-live memory, portable allocator, or standalone synth claim.
+Payload/program assignment follows bank-request allocation now. Allocation
+failure may leave a different unpublished builder; both module paths unwind
+without returning partial ScanResult values. Keep this failure-phase limit.
+
+The synth helper's 22 commands pass, including six actual configured checks,
+paired Release/focused SAN full existing SynthExport assertions, and 80 custom
+four-rounding-mode scenarios. Capture 72 completed direct preparations, 144 custom
+SF2/DLS artifacts, 56 existing fixture artifacts, and 24 expected callback/changed
+sample map.at exceptions. Complete fields/order/diagnostics/callback traces and
+all writer bytes are exact across four 21,642,519-byte streams, SHA256
+e58a48888ec391dba3447eb3673f65287e6ba9026637368aaa1acf28d6350adf.
+Invalid/duplicate addresses still reject before callbacks, empty instruments are
+discarded, and exceptions unwind the local prepared value. Existing public
+preparation consumers and returned lifetimes are unchanged. No allocation or
+performance saving is claimed for replacing an already cheap vector move.
+
+Both proofs instrument the exact changed units and complete focused fixtures;
+unchanged frozen42 core/formats/fmt/decompressor objects remain Release. SegSat
+also instruments its three companion units and Source.cpp. Ordinary address,
+undefined, and float-cast-overflow checks remain; libc++ container annotations
+are disabled consistently for mixed archives. No whole-program or Windows
+sanitizer claim. Root cold-reads and gates source/patch/proof/archive hashes.
+
+Sony's 70 commands pass, including 18 actual configured Werror checks for Synth,
+Module and full SonyPS1 fixture across three configurations and both sides.
+Four full SonyPS1/Registry/Session fixture arms pass with identical 44-byte stdout
+and empty stderr. Four 15-case traces preserve 151,111 bytes, SHA256
+d0c87e7ee8f74a9524f3151a7a5e1e0bd63772656b6bde368db1d794262774df.
+Expected shapes cover 1/2/3/16 raw samples, padding/gaps, invalid/rejected bodies,
+duplicate placements and selected-bank order. Complete native sample/layout,
+source map, metadata, selection/resolution diagnostics, prepared placement,
+durable IR and both MIDI policies remain exact after relevant owners die.
+SourceStore must still live for later sample-byte decoding; no contrary claim.
+
+Recognized pools save one allocation and 48/96/144/768 requested bytes for
+1/2/3/16 samples. Rejected paths remain unchanged. Moving parser capacity has a
+retained-memory tradeoff: three samples keep capacity four instead of three,
+48 additional bytes on this target; measured 1/2/16 capacities remain unchanged.
+Growth is implementation-defined, and nonoverlapping samples of at least 32
+bytes conservatively bound count by input_size/32. Do not claim peak-live/RSS or
+speed improvement. No shrink/cache policy is added. Private-data allocation
+moves after authoring, so caught allocation failure can expose a different
+unpublished draft; native unwinding publishes no partial ScanResult. All six
+Sony units, Source.cpp, three full fixtures and harness are instrumented in the
+focused SAN arms; remaining archives are Release. Root and the export agent
+independently cold-review the one-file lifetime boundary. Exact final manifest
+SHA256 bc6861576a4ebd2c7b683647b0f1123c6c631fdd6f8db0170eb4592782e4ba90.
+
+### Rejected DLS numerical rearrangement and retained architecture boundaries
+
+Keep DLS unchanged. A second finite tuning candidate independently bounded the
+rounded root and residual inputs to signed32 storage while retaining target
+u7/s16 clamps and the original source subtraction. The bounded actual configured
+unappended writer gate captures 184 direct/callback records in four rounding
+modes. Twelve ordinary cancellation artifacts drift; all 184 FENV observations
+match. Configured Clang again changes positive 100 division/subtraction to
+negative 100 division/addition, changing directed-rounding cancellation before
+clipping. 32 saturated-fine and eight 127.5-root records stay exact. 48 root-extreme
+records deliberately correct prior residual overflow; 46/48 fine-adjacent records
+match, and two downward-mode extreme records differ. Those corrections do not
+justify the ordinary drift. Seven commands pass; no broader/SAN/timing/Windows
+proof or live application is claimed. Retain all 26 proof files/2.31 MB and both
+DLS rejected designs. No volatile/noinline/FENV-forcing framework is introduced.
+
+Fresh read-only boundaries: dependencyTargets remains needed by native
+SquarePS2/SonyPS2/Tamsoft ambiguity fallbacks that deliberately retain selected
+banks; selectOne would discard them. Per-request empty selections mean incomplete,
+while an untouched accumulated input result means no dependencies/resolved.
+Chosen targets, alternatives, placements, statuses and diagnostics cannot be
+collapsed into one vector. Extraction's resolved SourceFile must stay owned while
+SourceStore grows child entries. Incremental session append and removal rebuilds
+have different indexing costs. Keep the collection phase types: binding owns
+selected snapshot/runtime and
+format-prepared bank copies, preparation additionally freezes output variants
+and addresses, and rendering may intentionally skip sequence work. Binding
+diagnostics plus optional success do not reduce to a severity-only branch.
+Named musical emitters keep source/voice/pan work out of format code; scalar fades and pitch transitions have distinct intent.
+All SourceMap enum members have src/tests consumers. Retain signed-zero motion
+behavior and validation failure order rather than reopening proved boundaries.
+
+Reject the cold decoded-field ownership draft without compilation. Adding a
+vector-rvalue fields overload and mutable projection adds 12 production lines,
+cannot transfer the buffer because the destination opcode comes first, and
+retains decoded vector capacity. It also empties retained decoded field values,
+changes repeat-finish annotations, and changes callback-failure partial state.
+Possible string payload savings do not remove another responsibility or justify
+that additional consumption contract. Keep the exact cold diff/source authority
+at decoded-field-ownership43; no runtime or performance proof is claimed.
+
+### Integrated publication gate
+
+- First five-path Release build completes 108 warning-free steps. The final
+  six-path Release build completes 46 steps, no warnings; all 44 CTest
+  suites pass. Frozen43 holds all value/shared headers and tests plus four matching
+  archives and the shell; its parent/source/diff authority is 77cbec8e4.
+- Shell SHA256: `e69fb9e74163714f76d8863ba20bc1e1270093282d5050ade4a7b6c7388fbe67`.
+- Against frozen42, the original corpus preserves all 252 input/policy records
+  and 3,922 artifact names/hashes.
+- The /Volumes/emu/vgm replay preserves all 894 export records: 852 successes
+  and 42 matching existing failures. All 858 artifact names/sizes/hashes and
+  218,240,549 bytes per binary match. All 73 raw inventories match exactly,
+  including five unchanged unsupported DSF failures. No inventory normalization
+  is needed. Real coverage remains 37/38 registered families; KonamiTMNT2
+  is synthetic only. See volume-coverage27/pass42-vs-pass43-summary.json.
+
+Only accepted production paths and this audit are staged. Existing user work is
+left untouched. No new permanent mirror test is added for these ownership changes.
+All original/expanded results, exact candidate/rejection drafts, commands, logs,
+source authority, allocation records and mismatch evidence remain task-owned
+artifacts. Verified original payload pruning retains manifests/provenance and
+uses exact size/hash/path gates; music archives are read-only inputs.
+
+Evidence: rare-direct-session41 (final concrete42 authority),
+segsat-binding-owner43/review-manifest.json,
+final-synth-instruments43/authority.json,
+sony-ps1-raw-owner44/proof-manifest.json (integrated in this batch),
+dls-independent-tuning-bounds43/rejection.json and seal.json,
+decoded-field-ownership43/cold.diff, pass43-read-only, build-pass43.log, ctest-pass43.log, pass43-baseline,
+comparison-pass43.json and volume-coverage27/pass42-vs-pass43-summary.json.
+
+Next: continue reviewing authoring/result responsibilities, starting with ROM-set
+assembly in its existing coupled ExtractedSource owner. Preserve canonical source
+ownership, callback failure order and native identity.

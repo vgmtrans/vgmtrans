@@ -63,35 +63,33 @@ struct BankAssets {
         result.sequence(name, input.reader.range(sequence.offset, sequence.normalTrackEnd - sequence.offset));
     auto parsed =
         parseSegSatSequence(input.reader, sequenceDraft.id(), sequence, &result.sourceMap(), &result.diagnostics());
-    const std::vector<u8> referencedBanks =
-        sequence.referencedBanks.empty() ? std::vector<u8>{0} : sequence.referencedBanks;
-    sequenceDraft.prepare<SegSatSequenceBindingData>(prepareSegSatSequence)
-        .data(SegSatSequenceBindingData{
-            .volumeModel = volumeModel,
-            .referencedBanks = referencedBanks,
-            .controllerChanges = std::move(parsed.controllerChanges),
-        })
-        .program(std::move(parsed.program));
+    SegSatSequenceBindingData binding{
+        .volumeModel = volumeModel,
+        .referencedBanks = sequence.referencedBanks.empty() ? std::vector<u8>{0} : sequence.referencedBanks,
+        .controllerChanges = std::move(parsed.controllerChanges),
+    };
 
     if (banks.size() == 1) {
       sequenceDraft.useBank(banks.front().bank);
-      continue;
-    }
-
-    // A stream without an explicit bank command begins on the driver's bank
-    // zero. Treat that implicit dependency exactly like a referenced bank.
-    for (const u8 referencedBank : referencedBanks) {
-      auto selected =
-          std::ranges::find_if(banks, [&](const BankAssets& bank) { return bank.layout.sourceBank == referencedBank; });
-      if (selected == banks.end() && !banks.empty()) {
-        // This is the Saturn driver's practical fallback used by the legacy
-        // scanner when a sequence names an unloaded bank.
-        selected = banks.begin();
+    } else {
+      // A stream without an explicit bank command begins on the driver's bank
+      // zero. Treat that implicit dependency exactly like a referenced bank.
+      for (const u8 referencedBank : binding.referencedBanks) {
+        auto selected =
+            std::ranges::find_if(banks, [&](const BankAssets& bank) { return bank.layout.sourceBank == referencedBank; });
+        if (selected == banks.end() && !banks.empty()) {
+          // This is the Saturn driver's practical fallback used by the legacy
+          // scanner when a sequence names an unloaded bank.
+          selected = banks.begin();
+        }
+        if (selected != banks.end()) {
+          sequenceDraft.useBank(selected->bank);
+        }
       }
-      if (selected != banks.end()) {
-        sequenceDraft.useBank(selected->bank);
-      }
     }
+    sequenceDraft.prepare<SegSatSequenceBindingData>(prepareSegSatSequence)
+        .data(std::move(binding))
+        .program(std::move(parsed.program));
   }
   return result.finish();
 }
