@@ -694,6 +694,9 @@ std::vector<NoteDraft*> appendSourceEvents(
         append(note);
       } else if constexpr (std::is_same_v<Event, InstrumentPerformanceEvent>) {
         events.emplace_back(MidiInstrumentEvent{source.header, resolved.selectionFor(source), source.forceBankSelect});
+      } else if constexpr (std::is_same_v<Event, ReverbPerformanceEvent>) {
+        // Song-wide reverb is supplied by the sequence renderer.
+        if (!source.voiceMask) events.emplace_back(source);
       } else if constexpr (std::is_same_v<Event, EnvelopePerformanceEvent> ||
                            std::is_same_v<Event, TempoPerformanceEvent> ||
                            std::is_same_v<Event, TimeSignaturePerformanceEvent> ||

@@ -271,10 +271,7 @@ using MidiTimeline = std::vector<const MidiTrackEvent*>;
   MidiTimeline timeline;
   timeline.reserve(events.size() + globalReverb.size());
   for (const auto& event : events) {
-    const auto* reverb = std::get_if<ReverbPerformanceEvent>(&event);
-    if (!reverb || !reverb->voiceMask) {
-      timeline.push_back(&event);
-    }
+    timeline.push_back(&event);
   }
   for (const auto& event : globalReverb) {
     timeline.push_back(&event);

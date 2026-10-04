@@ -1,14 +1,13 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Fifty-nine validated batches remove 1,500 net production lines
+`cb9e0b766`. Sixty validated batches remove 1,500 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 59 replays both corpora against the last executed batch 55;
-its rebuilt batch 58 predecessor has identical shell bytes to batch 55.
-Seventy-one expanded raw inventories match byte-for-byte; two retain the previously
-documented Sony sample-pool ID scheduling variation. The cleanup2 records appear
+cover 37 of 38 registered families. Batch 60 replays both corpora against its executed batch 59 predecessor.
+Seventy-two expanded raw inventories match byte-for-byte; one shows Sony
+sample-pool ID scheduling variation, independently reproduced in unchanged59. The cleanup2 records appear
 at the end of this document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
@@ -10850,3 +10849,81 @@ and pass59-final-root-review.json.
 Cumulative production removal is 1,500 value lines: 1,193 architecture
 and 307 formats, plus the earlier 22 UI lines. Continue looking for
 redundant adaptation and duplicated policy in MIDI planning and sequence authoring.
+
+## Cleanup2 batch 60: supply global reverb from its existing owner
+
+MIDI planning used to copy masked song-wide reverb into the originating track's
+completed events, even though midiTimeline immediately discarded those copies
+and supplied the same writes from globalReverbEvents. Omit masked writes at
+appendSourceEvents, beside its other consumed global events; midiTimeline can
+then append every completed local event without recognizing reverb again.
+
+The two-CPP change is line-neutral with its explanatory comment. It removes a
+construct-then-discard adaptation and downstream filtering policy. The neutral
+performance retains every source event for inspection and other export targets.
+An absent mask remains local; an engaged mask, including zero, stays global.
+The existing global owner, insertion order, stable header ordering and pointer
+lifetimes remain. Local relative order is unchanged. Source headers still drive
+sequence/automation counters, pitch and physical planning, and render tail bounds.
+Note output positions are assigned from actual vector size before completion and
+pitch-wheel extraction. No expired-boundary eligibility changes.
+
+The internal detail::planMidiTrack output intentionally stops exposing masked
+reverbs. All actual consumers were checked: one production renderer and fourteen
+fixture calls. They use completed notes/controls rather than those discarded
+entries. Ordinary scalar copy invokes no callback or diagnostic. Allocation
+failure staging can change as vector/sort/pointer work shrinks; no arbitrary
+bad_alloc ordinal, allocation, timing or performance parity claim is made.
+
+Root independently reconstructs both candidate bodies and checks twelve scoped
+inputs against committed59, original58 and the sealed eighteen-file draft; ten
+also match frozen59. The two docs are pinned to committed source only. Whole-song
+context and reverb-dedup fixtures exercise real cross-track/local/global behavior.
+No public model/header/layout, format API or numerical conversion body changes.
+
+All 48 complete Release rebuild steps and all 44 CTest suites pass
+without warnings. Frozen60 retains complete matching value/shared/tests/Qt,
+four archives and the shell under true precommit parent59 authority. Shell SHA256:
+5d34ac65dd971a2531b0034259513a3312bd941c48ef856bb2b6496d74ab0a07. The differing binary required fresh original and expanded replays
+against the executed59 predecessor:
+
+- All 252 original records and 3,922 artifact names/hashes match. Root rehashes
+  the retained60 payloads and their 1,604,324,580 bytes.
+- All 894 expanded export records match: 852 successes and the same 42 failures.
+  All 858 artifact names/sizes/hashes and 218,240,549 bytes per binary match.
+- Seventy-two raw inventories match. The sole difference is another Sony
+  PS1/PS2 pool-ID scheduling case, Growlanser II volume-38. Asset declarations0/1
+  swap IDs, with the corresponding selected-pool reference. Source/collection IDs,
+  metadata/order/ranges, bank/sequence IDs2/3, statuses and the two ordered Sony
+  warning messages are exact.
+
+The original strict classifier accepted only the previously proven inputs35/36
+and correctly stopped on38. Preserve that failed attempt and its raw summary.
+Six new inventory-only executions of unchanged59 reproduce both raw ID states;
+all ten initial/automatic-repeat/additional records match after the same narrow
+three-location declaration/member-ID mapping. This extends evidence to one input,
+not the normalization rule. The first root investigation also stopped before
+execution because it incorrectly expected empty stderr; the retained equal Sony
+warnings were nonempty. Corrected authority is separate. No successful export
+campaign or compiler command was rerun for these corrections.
+
+Root independently verifies 2,484 pinned records, actual raw buffers/commands
+for the six new baseline checks, and all payload/summary/classification gates.
+No extra numerical mirror or sanitizer matrix was needed for this data-flow move.
+Five unsupported DSF failures persist; real coverage remains 37/38 families,
+with KonamiTMNT2 synthetic only. Old59 generated original payloads are reclaimed
+only after full exact60 comparison and per-file hash gates. Every record, source,
+log, archive/executable and latest60 payload remains; user/music data is untouched.
+
+Evidence below /tmp/vgmtrans-cleanup2: global-reverb60-root-cold-review.json,
+pass60-application-receipt.json, build-pass60.log, ctest-pass60.log,
+pass60-baseline/provenance.json, corpora60-root-review.json,
+volume-coverage27/pass59-vs-pass60-summary.json,
+sony38-pass60-investigation/results.json,
+volume-coverage27/comparisons/pass59-vs-pass60/volume-38/classification.json,
+pruned-verified-originals59-after60-replay.json and pass60-final-root-review.json.
+
+Cumulative production removal remains 1,500 value lines: 1,193 architecture
+and 307 formats, plus the earlier 22 UI lines. Next, remove the unused
+CommandExecution::valid wrapper: actual dispatch admits empty source/flow-only
+bodies, so fixture queries should ask for body presence directly.
