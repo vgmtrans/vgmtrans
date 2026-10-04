@@ -255,8 +255,7 @@ using ZipPtr = std::unique_ptr<void, decltype(&unzClose)>;
   return path.stem().string();
 }
 
-[[nodiscard]] std::vector<u8> readMember(unzFile archive, std::string_view name) {
-  const std::string memberName(name);
+[[nodiscard]] std::vector<u8> readMember(unzFile archive, const std::string& memberName) {
   if (unzLocateFile(archive, memberName.c_str(), 0) != UNZ_OK) {
     throw std::runtime_error("missing ROM member '" + memberName + "'");
   }

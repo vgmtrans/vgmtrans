@@ -603,7 +603,7 @@ struct SequenceDecodeContext {
 // Reads the opening track setup and returns the start of the main track followed
 // by any additional tracks it opens.
 [[nodiscard]] std::vector<u32> readTrackStarts(const SequenceDecodeContext& context) {
-  std::vector<u32> secondaryTracks;
+  std::vector<u32> starts;
   u32 offset = context.dataBase();
   if (!hasBytecodeBytes(context.reader(), offset, 1, context.range.sequenceEnd)) {
     return {offset};
@@ -633,13 +633,12 @@ struct SequenceDecodeContext {
     const u32 relative = context.reader().le24(offset + 2);
     const u32 destination = context.dataBase() + relative;
     if (destination < context.range.sequenceEnd) {
-      secondaryTracks.push_back(destination);
+      starts.push_back(destination);
     }
     offset += 5;
   }
 
-  std::vector<u32> starts{offset};
-  starts.insert(starts.end(), secondaryTracks.begin(), secondaryTracks.end());
+  starts.insert(starts.begin(), offset);
   return starts;
 }
 

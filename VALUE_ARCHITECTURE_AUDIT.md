@@ -1,11 +1,11 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Forty-four validated batches remove 1,215 net production lines
+`cb9e0b766`. Forty-five validated batches remove 1,217 net production lines
 from `src/value`, plus 12 unused UI presentation lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. All export records match batch 43 exactly;
+cover 37 of 38 registered families. All export records match batch 44 exactly;
 all 73 expanded raw inventories match byte-for-byte. The cleanup2 records appear
 at the end of this document.
 
@@ -8996,3 +8996,220 @@ pruned-verified-originals27-for44.json, pruned-verified-originals26-for44.json.
 
 Next: continue probing shared authoring and preparation for redundant
 responsibilities while preserving real ownership, discovery and failure phases.
+
+## Cleanup2 forty-fifth batch: consolidate existing rules and owners
+
+This batch reduces repeated state rules and temporary ownership while making
+export header dependencies explicit. It preserves SequenceVM, typed source
+commands, native discovery order and the physical/output model boundary.
+
+- DependencySelection uses the established ResolutionStatus ordering for both
+  incomplete and ambiguous updates. Replace two hand-coded precedence branches
+  with std::max, as the resolver and collection summary already do. Keep the
+  empty-target status getter, alternatives, fallback targets and diagnostic
+  operations unchanged. A direct algorithm include makes the dependency visible;
+  three architecture lines disappear.
+- VM wait-ready execution retains the current-command/runtime/predicate/channel
+  checks. Its two private callers already establish positive pending ticks and
+  no delayed command, so remove those two repeated checks from the helper. Keep
+  both scheduling sites and all source timing; one architecture line disappears.
+- MAME's private readMember takes the const string its sole native caller already
+  owns, instead of accepting string_view and copying it to obtain c_str(). The
+  immutable database outlives synchronous lookup/read/error construction; no
+  pointer escapes. One architecture line disappears.
+- NDS collects track starts directly in its final returned vector and prepends
+  the primary start after bootstrap parsing. Remove the separate secondary
+  vector and range copy. Primary/secondary ordering, duplicate destinations,
+  malformed early returns and existing u32 narrowing remain unchanged. One
+  format line disappears.
+- ModulationScaling.h imports primitive Types and the physical modulation/policy
+  models. It declares its two MIDI parameter types without importing their full
+  models; ModulationScaling.cpp imports those definitions where used. Existing
+  synth lowering records no longer pull MIDI events or usage definitions into
+  a container writer through this header. The explicit dependencies add four
+  architecture lines; no public type, function signature or numerical body changes.
+
+- Value: 2,222 added/3,439 deleted across 170 paths.
+- Architecture: 1,807 added/2,890 deleted across 95 paths.
+- Formats: 415 added/549 deleted across 75 paths.
+- Tests: 1,100 added/424 deleted across 43 paths.
+
+Net production reductions are 1,217 value lines, 1,083 architecture and 134
+format lines.
+
+### Exact bounded proof gates
+
+Dependency status: all68 final commands pass, including24 actual configured
+checks (18 real consumer checks plus six standalone header checks). Complete
+AssetResolution/Session fixtures pass in four Release/focused sanitizer arms.
+Forty-eight ordered operation traces match72,563 bytes exactly, SHA256
+`e53ea3b533df54fa54997c2ad56bf41c6c45a4038a4100e43b1d3097f25eb66c`.
+They retain default/failed construction, empty-target getter behavior, fallback
+targets, alternative replacement, earlier failure followed by success, owned
+placement copies and every diagnostic field after original owners die. No
+initial harness failure, allocation/performance or injected-failure claim.
+Root gates96 proof files plus all450 held project files and four archives.
+Proof summary/report/manifest SHA256 respectively:
+`d6beed5216f83f940ac919c28ec34de67b975beb4085b9d2a4a1eca0b7db8e55`,
+`9347ad965caad37702f9ab34848286ee07e748996b13c2178989e1efb5dc71ca`,
+`34628a8fa9644650ebce5fa4eac424c42bb3edd63b27cbdb061fe0fda8f55eaa`.
+
+VM wait entry: full existing VM/CompilerCursor fixtures match82,438 bytes
+in all four Release/focused sanitizer arms, SHA256
+`b382d6bb2309509e5c43f18d0858290a48d9e0da14c36044627455fc86613430`.
+Forty-two callback/order/eligibility/exception traces match54,845 bytes, SHA256
+`186489938de914162e89d63e77251a5a998fdcc42931d9b2269f22291a59b36f`.
+Both private entries, delayed/final waits, missing predicates/channels/runtime,
+loop/budget stops, tickless waits, prohibited during-wait effects and all three
+MIDI transition policies remain exact after original program ownership dies.
+All18 actual configured checks pass; native configured text decreases32 bytes.
+Three reused Release fixture objects recompile to their exact retained hashes.
+Temporary matrix include/enum/setup corrections remain separately recorded;
+Preserve is required to reach the intended self-loop stop boundary. No native
+regression, allocation, throughput or whole-binary improvement claim. Root gates
+113 proof files and all held project/archive inputs. Proof/report/manifest:
+`02d2fa57b920194afb9d65b83214b4df5d6462dc6640566639eb9610a300862f`,
+`f947bbd00012f07f7aa84750d295d0ecd808e02884a8a59fc6591ae96f8f0467`,
+`4a08487b01229e1a190a3a0cf5245207974309f5b12447accc002fbad1f59dd8`.
+
+MAME member-name ownership: all60 final commands pass, including six
+configured checks and complete KonamiArcade/CPS/Registry/Session fixtures in
+four Release/focused sanitizer arms. Thirty-two native group/name cases match
+74,670 bytes, SHA256
+`b8427e581a49c3d547b6168dcd442d1618f2cbe2af1548285a16639d04964fa4`.
+They cover groups, Konami lifetime,255/256-byte vendor length boundaries,
+missing members, literal path components, embedded NUL and complete C++ error
+suffixes. The frozen macOS vendor default is case-insensitive; derive the
+expected result from its unchanged comparator. An initially incorrect
+case-sensitive harness expectation remains separately recorded.
+Scoped scalar-new measurements during extractor.extract preserve27 shapes;
+four long-name shapes remove one call and256/272/1,040/1,040 requested bytes.
+Vendor malloc, setup, aligned allocation, peak memory and throughput are outside
+that measurement. Root gates99 files. Summary/report/manifest:
+`a199edbf3181f241c87e73ec878a4f3730fb54a4d2ec0253883ac317ff432f43`,
+`ca22e4a3e802161bb34169b8644b7c1bc14e40b025945d77afc2e4490d852d03`,
+`9b760e5640815341192b40aafcc9852a39789e25f0a2a1ef670168aa5898c001`.
+
+NDS final starts owner: full native NDS fixtures match28,058 bytes in
+all four arms, SHA256
+`76e92e0c7b81a971ca509846c9490e48dce6324a63f0b2f655535235864dd11d`.
+The148 focused cases match666,355 bytes, SHA256
+`ecd13b1871a88a648cfdf50975de7006de9459de9b629886c54e04b7f522f6dd`.
+Zero/one/many track starts, delays, malformed bootstrap, duplicate/invalid
+destinations, four wrap boundaries, binding, owner lifetime, source/IR and three
+MIDI transition policies remain exact. Eighteen configured consumer checks and
+two optimized objects pass. Across88 scoped helper cases, allocation calls
+decrease336 to278 and requested bytes34,188 to27,152; per-case increases and
+native text growth are disclosed below. Temporary fixture-main link setup was
+corrected without native changes. Root gates101 files. Proof/report/manifest:
+`621cee5b48daed3f8732f4610c3c5f89e5b3cc7f1741099503cd5693d74260f4`,
+`e3f527005cc3798c01fbd510074de404f403e4c494357e825960cd13c6881069`,
+`e5d4fea0ec8126fb2cd6d7145603883753826571dbc584aaf1f94d55c9a02c0b`.
+
+MIDI header dependencies: all132 final configured checks pass with
+empty output, comprising120 checks of20 actual consumers in three configurations
+before/after and12 standalone opaque/reference/pointer/concrete-type contracts.
+All value/shared/tests inputs are held44 or the two-file overlay. A separately
+hashed255-file legacy snapshot supplies45 actual non-system dependencies;
+150 encountered dependencies have explicit source/held/legacy classification.
+The first draft omitted Types.h and six real consumer checks failed: the removed
+MIDI imports supplied s32 transitively. The final revised patch adds Types.h and
+reruns all132 checks. A nonexistent harness-only policy enumerator was also
+corrected; initial failures remain. Canonical /tmp versus /private/tmp metadata
+classification was corrected without recompilation or source/command changes.
+Root gates all813 proof files,2,924,542 bytes. Final patch/authority/results/manifest:
+`9de1be7bafcfa5253a786bb0c170b1835ff97ec9cd03ae201f369fb084581c1b`,
+`6f0854e24562a038c5f46ff7e8ed9f7978b92a29d723691bbdccbeeb4460665a`,
+`4caac0a346b8f9c419f8a7a84ef51793705b57dd845389bef172f76cd6a310f9`,
+`d92585f15b46ee07789f4b1f293f0dac1386225d88d602c866a6cbaccf737bc4`.
+
+All final proofs use complete frozen44 value/shared/tests and matching archives.
+Its precommit parent1ee885713 differs intentionally from current committed44
+HEAD35a5d4bde4238e07e5b1fd16b089ae7a0f5b584e. Root reads exact diffs and gates
+all held source/patch/manifest/command/trace/archive hashes before application.
+Focused sanitizer proofs instrument changed units and full existing fixtures;
+remaining frozen archive objects remain Release. Consistent libc++ annotation
+settings retain normal ASan/UBSan/float-cast-overflow checks without claiming
+whole-program or Windows coverage. The header-only dependency proof claims no
+runtime, sanitizer or compile-time performance coverage; integrated checks follow.
+
+### Clarity, memory and failure boundaries
+
+NDS reduces a vector owner and total measured allocation requests, but geometric
+front insertion has explicit costs: 17 of 88 scoped cases retain more capacity
+and 12 request more bytes. Four secondary starts save one call while requesting
+52 to 60 bytes and retaining capacity5 to8; eight starts save one call while
+requesting100 to124 bytes/capacity9 to16. Fifteen starts save two calls/68 bytes
+with capacity16 unchanged. Configured native text grows48 bytes. There is no
+blanket memory, peak-live, speed or whole-binary improvement claim. Eliminated
+final-vector allocation and shifted allocator ordinals change unpublished
+failure staging; ordinary output and malformed recovery remain exact.
+
+MAME removes the long-name copy failure site before vendor lookup. The returned
+sources/diagnostics remain owned, and full messages preserve embedded-NUL
+suffixes while C lookup uses its terminated prefix. No arbitrary bad_alloc or
+partial-group failure equivalence is claimed. Native vendor case/length policy
+is preserved, not replaced with a guessed portable policy.
+
+Dependency status updates stay before the same alternative/diagnostic vector
+operations and cannot invoke callbacks or allocate. The private stored enum has
+only valid construction/setter paths; public malformed collection values are
+unchanged. A stored Resolved selection without targets still reports Incomplete;
+use the private stored state for precedence rather than feeding that getter back
+into mutation. Keep typed dependency inputs, selected fallbacks and alternatives
+as different responsibilities.
+
+VM wait-entry preconditions come directly from its private callers. Retain ready
+predicate execution, beginCommand loop/limit checks, during-wait effect validation,
+command-channel routing and durable source provenance. Keep saved wait command
+separate from last executed command across synchronized restoration, and keep
+source motion intent distinct from shortened realized events for future exporters.
+No new adapter state or HOSA empty-track protocol is introduced.
+
+Reject the cold WAV filename fold: its three-line reduction adds an empty-pool
+branch and buries fallback/sanitization inside the Artifact initializer. Keep
+sampleArtifactName's clear named rule. No compiler, runtime or performance claim
+was made for that rejected draft. Keep borrowed synth instrument metadata through
+region callbacks and existing shared stitch-part ownership; replacing them would
+add capture/cache contracts. Further root retained boundaries appear in
+pass45-read-only/root-retained-boundaries.md.
+
+The MAME archiveStem/SourceFile.logicalPath identity candidate stays separate.
+It may fix reachable RAR-contained ZIP discovery and remove duplicated path
+policy, but member precedence/lexical normalization intentionally changes lookup.
+Its current cold record has no runtime proof or live application; evaluate its
+native nested-member regression after this frozen baseline.
+
+### Integrated publication gates
+
+- Complete macOS Release build: 350 warning-free steps; all 44 CTest
+  suites pass. Frozen45 holds complete value/shared/tests, four matching archives
+  and shell under committed44/source/diff authority35a5d4bde.
+- Shell SHA256: `04af7c231952e317579e23eaa23964baf2c0c066a960f2ec8af04fc1162f0047`.
+- Against frozen44, the original corpus preserves all 252 input/policy records
+  and 3,922 artifact names/hashes.
+- The /Volumes/emu/vgm replay preserves all 894 export records: 852 successes
+  and 42 matching existing failures. All 858 artifact names/sizes/hashes and
+  218,240,549 bytes per binary match. All 73 raw inventories match exactly,
+  including five unchanged unsupported DSF failures. No inventory normalization
+  is needed. Real coverage remains 37/38 registered families; KonamiTMNT2
+  is synthetic only. See volume-coverage27/pass44-vs-pass45-summary.json.
+
+Only the six approved production paths and this audit are staged. User work and
+music archives remain untouched. No permanent tests mirror these refactors;
+complete existing fixtures and temporary paired probes verify the contracts.
+Task-owned after42 original artifacts reclaim3,922 exact-matched files/
+1,604,324,580 bytes under closed comparison44/per-generation/path/size/hash gates,
+retaining all records/logs/frozen sources/binaries and latest43/44 payloads.
+An attempted after25 gate found zero remaining payloads and stopped before any
+receipt/deletion; earlier pruning already retained only records there.
+
+Evidence: dependency-status-priority46 (integrated in45), vm-wait-entry44,
+mame-member-name-owner45, nds-track-start-owner44, modulation-midi-headers45,
+pass45-read-only, wav-name-prefix45/rejection.json, pass45-owner-root-review.json,
+pass45-root-review.json, build-pass45.log, ctest-pass45.log, pass45-baseline,
+comparison-pass45.json, volume-coverage27/pass44-vs-pass45-summary.json,
+pruned-verified-originals42-for45.json, prune-attempt25-for45.json.
+
+Next: continue simplifying shared identity handling; assess actual nested-ROM
+archive behavior before accepting that distinct change.

@@ -6,15 +6,16 @@
 
 #pragma once
 
-#include "value/export/midi/MidiModel.h"
-#include "value/export/midi/ModulationAnalysis.h"
+#include "value/base/Types.h"
 #include "value/model/ModulationModel.h"
 #include "value/export/ExportPolicy.h"
 
-#include <optional>
 #include <vector>
 
 namespace vgmtrans::core {
+
+struct MidiModulationUsage;
+struct MidiSequence;
 
 // Export-lowering vocabulary. These records are deliberately outside the
 // synth model: format authors describe physical modulation there, and only

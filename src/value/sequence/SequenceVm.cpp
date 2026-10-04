@@ -437,8 +437,7 @@ private:
   }
 
   void executeReadyCommandDuringWait() {
-    if (position_.pendingTicks == 0 || position_.delayedCommand || !position_.command ||
-        sequenceRuntime_.readyDuringWait == nullptr) {
+    if (!position_.command || sequenceRuntime_.readyDuringWait == nullptr) {
       return;
     }
     const u32 commandIndex = *position_.command;

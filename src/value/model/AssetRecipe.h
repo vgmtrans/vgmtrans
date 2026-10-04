@@ -8,6 +8,7 @@
 
 #include "value/model/CollectionModel.h"
 
+#include <algorithm>
 #include <functional>
 #include <optional>
 #include <string>
@@ -43,9 +44,7 @@ public:
   }
 
   DependencySelection& incomplete(std::string message, std::string code = "incomplete-dependency") {
-    if (status_ == ResolutionStatus::Resolved) {
-      status_ = ResolutionStatus::Incomplete;
-    }
+    status_ = std::max(status_, ResolutionStatus::Incomplete);
     issues_.push_back({.severity = Severity::Warning, .code = std::move(code), .message = std::move(message)});
     return *this;
   }
@@ -53,9 +52,7 @@ public:
   // Keep any targets the format deliberately chose as a fallback. Alternatives
   // describe the unresolved choices, including different positions in one pool.
   DependencySelection& ambiguous(std::vector<DependencyTarget> alternatives, std::string message) {
-    if (status_ != ResolutionStatus::Failed) {
-      status_ = ResolutionStatus::Ambiguous;
-    }
+    status_ = std::max(status_, ResolutionStatus::Ambiguous);
     alternatives_ = std::move(alternatives);
     issues_.push_back({.severity = Severity::Warning, .code = "ambiguous-match", .message = std::move(message)});
     return *this;

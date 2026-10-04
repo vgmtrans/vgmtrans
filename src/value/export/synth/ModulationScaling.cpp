@@ -6,6 +6,9 @@
 
 #include "value/export/synth/ModulationScaling.h"
 
+#include "value/export/midi/MidiModel.h"
+#include "value/export/midi/ModulationAnalysis.h"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
