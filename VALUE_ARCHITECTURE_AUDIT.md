@@ -1,11 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Sixty validated batches remove 1,500 net production lines
+`cb9e0b766`. Sixty-one validated batches remove 1,502 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 60 replays both corpora against its executed batch 59 predecessor.
+cover 37 of 38 registered families. Batch 61 has identical shell bytes to executed batch 60;
+its corpus evidence is reused from that comparison.
 Seventy-two expanded raw inventories match byte-for-byte; one shows Sony
 sample-pool ID scheduling variation, independently reproduced in unchanged59. The cleanup2 records appear
 at the end of this document.
@@ -10927,3 +10928,58 @@ Cumulative production removal remains 1,500 value lines: 1,193 architecture
 and 307 formats, plus the earlier 22 UI lines. Next, remove the unused
 CommandExecution::valid wrapper: actual dispatch admits empty source/flow-only
 bodies, so fixture queries should ask for body presence directly.
+
+## Cleanup2 batch 61: query command body presence directly
+
+CommandExecution::valid only converted its body to bool. An empty body is not an
+invalid command: static flow, delay, coordinator signals and source-only commands
+can execute without one. Remove that misleading convenience query and let the
+existing fixtures inspect body directly. This reduces the architecture by one
+getter and one separating blank line; the nineteen assertion substitutions are
+line-neutral. No hasBody helper or new command-validity rule is introduced.
+
+All positive fixture uses are contextual &&/|| conversions and all negative uses
+are !, so std::function's explicit bool conversion preserves truth and short
+circuiting. The runtime still constructs Playback and calls beforeCommand before
+checking whether a body exists. Default VM flow, SequenceRuntime admission,
+execution fields/layout and source/export responsibilities remain unchanged.
+The public convenience member and any external member pointer to it intentionally
+disappear; this is a small API simplification, not an ABI guarantee.
+
+Root verifies all sixteen scoped cold inputs against committed60, frozen60 and
+the original59 authority, reconstructs the six complete changed files, and
+checks nineteen assertion replacements. The sealed original type search had
+double-escaped word boundaries and returned no matches. Its initial applier
+stopped before mutation. Root mistakenly dispatched the dependent integration
+request anyway; it stopped on the absent expected-source receipt before any
+compiler ran. Both failures remain recorded. A separate corrected source check
+uses tracked git grep -w, preserves the original seal, and passes before applying.
+
+All 339 matching Release rebuild steps and all 44 CTest suites pass,
+without warnings. Frozen61 contains the complete 359 value, one shared, ninety
+test and 199 Qt source files, four archives and shell, with committed60 as its
+true precommit parent. The result commit is recorded separately. Shell SHA256:
+5d34ac65dd971a2531b0034259513a3312bd941c48ef856bb2b6496d74ab0a07. It is byte-identical to executed60, so no new corpus execution is
+needed. Root rechecks all 2,484 pinned records of the closed60 comparison:
+252 original records/3,922 artifacts and 894 expanded exports/858 artifacts;
+72 raw inventories are exact and the sole Sony volume-38 pool-ID permutation
+has six unchanged59 inventory executions proving its preexisting variation.
+That is inherited60 evidence, not a new61 replay or a new normalization rule.
+No numerical conversion, sanitizer matrix or format body changed.
+
+The larger cursor proposal was rejected on source review. Replacing four Event
+members with a partially assembled DecodedBytecodeCommand saves six lines but
+adds source fields and two empty vector owners to every builder while the cursor
+still owns the decoded fields/operands. It adds move staging and longer flow
+accesses without removing a format-authoring responsibility. No candidate build,
+measured size/performance claim or runtime proof is attributed to that rejection.
+
+Evidence under /tmp/vgmtrans-cleanup2: command-body61-root-cold-review.json,
+command-body61-preapplication-failure.json, pass61-application-receipt.json,
+build-pass61.log, ctest-pass61.log, pass61-baseline/provenance.json,
+event-command-owner61-root-rejection.json, corpora60-root-review.json and
+pass61-final-root-review.json.
+
+Cumulative production removal is 1,502 value lines: 1,195 architecture
+and 307 formats, plus the earlier 22 UI lines. Continue reviewing unused
+source-level policy channels and optional-operand boundary semantics.

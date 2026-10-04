@@ -1388,7 +1388,7 @@ void capcomSnesReleaseRateIsStickyAcrossInstrumentChanges() {
                                                          });
   const SourceMap sourceMap = sourceMapBuilder.finish();
   expect(track.commands.size() == 6 && track.commands.front().semantic == SequenceSemantic::Envelope &&
-             track.commands.front().range.size == 2 && track.commands.front().execution.valid(),
+             track.commands.front().range.size == 2 && track.commands.front().execution.body,
          "CapcomSnes $1D should decode as an executable two-byte envelope command");
   const SourceAnnotation& releaseAnnotation = commandAnnotation(sourceMap, track.commands.front());
   const SourceField* gain = fieldWithName(releaseAnnotation, "gain");

@@ -926,7 +926,7 @@ void konamiSnesCompilerCursorDecodesVersionedFlowAndTruncation() {
   const TrackProgram truncated =
       decodeKonamiSnesSourceTrack(ByteReader(SourceId{31}, truncatedBytes), KONAMISNES_V6, 0, 0, nullptr, &diagnostics);
   expect(truncated.commands.size() == 1 && truncated.commands[0].flow.endsPlayback() &&
-             !truncated.commands[0].execution.valid() && truncated.commands[0].range.size == 3,
+             !truncated.commands[0].execution.body && truncated.commands[0].range.size == 3,
          "truncated Konami commands should keep their partial source range but no executable behavior");
   expect(!diagnostics.empty() && diagnostics.front().code == "truncated-record",
          "truncated Konami operands should use the shared compiler-cursor diagnostic");

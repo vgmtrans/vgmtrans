@@ -166,8 +166,6 @@ struct CommandExecution {
   u32 delayTicks = 0;
   // Notify the sequence coordinator without changing this stream's control flow.
   SequenceCoordinatorSignal coordinatorSignal = SequenceCoordinatorSignal::None;
-
-  [[nodiscard]] bool valid() const noexcept { return static_cast<bool>(body); }
 };
 
 // One executable source opcode. Detailed decoded fields and alternative

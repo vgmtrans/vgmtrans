@@ -533,7 +533,7 @@ void ndsSequenceComposesPitchBendRangeBehavior() {
   const SequenceProgramConfig& config = ndsSequenceConfig();
   const TrackProgram track =
       decodeTestTrack(ByteReader(SourceId{16}, bytes), sequenceOffset, trackStart + 5, trackStart, 0);
-  expect(track.commands.size() == 3 && track.commands[0].execution.valid(),
+  expect(track.commands.size() == 3 && track.commands[0].execution.body,
          "NDS pitch-bend range should compose its state update and output into one command body");
 
   const SequenceProgram program{
@@ -579,7 +579,7 @@ void ndsSequenceEmitsStickyDynamicAdsr() {
       envelopeCommandCount == 4 && std::ranges::all_of(commands,
                                                        [](const SourceCommand& command) {
                                                          return command.semantic != SequenceSemantic::Envelope ||
-                                                                (command.range.size == 2 && command.execution.valid());
+                                                                (command.range.size == 2 && command.execution.body);
                                                        }),
       "NDS D0-D3 should decode as executable two-byte envelope commands");
 
@@ -1110,7 +1110,7 @@ void ndsSequenceAnnotatesModulationDelayOperands() {
   const SourceCommand& command = track.commands[0];
   expect(commandKind(annotations, command) == "nds.modulation-delay",
          "NDS modulation delay should stay annotated as its source-driver command");
-  expect(command.range.size == 3 && command.execution.valid(),
+  expect(command.range.size == 3 && command.execution.body,
          "NDS modulation delay should retain executable playback behavior");
   const SourceField* delayField = fieldWithName(commandAnnotation(annotations, command), "delay");
   expect(fieldEquals(delayField, u64{0x3412}),

@@ -300,8 +300,8 @@ void compilerCursorCompilesAndExecutesTypedCommands() {
   expect(std::ranges::all_of(track.commands, [](const SourceCommand& command) { return command.range.size != 0; }),
          "compiler-cursor commands should retain source ranges instead of source bytes");
   expect(track.commands.size() == 8, "compiler cursor should decode every probe command once");
-  expect(track.commands[0].execution.valid() && track.commands[1].execution.valid() &&
-             track.commands[2].execution.valid() && track.commands[3].execution.valid(),
+  expect(track.commands[0].execution.body && track.commands[1].execution.body &&
+             track.commands[2].execution.body && track.commands[3].execution.body,
          "output, state, toggle, and local handlers should compile to command bodies");
 
   const auto annotations = sourceMap.withRole(SourceId{7}, SourceRole::Command);
@@ -436,8 +436,8 @@ void compilerCursorCompilesControlFlow() {
   expect(track.commands.size() == 6, "reachable decoding should compile call and jump targets");
   expect(track.commands[0].flow.callTarget() && track.commands[2].flow.unconditionalJump(),
          "compiled flow should preserve discovery targets beside runtime behavior");
-  expect(!track.commands[0].execution.valid() && !track.commands[2].execution.valid() &&
-             !track.commands[4].execution.valid() && !track.commands[5].execution.valid(),
+  expect(!track.commands[0].execution.body && !track.commands[2].execution.body &&
+             !track.commands[4].execution.body && !track.commands[5].execution.body,
          "static call, jump, return, and end flow should compile no redundant runtime bodies");
   const SourceAnnotation& callAnnotation = sourceMap.get(track.commands[0].annotation);
   const SourceAnnotation& jumpAnnotation = sourceMap.get(track.commands[2].annotation);
@@ -527,7 +527,7 @@ void compilerCursorComposesOperationsIntoOneBody() {
       0xff,
   };
   const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{12}, bytes), static_cast<u32>(bytes.size()));
-  expect(track.commands.size() == 6 && track.commands[0].execution.valid() && track.commands[2].execution.valid(),
+  expect(track.commands.size() == 6 && track.commands[0].execution.body && track.commands[2].execution.body,
          "chained and separate compiler-cursor calls should compose into one command body");
 
   const SequenceProgramConfig config = compilerProbeConfig();
@@ -554,7 +554,7 @@ void compilerCursorComposesOperationsIntoOneBody() {
 void compilerCursorReadsRuntimeStateInsideCommandBody() {
   const std::vector<u8> bytes{0x27, 0x27, 0xff};
   const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{14}, bytes), static_cast<u32>(bytes.size()));
-  expect(track.commands.size() == 3 && track.commands[0].execution.valid(),
+  expect(track.commands.size() == 3 && track.commands[0].execution.body,
          "runtime-state fixture should compile its related effects into one body");
 
   const SequenceProgramConfig config = compilerProbeConfig();
@@ -617,7 +617,7 @@ void compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior() {
         decodeProbeTrack(ByteReader(SourceId{11}, bytes), static_cast<u32>(bytes.size()), nullptr, &diagnostics);
     expect(track.commands.size() == 1 && track.commands[0].flow.endsPlayback(),
            "truncated compiler command should become a terminal command automatically");
-    expect(track.commands[0].range.size == bytes.size() && !track.commands[0].execution.valid(),
+    expect(track.commands[0].range.size == bytes.size() && !track.commands[0].execution.body,
            "truncated compiler command should retain its partial source range but no executable behavior");
     expect(!diagnostics.empty() && diagnostics[0].code == "truncated-record",
            "truncated compiler field should retain the shared RecordReader diagnostic");
@@ -632,7 +632,7 @@ void compilerCursorRetainsPartialIgnoredPayload() {
   expect(command.fields.size() == 1 && command.fields[0].name == "bytes" &&
              std::get<std::string>(command.fields[0].value) == "AB CD" &&
              command.fields[0].range == SourceRange{SourceId{11}, 1, 2} &&
-             command.fields[0].display == SourceValueDisplay::Hex && !command.execution.valid() &&
+             command.fields[0].display == SourceValueDisplay::Hex && !command.execution.body &&
              command.flow.defaultTransition.kind == CommandTransitionKind::End &&
              diagnostics.size() == 1 &&
              diagnostics[0].code == "truncated-record" && diagnostics[0].range == SourceRange{SourceId{11}, 3, 0},
