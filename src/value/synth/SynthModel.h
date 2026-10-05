@@ -47,8 +47,6 @@ public:
   // resolved to either its local sound bank or an independent sample pool.
   constexpr SampleRef() noexcept = default;
 
-  [[nodiscard]] static constexpr SampleRef none() noexcept { return {}; }
-
   [[nodiscard]] static SampleRef resolved(AssetId owner, u32 index) noexcept {
     assert(owner.valid() && index != invalidIdValue);
     return SampleRef(owner, index);

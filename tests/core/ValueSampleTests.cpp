@@ -71,6 +71,19 @@ void snesBrrDecoderProducesPcm() {
   expect(!decodeSample(invalidRange, sourceBytes).has_value(), "BRR decoder should reject invalid source ranges");
 }
 
+void gbaDirectSoundRejectsWrappedOutputDimensions() {
+  const std::vector<u8> sourceBytes(16 + 1024);
+  const Sample sample{
+      .codec = AudioCodec::GbaDirectSound,
+      .encodedData = SourceRange{.source = SourceId{1}, .offset = 0, .size = sourceBytes.size()},
+      .sampleRate = u32{1} << 31,
+      .loop = Loop{.length = 1024},
+      .codecParameter = (u64{1} << 32) | 1,
+  };
+  expect(!decodeSample(sample, sourceBytes).has_value(),
+         "DirectSound should reject oversized output before its frame-count multiplication wraps to zero");
+}
+
 void snesDspNoiseDecoderMatchesHardwareSequence() {
   Sample sample{
       .codec = AudioCodec::SnesDspNoise,
@@ -260,6 +273,7 @@ void psxFormatsPreferSpuFiltering() {
 
 void runValueSampleTests() {
   snesBrrDecoderProducesPcm();
+  gbaDirectSoundRejectsWrappedOutputDimensions();
   snesDspNoiseDecoderMatchesHardwareSequence();
   snesGainEvaluationHandlesLongIntervals();
   ndsImaAdpcmDecoderValidatesItsPredictorHeader();

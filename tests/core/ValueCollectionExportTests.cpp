@@ -127,7 +127,7 @@ void sampleReferenceValidationEnforcesOwnership() {
       {SampleRef::resolved(bank.metadata.id, 1), {}, false, "synth.sample-reference.out-of-range"},
       {SampleRef::unbound(0), {}, false, "synth.sample-reference.unresolved"},
       {SampleRef::unbound(0), {}, true, {}},
-      {SampleRef::none(), {}, false, {}},
+      {SampleRef{}, {}, false, {}},
       {SampleRef::resolved(external.metadata.id, 0), selected, false, {}},
       {SampleRef::resolved(external.metadata.id, 1), selected, false, "synth.sample-reference.out-of-range"},
       {SampleRef::resolved(otherBank.metadata.id, 0), {}, false, "synth.sample-reference.external-owner"},

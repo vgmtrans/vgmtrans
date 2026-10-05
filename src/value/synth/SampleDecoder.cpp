@@ -475,10 +475,11 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   const u64 step = static_cast<u32>(sample.codecParameter) == 0 ? unit : static_cast<u32>(sample.codecParameter);
   const auto ceilDivide = [](u64 value, u64 divisor) { return (value + divisor - 1) / divisor; };
   const u64 mixerFrames = ceilDivide(totalSamples * unit, step);
-  const u64 outputFrames = ceilDivide(mixerFrames * sample.sampleRate, mixerRate);
-  if (outputFrames > std::numeric_limits<u32>::max()) {
+  // Bound the output frame count before multiplying by the sample rate.
+  if (mixerFrames > static_cast<u64>(std::numeric_limits<u32>::max()) * mixerRate / sample.sampleRate) {
     return std::nullopt;
   }
+  const u64 outputFrames = ceilDivide(mixerFrames * sample.sampleRate, mixerRate);
 
   const auto body = header.subspan(16);
   std::vector<s16> source = compressed ? decodeGbaBdpcm(body, sampleCount) : std::vector<s16>(sampleCount);

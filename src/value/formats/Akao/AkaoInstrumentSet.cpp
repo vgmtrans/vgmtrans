@@ -93,7 +93,6 @@ struct ParsedInstrumentSet {
     Region region{
         .keyRange = KeyRange{.low = reader.u8At(regionOffset + 1), .high = reader.u8At(regionOffset + 2)},
         .velocityRange = VelocityRange{.low = 0, .high = 127},
-        .sample = SampleRef::none(),
         .range = reader.range(regionOffset, 8),
         .attenuationDb = linearAmplitudeToAttenuationDb(
             reader.u8At(regionOffset + 7) == 0 ? 1.0 : reader.u8At(regionOffset + 7) / 128.0),
@@ -177,7 +176,6 @@ void addDrumInstrument(std::vector<Instrument>& instruments, ByteReader reader, 
       Region region{
           .keyRange = KeyRange{.low = static_cast<u8>(key), .high = static_cast<u8>(key)},
           .velocityRange = VelocityRange{.low = 0, .high = 127},
-          .sample = SampleRef::none(),
           .range = reader.range(regionOffset, 8),
           .pan = panPositionFrom7Bit(reader.u8At(regionOffset + 7) & 0x7f),
           .attenuationDb = linearAmplitudeToAttenuationDb(
@@ -209,7 +207,6 @@ void addDrumInstrument(std::vector<Instrument>& instruments, ByteReader reader, 
       Region region{
           .keyRange = KeyRange{.low = key, .high = key},
           .velocityRange = VelocityRange{.low = 0, .high = 127},
-          .sample = SampleRef::none(),
           .range = reader.range(regionOffset, regionSize),
           .pan = panPositionFrom7Bit(reader.u8At(regionOffset + 4)),
           .attenuationDb = linearAmplitudeToAttenuationDb(reader.le16(regionOffset + 2) / (127.0 * 128.0)),

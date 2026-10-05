@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Seventy-eight validated batches remove 1,629 net production lines
+`cb9e0b766`. Seventy-nine validated batches remove 1,633 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 78 replays both corpora against its
-committed batch 77 predecessor. All 73 expanded raw inventories match exactly;
+cover 37 of 38 registered families. Batch 79 replays both corpora against its
+committed batch 78 predecessor. All 73 expanded raw inventories match exactly;
 no classification is needed. The cleanup2 records appear at the end of this
 document.
 
@@ -12123,3 +12123,53 @@ Shell SHA-256: `15c8681f0f238deee4759a3c9feba9e712f489008b0bd1d907276f66cd68efc3
 `author-types78-root-cold-review.json` and `pass78-final-root-review.json`.
 The branch now removes 1,629 net value lines: 1,283 architecture and
 346 native-format lines, plus the earlier 22 UI lines. The audit continues.
+
+## Cleanup2 batch 79 — author empty samples directly and check the output budget
+
+Remove the duplicate `SampleRef::none()` factory. Default construction already
+creates the same constexpr/noexcept empty reference; AKAO's three redundant
+`Region.sample` initializers disappear, and the existing empty-reference
+validation case uses `SampleRef{}`. Empty, unbound-index and resolved-owner states
+remain distinct. Deferred articulation binding, source reads and diagnostics
+remain; existing AKAO fixtures check empty regions before binding and their
+later sample ownership. External users of the removed named factory or its
+address must migrate to default construction. This removes five production
+lines without changing the representation or adding an abstraction.
+
+GBA DirectSound now expresses its existing u32 output-frame ceiling before
+multiplying the mixer frame count by the sample rate. The budget product has two
+u32-bounded factors and fits u64. For positive rates,
+ceil(mixerFrames * sampleRate / mixerRate) <= u32max is exactly equivalent to
+mixerFrames <= floor(u32max * mixerRate / sampleRate). The original rounding,
+phase, interpolation, loop and materialization formulas stay literal. Accepted
+dimensions also bound the ceil additions and source indexes. One comment
+explains the order; no generic checked-arithmetic helper or new limit is added.
+
+A small custom public `Sample` (1,040 source bytes) previously wrapped the rate
+product from 2^64 to zero and was accepted. The new decoder rejects it through
+the existing unsupported-codec path before allocating source PCM. This is an
+intentional malformed-dimension correction; skipping that work changes failure
+staging. The new permanent public decoder regression fails against the frozen
+batch 78 build with its expected rejection assertion. That runtime check
+observes acceptance; the empty output size follows from the separately reviewed
+original arithmetic. Fourteen fixture lines cover the input and runner entry.
+No allocation, speed, arbitrary mutable-alias, fault or all-codec claim is made.
+
+Original complete drafts and independent peers remain sealed, with separate
+fresh scoped authority against committed/frozen batch 78. The combined change
+removes four production lines: one architecture and three native-format lines.
+SequenceVM and neutral exports remain. Adjacent bounded sequence reviews retain
+the distinct instrument selectors, optional no-replacement preparation boundary,
+stream validation count and required asset-recipe declaration.
+
+336 warning-free Release steps and all 44 CTest suites pass. Fresh original
+and expanded comparisons against committed batch 78 preserve all 252 original
+results/3,922 artifacts and all 894 expanded exports/858 artifacts. All 73 raw inventories match exactly; no classification is needed.
+Expected failed conversions and partial outputs remain identified. All original
+payloads and linked pending/completed removal journals were fully verified before
+the expanded replay; all source trees, archives, shell and pinned records were
+verified through commit. The earlier disk-interrupted78 attempt stays preserved.
+Shell SHA-256: `4a5c4b174fc369d3ab6f77d68e5594582100bac71bbca3fec36e638bfb55fc1d`. Records under `/tmp/vgmtrans-cleanup2` include
+`sample-dimensions79-root-cold-review.json` and `pass79-final-root-review.json`.
+The branch now removes 1,633 net value lines: 1,284 architecture and
+349 native-format lines, plus the earlier 22 UI lines. The audit continues.
