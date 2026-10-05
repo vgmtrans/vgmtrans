@@ -484,7 +484,7 @@ SequenceProgram parseSequence(ByteReader reader, AssetId id, const SequenceLayou
   if (sourceMap != nullptr) {
     sourceMap->table("Song Table", reader.range(0, layout.tableSize))
         .kind("tamsoft-ps1-song-table")
-        .owner(ObjectRefs::sequence(id));
+        .owner(ObjectRefs::asset(id));
   }
   SequenceDecodeSession sequence(reader, config, id, reader.range(songEntry, kSongEntrySize), sourceMap,
                                  kMaximumCommands);
@@ -496,7 +496,7 @@ SequenceProgram parseSequence(ByteReader reader, AssetId id, const SequenceLayou
   if (sourceMap != nullptr && layout.headerSize != 0) {
     sourceMap->table("Track Records", reader.range(layout.headerOffset, layout.headerSize))
         .kind("tamsoft-ps1-track-records")
-        .owner(ObjectRefs::sequence(id));
+        .owner(ObjectRefs::asset(id));
   }
 
   for (u32 number = 0; number < seeds.size(); ++number) {

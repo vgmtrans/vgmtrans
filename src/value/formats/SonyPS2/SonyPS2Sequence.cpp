@@ -988,7 +988,7 @@ SequenceProgram parseMidiSequence(ByteReader reader, AssetId id, const MidiBlock
   if (sourceMap != nullptr) {
     sourceMap->header("SonyPS2 MIDI data block", reader.range(layout.offset, layout.dataOffset - layout.offset))
         .kind("sony-ps2-midi-header")
-        .owner(ObjectRefs::sequence(id))
+        .owner(ObjectRefs::asset(id))
         .fieldsAsChildren()
         .field("sequence_offset", reader.range(layout.offset, 4), layout.dataOffset - layout.offset,
                SourceValueDisplay::Address)
@@ -1184,7 +1184,7 @@ std::optional<SequenceProgram> parseSongSequence(ByteReader reader, AssetId id, 
   if (sourceMap != nullptr) {
     sourceMap->header("SonyPS2 Song table", reader.range(songOffset, songEnd - songOffset))
         .kind("sony-ps2-song-table")
-        .owner(ObjectRefs::sequence(id));
+        .owner(ObjectRefs::asset(id));
   }
   program.timebase.ppqn = song.ppqn.value_or(program.timebase.ppqn);
   program.sectionPlaylist = std::move(song.playlist);

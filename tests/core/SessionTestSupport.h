@@ -52,7 +52,7 @@ namespace {
   SourceMapBuilder sourceMap([&input]() { return input.ids.nextSourceAnnotationId(); });
   auto root = sourceMap.annotation(SourceRole::Sequence, input.source.name, assetRange)
                   .kind("probe-sequence")
-                  .owner(ObjectRefs::sequence(assetId));
+                  .owner(ObjectRefs::asset(assetId));
   sourceMap.header("Header", input.reader.range(0, 1)).kind("probe-header").parent(root.id());
 
   SequenceProgramAsset sequence{
@@ -93,7 +93,7 @@ namespace {
   ScanResultBuilder out(input, "ProbeMisc");
   const SourceRange range = input.reader.range(0, input.reader.size());
   const auto asset = out.misc(input.source.name, range);
-  out.sourceMap().annotation(SourceRole::Payload, input.source.name, range).owner(ObjectRefs::misc(asset));
+  out.sourceMap().annotation(SourceRole::Payload, input.source.name, range).owner(ObjectRefs::asset(asset));
   return out.finish();
 }
 
@@ -113,12 +113,12 @@ namespace {
   auto sequence = out.sequence("Declared Sequence", input.reader.range(0, 1)).program(probeSequenceProgram());
   out.sourceMap()
       .header("Probe Header", input.reader.range(0, 1))
-      .owner(ObjectRefs::sequence(sequence.id()))
+      .owner(ObjectRefs::asset(sequence.id()))
       .field("Magic", input.reader.range(0, 1), input.reader.u8At(0), SourceValueDisplay::Hex);
   if (input.reader.size() > 1) {
     out.sourceMap()
         .annotation(SourceRole::Payload, "Probe Payload", input.reader.range(1, input.reader.size() - 1))
-        .owner(ObjectRefs::sequence(sequence.id()));
+        .owner(ObjectRefs::asset(sequence.id()));
   }
   sequence.collectionName(input.source.name);
   return out.finish();
@@ -166,7 +166,7 @@ struct ProbeBankData {
       .range = input.reader.range(0, input.reader.size()),
       .role = SourceRole::Sequence,
       .label = input.source.name,
-      .owner = ObjectRefs::sequence(assetId),
+      .owner = ObjectRefs::asset(assetId),
   }}};
   return result;
 }

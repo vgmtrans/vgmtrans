@@ -40,7 +40,7 @@ namespace {
   const auto sequenceTable = result.misc("Sequence Table", sequenceTableRange);
   const SourceAnnotationId sequenceTableRoot = result.sourceMap()
                                                    .table("Sequence Table", sequenceTableRange)
-                                                   .owner(ObjectRefs::misc(sequenceTable))
+                                                   .owner(ObjectRefs::asset(sequenceTable))
                                                    .kind("konami-tmnt2-sequence-table")
                                                    .id();
   const SourceAnnotationId pointerTable = result.sourceMap()
@@ -70,7 +70,7 @@ namespace {
                                     &result.diagnostics()));
     const SourceAnnotationId trackTable = result.sourceMap()
                                               .entry(sourceSequence.name + " Track Table", sourceSequence.trackTable)
-                                              .owner(ObjectRefs::misc(sequenceTable))
+                                              .owner(ObjectRefs::asset(sequenceTable))
                                               .parent(sequenceTableRoot)
                                               .kind("konami-tmnt2-sequence-track-table")
                                               .id();

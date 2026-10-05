@@ -118,7 +118,7 @@ void annotateArticulationTable(SourceMapBuilder& sourceMap, ByteReader reader, c
     const SourceRange range = input.reader.range(offset, size);
     const auto misc = result.misc(name, range);
     const SourceAnnotationId table =
-        result.sourceMap().table(name, range).owner(ObjectRefs::misc(misc)).kind(kind).id();
+        result.sourceMap().table(name, range).owner(ObjectRefs::asset(misc)).kind(kind).id();
     miscAssets.push_back(misc);
     return table;
   };

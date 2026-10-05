@@ -682,7 +682,7 @@ SequenceProgram parseNdsSequenceProgram(ByteReader reader, AssetId id, NdsSequen
   if (sourceMap != nullptr && reader.has(sequenceOffset, kSseqHeaderSize)) {
     sourceMap->header("SSEQ Header", reader.range(sequenceOffset, kSseqHeaderSize))
         .kind("sseq-header")
-        .owner(ObjectRefs::sequence(id))
+        .owner(ObjectRefs::asset(id))
         .field("data_offset", reader.range(sequenceOffset + kSseqDataOffsetField, 4),
                sequenceOffset + reader.le32(sequenceOffset + kSseqDataOffsetField), SourceValueDisplay::Address);
   }

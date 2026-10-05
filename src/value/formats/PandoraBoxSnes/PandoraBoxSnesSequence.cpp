@@ -603,7 +603,7 @@ void annotateHeader(ByteReader reader, const Layout& layout, AssetId sequenceId,
              SourceValueDisplay::Address);
   auto echo = sourceMap.table("DSP Echo Configuration", reader.range(header + 0x20, 0x0c))
                   .kind("pandora-box-snes-echo-config")
-                  .owner(ObjectRefs::sequence(sequenceId))
+                  .owner(ObjectRefs::asset(sequenceId))
                   .parent(annotation);
   echo.fieldsAsChildren()
       .field("master_volume", reader.range(header + 0x20, 1), reader.s8At(header + 0x20),

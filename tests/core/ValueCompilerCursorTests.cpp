@@ -765,7 +765,7 @@ void trackDecodeSourceHierarchyDistinguishesTrackedAndTracklessFormats() {
     for (const bool hasParent : {false, true}) {
       SourceMapBuilder sourceMap;
       const auto parent = hasParent ? std::optional{sourceMap.section("Pattern", reader.range(0, 1))
-                                                       .owner(ObjectRefs::sequence(asset)).id()}
+                                                       .owner(ObjectRefs::asset(asset)).id()}
                                     : std::nullopt;
       TrackDecodeScope scope{
           .reader = reader,
@@ -786,7 +786,7 @@ void trackDecodeSourceHierarchyDistinguishesTrackedAndTracklessFormats() {
         expect(annotations.get(program.annotation).parent == parent && !command->owner,
                "a source track should retain its optional parent and own its commands");
       } else {
-        const auto owner = hasParent ? std::nullopt : std::optional{ObjectRefs::sequence(asset)};
+        const auto owner = hasParent ? std::nullopt : std::optional{ObjectRefs::asset(asset)};
         expect(annotations.withRole(reader.source(), SourceRole::SequenceTrack).empty() && command->owner == owner,
                "trackless commands should inherit from a parent or own the sequence directly at the root");
       }

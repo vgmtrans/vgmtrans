@@ -245,7 +245,7 @@ void publishSongs(ScanResultBuilder& result, const SequenceLayout& layout, const
     const auto name = fmt::format("{} Song {} table", result.sourceDisplayName(), song);
     const auto range = reader.range(*entry, end - *entry);
     const auto misc = result.misc(name, range);
-    result.sourceMap().table(name, range).kind("sony-ps2-song-table").owner(ObjectRefs::misc(misc));
+    result.sourceMap().table(name, range).kind("sony-ps2-song-table").owner(ObjectRefs::asset(misc));
   }
   if (!foundPlayableSong) {
     std::fill(publishMidi.begin(), publishMidi.end(), true);
@@ -285,7 +285,7 @@ void publishSeSequences(ScanResultBuilder& result, const SequenceLayout& layout)
     const auto name = fmt::format("{} SeSong tables", result.sourceDisplayName());
     const auto range = reader.range(layout.seSongs->offset, layout.seSongs->size);
     const auto misc = result.misc(name, range);
-    result.sourceMap().table(name, range).kind("sony-ps2-sesong-tables").owner(ObjectRefs::misc(misc));
+    result.sourceMap().table(name, range).kind("sony-ps2-sesong-tables").owner(ObjectRefs::asset(misc));
     result.warning("SonyPS2 SeSong playback tables remain source-only", range);
   }
 }

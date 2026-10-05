@@ -1192,7 +1192,7 @@ SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetI
     const SourceAnnotationId root = sourceMap != nullptr
                                         ? sourceMap->header("Sound Effect", header)
                                               .kind("mori-snes-sfx")
-                                              .owner(ObjectRefs::sequence(sequenceId))
+                                              .owner(ObjectRefs::asset(sequenceId))
                                               .id()
                                         : SourceAnnotationId{};
     SequenceProgram program = sequenceConfig(layout.traits).makeProgram();

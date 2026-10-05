@@ -1394,7 +1394,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, SectionPla
   program.behavior.initialPitchBendRangeSemitones = 24;
   if (config.sfx && sourceMap) {
     parent = sourceMap->header("SFX Section", reader.range(layout.playlistAddress, layout.trackCount() * 2))
-                 .owner(ObjectRefs::sequence(sequenceId)).id();
+                 .owner(ObjectRefs::asset(sequenceId)).id();
   }
   const TrackDecodeScope scope{.reader = reader,
                                .maxCommands = 32768,

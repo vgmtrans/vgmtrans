@@ -232,9 +232,9 @@ void scanResultBuilderInfersSequenceRangesUnlessExplicit() {
   for (const SourceRange bounds : {SourceRange{}, reader.range(12, 0), reader.range(12, 2)}) {
     ScanResultBuilder out(input, "RangeProbe");
     auto sequence = out.sequence("Sequence", bounds);
-    auto header = out.sourceMap().header("Header", reader.range(10, 4)).owner(ObjectRefs::sequence(sequence.id()));
+    auto header = out.sourceMap().header("Header", reader.range(10, 4)).owner(ObjectRefs::asset(sequence.id()));
     out.sourceMap().table("Track pointers", reader.range(2, 2)).parent(header.id());
-    out.sourceMap().header("Another sequence", reader.range(0, 32)).owner(ObjectRefs::sequence(AssetId{99}));
+    out.sourceMap().header("Another sequence", reader.range(0, 32)).owner(ObjectRefs::asset(AssetId{99}));
     out.sourceMap().table("Foreign source", SourceRange{.source = SourceId{8}, .size = 32}).parent(header.id());
     const SourceCommand command{.range = reader.range(20, 2)};
     sequence.program(SequenceProgram{.tracks = {TrackProgram{.commands = {command}}}});
@@ -255,7 +255,7 @@ void scanResultBuilderChecksAllDraftsBeforeConsumingValues() {
   bank.instruments().append(Instrument{.name = "Retained Instrument"});
   auto sequence = out.sequence("Incomplete Sequence");
   const auto misc = out.misc("Retained Misc", input.reader.range(0, 1));
-  const auto annotation = out.sourceMap().table("Retained Misc", input.reader.range(0, 1)).owner(ObjectRefs::misc(misc));
+  const auto annotation = out.sourceMap().table("Retained Misc", input.reader.range(0, 1)).owner(ObjectRefs::asset(misc));
   sequence.collectionName("Broken");
 
   expectThrows<std::logic_error>([&] { static_cast<void>(out.finish()); },
@@ -270,7 +270,7 @@ void scanResultBuilderChecksAllDraftsBeforeConsumingValues() {
              std::get<MiscAsset>(result.assets[2]).metadata.id == misc &&
              std::get<MiscAsset>(result.assets[2]).metadata.name == "Retained Misc" &&
              std::get<MiscAsset>(result.assets[2]).metadata.range == input.reader.range(0, 1) &&
-             result.sourceMap.ownedBy(ObjectRefs::misc(misc)) == std::vector{annotation.id()},
+             result.sourceMap.ownedBy(ObjectRefs::asset(misc)) == std::vector{annotation.id()},
          "a missing sequence program must leave audio drafts and published misc metadata intact for repair");
 }
 

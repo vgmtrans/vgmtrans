@@ -626,7 +626,7 @@ SequenceProgram parseSegSatSequence(ByteReader reader, AssetId id, const SegSatS
   if (sourceMap != nullptr) {
     auto annotation = sourceMap->header("SegSat Sequence Header", reader.range(layout.offset, 8))
                           .kind("segsat-sequence-header")
-                          .owner(ObjectRefs::sequence(id))
+                          .owner(ObjectRefs::asset(id))
                           .field("ppqn", reader.range(layout.offset, 2), layout.ppqn)
                           .field("tempo_event_count", reader.range(layout.offset + 2, 2), layout.tempoEventCount)
                           .field("normal_track_relative", reader.range(layout.offset + 4, 2), layout.normalTrack,

@@ -55,7 +55,7 @@ ScanResult scanProbe(const ScanInput& input, bool emptyBank) {
   auto sequence = result.sequence("Probe sequence", input.reader.range(0, 1));
   const auto root = result.sourceMap()
                         .annotation(SourceRole::Sequence, "Sequence", input.reader.range(0, 1))
-                        .owner(ObjectRefs::sequence(sequence.id()));
+                        .owner(ObjectRefs::asset(sequence.id()));
   const auto note = result.sourceMap()
                         .command("Note", input.reader.range(0, 1), SequenceSemantic::Note)
                         .parent(root.id())

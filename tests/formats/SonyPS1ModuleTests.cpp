@@ -197,7 +197,7 @@ void sonyPs1SequenceSupportsBothLoopCountGenerations() {
              std::ranges::all_of(modernCommands,
                                  [&](SourceAnnotationId id) {
                                    const SourceAnnotation& command = modernAnnotations.get(id);
-                                   return !command.parent && command.owner == ObjectRefs::sequence(AssetId{81});
+                                   return !command.parent && command.owner == ObjectRefs::asset(AssetId{81});
                                  }),
          "SonyPS1 source events should be sequence-owned roots rather than children of a synthetic track");
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);

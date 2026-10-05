@@ -140,7 +140,7 @@ using namespace core;
                                         .size = static_cast<u32>(last - first),
                                     })
                            .kind("nin-snes-playlist")
-                           .owner(ObjectRefs::sequence(sequenceId))
+                           .owner(ObjectRefs::asset(sequenceId))
                            .id();
 
   for (auto& command : decoded.playlist.commands) {
@@ -170,7 +170,7 @@ using namespace core;
     auto annotation = sourceMap->header("Section", reader.range(address, trackCount * 2))
                           .kind("nin-snes-section")
                           .parent(*decoded.annotation)
-                          .owner(ObjectRefs::sequence(sequenceId));
+                          .owner(ObjectRefs::asset(sequenceId));
     for (u8 track = 0; track < trackStarts.size(); ++track) {
       const SourceRange range = reader.range(address + track * 2, 2);
       if (trackStarts[track]) {

@@ -459,7 +459,7 @@ void scannerBuildsTunedSynthAndCollection() {
   });
   const auto note =
       std::ranges::find_if(commands, [&](SourceAnnotationId id) { return sourceMap.get(id).range.offset == 0x6000; });
-  expect(header != headers.end() && sourceMap.get(*header).owner == ObjectRefs::sequence(sequence->metadata.id) &&
+  expect(header != headers.end() && sourceMap.get(*header).owner == ObjectRefs::asset(sequence->metadata.id) &&
              table != tables.end() &&
              sourceMap.get(*table).range == SourceRange{.source = source, .offset = 0x5000, .size = 4} &&
              std::ranges::count_if(pointers,

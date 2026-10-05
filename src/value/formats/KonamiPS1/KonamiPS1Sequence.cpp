@@ -759,7 +759,7 @@ SequenceProgram parseKonamiPs1Sequence(ByteReader reader, AssetId id, const Sequ
   if (sourceMap != nullptr && layout.hasKdt2Header) {
     sourceMap->header("KDT2 Container Header", reader.range(layout.containerOffset, 0x10))
         .kind("konami-ps1-kdt2-header")
-        .owner(ObjectRefs::sequence(id))
+        .owner(ObjectRefs::asset(id))
         .fieldsAsChildren()
         .field("signature", reader.range(layout.containerOffset, 4), reader.le32(layout.containerOffset),
                SourceValueDisplay::Hex)

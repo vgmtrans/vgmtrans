@@ -618,7 +618,7 @@ SequenceProgram parseSuzukiPs1Sequence(ByteReader reader, AssetId id, const Suzu
   if (sourceMap != nullptr) {
     sourceMap->table("Track Pointers", reader.range(layout.offset + 0x22, layout.trackCount * 2))
         .kind("suzuki-ps1-track-pointers")
-        .owner(ObjectRefs::sequence(id));
+        .owner(ObjectRefs::asset(id));
   }
 
   for (u32 i = 0; i < layout.trackAddresses.size(); ++i) {

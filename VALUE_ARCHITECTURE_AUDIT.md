@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Seventy-nine validated batches remove 1,633 net production lines
+`cb9e0b766`. Eighty validated batches remove 1,643 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 79 replays both corpora against its
-committed batch 78 predecessor. All 73 expanded raw inventories match exactly;
+cover 37 of 38 registered families. Batch 80 replays both corpora against its
+committed batch 79 predecessor. All 73 expanded raw inventories match exactly;
 no classification is needed. The cleanup2 records appear at the end of this
 document.
 
@@ -12173,3 +12173,38 @@ Shell SHA-256: `4a5c4b174fc369d3ab6f77d68e5594582100bac71bbca3fec36e638bfb55fc1d
 `sample-dimensions79-root-cold-review.json` and `pass79-final-root-review.json`.
 The branch now removes 1,633 net value lines: 1,284 architecture and
 349 native-format lines, plus the earlier 22 UI lines. The audit continues.
+
+## Cleanup2 batch 80 — one reference spelling for a whole asset
+
+Use `ObjectRefs::asset(id)` for whole-asset ownership. Remove the overlapping
+`sequence`/`misc` factories and their `ObjectKind` entries; concrete asset typing
+already lives in the `Asset` variant. RareSnes and SoftCreatSnes already used
+generic roots. Format authors now choose only between an asset and an actual
+subobject. All track, instrument, region, sample and instrument-selector kinds
+remain, including their numeric values through the `SequenceTrack = 2` anchor.
+
+Twenty-nine production calls in 20 files and 35 fixture calls migrate in place.
+The snapshot fixture compares its complete optional owner to the selected asset.
+Asset-ID ownership inheritance, admission, inspection and removal stay intact;
+Qt retains its actual track/instrument/sample decisions. Annotation nodes, source
+fields, ranges, roles, categories, IDs, ordering and playback computations remain.
+The 34-path change removes ten architecture lines and adds no helper or owner.
+
+This deliberately narrows public root-kind metadata, exact `ObjectRef` equality,
+`ownedBy` queries and possible mixed-root link-target distinctions. Users of the
+removed enum/factory names or factory addresses must migrate. It is not universal
+raw source-information parity or an external-client ABI claim. The original cold78
+draft and separate current79 peer remain immutable; current79 authority records the two
+unrelated companion changes. No lifetime/allocation stage moves or performance
+guarantee is claimed. SequenceVM and neutral exports remain.
+
+372 warning-free Release steps and all 44 CTest suites pass. Fresh comparisons
+against committed batch 79 preserve all 252 original results/3,922 files and all
+894 expanded exports/858 files. All 73 raw inventories match exactly; no classification is needed. Expected failures and partial outputs
+remain identified. All retained original payloads and 504 linked removal journals
+were verified before the expanded replay; source trees, archives, shell and proof
+records match through commit. Shell SHA-256: `63c959ed305cfcb928295ef1af0f082c0f508cb7b052d1107af4725e18b65499`.
+Records include `whole-asset-object-ref80-root-cold-review.json` and
+`pass80-final-root-review.json` under `/tmp/vgmtrans-cleanup2`.
+The branch removes 1,643 net value lines: 1,294 architecture and 349
+native-format lines, plus the earlier 22 UI lines. The audit continues.

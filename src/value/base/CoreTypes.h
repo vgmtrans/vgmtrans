@@ -50,14 +50,12 @@ using CommandId = Id<CommandIdTag>;
 
 enum class ObjectKind : u8 {
   Asset,
-  Sequence,
-  SequenceTrack,
+  SequenceTrack = 2,
   Instrument,
   Region,
   Sample,
   InstrumentIndex,
   InstrumentProgram,
-  Misc,
 };
 
 struct ObjectRef {
@@ -73,10 +71,6 @@ namespace ObjectRefs {
 
 [[nodiscard]] inline ObjectRef asset(AssetId asset) {
   return ObjectRef{.kind = ObjectKind::Asset, .asset = asset};
-}
-
-[[nodiscard]] inline ObjectRef sequence(AssetId sequenceAsset) {
-  return ObjectRef{.kind = ObjectKind::Sequence, .asset = sequenceAsset};
 }
 
 [[nodiscard]] inline ObjectRef sequenceTrack(AssetId sequenceAsset, u32 trackIndex) {
@@ -106,10 +100,6 @@ namespace ObjectRefs {
 
 [[nodiscard]] inline ObjectRef sample(AssetId sampleSetAsset, u32 sampleIndex) {
   return ObjectRef{.kind = ObjectKind::Sample, .asset = sampleSetAsset, .index0 = sampleIndex};
-}
-
-[[nodiscard]] inline ObjectRef misc(AssetId miscAsset) {
-  return ObjectRef{.kind = ObjectKind::Misc, .asset = miscAsset};
 }
 
 }  // namespace ObjectRefs

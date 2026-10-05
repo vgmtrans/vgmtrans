@@ -1129,7 +1129,7 @@ void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView() {
   });
   expect(header != sequenceHeaders.end(), "Akao source map should expose the sequence header annotation");
   const SourceAnnotation& sequenceHeader = project.sourceMap().get(*header);
-  expect(sequenceHeader.owner == ObjectRefs::sequence(sequenceId),
+  expect(sequenceHeader.owner == ObjectRefs::asset(sequenceId),
          "Akao sequence header annotation should point at the semantic sequence asset");
   const auto trackAnnotations = project.sourceMap().withRole(SourceId{0}, SourceRole::SequenceTrack);
   expect(!trackAnnotations.empty(), "Akao source map should expose decoded track annotations");

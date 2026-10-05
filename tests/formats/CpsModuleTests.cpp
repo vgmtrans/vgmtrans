@@ -504,7 +504,7 @@ const MiscAsset& miscAt(const ScanResult& result, u64 offset, u64 size) {
 }
 
 const SourceAnnotation& miscRoot(const ScanResult& result, const MiscAsset& misc, std::string_view kind) {
-  const auto roots = result.sourceMap.ownedBy(ObjectRefs::misc(misc.metadata.id));
+  const auto roots = result.sourceMap.ownedBy(ObjectRefs::asset(misc.metadata.id));
   expect(roots.size() == 1, "misc asset should have exactly one explicitly owned annotation root");
   const auto& root = result.sourceMap.get(roots.front());
   expect(root.role == SourceRole::Table && root.category() == kind && root.range == misc.metadata.range,

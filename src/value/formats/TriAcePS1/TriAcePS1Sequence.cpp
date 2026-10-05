@@ -768,7 +768,7 @@ SequenceProgram parseTriAcePs1Sequence(ByteReader reader, AssetId id, const TriA
   if (sourceMap != nullptr) {
     sourceMap->table("Track Records", reader.range(layout.offset + 0x16, 32 * 6))
         .kind("triace-ps1-track-records")
-        .owner(ObjectRefs::sequence(id));
+        .owner(ObjectRefs::asset(id));
     for (const auto& track : layout.tracks) {
       sourceMap->table("Pattern Playlist", reader.range(track.playlistOffset, track.playlistLength))
           .kind("triace-ps1-pattern-playlist")

@@ -559,10 +559,10 @@ SequenceProgram parseSequence(ByteReader reader, AssetId id, const SequenceLayou
   if (sourceMap != nullptr) {
     sourceMap->table("Duration Table", reader.range(layout.offset + 0x10, 0x40))
         .kind("hosa-duration-table")
-        .owner(ObjectRefs::sequence(id));
+        .owner(ObjectRefs::asset(id));
     sourceMap->table("Track Pointers", reader.range(layout.offset + 0x50, layout.tracks.size() * 2))
         .kind("hosa-track-pointers")
-        .owner(ObjectRefs::sequence(id));
+        .owner(ObjectRefs::asset(id));
   }
 
   for (u32 i = 0; i < layout.tracks.size(); ++i) {

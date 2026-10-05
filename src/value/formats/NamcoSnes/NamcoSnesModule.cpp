@@ -107,7 +107,7 @@ void addSongTables(ScanResultBuilder& result, const Layout& layout, const std::s
   const SourceRange range = reader.range(begin, end - begin);
   const auto asset = result.misc("Song Tables", range);
   auto& sourceMap = result.sourceMap();
-  const ObjectRef owner = ObjectRefs::misc(asset);
+  const ObjectRef owner = ObjectRefs::asset(asset);
   const auto resources = sourceMap.table("Resource Pointers", reader.range(begin, 8)).owner(owner).id();
   pointer(reader, sourceMap, "Amplitude Envelopes Pointer", begin).parent(resources);
   pointer(reader, sourceMap, "Pitch Envelopes Pointer", begin + 2).parent(resources);
@@ -128,7 +128,7 @@ void addSongTables(ScanResultBuilder& result, const Layout& layout, const std::s
       entry.owner(owner);
     } else {
       const auto entryAsset = result.misc("Song Entry", entryRange);
-      entry.owner(ObjectRefs::misc(entryAsset));
+      entry.owner(ObjectRefs::asset(entryAsset));
       sequence.includeMisc(entryAsset);
     }
     pointer(reader, sourceMap, "Event Data Pointer", entryRange.offset).parent(entry.id());

@@ -547,7 +547,7 @@ SequenceProgram parseHeartBeatPs1Sequence(ByteReader reader, AssetId id, const H
     auto soundHeader =
         sourceMap->header("HeartBeatPS1 Sound Header", reader.range(layout.containerOffset, 0x3c))
             .kind("heartbeat-ps1-sound-header")
-            .owner(ObjectRefs::sequence(id))
+            .owner(ObjectRefs::asset(id))
             .fieldsAsChildren()
             .field("sequence_size", reader.range(layout.containerOffset, 4), layout.dataEnd - layout.qQesOffset)
             .field("sequence_id", reader.range(layout.containerOffset + 4, 2), layout.sequenceId)
@@ -561,7 +561,7 @@ SequenceProgram parseHeartBeatPs1Sequence(ByteReader reader, AssetId id, const H
     }
     sourceMap->header("qQES Sequence Header", reader.range(layout.qQesOffset, 0x10))
         .kind("heartbeat-ps1-sequence-header")
-        .owner(ObjectRefs::sequence(id))
+        .owner(ObjectRefs::asset(id))
         .fieldsAsChildren()
         .field("signature", reader.range(layout.qQesOffset, 4), reader.le32(layout.qQesOffset), SourceValueDisplay::Hex)
         .field("version", reader.range(layout.qQesOffset + 4, 2), layout.version)

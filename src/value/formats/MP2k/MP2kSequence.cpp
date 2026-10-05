@@ -808,7 +808,7 @@ SequenceProgram parseMp2kSequenceProgram(RetainedSource source, AssetId id, cons
   if (sourceMap && reader.has(song.offset, headerSize)) {
     auto annotation = sourceMap->header("MP2k Song Header", reader.range(song.offset, headerSize))
                           .kind("mp2k-song-header")
-                          .owner(ObjectRefs::sequence(id))
+                          .owner(ObjectRefs::asset(id))
                           .field("track_count", reader.range(song.offset, 1), song.declaredTracks)
                           .field("block_count", reader.range(song.offset + 1, 1), reader.u8At(song.offset + 1))
                           .field("priority", reader.range(song.offset + 2, 1), reader.u8At(song.offset + 2))

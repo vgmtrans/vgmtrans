@@ -125,7 +125,7 @@ TrackProgram TrackDecodeSession::finish() {
     span.include(decoded.range);
     const SourceAnnotationId annotation = projectDecodedCommand(sourceMap_, decoded, commandParent_);
     if (sourceMap_ != nullptr && annotation.valid() && rootSequenceAsset_) {
-      AnnotationBuilder{*sourceMap_, annotation}.owner(ObjectRefs::sequence(*rootSequenceAsset_));
+      AnnotationBuilder{*sourceMap_, annotation}.owner(ObjectRefs::asset(*rootSequenceAsset_));
     }
     track.commands.push_back(SourceCommand{
         .opcode = decoded.opcode,
@@ -161,7 +161,7 @@ SequenceDecodeSession::SequenceDecodeSession(ByteReader reader, const SequencePr
 
   header_ = tracks_.sourceMap->header("Sequence Header", headerRange)
                 .kind(sourceKindPrefix_ + "-sequence-header")
-                .owner(ObjectRefs::sequence(sequenceAsset));
+                .owner(ObjectRefs::asset(sequenceAsset));
 }
 
 AnnotationBuilder SequenceDecodeSession::trackPointer(u32 trackIndex, SourceRange pointerRange, u32 startOffset,

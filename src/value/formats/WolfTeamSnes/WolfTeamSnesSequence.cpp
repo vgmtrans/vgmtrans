@@ -995,7 +995,7 @@ SequenceProgram decodeSequence(ByteReader reader, const Layout& layout, AssetId 
         ->field("Tempo/Timing", reader.range(layout.sequenceHeaderAddress + 0x22, 1),
                 reader.u8At(layout.sequenceHeaderAddress + 0x22))
         .kind("wolf-team-snes-header-tempo")
-        .owner(ObjectRefs::sequence(sequenceId))
+        .owner(ObjectRefs::asset(sequenceId))
         .parent(header.id());
   }
 

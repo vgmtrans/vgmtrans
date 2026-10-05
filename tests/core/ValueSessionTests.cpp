@@ -100,7 +100,7 @@ void sessionScansValuesAndDerivedSources() {
   const auto sequenceAnnotations = sourceMap.withRole(snapshot.sources()[1].id, SourceRole::Sequence);
   expect(sequenceAnnotations.size() == 1, "sequence should expose a source-root annotation");
   const SourceAnnotation& sequenceRoot = sourceMap.get(sequenceAnnotations.front());
-  expect(sequenceRoot.owner == ObjectRefs::sequence(sequence->metadata.id),
+  expect(sequenceRoot.owner == ObjectRefs::asset(sequence->metadata.id),
          "sequence root annotation should point at the semantic sequence asset");
   const auto rootChildren = sourceMap.childrenOf(sequenceRoot.id);
   expect(rootChildren.size() == 1, "source annotations should preserve parent-child relationships");
@@ -165,7 +165,7 @@ void sessionRoutesKnownFormatsAndConsumesExtractedParents() {
         ScanResultBuilder out(input, "Target");
         const auto range = input.reader.range(0, 1);
         const auto asset = out.misc("Target Asset", range);
-        out.sourceMap().annotation(SourceRole::Payload, "Target Asset", range).owner(ObjectRefs::misc(asset));
+        out.sourceMap().annotation(SourceRole::Payload, "Target Asset", range).owner(ObjectRefs::asset(asset));
         return out.finish();
       },
   });
@@ -238,7 +238,7 @@ void sessionScansApplicableFormatsConcurrently() {
               ScanResultBuilder out(input, name);
               const SourceRange range = input.reader.range(0, 1);
               const auto asset = out.misc(name, range);
-              out.sourceMap().annotation(SourceRole::Payload, name, range).owner(ObjectRefs::misc(asset));
+              out.sourceMap().annotation(SourceRole::Payload, name, range).owner(ObjectRefs::asset(asset));
               completed.fetch_add(1, std::memory_order_relaxed);
               return out.finish();
             },
@@ -1173,8 +1173,8 @@ void sessionKeepsSequenceCollectionsWhenSupplementalAssetsDisappear() {
           if (wrongType) {
             sequence.includeMisc(sequence.id());
           }
-          out.sourceMap().header("Sequence", input.reader.range(0, 1)).owner(ObjectRefs::sequence(sequence.id()));
-          out.sourceMap().header("Table", input.reader.range(0, 1)).owner(ObjectRefs::misc(misc));
+          out.sourceMap().header("Sequence", input.reader.range(0, 1)).owner(ObjectRefs::asset(sequence.id()));
+          out.sourceMap().header("Table", input.reader.range(0, 1)).owner(ObjectRefs::asset(misc));
           return out.finish();
         }});
     session.addSource(SourceFile{.name = "supplemental.bin"}, {0});

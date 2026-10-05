@@ -447,7 +447,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const auto* sequenceHeader = annotationWithKind(sourceMap, source, SourceRole::Header, "capcom-snes-sequence-header");
   expect(sequenceHeader != nullptr && sequenceHeader->range.offset == 0x2001 && sequenceHeader->range.size == 16,
          "CapcomSnes scan should annotate the sequence header");
-  expect(sequenceHeader->owner == ObjectRefs::sequence(sequence->metadata.id),
+  expect(sequenceHeader->owner == ObjectRefs::asset(sequence->metadata.id),
          "sequence header annotation should point at the semantic sequence asset");
   const auto* trackPointer = annotationWithKind(sourceMap, source, SourceRole::Pointer, "capcom-snes-track-pointer");
   const auto trackPointers = sourceMap.withRole(source, SourceRole::Pointer);

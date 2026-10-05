@@ -313,7 +313,7 @@ void sessionStateScrubsCrossSourceObjectLinks() {
       .sourceMap = SourceMap{{SourceAnnotation{
           .id = SourceAnnotationId{1},
           .range = SourceRange{.source = firstSource, .offset = 0, .size = 1},
-          .owner = ObjectRefs::misc(AssetId{1}),
+          .owner = ObjectRefs::asset(AssetId{1}),
       }}},
   });
   state.appendScan(ScanResult{
@@ -325,10 +325,10 @@ void sessionStateScrubsCrossSourceObjectLinks() {
       .sourceMap = SourceMap{{SourceAnnotation{
           .id = SourceAnnotationId{2},
           .range = SourceRange{.source = secondSource, .offset = 0, .size = 1},
-          .owner = ObjectRefs::misc(AssetId{2}),
+          .owner = ObjectRefs::asset(AssetId{2}),
           .links = {SourceLink{
               .role = SourceLinkRole::Related,
-              .target = ObjectRefs::misc(AssetId{1}),
+              .target = ObjectRefs::asset(AssetId{1}),
           }},
       }}},
   });
@@ -359,24 +359,24 @@ void sourceMapParentTraversalHandlesBranchesAndCycles() {
   const AssetId firstAsset{0};
   const AssetId lastAsset{invalidIdValue - 1};
   SourceMapBuilder builder;
-  const auto owner = builder.annotation(SourceRole::Payload, "Owner", range).owner(ObjectRefs::misc(firstAsset)).id();
-  const auto branch = builder.section("Branch", range).parent(owner).owner(ObjectRefs::misc(AssetId{})).id();
+  const auto owner = builder.annotation(SourceRole::Payload, "Owner", range).owner(ObjectRefs::asset(firstAsset)).id();
+  const auto branch = builder.section("Branch", range).parent(owner).owner(ObjectRefs::asset(AssetId{})).id();
   const auto first = builder.entry("First", range).parent(branch).id();
   const auto second = builder.entry("Second", range).parent(branch).id();
-  const auto unowned = builder.annotation(SourceRole::Payload, "Unowned", range).owner(ObjectRefs::misc(AssetId{})).id();
+  const auto unowned = builder.annotation(SourceRole::Payload, "Unowned", range).owner(ObjectRefs::asset(AssetId{})).id();
   const auto child = builder.entry("Unowned child", range).parent(unowned).id();
   auto cycleA = builder.section("Cycle A", range);
   const auto cycleB = builder.section("Cycle B", range).parent(cycleA.id());
   cycleA.parent(cycleB.id());
   const auto cycleChild = builder.entry("Cycle child", range).parent(cycleB.id()).id();
-  auto self = builder.annotation(SourceRole::Payload, "Owned cycle", range).owner(ObjectRefs::misc(lastAsset));
+  auto self = builder.annotation(SourceRole::Payload, "Owned cycle", range).owner(ObjectRefs::asset(lastAsset));
   self.parent(self.id());
   const auto selfChild = builder.entry("Owned cycle child", range).parent(self.id()).id();
   const auto missing = builder.section("Missing parent", range).parent(SourceAnnotationId{99}).id();
   const auto missingChild = builder.entry("Missing parent's child", range).parent(missing).id();
   const auto map = builder.finish();
   std::vector<SourceAnnotation> annotations(map.annotations().begin(), map.annotations().end());
-  annotations.push_back(SourceAnnotation{.range = range, .owner = ObjectRefs::misc(firstAsset)});
+  annotations.push_back(SourceAnnotation{.range = range, .owner = ObjectRefs::asset(firstAsset)});
 
   for (int order = 0; order < 2; ++order) {
     ScanResult result{
@@ -447,13 +447,13 @@ void scanValidationRejectsCrossAssetAnnotationParents() {
               .id = SourceAnnotationId{1},
               .range = sources.reader(source).range(0, 1),
               .label = "First",
-              .owner = ObjectRefs::misc(AssetId{1}),
+              .owner = ObjectRefs::asset(AssetId{1}),
           },
           SourceAnnotation{
               .id = SourceAnnotationId{2},
               .range = sources.reader(source).range(1, 1),
               .label = "Second",
-              .owner = ObjectRefs::misc(AssetId{2}),
+              .owner = ObjectRefs::asset(AssetId{2}),
               .parent = SourceAnnotationId{1},
           },
       }},
@@ -485,7 +485,7 @@ void scanValidationChecksMemoizedInheritedOwnersIndependentOfAnnotationOrder() {
               .id = SourceAnnotationId{1},
               .range = assetRange,
               .label = "Owner",
-              .owner = ObjectRefs::misc(AssetId{1}),
+              .owner = ObjectRefs::asset(AssetId{1}),
           },
       }},
   };
@@ -557,8 +557,8 @@ void sessionSnapshotCarriesScannerSourceMap() {
   expect(headerIds.size() == 1, "session snapshot should publish scanner source annotations");
   const auto& header = snapshot.sourceMap().get(headerIds[0]);
   expect(header.label == "Probe Header", "session source map should preserve annotation labels");
-  expect(header.owner && header.owner->kind == ObjectKind::Sequence && snapshot.collections()[0].selection.sequence &&
-             header.owner->asset == *snapshot.collections()[0].selection.sequence,
+  expect(snapshot.collections()[0].selection.sequence &&
+             header.owner == ObjectRefs::asset(*snapshot.collections()[0].selection.sequence),
          "session source map should preserve annotation ownership");
   expect(header.fields.size() == 1 && std::get<u64>(header.fields[0].value) == 0xab,
          "session source map should preserve annotation fields");

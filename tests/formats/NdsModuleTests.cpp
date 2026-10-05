@@ -476,7 +476,7 @@ void ndsSequenceDecodesAndRendersNoteWaitCommands() {
          "NDS program source-link fixture should still decode program and end commands");
   const SourceMap programAnnotations = programSourceMap.finish();
   const auto* sseqHeader = annotationWithKind(programAnnotations, SourceId{4}, SourceRole::Header, "sseq-header");
-  expect(sseqHeader != nullptr && sseqHeader->owner == ObjectRefs::sequence(AssetId{7}),
+  expect(sseqHeader != nullptr && sseqHeader->owner == ObjectRefs::asset(AssetId{7}),
          "NDS SSEQ header annotation should point at the semantic sequence asset");
   const auto trackAnnotations = programAnnotations.withRole(SourceId{4}, SourceRole::SequenceTrack);
   expect(trackAnnotations.size() == 1, "NDS sequence parse should publish a track annotation");
