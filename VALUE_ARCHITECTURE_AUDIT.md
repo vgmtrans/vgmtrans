@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Eighty validated batches remove 1,643 net production lines
+`cb9e0b766`. Eighty-one validated batches remove 1,636 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 80 replays both corpora against its
-committed batch 79 predecessor. All 73 expanded raw inventories match exactly;
+cover 37 of 38 registered families. Batch 81 replays both corpora against its
+committed batch 80 predecessor. All 73 expanded raw inventories match exactly;
 no classification is needed. The cleanup2 records appear at the end of this
 document.
 
@@ -12208,3 +12208,36 @@ Records include `whole-asset-object-ref80-root-cold-review.json` and
 `pass80-final-root-review.json` under `/tmp/vgmtrans-cleanup2`.
 The branch removes 1,643 net value lines: 1,294 architecture and 349
 native-format lines, plus the earlier 22 UI lines. The audit continues.
+
+## Cleanup2 batch 81 — saturating MIDI timeline arithmetic
+
+Reuse the neutral timeline's `addTicks` rule in the MIDI writer. Guard the whole
+PPQN conversion before multiplication and saturate the remaining rounded sum;
+retain the existing quotient/remainder rounding. Its fractional numerator fits
+for all positive u32 source/target PPQN values. Source note endpoints and the
+one-output-tick minimum also saturate. When a positive note cannot advance beyond
+the last representable tick, keep its attack/release together in insertion order,
+using the existing zero-length output-note priority. Ordinary event ordering and
+the existing variable-length encoding policy remain.
+
+Four tiny public `encodeMidiFile` regressions fail independently against the frozen
+batch80 library: source-duration addition, minimum release tick, PPQN whole-part
+multiplication, and final fractional addition. All four pass against the rebuilt
+library. Permanent assertions use literal complete track payloads rather than
+reimplementing the conversion. This corrects extreme public inputs; it is not a
+native-corpus occurrence claim or a new strict-SMF admission policy. No new helper,
+owner, export setting or diagnostic policy is introduced. The change adds seven
+architecture lines and 28 meaningful fixture lines. It is a correctness addition,
+not a line-reduction claim. Pure endpoint computation moves before the attack
+push; no arbitrary allocator-fault or performance equivalence is claimed.
+
+48 warning-free Release steps and all 44 CTest suites pass. Fresh comparisons
+against committed batch80 preserve all 252 original results/3,922 files and all
+894 expanded exports/858 files. All 73 raw inventories match exactly; no classification is needed. Expected failures and partial output
+remain identified. All retained original payloads and 504 linked removal journals
+were verified before expanded replay. Complete sources, archives and shell match
+through commit. Shell SHA-256: `fc70288dcd528e2989a6c1b431ef35809ce9e3beb0cdd745687375caa0fcb888`.
+Records include `midi81-root-cold-review.json` and `pass81-final-root-review.json`
+under `/tmp/vgmtrans-cleanup2`. The branch removes 1,636 net value lines:
+1,287 architecture and 349 native-format lines, plus the earlier 22 UI
+lines. SequenceVM and export decoupling remain; the audit continues.

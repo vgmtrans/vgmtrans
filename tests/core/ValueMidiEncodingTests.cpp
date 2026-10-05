@@ -182,6 +182,33 @@ void midiExporterKeepsZeroDurationNotePairedAtSameTick() {
          "zero-duration notes should close before a following same-key attack");
 }
 
+void midiExporterSaturatesTimelineEndpoints() {
+  constexpr u64 lastTick = std::numeric_limits<u64>::max();
+  struct Case { Timebase timebase; u64 tick; u32 duration; u8 attackDeltaEnd; u8 releaseDelta; };
+  const std::array<Case, 4> cases{{
+      {{48}, lastTick - 2, 3, 0x7d, 2},
+      {{48}, lastTick, 1, 0x7f, 0},
+      {{1, 2}, u64{1} << 63, 0, 0x7f, 0},
+      {{2, 3}, 0xaaaaaaaaaaaaaaab, 0, 0x7f, 0},
+  }};
+  for (const auto& test : cases) {
+    const MidiSequence sequence{
+        .timebase = test.timebase,
+        .tracks = {MidiTrack{.events = {{.tick = test.tick,
+                                      .payload = NoteDuration{.key = 60, .velocity = 100,
+                                                              .duration = test.duration}}}}}};
+    const auto bytes = encodeMidiFile(sequence);
+    const std::vector<u8> expected{
+        0x81, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, test.attackDeltaEnd,
+        0x90, 0x3c, 0x64,
+        test.releaseDelta, 0x80, 0x3c, 0x40,
+        0x00, 0xff, 0x2f, 0x00,
+    };
+    expect(std::vector<u8>(bytes.begin() + 22, bytes.end()) == expected,
+           "MIDI tick conversion and note endpoints should saturate and keep clipped notes paired");
+  }
+}
+
 void midiExporterClampsSignedPitchBendBeforeBias() {
   const std::array<std::pair<s32, u16>, 11> cases{{
       {std::numeric_limits<s32>::min(), 0},
@@ -225,5 +252,6 @@ void runValueMidiEncodingTests() {
   midiExporterWritesTimeSignatureMetaEvent();
   midiExporterOrdersGeneratedNoteOffBeforeSameTickNoteOn();
   midiExporterKeepsZeroDurationNotePairedAtSameTick();
+  midiExporterSaturatesTimelineEndpoints();
   midiExporterClampsSignedPitchBendBeforeBias();
 }

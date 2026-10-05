@@ -6,9 +6,11 @@
 
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/BinaryWriter.h"
+#include "value/sequence/PerformanceModel.h"
 
 #include <algorithm>
 #include <array>
+#include <limits>
 #include <span>
 #include <string>
 #include <type_traits>
@@ -85,7 +87,12 @@ void addChannelMessage(std::vector<MidiMessage>& messages, u64 tick, int priorit
 [[nodiscard]] u64 midiTick(Timebase timebase, u64 tick) {
   const u64 source = std::max<u32>(timebase.ppqn, 1);
   const u64 target = std::max<u32>(timebase.midiDivision(), 1);
-  return tick / source * target + ((tick % source) * target + source / 2) / source;
+  const u64 whole = tick / source;
+  const u64 fraction = ((tick % source) * target + source / 2) / source;
+  if (whole > std::numeric_limits<u64>::max() / target) {
+    return std::numeric_limits<u64>::max();
+  }
+  return addTicks(whole * target, fraction);
 }
 
 void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event, Timebase timebase, u64& endTick) {
@@ -94,13 +101,13 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
       [&](const auto& payload) {
         using Payload = std::decay_t<decltype(payload)>;
         if constexpr (std::is_same_v<Payload, NoteDuration>) {
-          // Keep a zero-length note's on/off pair in source order. Sorting its
-          // off before its on would leave the attack hanging until a later release.
-          const int noteOnPriority = payload.duration == 0 ? 40 : event.priority;
+          const u64 noteEnd = std::max(midiTick(timebase, addTicks(event.tick, payload.duration)),
+                                       addTicks(tick, payload.duration != 0));
+          // Keep a zero-length output note's on/off pair in source order, including
+          // a positive-duration note clipped at the last representable tick.
+          const int noteOnPriority = noteEnd == tick ? 40 : event.priority;
           messages.push_back({tick, noteOnPriority,
                               {static_cast<u8>(0x90 | channel4(payload.channel)), data7(payload.key), payload.velocity}});
-          const u64 noteEnd = std::max(midiTick(timebase, event.tick + payload.duration),
-                                       tick + (payload.duration != 0));
           messages.push_back({noteEnd, 40,
                               {static_cast<u8>(0x80 | channel4(payload.channel)), data7(payload.key), 64}});
           endTick = std::max(endTick, noteEnd);
