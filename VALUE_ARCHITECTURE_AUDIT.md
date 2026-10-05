@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Seventy-five validated batches remove 1,611 net production lines
+`cb9e0b766`. Seventy-six validated batches remove 1,620 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 75 replays both corpora against its
-committed batch 74 predecessor. All 73 expanded raw inventories match exactly;
+cover 37 of 38 registered families. Batch 76 replays both corpora against its
+committed batch 75 predecessor. All 73 expanded raw inventories match exactly;
 no classification is needed. The cleanup2 records appear at the end of this
 document.
 
@@ -12003,3 +12003,37 @@ pending/completed receipts. Shell SHA-256: `574da85da084699783b09705164fc031b49d
 lines. Pointer-backed synth selections remain because current export filtering
 compacts their vector; shared stitch preparation remains because repeated parts
 reuse it. These are bounded source findings, not exhaustion of the audit.
+
+## Cleanup2 batch 76 — derive Sony song state from its playlist
+
+Sony PS2's private song-table parser no longer carries `hasPlaybackCommand` or
+`unsupported`. Its accepted command vector already supplies both facts:
+nonempty means playback has started, and a final `End` means decoding reached a
+valid terminal command. The only `End` append immediately returns. Every
+malformed early return therefore leaves an empty list or one ending in
+`PlaySection`/`Repeat`, which the existing terminal check rejects. The nonempty
+check stays before `back()`.
+
+The independent prefix-state/repeat and mixed-division history remain. Warning
+priority, fallback publication, reads, ranges and both discovery/publication
+calls are unchanged. The nine-line removal adds no helper, type, traversal or
+branch. The earlier four-line phase-only draft and source preparation failures
+remain separate records; the accepted complete body includes both flag removals.
+
+The unchanged complete Sony fixture covers actual trivial, prefix, unsupported
+opcode, repeat and state-restoration cases; it does not assert every malformed
+exit. Complete decoder reasoning and independent review cover the removed state,
+with current batch 75 source authority refreshed separately from the immutable
+batch 74 draft. No stack-size, speed, sanitizer or arbitrary fault claim is made.
+
+46 warning-free Release steps and all 44 CTest suites pass. Fresh original
+and expanded comparisons against committed batch 75 preserve all 252 original
+results/3,922 artifacts and all 894 expanded exports/858 artifacts. All 73 raw inventories match exactly; no classification is needed.
+Expected failed conversions and their partial outputs remain identified.
+Complete value/shared/test/Qt sources, archives, shell, reviews and receipts were
+rechecked through commit; matched old payloads were removed only after retained
+outputs and linked pending/completed receipts were verified. Shell SHA-256:
+`15b8350321fcf86f3ae69d8a9e3f18941b82e035fa998459857bde348a853672`. Records under `/tmp/vgmtrans-cleanup2` include
+`song-state76-root-cold-review.json` and `pass76-final-root-review.json`.
+The branch now removes 1,620 net value lines: 1,279 architecture and
+341 native-format lines, plus the earlier 22 UI lines. The audit continues.

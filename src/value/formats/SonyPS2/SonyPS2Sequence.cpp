@@ -1024,9 +1024,7 @@ struct ParsedSongTable {
   u8 pan = 64;
   u8 tempo = 120;
   bool hasPrefixState = false;
-  bool hasPlaybackCommand = false;
   bool hasRepeat = false;
-  bool unsupported = false;
   bool mixedTimebase = false;
   std::optional<u16> ppqn;
 };
@@ -1042,13 +1040,11 @@ struct ParsedSongTable {
     const u8 value = reader.u8At(cursor++);
 
     if (family != 0xa0) {
-      song.unsupported = true;
       return song;
     }
 
     if ((operation >= 1 && operation <= 6) || (operation >= 0x21 && operation <= 0x23)) {
-      if (song.hasPlaybackCommand) {
-        song.unsupported = true;
+      if (!song.playlist.commands.empty()) {
         return song;
       }
       song.hasPrefixState = true;
@@ -1074,10 +1070,8 @@ struct ParsedSongTable {
     if (operation == 0) {
       const auto midi = std::ranges::find(layout.midiBlocks, value, &MidiBlockLayout::index);
       if (midi == layout.midiBlocks.end()) {
-        song.unsupported = true;
         return song;
       }
-      song.hasPlaybackCommand = true;
       song.mixedTimebase |= song.ppqn && *song.ppqn != midi->ppqn;
       song.ppqn = midi->ppqn;
       if (song.playlist.commands.empty()) {
@@ -1095,7 +1089,6 @@ struct ParsedSongTable {
     }
 
     if (operation == 0x11 && cursor + 3 <= songEnd && reader.u8At(cursor) == 0xa1) {
-      song.hasPlaybackCommand = true;
       song.hasRepeat = true;
       const u16 relative = static_cast<u16>((reader.u8At(cursor + 1) << 8) | reader.u8At(cursor + 2));
       cursor += 3;
@@ -1111,7 +1104,6 @@ struct ParsedSongTable {
     }
 
     if (operation == 0x7f && value == 0x7f) {
-      song.hasPlaybackCommand = true;
       song.playlist.commands.push_back(PlaylistCommand{
           .address = Address{commandOffset},
           .fallthrough = Address{cursor},
@@ -1121,7 +1113,6 @@ struct ParsedSongTable {
       return song;
     }
 
-    song.unsupported = true;
     return song;
   }
   return song;
@@ -1160,7 +1151,7 @@ std::optional<SequenceProgram> parseSongSequence(ByteReader reader, AssetId id, 
   }
 
   ParsedSongTable song = readSongTable(reader, layout, songOffset, songEnd);
-  const bool valid = !song.playlist.commands.empty() && !song.unsupported && !song.mixedTimebase &&
+  const bool valid = !song.playlist.commands.empty() && !song.mixedTimebase &&
                      !(song.hasPrefixState && song.hasRepeat) &&
                      song.playlist.commands.back().kind == PlaylistCommandKind::End;
   if (!valid) {
