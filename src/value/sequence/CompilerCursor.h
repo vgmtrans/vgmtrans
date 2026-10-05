@@ -666,11 +666,8 @@ private:
   void add(std::string_view name, SourceValue value, SourceRange range, SourceValueDisplay display,
            SemanticOperandRole role) {
     if (role != SemanticOperandRole::Value) {
-      auto& operand = operands_.emplace_back();
-      if (const auto* number = std::get_if<u64>(&value)) {
-        operand.value = *number;
-      }
-      operand.role = role;
+      const auto* number = std::get_if<u64>(&value);
+      operands_.push_back({.value = number ? std::optional{*number} : std::nullopt, .role = role});
     }
     if (!name.empty()) {
       fields_.push_back(SourceField{

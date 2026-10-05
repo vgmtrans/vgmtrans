@@ -309,9 +309,8 @@ struct TrackLayout {
 }
 
 struct ProgramState {
-  explicit ProgramState(Version newVersion) : version(newVersion), tempo(math::initialTempo(version)) {}
+  explicit ProgramState(Version newVersion) : tempo(math::initialTempo(newVersion)) {}
 
-  Version version;
   u8 tempo = 0;
 };
 

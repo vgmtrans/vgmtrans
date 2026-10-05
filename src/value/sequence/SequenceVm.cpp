@@ -128,9 +128,10 @@ public:
           !inserted) {
         if (options_.loopPolicy == LoopPolicy::PlayOnce && loopRepeats_ < options_.sequenceLoops) {
           ++loopRepeats_;
-          auto state = previous->first;
+          auto loopVisit = visited_.extract(previous);
           visited_.clear();
-          visited_.emplace(std::move(state), tick);
+          loopVisit.mapped() = tick;
+          visited_.insert(std::move(loopVisit));
         } else {
           return PlaylistAdvance{
               .preservedLoopStart =

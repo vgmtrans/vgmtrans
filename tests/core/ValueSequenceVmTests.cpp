@@ -1533,6 +1533,17 @@ void sequenceVmExecutesFiniteAndInfiniteSectionPlaylistRepeats() {
       SequenceVm(SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = 1}).render(makeProgram(true));
   expect(oneRepeat.tracks[0].endTick == 8 && oneRepeat.tracks[0].events.size() == 2,
          "a requested playlist loop should replay every section once more");
+
+  auto nested = makeProgram(true);
+  nested.sectionPlaylist->startAddress = Address{998};
+  nested.sectionPlaylist->commands.insert(nested.sectionPlaylist->commands.begin(),
+      PlaylistCommand{.address = Address{998}, .fallthrough = Address{1004},
+                      .kind = PlaylistCommandKind::Repeat, .target = Address{1000}, .additionalPlays = 2});
+  const auto nestedRepeat =
+      SequenceVm(SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = 2}).render(nested);
+  expect(nestedRepeat.diagnostics.empty() && nestedRepeat.tracks[0].endTick == 12 &&
+             nestedRepeat.tracks[0].events.size() == 3,
+         "an inner infinite playlist loop should replay while its outer finite counter remains active");
 }
 
 void sequenceVmPairsNoteOnAndNoteOffCommands() {

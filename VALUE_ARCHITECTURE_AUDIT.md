@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Eighty-one validated batches remove 1,636 net production lines
+`cb9e0b766`. Eighty-two validated batches remove 1,639 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 81 replays both corpora against its
-committed batch 80 predecessor. All 73 expanded raw inventories match exactly;
+cover 37 of 38 registered families. Batch 82 replays both corpora against its
+committed batch 81 predecessor. All 73 expanded raw inventories match exactly;
 no classification is needed. The cleanup2 records appear at the end of this
 document.
 
@@ -12240,4 +12240,44 @@ through commit. Shell SHA-256: `fc70288dcd528e2989a6c1b431ef35809ce9e3beb0cdd745
 Records include `midi81-root-cold-review.json` and `pass81-final-root-review.json`
 under `/tmp/vgmtrans-cleanup2`. The branch removes 1,636 net value lines:
 1,287 architecture and 349 native-format lines, plus the earlier 22 UI
+lines. SequenceVM and export decoupling remain; the audit continues.
+
+## Cleanup2 batch 82 — initialize operands and retain playlist visits directly
+
+Append a complete `SemanticOperand` aggregate instead of appending an empty value
+and assigning its fields afterward. Keep every nonunsigned role slot and its
+position, the ordinary Value omission, encoded/resolved field ordering, and the
+operand append before later SourceField construction. This removes three
+architecture lines and adds no author choice, helper or representation.
+
+For a requested playlist replay, extract the existing visit entry, clear the
+other history, update its tick and reinsert it into the same map. This local
+standard-node operation replaces copying its owned repeat-counter key and
+rebuilding the entry. It adds one line but removes those reconstruction stages;
+the initial live counter snapshot, history comparison, loop budget and scheduler
+phases remain. Old key-copy/reinsert failure sites and destruction order can
+differ; no arbitrary allocation-fault, timing or memory-count parity is claimed.
+Eleven fixture lines cover an active outer finite counter during two requested
+inner infinite replays, observing three four-tick sections through the public VM.
+The amended finite/infinite/nested function passes against both frozen batch81
+and rebuilt batch82 libraries. It does not mirror map construction or claim to
+drain the outer counter.
+
+Suzuki's private song-state version only initialized tempo. Initialize tempo from
+the identical incoming enum and remove that unread scalar. Keep all seven actual
+track-version uses. This removes one native line; no state lifetime, dispatch or
+public API changes. The four-path batch removes three production lines overall:
+two architecture and one native. The original cold79/80 records remain separate
+from explicitly refreshed committed81 authority. Private layout/code generation
+and allocator behavior are not claimed equivalent.
+
+99 warning-free Release steps and all 44 CTest suites pass. Fresh comparisons
+against committed batch81 preserve all 252 original results/3,922 files and all
+894 expanded exports/858 files. All 73 raw inventories match exactly; no classification is needed. Expected failures and partial outputs
+remain identified. All retained original payloads and 504 linked removal journals
+were verified before expanded replay. Complete source trees, archives and shell
+match through commit. Shell SHA-256: `caab24f2082dbf039a9d7465ca03e0da263df41e4692ce8e82d77ed351f211d5`.
+Records include `state82-root-cold-review.json` and `pass82-final-root-review.json`
+under `/tmp/vgmtrans-cleanup2`. The branch removes 1,639 net value lines:
+1,289 architecture and 350 native-format lines, plus the earlier 22 UI
 lines. SequenceVM and export decoupling remain; the audit continues.
