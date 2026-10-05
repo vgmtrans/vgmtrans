@@ -417,7 +417,8 @@ using Cursor = CompilerCursor<Playback>;
   }
   cursor.derived("delta", source.delta);
   cursor.u8("status", SourceValueDisplay::Hex);
-  return event.delay(source.delta);
+  event.delay(source.delta);
+  return event;
 }
 
 [[nodiscard]] DecodedBytecodeCommand sourceOnly(Cursor& cursor, const EventPrefix& source, std::string_view label,

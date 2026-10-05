@@ -105,18 +105,14 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
                               {static_cast<u8>(0x80 | channel4(payload.channel)), data7(payload.key), 64}});
           endTick = std::max(endTick, noteEnd);
         } else if constexpr (std::is_same_v<Payload, BankSelect>) {
-          const s32 bankMsb = payload.writeLsb ? (payload.bank >> 7) & 0x7f : payload.bank & 0x7f;
-          addChannelMessage(messages, tick, event.priority,
-                            MidiChannelMessage{.kind = MidiChannelMessageKind::ControlChange,
-                                               .channel = payload.channel,
-                                               .parameter = static_cast<u8>(MidiController::BankSelectMsb),
-                                               .value = bankMsb});
+          const u8 status = static_cast<u8>(0xb0 | channel4(payload.channel));
+          const u8 bankMsb = static_cast<u8>(payload.writeLsb ? (payload.bank >> 7) & 0x7f : payload.bank & 0x7f);
+          messages.push_back({tick, event.priority,
+                              {status, static_cast<u8>(MidiController::BankSelectMsb), bankMsb}});
           if (payload.writeLsb) {
-            addChannelMessage(messages, tick, event.priority,
-                              MidiChannelMessage{.kind = MidiChannelMessageKind::ControlChange,
-                                                 .channel = payload.channel,
-                                                 .parameter = static_cast<u8>(MidiController::BankSelectLsb),
-                                                 .value = payload.bank & 0x7f});
+            messages.push_back({tick, event.priority,
+                                {status, static_cast<u8>(MidiController::BankSelectLsb),
+                                 static_cast<u8>(payload.bank & 0x7f)}});
           }
         } else if constexpr (std::is_same_v<Payload, MidiChannelMessage>) {
           addChannelMessage(messages, tick, event.priority, payload);

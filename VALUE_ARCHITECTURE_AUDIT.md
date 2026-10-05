@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Seventy-six validated batches remove 1,620 net production lines
+`cb9e0b766`. Seventy-seven validated batches remove 1,623 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 76 replays both corpora against its
-committed batch 75 predecessor. All 73 expanded raw inventories match exactly;
+cover 37 of 38 registered families. Batch 77 replays both corpora against its
+committed batch 76 predecessor. All 73 expanded raw inventories match exactly;
 no classification is needed. The cleanup2 records appear at the end of this
 document.
 
@@ -12037,3 +12037,43 @@ outputs and linked pending/completed receipts were verified. Shell SHA-256:
 `song-state76-root-cold-review.json` and `pass76-final-root-review.json`.
 The branch now removes 1,620 net value lines: 1,279 architecture and
 341 native-format lines, plus the earlier 22 UI lines. The audit continues.
+
+## Cleanup2 batch 77 — return the owning event and write final bank messages
+
+Square PS2's private `beginEvent` now sets the same final delay and returns its
+named local `Event`. Returning the old fluent `Event&` expression copied its
+owned presentation strings. The named local permits NRVO or an ordinary implicit
+move while retaining the cursor reference; NRVO is not guaranteed. Prefix reads,
+truncation handling, later conversion/finalization, and all 59 native calls are
+unchanged. Public event copying remains available. One extra line makes the
+ownership transfer explicit. Copy-allocation failure sites disappear; no speed,
+allocation-count, stack-size or arbitrary failure-equivalence claim is made.
+
+MIDI bank selection now creates its final wire messages directly, removing two
+temporary `MidiChannelMessage` projections and their kind dispatch. Bank's full
+`u16` domain is masked to seven bits in either style, so the removed data clamp
+was the identity. The existing channel mask, controller numbers, ticks, priorities
+and MSB-before-optional-LSB order remain. Logical bank selection, general channel
+messages, stable sorting and end-of-track handling remain. The branch now spells
+the small ControlChange wire shape directly; that modest duplication is accepted
+because the bank operation reads more clearly without a temporary event language.
+
+Both complete candidate bodies and independent cold reviews were preserved at
+batch 75, with scoped unchanged-source authority refreshed separately against
+committed/frozen batch 76. Existing Square, cursor, encoding, rendering and
+stitching fixtures cover actual consumers; they do not enumerate every bank or
+channel integer. No mirrored test or new helper/API was added. The combined
+change removes three production lines: four architecture lines removed and one
+native-format line added. SequenceVM and neutral format output remain intact.
+
+49 warning-free Release steps and all 44 CTest suites pass. Fresh original
+and expanded comparisons against committed batch 76 preserve all 252 original
+results/3,922 artifacts and all 894 expanded exports/858 artifacts. All 73 raw inventories match exactly; no classification is needed.
+Expected failed conversions and their partial outputs remain identified. All
+source trees, archives, shell and pinned review/output records were verified
+through commit; exact duplicate old payloads were removed only after retaining
+and rehashing their replacements with linked pending/completed journals.
+Shell SHA-256: `d1c8fba62cd523d6a302e8f8625b38110f9ec388f5ae1498b9b5c613680ab531`. Records under `/tmp/vgmtrans-cleanup2` include
+`direct-values77-root-cold-review.json` and `pass77-final-root-review.json`.
+The branch now removes 1,623 net value lines: 1,283 architecture and
+340 native-format lines, plus the earlier 22 UI lines. The audit continues.
