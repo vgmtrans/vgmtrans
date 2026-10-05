@@ -1,14 +1,17 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Eighty-two validated batches remove 1,639 net production lines
+`cb9e0b766`. Eighty-three validated batches remove 1,640 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 82 replays both corpora against its
-committed batch 81 predecessor. All 73 expanded raw inventories match exactly;
-no classification is needed. The cleanup2 records appear at the end of this
-document.
+cover 37 of 38 registered families. Batch 83 replays both corpora against its
+committed batch 82 predecessor. Of 73 expanded inventories, 72 match exactly.
+One Sony sample-pool ID ordering difference is admitted from unchanged concurrent
+scanner code and variation in the same new executable. In 38 batch 82 runs and
+eight original-binary runs, the IDs kept one ordering. Raw records and the failed
+baseline-variation checks are retained. The cleanup2 records appear at the end of
+this document.
 
 Earlier audit starting revision: `e9f4450c3` (`core-rewrite-refactor`).
 
@@ -12281,3 +12284,53 @@ Records include `state82-root-cold-review.json` and `pass82-final-root-review.js
 under `/tmp/vgmtrans-cleanup2`. The branch removes 1,639 net value lines:
 1,289 architecture and 350 native-format lines, plus the earlier 22 UI
 lines. SequenceVM and export decoupling remain; the audit continues.
+
+## Cleanup2 batch 83 — populate the final MIDI track owner directly
+
+Construct each named empty MIDI track in the existing reserved output vector and
+render through its local reference. Remove the later populated-track handoff.
+Planning, timeline creation, naming, channel assignment, optional port metadata,
+rendering, conductor metadata, end ticks and final port warnings keep their
+successful order. Exactly one insertion occurs per source track; the renderer
+cannot access the outer vector and no subsequent insertion happens during its
+borrow. No incomplete private sequence escapes an exception. The aggregate
+argument still initializes an empty track; no total move or allocation removal
+is claimed. This removes one architecture line and one ownership stage.
+
+Let SourceStore's named family-removal result remain movable. The same breadth-
+first list drives the same removal loop and returns as an owned vector. NRVO is
+permitted before and after; when it is absent, a possible post-removal copy is
+replaced by an implicit move. This change is line-neutral. No measured Release
+saving, allocator-fault ordinal, destruction-order or rollback parity is claimed.
+Both changes preserve public signatures and add no helper or author concept.
+
+Root independently reviewed both sealed agent proposals and their actual
+consumer scopes, verifying 30 whole-body authority rows against batches 81 and
+82 and their frozen sources. The agents reached their account limit after saving
+these drafts; root finished the review. The corpus runner changes only five
+generation lines/six references, with its closed batch 82 executor byte unchanged
+and separately reviewed by root. Existing meaningful session, renderer,
+pitch, modulation, instrument and artifact suites cover these ownership changes;
+no implementation-mirroring fixture was added.
+
+48 warning-free Release steps and all 44 CTest suites pass. Fresh comparisons
+against committed batch 82 preserve all 252 original results/3,922 files and all
+894 expanded exports/858 files. Of 73 raw inventories, 72 match exactly. Volume39
+differs only in the two Sony sample-pool IDs and their collection reference; all
+six exports match. The same batch 83 executable produces both orderings. The
+unchanged concurrent scanner permits either assignment, supporting this
+source-specific admission. Neither 38 additional batch 82 runs nor eight original
+runs varied, so these runs do not prove older-binary variation. All 50 raw records
+and the two failed variation assertions are retained. The original expanded
+wrapper returned status 1 after completing all replays when the unchanged strict
+classifier rejected this new case. A separate root admission closes it; the
+historical classifier and original runner remain unchanged. Expected failures and
+partial outputs remain identified. All retained original payloads and 504 linked removal journals
+were verified before expanded replay. Complete source trees, archives and shell
+match through commit. Shell SHA-256: `1b0c0c99b0f9be4c4811308fade7c8f8c5e65b08a52686452413f991241fdf56`.
+Records include `volume39-baseline83-proof/source-admission.json`,
+`expanded83-source-admission-completion.json`, `owners83-root-cold-review.json`
+and `pass83-final-root-review.json` under `/tmp/vgmtrans-cleanup2`. The branch removes 1,640 net value lines:
+1,290 architecture and 350 native-format lines, plus the earlier 22 UI
+lines. The current ownership work is complete; the broader audit is paused at the
+user's request. SequenceVM and export decoupling remain.

@@ -245,7 +245,7 @@ SourceId SourceStore::addDerived(SourceFile file, std::vector<u8> bytes, SourceI
 }
 
 std::vector<SourceId> SourceStore::removeFamily(SourceId id) {
-  const auto family = sourceFamily(id);
+  auto family = sourceFamily(id);
   for (const SourceId source : family) {
     auto& entry = entries_[source.value];
     entry.members.clear();

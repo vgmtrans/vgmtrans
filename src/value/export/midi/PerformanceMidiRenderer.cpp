@@ -1282,10 +1282,10 @@ MidiSequence renderMidiSequence(const ResolvedPerformance& resolved,
     const auto& performanceTrack = performance.tracks[trackIndex];
     const auto events = detail::planMidiTrack(resolved, trackIndex, options, globalTempos, sequence.diagnostics);
     const auto timeline = midiTimeline(events, globalReverb);
-    MidiTrack midiTrack{
+    auto& midiTrack = sequence.tracks.emplace_back(MidiTrack{
         .name = performanceTrack.name.empty() ? "Track " + std::to_string(performanceTrack.sourceTrackNumber)
                                               : performanceTrack.name,
-    };
+    });
     const auto assignment = midiChannelAssignment(trackIndex, options);
     MidiTrackRenderer renderer{midiTrack, assignment.channel,
                                globalTempos, options, modulationConversion, levelHeadroom,
@@ -1308,7 +1308,6 @@ MidiSequence renderMidiSequence(const ResolvedPerformance& resolved,
       }
     }
     midiTrack.endTick = endTick;
-    sequence.tracks.push_back(std::move(midiTrack));
   }
 
   // Keep source/lowering diagnostics before channel-encoding warnings.
