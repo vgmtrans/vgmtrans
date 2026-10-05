@@ -90,14 +90,15 @@ namespace {
 
 }  // namespace
 
-void registerValueFormats(core::Session& session, const ValueFormatOptions& options) {
+void registerValueFormats(core::Session& session,
+                          const std::optional<std::filesystem::path>& mameRomDatabase) {
   session.registerExtractor(cue::cueExtractor());
-  const auto mameDatabasePath = options.mameRomDatabase ? options.mameRomDatabase : defaultMameRomDatabasePath();
+  const auto mameDatabasePath = mameRomDatabase ? mameRomDatabase : defaultMameRomDatabasePath();
   if (mameDatabasePath) {
     try {
       session.registerExtractor(mame::mameRomSetExtractor(mame::RomDatabase::load(*mameDatabasePath)));
     } catch (const std::exception&) {
-      if (options.mameRomDatabase) {
+      if (mameRomDatabase) {
         throw;
       }
     }

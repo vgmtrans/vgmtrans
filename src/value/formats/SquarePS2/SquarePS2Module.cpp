@@ -34,9 +34,9 @@ namespace {
   for (const auto& bgm : bgms) {
     const std::string name = fmt::format("{} BGM {}", result.sourceDisplayName(), bgm.sequenceId);
     auto sequence = result.sequence(name, input.reader.range(bgm.offset, bgm.length));
-    sequence.data(SequenceData{.waveBankId = bgm.waveBankId})
+    sequence.data(WdBankId{bgm.waveBankId})
         .useBanks(WdBankId{bgm.waveBankId})
-        .prepare<SequenceData>(prepareSequence)
+        .prepare<WdBankId>(prepareSequence)
         .program(parseBgm(input.reader, sequence.id(), bgm, &result.sourceMap(), &result.diagnostics()));
   }
   return result.finish();

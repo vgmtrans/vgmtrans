@@ -53,11 +53,11 @@ DependencySelection WdBankId::operator()(const DependencyContext& context) const
   return selected;
 }
 
-SequenceRuntime prepareSequence(SequencePreparationContext& context, const SequenceData& sequence) {
-  RuntimeConfig config{.defaultBank = sequence.waveBankId};
+SequenceRuntime prepareSequence(SequencePreparationContext& context, const WdBankId& requestedBank) {
+  RuntimeConfig config{.defaultBank = requestedBank.value};
   const SoundBankData* selected = nullptr;
   for (const auto& bank : context.banks<SoundBankData>(kSquarePs2FormatName)) {
-    if (bank.data.bankId != sequence.waveBankId) {
+    if (bank.data.bankId != requestedBank.value) {
       continue;
     }
     if (selected != nullptr) {

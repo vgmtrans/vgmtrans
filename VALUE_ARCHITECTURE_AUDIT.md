@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Seventy-seven validated batches remove 1,623 net production lines
+`cb9e0b766`. Seventy-eight validated batches remove 1,629 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 77 replays both corpora against its
-committed batch 76 predecessor. All 73 expanded raw inventories match exactly;
+cover 37 of 38 registered families. Batch 78 replays both corpora against its
+committed batch 77 predecessor. All 73 expanded raw inventories match exactly;
 no classification is needed. The cleanup2 records appear at the end of this
 document.
 
@@ -12077,3 +12077,49 @@ Shell SHA-256: `d1c8fba62cd523d6a302e8f8625b38110f9ec388f5ae1498b9b5c613680ab531
 `direct-values77-root-cold-review.json` and `pass77-final-root-review.json`.
 The branch now removes 1,623 net value lines: 1,283 architecture and
 340 native-format lines, plus the earlier 22 UI lines. The audit continues.
+
+## Cleanup2 batch 78 — remove redundant author types and admit dimensions first
+
+Format registration now accepts the optional MAME database path directly,
+removing its one-field `ValueFormatOptions` wrapper. The chosen path remains
+locally owned, extractor ownership and registration order remain, and an
+explicit path remains strict, including an engaged empty path. An absent path
+still searches defaults and tolerates unavailable default databases. The 28
+current calls use the default argument. External users of the removed type,
+member, function signature or symbol must migrate; no external ABI claim is made.
+
+Square PS2 stores and prepares the existing `WdBankId`, removing its duplicate
+`SequenceData` representation. The preparer names its argument `requestedBank`,
+and the bank ID still defaults to zero. Private data and dependency selection
+retain separate owners and their existing order. Bank matching, ambiguity and
+missing-bank diagnostics, envelope copies and runtime configuration remain.
+The typed private-data discriminator and public preparer signature change.
+
+GBA DirectSound checks its existing scalar dimensions before allocating and
+decoding local source PCM. This moves a literal block without adding helpers or
+changing arithmetic, BDPCM decoding, zero padding, reversal, interpolation or
+loop conversion. Rejected dimensions now return before materialization, so
+allocation and exception staging intentionally change. A separate source audit
+found unsigned frame-count multiplication overflow for a small custom public
+`Sample`; this batch does not repair it or claim universal malformed-input safety.
+Recognized source-derived MP2k settings have tighter bounds for that product.
+
+Complete source bodies and independent peer reviews are preserved, including
+the separate current-parent refresh for the registry proposal and the Square
+parameter-name refinement. Existing registry consumers, Square and MP2k/sample
+fixtures pass; no mirrored test was added. Six native-format lines are removed;
+the decoder reorder is line-neutral. SequenceVM and neutral exports remain.
+
+73 warning-free Release steps and all 44 CTest suites pass. Fresh original
+and expanded comparisons against committed batch 77 preserve all 252 original
+results/3,922 artifacts and all 894 expanded exports/858 artifacts. All 73 raw inventories match exactly; no classification is needed.
+Expected failed conversions and their partial outputs remain identified. The
+initial original replay ran out of local space; its outputs and failure record
+remain preserved separately. A fresh retry uses the same reviewed runner after
+restoring exact old payloads from verified pairs. The original retained payloads
+and linked removal journals were fully verified before the expanded replay. All source trees, archives, shell and pinned records
+were verified through commit.
+Shell SHA-256: `15c8681f0f238deee4759a3c9feba9e712f489008b0bd1d907276f66cd68efc3`. Records under `/tmp/vgmtrans-cleanup2` include
+`author-types78-root-cold-review.json` and `pass78-final-root-review.json`.
+The branch now removes 1,629 net value lines: 1,283 architecture and
+346 native-format lines, plus the earlier 22 UI lines. The audit continues.

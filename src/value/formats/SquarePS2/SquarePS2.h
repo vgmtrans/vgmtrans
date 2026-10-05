@@ -67,10 +67,6 @@ struct EnvelopeDefaults {
   u16 adsr2 = 0;
 };
 
-struct SequenceData {
-  u16 waveBankId = 0;
-};
-
 struct SoundBankData {
   u16 bankId = 0;
   std::vector<EnvelopeDefaults> envelopes;
@@ -94,10 +90,10 @@ struct RuntimeConfig {
 
 [[nodiscard]] std::optional<core::ScanSoundBankDraft> addWd(core::ScanResultBuilder& result, const WdLayout& layout);
 struct WdBankId {
-  u16 value;
+  u16 value = 0;
   [[nodiscard]] core::DependencySelection operator()(const core::DependencyContext& context) const;
 };
-core::SequenceRuntime prepareSequence(core::SequencePreparationContext& context, const SequenceData& sequence);
+core::SequenceRuntime prepareSequence(core::SequencePreparationContext& context, const WdBankId& requestedBank);
 [[nodiscard]] core::FormatModule module();
 
 }  // namespace vgmtrans::formats::square_ps2
