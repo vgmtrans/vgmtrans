@@ -278,9 +278,6 @@ struct StreamState {
 };
 
 struct Playback : SequencePlayback<TrackState, StreamState> {
-  Playback(SequencePlayback<TrackState, StreamState> context, ProgramState& program)
-      : SequencePlayback(context), program(program) {}
-
   [[nodiscard]] double noteVelocity(u8 key, u8 velocity) const {
     const double linearVelocity = LevelScale::linearFromMidi7(velocity);
     if (program.config == nullptr) {

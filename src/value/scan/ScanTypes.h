@@ -33,7 +33,8 @@ private:
 };
 
 struct ScanInput {
-  SourceFile source;
+  // Borrow stable metadata during scanning and building; results own the metadata they retain.
+  const SourceFile& source;
   ByteReader reader;
   ScanIdAllocator& ids;
   RetainedSource retained;

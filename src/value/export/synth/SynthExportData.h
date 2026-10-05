@@ -23,7 +23,8 @@ class SourceStore;
 
 // A bank supplies local samples and the region-sampling policy for its selected
 // instruments. Keep it even when no instruments are selected: unfiltered sample
-// export still includes its local samples. Builders omit null bank pointers.
+// export still includes its local samples. Bank and instrument pointers must
+// be nonnull, with their owners retained through conversion.
 struct SynthBankSelection {
   const SoundBankAsset* bank = nullptr;
   std::vector<ResolvedInstrument> instruments;

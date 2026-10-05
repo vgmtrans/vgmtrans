@@ -1,12 +1,12 @@
 # Value architecture simplification audit
 
 Current work is on `core-rewrite-cleanup2`, based on `core-rewrite` revision
-`cb9e0b766`. Seventy-four validated batches remove 1,610 net production lines
+`cb9e0b766`. Seventy-five validated batches remove 1,611 net production lines
 from `src/value`, plus 22 UI lines. All 44 CTest suites pass.
 The original corpus preserves all 3,922 artifacts; the expanded archive replay
 preserves another 858 artifacts across 73 input closures. Together the real inputs
-cover 37 of 38 registered families. Batch 74 replays both corpora against its
-committed batch 73 predecessor. All 73 expanded raw inventories match exactly;
+cover 37 of 38 registered families. Batch 75 replays both corpora against its
+committed batch 74 predecessor. All 73 expanded raw inventories match exactly;
 no classification is needed. The cleanup2 records appear at the end of this
 document.
 
@@ -11961,3 +11961,45 @@ original74-root-closed.json, corpora74-root-review.json, the null-selection
 erratum/annex and final/postcommit receipts. User-owned changes remain untouched.
 Architecture review continues; the separate SegSat constructor draft is outside
 this batch and has no runtime claim yet.
+
+## Cleanup2 batch 75 — borrow scan metadata and use direct playback construction
+
+`ScanInput` now borrows `const SourceFile&`. Session already owns resolved
+metadata until its scanner workers join; copying it into the input and again
+into local result builders duplicated that ownership. Returned assets and native
+configuration retain owned metadata. The 38 input constructions and 73 local
+builders were reviewed, including named aggregates that extend temporary
+metadata lifetimes and three temporary inputs whose metadata comes from local
+stores. The input and finished builder in the MP2k corpus fixture can remain
+inert across store growth; they perform no later metadata read.
+
+This deliberately changes the public input contract: copies share metadata,
+source must be initialized, and its owner must stay alive and stable while the
+input or builder reads it. Store growth can invalidate borrowed entry metadata.
+The change removes copy/allocation failure sites; it does not establish external
+callback, ABI, allocation-failure, sanitizer, or performance equivalence.
+
+SegSat's forwarding `Playback` constructor is gone. The existing compiled
+runtime adapter directly initializes its reference-only base and song-state
+reference. Constructors that derive a profile or perform checked track mapping
+remain. A separate exporter comment now states the actual nonnull borrowed-bank
+and instrument contract; it no longer incorrectly promises null-bank omission.
+
+The three production paths remove one net line: three constructor lines removed,
+two useful contract-comment lines added. The responsibility reduction is the
+removed metadata copies and forwarding constructor, not text compression.
+310 warning-free Release steps and all 44 CTest suites pass. Fresh original
+and expanded archive comparisons against committed batch 74 preserve all 3,922
+original artifacts and all 894 expanded export results/858 artifacts. All 73 raw inventories match exactly; no classification is needed.
+Expected nonzero conversions and their partial output remain identified as such.
+
+Complete matching value/shared/test/Qt sources, archives, shell, cold source
+reviews and independent peers were rechecked before commit. Original duplicate
+payloads were removed only after exact matching retained outputs and linked
+pending/completed receipts. Shell SHA-256: `574da85da084699783b09705164fc031b49d8a1c7c5d52cce8979f1f1f7b7919`. Records are under
+`/tmp/vgmtrans-cleanup2`, including `borrowed-inputs75-root-cold-review.json` and
+`pass75-final-root-review.json`. The branch now removes 1,611 net value lines:
+1,279 architecture and 332 native-format lines, plus the earlier 22 UI
+lines. Pointer-backed synth selections remain because current export filtering
+compacts their vector; shared stitch preparation remains because repeated parts
+reuse it. These are bounded source findings, not exhaustion of the audit.
