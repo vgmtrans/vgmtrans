@@ -1,6 +1,7 @@
 #include "PSDSEPS2Seq.h"
 
 #include "LogManager.h"
+#include "MidiFile.h"
 #include "PSDSEFormat.h"
 #include "SeqEvent.h"
 
@@ -346,6 +347,17 @@ void PSDSEPS2Seq::resetVars() {
   addBankReference(m_header.defaultBankId);
 }
 
+bool PSDSEPS2Seq::postLoad() {
+  // [Tsukiyo ni Saraba]: Zero-countdown voices persist until cutoff. Finalizing a bounded MIDI export also
+  // closes pending voices when a loop, time limit, or offset limit ends conversion without a Stop command.
+  if (readMode == READMODE_CONVERT_TO_MIDI) {
+    for (auto* track : tracks()) {
+      static_cast<PSDSEPS2Track*>(track)->endDseNotes();
+    }
+  }
+  return VGMSeq::postLoad();
+}
+
 void PSDSEPS2Seq::observeEffectVelocity() {
   if (!m_header.isEffect) {
     return;
@@ -599,9 +611,52 @@ void PSDSEPS2Track::resetVars() {
   m_repeatOffset = 0;
   m_repeatOctave = m_octave;
   m_dseLoopStack.clear();
+  m_sustainedNotes.clear();
+  m_durationNotes.clear();
   vol = 127;
   expression = 127;
   prevPan = 64;
+}
+
+void PSDSEPS2Track::loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
+  SeqTrack::loadTrackMainLoop(stopOffset, stopTime);
+  if (!active) {
+    endDseNotes();
+  }
+}
+
+void PSDSEPS2Track::endDseNotes(int key) {
+  for (auto it = m_durationNotes.begin(); it != m_durationNotes.end();) {
+    if (it->noteOff->absTime <= getTime()) {
+      it = m_durationNotes.erase(it);
+      continue;
+    }
+    if (key >= 0 && it->key != key) {
+      ++it;
+      continue;
+    }
+    // [Tsukiyo ni Saraba]: Same-key retrigger replaces the old voice countdown. Moving its scheduled note-off
+    // prevents the old duration from releasing a new zero-countdown voice with the same MIDI key.
+    it->noteOff->absTime = getTime();
+    if (it->timeIndex != SeqEventTimeIndex::kInvalidIndex) {
+      auto& event = parentSeq->timedEventIndex().event(it->timeIndex);
+      event.duration = getTime() > event.startTick ? getTime() - event.startTick : 0;
+    }
+    it = m_durationNotes.erase(it);
+  }
+  const int8_t currentTranspose = transpose;
+  for (auto it = m_sustainedNotes.begin(); it != m_sustainedNotes.end();) {
+    if (key >= 0 && it->key != key) {
+      ++it;
+      continue;
+    }
+    // [Tsukiyo ni Saraba]: Transpose changes pitch without changing the voice's source key. MIDI key shifts
+    // used outside the RPN range must be paired with the original note-on shift when releasing that voice.
+    transpose = it->transpose;
+    addNoteOffNoItem(static_cast<int8_t>(it->key));
+    it = m_sustainedNotes.erase(it);
+  }
+  transpose = currentTranspose;
 }
 
 uint16_t PSDSEPS2Track::readEventU16LE() {
@@ -662,6 +717,7 @@ void PSDSEPS2Track::addDseBankSelect(uint32_t eventOffset, uint32_t eventLength,
 }
 
 bool PSDSEPS2Track::readEvent() {
+  std::erase_if(m_durationNotes, [this](const DurationNote& note) { return note.noteOff->absTime <= getTime(); });
   const uint32_t beginOffset = curOffset;
   const uint32_t trackEnd = offset() + length();
   if (curOffset >= trackEnd) {
@@ -742,8 +798,32 @@ bool PSDSEPS2Track::readEvent() {
     // [Shadow Hearts]: SsdNormalTrackSequence stores the raw duration at 0x5c54 without gate scaling.
     // [Tokimeki Memorial: Girl's Side 2nd Kiss]: The music handler at 0x6174 retains this raw-duration behavior.
     const int key = m_octave * 12 + (flags & 0x0f);
-    addNoteByDur(beginOffset, curOffset - beginOffset, static_cast<uint8_t>(std::clamp(key, 0, 127)), status,
-                 duration);
+    const uint8_t midiKey = static_cast<uint8_t>(std::clamp(key, 0, 127));
+    // [Tsukiyo ni Saraba]: SsdForceKeyoffChannel releases an existing voice with the same source key before
+    // retriggering. Different-key voices remain active, including voices whose countdown is zero.
+    if (!PSDSEPS2::isV2(m_version)) {
+      endDseNotes(midiKey);
+    }
+    if (duration == 0) {
+      // [Tsukiyo ni Saraba]: SsdNormalTrackGate skips zero counters rather than issuing an immediate keyoff.
+      // [Shadow Hearts]: Its older gate loop decrements zero to 0xffffffff, also sustaining the voice.
+      addNoteOn(beginOffset, curOffset - beginOffset, static_cast<int8_t>(midiKey), status,
+                "Note with Unscheduled Keyoff");
+      if (status != 0) {
+        m_sustainedNotes.push_back({midiKey, transpose});
+      }
+    } else {
+      std::erase_if(prevDurEventIndices, [this](SeqEventTimeIndex::Index index) {
+        return parentSeq->timedEventIndex().endTickExclusive(index) <= getTime();
+      });
+      const size_t previousEventCount = prevDurEventIndices.size();
+      addNoteByDur(beginOffset, curOffset - beginOffset, midiKey, status, duration);
+      if (readMode == READMODE_CONVERT_TO_MIDI) {
+        m_durationNotes.push_back({midiKey, pMidiTrack->previousDurNoteOffs().back(),
+                                   prevDurEventIndices.size() > previousEventCount
+                                       ? prevDurEventIndices.back() : SeqEventTimeIndex::kInvalidIndex});
+      }
+    }
     return true;
   }
 
@@ -810,7 +890,11 @@ bool PSDSEPS2Track::readEvent() {
     case 0x89: {
       const uint32_t duration = PSDSEPS2::isV2(m_version) ? readByte(curOffset++) : readEventU16LE();
       addTie(beginOffset, curOffset - beginOffset, duration, eventName(status, m_version));
-      makePrevDurNoteEnd(getTime() + duration);
+      // [Tsukiyo ni Saraba]: The music parser treats Tie as a delay; only the effect parser applies its
+      // special voice lifetime behavior. Existing music voice countdowns continue unchanged.
+      if (static_cast<PSDSEPS2Seq*>(parentSeq)->m_header.isEffect) {
+        makePrevDurNoteEnd(getTime() + duration);
+      }
       addTime(duration);
       break;
     }
@@ -824,8 +908,12 @@ bool PSDSEPS2Track::readEvent() {
         m_gateDelta = 0;
         m_lastNoteDuration = 0;
         curOffset = m_repeatOffset;
+        if (!shouldContinue) {
+          endDseNotes();
+        }
         return shouldContinue;
       }
+      endDseNotes();
       addEndOfTrack(beginOffset, 1);
       return false;
     case 0x91:
@@ -1247,11 +1335,12 @@ bool PSDSEPS2Track::readEvent() {
         break;
       }
       const uint8_t value = readByte(curOffset++);
-      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqSustaion reads one byte only to
-      // advance the event pointer, then emits a channel keyoff event; the operand is not used in the decision.
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqSustaion enables channel sustain for
+      // values at least 64. Lower values release only voices with an already-requested keyoff; zero-countdown
+      // voices continue. The driver's same-key forced keyoff bypasses sustain, unlike MIDI channel sustain.
       addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
-                      fmt::format("Operand: {}; driver sends channel keyoff; MIDI sustain approximation omitted",
-                                  value),
+                      fmt::format("Operand: {}; sustain {}; per-voice keyoff deferral automation stub",
+                                  value, value >= 64 ? "enabled" : "disabled"),
                       VGMItem::Type::Unknown);
       break;
     }
@@ -1540,6 +1629,7 @@ bool PSDSEPS2Track::readEvent() {
         // sets volume to 100 and internal pan to 63 (the value authored by Panpot Absolute 64), and retains
         // the tuning halfword. Hardware effect and LFO resets remain synthesis automation stubs.
         // [Bakusou Dekotora Densetsu: Otoko Hanamichi Yume Roman]: The named handler performs the same reset.
+        endDseNotes();
         addControllerEventNoItem(120, 0);
         m_bender = 0;
         addDseTuning(beginOffset, 1, m_tuning, eventName(status, m_version));

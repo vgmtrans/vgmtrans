@@ -14,6 +14,7 @@ public:
   bool parseHeader() override;
   bool parseTrackPointers() override;
   void resetVars() override;
+  bool postLoad() override;
 
   void observeEffectVelocity();
   [[nodiscard]] uint8_t normalizedEffectVelocity() const;
@@ -30,6 +31,8 @@ public:
 
   void resetVars() override;
   bool readEvent() override;
+  void loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) override;
+  void endDseNotes(int key = -1);
 
 protected:
   void setChannelAndGroupFromTrkNum(int trackNum) override;
@@ -41,6 +44,15 @@ private:
     uint32_t escapeOffset;
     int8_t startOctave;
     int8_t exitOctave;
+  };
+  struct SustainedNote {
+    uint8_t key;
+    int8_t transpose;
+  };
+  struct DurationNote {
+    uint8_t key;
+    NoteEvent* noteOff;
+    SeqEventTimeIndex::Index timeIndex;
   };
 
   void addDelta(uint32_t offset, uint32_t length, uint32_t ticks, const std::string& name);
@@ -66,4 +78,6 @@ private:
   uint32_t m_repeatOffset;
   int8_t m_repeatOctave;
   std::vector<DseLoopFrame> m_dseLoopStack;
+  std::vector<SustainedNote> m_sustainedNotes;
+  std::vector<DurationNote> m_durationNotes;
 };
