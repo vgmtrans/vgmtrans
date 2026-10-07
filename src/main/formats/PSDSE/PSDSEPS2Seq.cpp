@@ -19,7 +19,10 @@ namespace {
 // SsdSeqFuncLength table disagrees with Position and Master Fader.
 // [Bakusou Dekotora Densetsu: Otoko Hanamichi Yume Roman]: The driver establishes the version 0x0300 width changes.
 // [Tokimeki Memorial: Girl's Side]: The unstripped version 0x0250 driver establishes the handlers added after
-// version 0x0201 and retains the zero-operand All Reset command.
+// version 0x0201 and retains the zero-operand All Reset command at 0x83dc; its return value is the unchanged
+// event cursor, even though the SsdSeqFuncLength table assigns four bytes to the command.
+// [Bakusou Dekotora Densetsu: Otoko Hanamichi Yume Roman]: SsdSeqAllReset at 0x8380 also returns the unchanged
+// cursor. The authoring length table does not describe the operand width consumed by this runtime handler.
 // [Tokimeki Memorial: Girl's Side 2nd Kiss]: The driver establishes the version 0x0320 width changes.
 constexpr std::array<uint8_t, 128> kOperandCounts = {
     0, 0, 1, 1, 1, 2, 3, 4, 2, 2, 2, 0, 3, 2, 3, 0,  // 80-8f
@@ -54,9 +57,6 @@ uint8_t operandCount(uint8_t status, uint16_t version) {
       default:
         break;
     }
-  }
-  if (status == 0xf8 && (PSDSEPS2::isV25(version) || version == 0x0300)) {
-    return 3;
   }
   if (version == 0x0320) {
     switch (status) {
@@ -1525,6 +1525,25 @@ bool PSDSEPS2Track::readEvent() {
       const std::string operands = readOperands(count);
       addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
                       "Operands: " + operands + "; runtime SPU2 LFO routing/automation stub", VGMItem::Type::Lfo);
+      break;
+    }
+    case 0xf8: {
+      if (PSDSEPS2::isV25(m_version) || m_version == 0x0300) {
+        // [Tokimeki Memorial: Girl's Side]: SsdSeqAllReset cuts off the channel, clears bender/sweep state,
+        // sets volume to 100 and internal pan to 63 (the value authored by Panpot Absolute 64), and retains
+        // the tuning halfword. Hardware effect and LFO resets remain synthesis automation stubs.
+        // [Bakusou Dekotora Densetsu: Otoko Hanamichi Yume Roman]: The named handler performs the same reset.
+        addControllerEventNoItem(120, 0);
+        m_bender = 0;
+        addDseTuning(beginOffset, 1, m_tuning, eventName(status, m_version));
+        addVolNoItem(100);
+        vol = 100;
+        addPanNoItem(64);
+        prevPan = 64;
+      } else {
+        // [Tsukiyo ni Saraba]: SsdSeqAllReset at 0x8704 returns without changing any channel state.
+        addGenericEvent(beginOffset, 1, eventName(status, m_version), "Runtime no-op", VGMItem::Type::Nop);
+      }
       break;
     }
     case 0xf9: {
