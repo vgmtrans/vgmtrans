@@ -594,6 +594,8 @@ void PSDSEPS2Track::resetVars() {
   m_gateDelta = 0;
   m_lastNoteDuration = 0;
   m_gateTime = isEffect ? 15 : 127;
+  m_tuning = 0;
+  m_bender = 0;
   m_repeatOffset = 0;
   m_repeatOctave = m_octave;
   m_dseLoopStack.clear();
@@ -606,6 +608,29 @@ uint16_t PSDSEPS2Track::readEventU16LE() {
   const uint16_t value = readByte(curOffset) | (readByte(curOffset + 1) << 8);
   curOffset += 2;
   return value;
+}
+
+void PSDSEPS2Track::addDseTuning(uint32_t eventOffset, uint32_t eventLength, int32_t value,
+                               const std::string& name) {
+  // [Tsukiyo ni Saraba]: SsdResetChannel clears the 8.8-semitone pitch state, and each pitch handler stores
+  // its result as a halfword. Transpose and fine tuning share this wrapping state and update active voices.
+  // [Tokimeki Memorial: Girl's Side 2nd Kiss]: The same handlers at 0x72f4 through 0x73c0 use channel +0x34.
+  const uint16_t wrapped = static_cast<uint16_t>(value);
+  m_tuning = static_cast<int16_t>(wrapped < 0x8000 ? wrapped : static_cast<int32_t>(wrapped) - 0x10000);
+  const uint16_t combined = static_cast<uint16_t>(static_cast<int32_t>(m_tuning) + m_bender);
+  const int pitch = combined < 0x8000 ? combined : static_cast<int32_t>(combined) - 0x10000;
+  const int coarse = pitch / 256;
+  // [Shadow Hearts]: The signed pitch state spans -128 through +127 semitones. MIDI coarse tuning spans
+  // -64 through +63, so any excess shifts subsequent note keys while the remaining pitch uses channel RPNs.
+  const int midiCoarse = std::clamp(coarse, -64, 63);
+  transpose = static_cast<int8_t>(coarse - midiCoarse);
+  const double cents = (pitch - coarse * 256) * (100.0 / 256.0);
+  addGenericEvent(eventOffset, eventLength, name,
+                  fmt::format("Tuning: {} / 256 semitone; bender: {} / 256 semitone; combined: {:.6f} cents",
+                              m_tuning, m_bender, pitch * (100.0 / 256.0)),
+                  VGMItem::Type::FineTune);
+  addCoarseTuningNoItem(midiCoarse);
+  addFineTuningNoItem(cents);
 }
 
 uint32_t PSDSEPS2Track::readEventU24LE() {
@@ -1320,40 +1345,55 @@ bool PSDSEPS2Track::readEvent() {
     }
     case 0xd0: {
       const int value = static_cast<int8_t>(readByte(curOffset++));
-      addTranspose(beginOffset, curOffset - beginOffset, static_cast<int8_t>(value), eventName(status, m_version));
+      addDseTuning(beginOffset, curOffset - beginOffset, value * 256, eventName(status, m_version));
       break;
     }
     case 0xd1: {
-      const int value = std::clamp(static_cast<int>(transpose) + static_cast<int8_t>(readByte(curOffset++)), -128, 127);
-      addTranspose(beginOffset, curOffset - beginOffset, static_cast<int8_t>(value), eventName(status, m_version));
+      const int delta = static_cast<int8_t>(readByte(curOffset++)) * 256;
+      addDseTuning(beginOffset, curOffset - beginOffset, m_tuning + delta, eventName(status, m_version));
       break;
     }
     case 0xd2: {
       const int8_t delta = static_cast<int8_t>(readByte(curOffset++));
       // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqTune sign-extends its byte and shifts
       // it left by three before adding it to the channel's 8.8-semitone pitch event, giving 1/32-semitone units.
-      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
-                      fmt::format("Signed tuning delta: {} / 32 semitone; SPU2 pitch automation stub", delta),
-                      VGMItem::Type::FineTune);
+      addDseTuning(beginOffset, curOffset - beginOffset, m_tuning + delta * 8, eventName(status, m_version));
       break;
     }
-    case 0xd3:
+    case 0xd3: {
+      const int16_t delta = static_cast<int16_t>(readEventU16LE());
+      // [Tsukiyo ni Saraba]: The trial's named SsdSeqDetune routine at 0x7744 combines an unsigned low byte
+      // with a sign-extended high byte and adds the result to channel +0x28, the 8.8-semitone pitch event.
+      // The halfword store wraps the accumulated value, and SsdSetChannelVoiceEvent propagates it to active voices.
+      // [Shadow Hearts]: SsdSeqDetune at 0x7e9c replaces track +0x52 rather than accumulating the operand.
+      // [Tokimeki Memorial: Girl's Side]: SsdSeqDetune at 0x741c adds the operand to channel +0x24.
+      // [Bakusou Dekotora Densetsu: Otoko Hanamichi Yume Roman]: SsdSeqDetune at 0x73c0 retains that addition.
+      addDseTuning(beginOffset, curOffset - beginOffset,
+                   PSDSEPS2::isV2(m_version) ? delta : m_tuning + delta, eventName(status, m_version));
+      break;
+    }
     case 0xd4: {
-      const int16_t value = static_cast<int16_t>(readEventU16LE());
-      addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
-                      fmt::format("Signed 16-bit SPU2 pitch value: {}; exact automation stub", value),
-                      VGMItem::Type::FineTune);
+      // [Tsukiyo ni Saraba]: SsdSeqBender stores the signed little-endian operand shifted left by 16 at
+      // channel +0x18. SsdDeviceVoiceEvent adds its arithmetic high halfword to the 8.8-semitone note value
+      // before SsdNoteToPitch; this is a separate additive offset rather than a MIDI pitch-wheel value.
+      // [Shadow Hearts]: SsdSeqBender at 0x7ee4 stores the same fixed-point value in track +0x54.
+      // [Tokimeki Memorial: Girl's Side 2nd Kiss]: The handler at 0x7410 retains the encoding at channel +0x1c.
+      m_bender = static_cast<int16_t>(readEventU16LE());
+      addDseTuning(beginOffset, curOffset - beginOffset, m_tuning, eventName(status, m_version));
       break;
     }
     case 0xd5: {
       const uint16_t duration = readEventU16LE();
       const int8_t delta = static_cast<int8_t>(readByte(curOffset++));
-      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqSweep reads a little-endian duration,
-      // combines the signed third byte with the current pitch event, and interpolates the result in the SPU2 voice
-      // state. MIDI has no equivalent for this driver-side sweep state.
+      // [Tsukiyo ni Saraba]: SsdSeqSweep at 0x7800 reads a little-endian duration and operates on track +0x50,
+      // the separate 16.16-semitone bender state. A nonzero signed byte adds that many semitones; zero targets
+      // an unbent pitch. Zero duration or an unchanged target leaves the existing sweep untouched. Otherwise
+      // the driver divides the signed target difference by duration and stores the step, target, and tick count.
       addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
-                      fmt::format("Duration ticks: {}, signed target delta: {}; SPU2 pitch sweep automation stub",
-                                  duration, delta),
+                      fmt::format("Duration ticks: {}; {}; bender sweep automation stub", duration,
+                                  duration == 0 ? "no runtime update"
+                                                : delta == 0 ? "target bender: zero"
+                                                             : fmt::format("relative bender delta: {} semitones", delta)),
                       VGMItem::Type::PitchBendSlide);
       break;
     }
@@ -1397,7 +1437,9 @@ bool PSDSEPS2Track::readEvent() {
       break;
     }
     case 0xdd:
-      addPitchBend(beginOffset, 1, 0, "Bender Off");
+      // [Tsukiyo ni Saraba]: SsdSeqBenderOff clears channel +0x18 without changing the tuning halfword at +0x28.
+      m_bender = 0;
+      addDseTuning(beginOffset, 1, m_tuning, "Bender Off");
       break;
     case 0xdf:
       if (PSDSEPS2::isV2(m_version)) {

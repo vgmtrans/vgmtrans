@@ -45,6 +45,7 @@ private:
 
   void addDelta(uint32_t offset, uint32_t length, uint32_t ticks, const std::string& name);
   void addDseBankSelect(uint32_t offset, uint32_t length, const std::string& name);
+  void addDseTuning(uint32_t offset, uint32_t length, int32_t value, const std::string& name);
   uint16_t readEventU16LE();
   uint32_t readEventU24LE();
   std::string readOperands(uint8_t count);
@@ -60,6 +61,8 @@ private:
   uint32_t m_gateDelta;
   uint32_t m_lastNoteDuration;
   uint8_t m_gateTime;
+  int16_t m_tuning;
+  int16_t m_bender;
   uint32_t m_repeatOffset;
   int8_t m_repeatOctave;
   std::vector<DseLoopFrame> m_dseLoopStack;
