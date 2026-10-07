@@ -339,6 +339,7 @@ PSDSEPS2Seq::PSDSEPS2Seq(RawFile* file, const PSDSEPS2::SequenceHeader& header)
 
 void PSDSEPS2Seq::resetVars() {
   VGMSeq::resetVars();
+  m_channelNotesUpdated = false;
   if (readMode != READMODE_CONVERT_TO_MIDI) {
     m_peakEffectiveVelocity = 0;
   }
@@ -356,6 +357,46 @@ bool PSDSEPS2Seq::postLoad() {
     }
   }
   return VGMSeq::postLoad();
+}
+
+void PSDSEPS2Seq::updateChannelNotesOnce() {
+  if (readMode != READMODE_CONVERT_TO_MIDI || (m_channelNotesUpdated && m_lastChannelNoteTick == time)) {
+    return;
+  }
+  m_channelNotesUpdated = true;
+  m_lastChannelNoteTick = time;
+  // [Tsukiyo ni Saraba]: Gate countdowns expire before sequence commands. Sweep every voice before the
+  // first track can change a shared channel's sustain state during this tick.
+  for (auto* track : tracks()) {
+    static_cast<PSDSEPS2Track*>(track)->updateDurationNotes();
+  }
+}
+
+void PSDSEPS2Seq::setChannelSustain(PSDSEPS2Track& source, bool enabled, bool releaseHeld) {
+  // [Tokimeki Memorial: Girl's Side]: SsdSetDataAddress selects channel work by the raw channel byte.
+  // Tracks with different output groups still share sustain and the native channel's voice list.
+  for (auto* track : tracks()) {
+    auto& peer = *static_cast<PSDSEPS2Track*>(track);
+    if (&peer != &source && (m_header.isEffect || PSDSEPS2::isV2(m_header.version) ||
+                            peer.m_channel != source.m_channel)) {
+      continue;
+    }
+    peer.m_sustain = enabled;
+    if (releaseHeld) {
+      peer.updateDurationNotes(true);
+    }
+  }
+}
+
+void PSDSEPS2Seq::endChannelNotes(PSDSEPS2Track& source, int key) {
+  for (auto* track : tracks()) {
+    auto& peer = *static_cast<PSDSEPS2Track*>(track);
+    if (&peer != &source && (m_header.isEffect || PSDSEPS2::isV2(m_header.version) ||
+                            peer.m_channel != source.m_channel)) {
+      continue;
+    }
+    peer.endDseNotes(key);
+  }
 }
 
 void PSDSEPS2Seq::observeEffectVelocity() {
@@ -608,6 +649,7 @@ void PSDSEPS2Track::resetVars() {
   m_gateTime = isEffect ? 15 : 127;
   m_tuning = 0;
   m_bender = 0;
+  m_sustain = false;
   m_repeatOffset = 0;
   m_repeatOctave = m_octave;
   m_dseLoopStack.clear();
@@ -619,13 +661,43 @@ void PSDSEPS2Track::resetVars() {
 }
 
 void PSDSEPS2Track::loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
+  static_cast<PSDSEPS2Seq*>(parentSeq)->updateChannelNotesOnce();
   SeqTrack::loadTrackMainLoop(stopOffset, stopTime);
   if (!active) {
     endDseNotes();
   }
 }
 
+void PSDSEPS2Track::updateDurationNotes(bool releaseHeld) {
+  // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: A gate expiry requests keyoff, but channel
+  // sustain defers that request until cleared. Retain the original gate time separately from the exported
+  // note-off so forced same-key keyoff can bypass sustain without releasing unrelated held voices.
+  for (auto it = m_durationNotes.begin(); it != m_durationNotes.end();) {
+    if (it->gateEnd > getTime()) {
+      ++it;
+      continue;
+    }
+    const bool keepHeld = m_sustain || (it->held && !releaseHeld);
+    if (keepHeld) {
+      it->held = true;
+      it->noteOff->absTime = getTime() + 1;
+    } else if (it->held) {
+      it->noteOff->absTime = getTime();
+    }
+    if (it->timeIndex != SeqEventTimeIndex::kInvalidIndex) {
+      auto& event = parentSeq->timedEventIndex().event(it->timeIndex);
+      event.duration = it->noteOff->absTime > event.startTick ? it->noteOff->absTime - event.startTick : 0;
+    }
+    if (keepHeld) {
+      ++it;
+    } else {
+      it = m_durationNotes.erase(it);
+    }
+  }
+}
+
 void PSDSEPS2Track::endDseNotes(int key) {
+  updateDurationNotes();
   for (auto it = m_durationNotes.begin(); it != m_durationNotes.end();) {
     if (it->noteOff->absTime <= getTime()) {
       it = m_durationNotes.erase(it);
@@ -717,7 +789,6 @@ void PSDSEPS2Track::addDseBankSelect(uint32_t eventOffset, uint32_t eventLength,
 }
 
 bool PSDSEPS2Track::readEvent() {
-  std::erase_if(m_durationNotes, [this](const DurationNote& note) { return note.noteOff->absTime <= getTime(); });
   const uint32_t beginOffset = curOffset;
   const uint32_t trackEnd = offset() + length();
   if (curOffset >= trackEnd) {
@@ -802,7 +873,7 @@ bool PSDSEPS2Track::readEvent() {
     // [Tsukiyo ni Saraba]: SsdForceKeyoffChannel releases an existing voice with the same source key before
     // retriggering. Different-key voices remain active, including voices whose countdown is zero.
     if (!PSDSEPS2::isV2(m_version)) {
-      endDseNotes(midiKey);
+      static_cast<PSDSEPS2Seq*>(parentSeq)->endChannelNotes(*this, midiKey);
     }
     if (duration == 0) {
       // [Tsukiyo ni Saraba]: SsdNormalTrackGate skips zero counters rather than issuing an immediate keyoff.
@@ -821,7 +892,8 @@ bool PSDSEPS2Track::readEvent() {
       if (readMode == READMODE_CONVERT_TO_MIDI) {
         m_durationNotes.push_back({midiKey, pMidiTrack->previousDurNoteOffs().back(),
                                    prevDurEventIndices.size() > previousEventCount
-                                       ? prevDurEventIndices.back() : SeqEventTimeIndex::kInvalidIndex});
+                                       ? prevDurEventIndices.back() : SeqEventTimeIndex::kInvalidIndex,
+                                   getTime() + duration, false});
       }
     }
     return true;
@@ -884,6 +956,9 @@ bool PSDSEPS2Track::readEvent() {
     }
     case 0x88: {
       const uint32_t duration = PSDSEPS2::isV2(m_version) ? readByte(curOffset++) : readEventU16LE();
+      // [Tsukiyo ni Saraba]: SsdSeqRest clears channel sustain without delivering pending keyoffs.
+      // Already-held voices retain their latch; future gate expiries use the cleared channel state.
+      static_cast<PSDSEPS2Seq*>(parentSeq)->setChannelSustain(*this, false, false);
       addRest(beginOffset, curOffset - beginOffset, duration, eventName(status, m_version));
       break;
     }
@@ -913,7 +988,7 @@ bool PSDSEPS2Track::readEvent() {
         }
         return shouldContinue;
       }
-      endDseNotes();
+      static_cast<PSDSEPS2Seq*>(parentSeq)->endChannelNotes(*this);
       addEndOfTrack(beginOffset, 1);
       return false;
     case 0x91:
@@ -1337,11 +1412,12 @@ bool PSDSEPS2Track::readEvent() {
       const uint8_t value = readByte(curOffset++);
       // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdSeqSustaion enables channel sustain for
       // values at least 64. Lower values release only voices with an already-requested keyoff; zero-countdown
-      // voices continue. The driver's same-key forced keyoff bypasses sustain, unlike MIDI channel sustain.
+      // voices continue. Deferring individual note-offs preserves forced-keyoff behavior without a MIDI pedal.
+      static_cast<PSDSEPS2Seq*>(parentSeq)->setChannelSustain(*this, value >= 64, value < 64);
       addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
-                      fmt::format("Operand: {}; sustain {}; per-voice keyoff deferral automation stub",
+                      fmt::format("Operand: {}; sustain {}; defers expired voice gates",
                                   value, value >= 64 ? "enabled" : "disabled"),
-                      VGMItem::Type::Unknown);
+                      VGMItem::Type::Sustain);
       break;
     }
     case 0xbe: {
@@ -1629,7 +1705,8 @@ bool PSDSEPS2Track::readEvent() {
         // sets volume to 100 and internal pan to 63 (the value authored by Panpot Absolute 64), and retains
         // the tuning halfword. Hardware effect and LFO resets remain synthesis automation stubs.
         // [Bakusou Dekotora Densetsu: Otoko Hanamichi Yume Roman]: The named handler performs the same reset.
-        endDseNotes();
+        static_cast<PSDSEPS2Seq*>(parentSeq)->setChannelSustain(*this, false, false);
+        static_cast<PSDSEPS2Seq*>(parentSeq)->endChannelNotes(*this);
         addControllerEventNoItem(120, 0);
         m_bender = 0;
         addDseTuning(beginOffset, 1, m_tuning, eventName(status, m_version));
