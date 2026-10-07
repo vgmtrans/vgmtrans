@@ -691,14 +691,18 @@ bool PSDSEPS2Track::readEvent() {
       // [Tokimeki Memorial: Girl's Side 2nd Kiss]: Version 0x0320 initializes note velocity from effect record +0xc.
       const uint32_t duration = PSDSEPS2::isV2(m_version) ? readByte(curOffset++) : readEventU16LE();
       uint32_t gateDuration;
-      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdEffectTrackSequence interprets effect
-      // gate values as sixteenths, with 15 shortening by two ticks and 16 preserving the full duration.
+      // [Shadow Hearts]: SsdEffectTrackSequence reads a signed gate byte and shortens gate 15 by one tick.
+      // [Xenosaga Episode I: Der Wille zur Macht]: The version 0x0250 handler shortens gate 15 by two ticks.
+      // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: Other signed gate values scale duration in
+      // sixteenths and clamp to at least one tick; gate 16 forwards the raw duration without that clamp.
       if (m_gateTime == 15) {
-        gateDuration = duration > 2 ? duration - 2 : 1;
+        const uint32_t shortening = PSDSEPS2::isV2(m_version) ? 1 : 2;
+        gateDuration = duration > shortening ? duration - shortening : 1;
       } else if (m_gateTime == 16) {
         gateDuration = duration;
       } else {
-        gateDuration = std::max<uint32_t>((duration * m_gateTime) >> 4, 1);
+        const int32_t scaled = static_cast<int32_t>(duration) * static_cast<int8_t>(m_gateTime);
+        gateDuration = static_cast<uint32_t>(std::max(scaled / 16, 1));
       }
 
       const int key = m_octave * 12 + (status & 0x0f);
@@ -732,12 +736,14 @@ bool PSDSEPS2Track::readEvent() {
       m_lastNoteDuration = duration;
     }
     m_gateDelta = duration;
-    // [Daito Giken Koushiki Pachi-Slot Simulator: 24 - Twenty Four]: SsdNormalTrackSequence scales the emitted note
-    // duration by the persistent SsdSeqGate value divided by 127; sequence timing remains controlled by delta events.
-    const uint32_t scaledDuration = static_cast<uint32_t>((static_cast<uint64_t>(duration) * m_gateTime) / 127);
+    // [Tsukiyo ni Saraba]: SsdNormalTrackSequence at 0x61cc forwards the raw duration to SsdKeyonChannel;
+    // both the wave and program paths copy it directly to the voice counter. Gate Time is read only by the
+    // effect sequencer. Delta events independently advance music sequence time.
+    // [Shadow Hearts]: SsdNormalTrackSequence stores the raw duration at 0x5c54 without gate scaling.
+    // [Tokimeki Memorial: Girl's Side 2nd Kiss]: The music handler at 0x6174 retains this raw-duration behavior.
     const int key = m_octave * 12 + (flags & 0x0f);
     addNoteByDur(beginOffset, curOffset - beginOffset, static_cast<uint8_t>(std::clamp(key, 0, 127)), status,
-                 scaledDuration);
+                 duration);
     return true;
   }
 
@@ -1202,9 +1208,10 @@ bool PSDSEPS2Track::readEvent() {
       m_gateTime = readByte(curOffset++);
       const bool isEffect = static_cast<PSDSEPS2Seq*>(parentSeq)->m_header.isEffect;
       const std::string detail = isEffect
-                                     ? fmt::format("Effect note duration scale: {}/16; 15 shortens by two ticks",
-                                                   m_gateTime)
-                                     : fmt::format("Note duration scale: {}/127", m_gateTime);
+                                     ? fmt::format("Signed effect gate: {}; scale /16; 15 shortens by {} tick(s)",
+                                                   static_cast<int>(static_cast<int8_t>(m_gateTime)),
+                                                   PSDSEPS2::isV2(m_version) ? 1 : 2)
+                                     : fmt::format("Stored gate: {}; music note durations remain unscaled", m_gateTime);
       addGenericEvent(beginOffset, curOffset - beginOffset, eventName(status, m_version),
                       detail, VGMItem::Type::DurationChange);
       break;
