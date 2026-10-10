@@ -12,7 +12,9 @@ a known, reachable numeric problem unresolved. This follow-up fixes all three.
 These issues predate cleanup2.
 
 This review compares `cb9e0b766` with the original branch tip `bc9043eb5` and records
-the follow-up on `codex/core-rewrite-cleanup2-audit`, dated October 10, 2026.
+the initial follow-up through `28e68088c` on `codex/core-rewrite-cleanup2-audit`,
+dated October 10, 2026. Further findings and fixes are recorded in the
+[continued audit](FOLLOWUP.md).
 
 ## How well it met the goals
 
@@ -39,7 +41,7 @@ core. The large resolved-instrument and voice-continuity redesigns described in
 older review documents already exist at the starting commit and should not be
 credited to cleanup2.
 
-This follow-up adds 21 net production lines to `src/value`, including bounds
+The initial follow-up adds 21 net production lines to `src/value`, including bounds
 checks and contract comments. Its simplifications remove duplicated data and work;
 the new regression tests and comparison tool are additional test code.
 

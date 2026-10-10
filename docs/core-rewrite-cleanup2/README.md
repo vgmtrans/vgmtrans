@@ -7,7 +7,8 @@ SequenceVM, typed format playback, immutable snapshots, and neutral performance
 and synth models.
 
 The [follow-up audit and fixes](REVIEW.md) independently assess these changes and
-record the subsequent corrections. This guide and the archive retain the original
+record the subsequent corrections. The [continued audit](FOLLOWUP.md) records
+additional fixes after that review. This guide and the archive retain the original
 cleanup2 scope described above.
 
 Production C++ source/header changes remove **1,640 net lines from `src/value`**:
