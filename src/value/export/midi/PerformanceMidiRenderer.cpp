@@ -1113,10 +1113,8 @@ private:
             panLevelGain = lowered.gain;
             addCombinedLevel(typedEvent.header.tick, forceControllers);
           } else if constexpr (std::is_same_v<TypedEvent, MasterLevelPerformanceEvent>) {
-            const u16 value = LevelScale::midi14FromLinear(typedEvent.linearGain);
-            track.events.push_back(midi::sysex(
-                typedEvent.header.tick,
-                {0x7f, 0x7f, 0x04, 0x01, static_cast<u8>(value & 0x7f), static_cast<u8>((value >> 7) & 0x7f), 0xf7}));
+            track.events.push_back(midi::masterVolume(typedEvent.header.tick,
+                                                      LevelScale::midi14FromLinear(typedEvent.linearGain)));
           } else if constexpr (std::is_same_v<TypedEvent, ReverbPerformanceEvent>) {
             const bool enabled = !typedEvent.voiceMask ||
                                  (sourceTrackNumber < 8 && (*typedEvent.voiceMask & (1u << sourceTrackNumber)) != 0);

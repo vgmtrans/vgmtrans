@@ -96,6 +96,7 @@ void appendInitialChannelState(MidiTrack& track, u64 tick, u8 channel, u16 bank,
   constexpr u16 defaultExpression = 127u << 7;
   constexpr u8 defaultSoundController = 64;
 
+  track.events.push_back(midi::controller(tick, channel, MidiController::PolyMode, 0));
   track.events.push_back(midi::bankSelect(tick, channel, bank, writeBankLsb));
   track.events.push_back(midi::programChange(tick, channel, 0));
   midi::appendController14(track, tick, channel, MidiController::ChannelVolume, defaultVolume);
@@ -180,30 +181,43 @@ void appendInitialChannelState(MidiTrack& track, u64 tick, u8 channel, u16 bank,
     applyMidiModulationScaling(partMidi, modulationUsage, request.modulationScaling);
     const u32 sourcePpqn = normalizedPpqn(partMidi.timebase.ppqn);
     u64 end = 0;
+    std::unordered_set<u8> initializedPorts;
     for (auto& track : partMidi.tracks) {
       // A rendered track uses at most one MIDI channel.
       std::optional<u8> channel;
+      u8 port = 0;
       end = std::max(end, track.endTick);
       for (auto& event : track.events) {
         end = std::max(end, eventEnd(event));
         if (!retime(event, sourcePpqn, midi.timebase.ppqn, cursor)) {
           return std::nullopt;
         }
-        if (partIndex != 0 && !channel) {
-          std::visit(
-              [&channel](const auto& typed) {
-                if constexpr (requires { typed.channel; }) {
-                  channel = typed.channel;
-                }
-              },
-              event.payload);
+        if (partIndex != 0) {
+          if (const auto* meta = std::get_if<MidiMetaMessage>(&event.payload);
+              meta && meta->type == 0x21 && meta->data.size() == 1) port = meta->data.front();
+          if (!channel) {
+            std::visit(
+                [&channel](const auto& typed) {
+                  if constexpr (requires { typed.channel; }) channel = typed.channel;
+                },
+                event.payload);
+          }
         }
       }
       if (partIndex != 0) {
-        // Each source MIDI assumes fresh channel state. Add the boundary after
+        // Each source MIDI assumes fresh playback state. Add the boundary after
         // retiming so controller values that happen to use ticks stay unscaled.
         MidiTrack initialState;
-        initialState.events.reserve(channel ? 32 : 0);
+        initialState.events.reserve(36);
+        if (&track == &partMidi.tracks.front()) {
+          initialState.events.push_back(midi::meta(cursor, 0x51, {0x07, 0xa1, 0x20}));  // 120 BPM
+          initialState.events.push_back(midi::meta(cursor, 0x58, {4, 2, 24, 8}));  // 4/4
+        }
+        // Other channels on this port must not reset a source master-volume
+        // command already emitted by its first track at the same boundary.
+        if (initializedPorts.insert(port).second) {
+          initialState.events.push_back(midi::masterVolume(cursor, 16383));
+        }
         const u16 bank = static_cast<u16>(part.prepared->performance()->bankMapping().at(0));
         if (channel) {
           appendInitialChannelState(initialState, cursor, *channel, bank,

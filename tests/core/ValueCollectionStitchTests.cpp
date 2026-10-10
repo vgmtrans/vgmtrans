@@ -19,6 +19,51 @@ using namespace vgmtrans::core;
 
 namespace {
 
+struct EncodedMessage {
+  u64 tick;
+  std::vector<u8> bytes;
+};
+
+// Inspect the serialized track, including ordering at a stitched boundary.
+std::vector<EncodedMessage> trackMessages(const std::vector<u8>& bytes, size_t trackIndex) {
+  const auto be32 = [&](size_t at) {
+    return (u32{bytes.at(at)} << 24) | (u32{bytes.at(at + 1)} << 16) |
+           (u32{bytes.at(at + 2)} << 8) | bytes.at(at + 3);
+  };
+  size_t cursor = 8 + be32(4);
+  for (size_t index = 0; index < trackIndex; ++index) cursor += 8 + be32(cursor + 4);
+  const size_t end = cursor + 8 + be32(cursor + 4);
+  cursor += 8;
+  const auto variableLength = [&]() {
+    u64 value = 0;
+    u8 byte;
+    do {
+      expect(cursor < end, "MIDI variable-length value must fit its track");
+      byte = bytes.at(cursor++);
+      value = (value << 7) | (byte & 0x7f);
+    } while (byte & 0x80);
+    return value;
+  };
+  std::vector<EncodedMessage> messages;
+  u64 tick = 0;
+  while (cursor < end) {
+    tick += variableLength();
+    const size_t begin = cursor;
+    const u8 status = bytes.at(cursor++);
+    if (status == 0xff || status == 0xf0) {
+      if (status == 0xff) ++cursor;
+      const u64 size = variableLength();
+      cursor += size;
+    } else {
+      expect(status >= 0x80 && status < 0xf0, "expected an explicit channel status in exported MIDI");
+      cursor += (status & 0xe0) == 0xc0 ? 1 : 2;
+    }
+    expect(cursor <= end, "MIDI message must fit its track");
+    messages.push_back({tick, {bytes.begin() + begin, bytes.begin() + cursor}});
+  }
+  return messages;
+}
+
 struct StitchProgramState {
   StitchProgramState(const SequenceProgram&, bool dirtyMidiState) : leaveDirtyMidiState(dirtyMidiState) {}
 
@@ -269,8 +314,102 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
          "used-only stitching should keep only the selected dynamic variants and their referenced samples");
 }
 
+struct BoundaryProgramState {
+  BoundaryProgramState(const SequenceProgram&, bool explicitState) : explicitState(explicitState) {}
+
+  void finalizePerformance(PerformanceSequence& performance) const {
+    if (!explicitState) return;
+    auto& conductor = performance.tracks.front();
+    conductor.events.push_back(TempoPerformanceEvent{.microsecondsPerQuarter = 750000});
+    conductor.events.push_back(TimeSignaturePerformanceEvent{.numerator = 3});
+    for (size_t index = 0; index < performance.tracks.size(); ++index) {
+      auto& track = performance.tracks[index];
+      track.events.push_back(MonoModePerformanceEvent{.channels = 1});
+      // The first channel on each port sets its master volume.
+      if (index % 15 == 0) track.events.push_back(MasterLevelPerformanceEvent{.linearGain = 0.25});
+    }
+  }
+
+  bool explicitState;
+};
+
+void stitchedPartsResetSongAndPortStateBeforeTheirOwnCommands() {
+  SourceStore sources;
+  const auto source = sources.add(SourceFile{.name = "boundary.pcm"}, {0});
+  for (const bool explicitNext : {false, true}) {
+    test::SessionSnapshotBuilder builder;
+    const AssetId bank{2};
+    builder.assets.emplace_back(SoundBankAsset{
+        .metadata = {.id = bank},
+        .instruments = {Instrument{.explicitAddress = InstrumentAddress{},
+                                    .regions = {Region{.sample = SampleRef::resolved(bank, 0)}}}},
+        .localSamples = {.samples = {Sample{.codec = AudioCodec::PcmS8, .encodedData = {source, 0, 1},
+                                            .sampleRate = 16000}}},
+    });
+    for (u32 part = 0; part < 2; ++part) {
+      auto program = probeSequenceProgram();
+      program.runtime = makeCompiledRuntime<ProbePlayback, BoundaryProgramState>(part == 0 || explicitNext);
+      for (u32 channel = 0; channel < 17; ++channel) {
+        TrackProgram track{.streams = {{.channels = {channel}}}, .startAddress = Address{0}};
+        const std::array<u8, 3> note{0x90, 60, 4};
+        const std::array<u8, 1> end{0xff};
+        addProbeCommand(track, Address{0}, probeRange(0, 3), note);
+        addProbeCommand(track, Address{3}, probeRange(3, 1), end);
+        program.tracks.push_back(std::move(track));
+      }
+      builder.assets.emplace_back(SequenceProgramAsset{.metadata = {.id = AssetId{part}},
+                                                        .program = std::move(program)});
+      builder.collections.push_back(Collection{.id = CollectionId{part},
+          .selection = {.sequence = AssetId{part}, .soundBanks = {bank}}, .inputs = {.banks = {{.bank = bank}}}});
+    }
+    const auto snapshot = builder.finish();
+    for (const bool writePorts : {false, true}) {
+      ExportRequest request;
+      request.sequence.midi.writePortMetaEvents = writePorts;
+      const std::array collections{CollectionId{0}, CollectionId{1}};
+      const auto result = stitchCollections(snapshot, sources, collections, request);
+      expect(result.complete() && result.parts[1].startTick == 4, "boundary fixture must export both parts");
+      for (size_t index = 0; index < 17; ++index) {
+        const auto messages = trackMessages(result.midi.bytes, 17 + index);
+        const auto matching = [&](std::initializer_list<u8> prefix) {
+          std::vector<std::vector<u8>> found;
+          for (const auto& message : messages) {
+            if (message.tick == 4 && message.bytes.size() >= prefix.size() &&
+                std::equal(prefix.begin(), prefix.end(), message.bytes.begin())) found.push_back(message.bytes);
+          }
+          return found;
+        };
+        if (index == 0) {
+          std::vector<std::vector<u8>> tempos{{0xff, 0x51, 3, 0x07, 0xa1, 0x20}};
+          std::vector<std::vector<u8>> signatures{{0xff, 0x58, 4, 4, 2, 24, 8}};
+          if (explicitNext) {
+            tempos.push_back({0xff, 0x51, 3, 0x0b, 0x71, 0xb0});
+            signatures.push_back({0xff, 0x58, 4, 3, 2, 24, 8});
+          }
+          expect(matching({0xff, 0x51}) == tempos && matching({0xff, 0x58}) == signatures,
+                 "each part must restore default tempo and meter before its own same-tick settings");
+        }
+        const u8 slot = index % 15;
+        const u8 status = 0xb0 | (slot >= 9 ? slot + 1 : slot);
+        expect(matching({status, 127}) == std::vector<std::vector<u8>>{{status, 127, 0}},
+               "a stitched channel must return to poly mode before its source commands");
+        const auto poly = std::ranges::find(messages, std::vector<u8>{status, 127, 0}, &EncodedMessage::bytes);
+        const auto mono = std::ranges::find(messages, std::vector<u8>{status, 126, 1}, &EncodedMessage::bytes);
+        expect(!explicitNext || (mono != messages.end() && poly < mono),
+               "an explicit mono command must override the boundary's poly reset");
+        std::vector<std::vector<u8>> volumes;
+        if (index == 0 || (writePorts && index == 15)) volumes.push_back({0xf0, 7, 0x7f, 0x7f, 4, 1, 127, 127, 0xf7});
+        if (explicitNext && index % 15 == 0) volumes.push_back({0xf0, 7, 0x7f, 0x7f, 4, 1, 0, 64, 0xf7});
+        expect(matching({0xf0, 7, 0x7f, 0x7f, 4, 1}) == volumes,
+               "master volume must reset once per output port, before any source volume on that port");
+      }
+    }
+  }
+}
+
 }  // namespace
 
 void runValueCollectionStitchTests() {
   stitchedExportCompactsBanksAndHonorsInstrumentPolicies();
+  stitchedPartsResetSongAndPortStateBeforeTheirOwnCommands();
 }

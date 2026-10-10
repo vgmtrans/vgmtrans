@@ -48,6 +48,7 @@ enum class MidiController : u8 {
   RpnParameterMsb = 101,
   AllSoundOff = 120,
   MonoMode = 126,
+  PolyMode = 127,
 };
 
 struct MidiChannelMessage {
@@ -114,6 +115,7 @@ namespace midi {
 [[nodiscard]] MidiEvent pitchBend(u64 tick, u8 channel, s16 value);
 [[nodiscard]] MidiEvent meta(u64 tick, u8 type, std::vector<u8> data, int priority = 0);
 [[nodiscard]] MidiEvent sysex(u64 tick, std::vector<u8> data, int priority = 5);
+[[nodiscard]] MidiEvent masterVolume(u64 tick, u16 value);
 
 void appendController14(MidiTrack& track, u64 tick, u8 channel, MidiController msb, u16 value, bool lsbFirst = false);
 void appendRpn(MidiTrack& track, u64 tick, u8 channel, u8 parameterMsb, u8 parameterLsb, u16 value, int priority = 18);

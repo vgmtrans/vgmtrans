@@ -40,6 +40,11 @@ MidiEvent sysex(u64 tick, std::vector<u8> data, int priority) {
   return {tick, priority, MidiSysExMessage{std::move(data)}};
 }
 
+MidiEvent masterVolume(u64 tick, u16 value) {
+  return sysex(tick, {0x7f, 0x7f, 0x04, 0x01, static_cast<u8>(value & 0x7f),
+                      static_cast<u8>((value >> 7) & 0x7f), 0xf7});
+}
+
 void appendController14(MidiTrack& track, u64 tick, u8 channel, MidiController msb, u16 value, bool lsbFirst) {
   const auto lsb = static_cast<MidiController>(static_cast<u8>(msb) + 32);
   const MidiEvent most = controller(tick, channel, msb, (value >> 7) & 0x7f);
