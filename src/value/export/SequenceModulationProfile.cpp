@@ -17,8 +17,9 @@ namespace vgmtrans::core {
 
 namespace {
 
-void observeRange(std::optional<ModulationRange>& range, double value, bool includeZero = false) {
-  if (!std::isfinite(value) || value < 0.0 || (!includeZero && value == 0.0)) {
+void observeRange(std::optional<ModulationRange>& range, double value) {
+  // Zero is a stopped oscillator or an immediate delay, not a missing setting.
+  if (!std::isfinite(value) || value < 0.0) {
     return;
   }
   if (!range) {
@@ -123,7 +124,7 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
     case ModulationPerformanceTarget::TremoloDelay:
       if (event.context.delay && event.context.delay->milliseconds) {
         auto& lfo = event.target == ModulationPerformanceTarget::VibratoDelay ? vibrato : tremolo;
-        observeRange(lfo.delay, *event.context.delay->milliseconds / 1000.0, true);
+        observeRange(lfo.delay, *event.context.delay->milliseconds / 1000.0);
       }
       break;
     case ModulationPerformanceTarget::PanDepth:

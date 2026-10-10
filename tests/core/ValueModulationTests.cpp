@@ -93,6 +93,53 @@ void modulationAnalysisReportsObservedPerformanceMaxima() {
   expect(usage.tremoloRate == 9.0 / 127.0, "performance modulation analysis should report global tremolo rate maximum");
 }
 
+void physicalModulationProfilesRetainStoppedOscillators() {
+  for (const bool startsRunning : {false, true}) {
+    PerformanceTrack track{.endTick = 24};
+    u64 nextSequence = 0;
+    u32 nextNote = 0;
+    PerformanceEmitter out{track, {}, {}, 0, nextSequence, nextNote};
+    out.vibratoDepth(1.0);
+    out.tremoloDepth(6.0);
+    out.vibratoRate(0.0);
+    out.tremoloRate(0.0);
+    if (startsRunning) {
+      out.at(12).vibratoRate(8.176);
+      out.at(12).tremoloRate(8.176);
+      out.at(24).vibratoRate(0.0);
+      out.at(24).tremoloRate(0.0);
+    }
+    const PerformanceSequence performance{.tracks = {track}};
+    const auto profile = analyzeSequenceModulation(performance);
+    expect(profile.instruments.vibrato && profile.instruments.tremolo,
+           "zero Hz is a physical LFO setting, not an absent observation");
+    for (const auto range : {profile.instruments.vibrato->rateHertz, profile.instruments.tremolo->rateHertz}) {
+      expect(range.minimum == 0.0 && range.maximum == (startsRunning ? 8.176 : 0.0),
+             "a sequence-derived frequency range must retain stopped and running settings");
+    }
+    const auto lowered = lowerSynthModulation(profile.instruments);
+    for (const auto destination : {SynthDestination::VibratoRate, SynthDestination::TremoloRate}) {
+      const auto base = std::ranges::find(lowered.generators, destination, &SynthGenerator::destination);
+      const auto control = std::ranges::find(lowered.modulators, destination, &SynthModulator::destination);
+      expect(base != lowered.generators.end() && base->amount == -16000 &&
+                 (startsRunning ? control != lowered.modulators.end() && control->amount == 16126
+                                : control == lowered.modulators.end()),
+             "synth frequency controls must span the stopped approximation and the observed running rate");
+    }
+    const auto midi = renderTestMidi(performance, {}, ModulationConversionPolicy::SynthModulators);
+    for (const auto controller : {MidiController::VibratoRate, MidiController::TremoloRate}) {
+      std::vector<std::pair<u64, s32>> values;
+      for (const auto& event : midi.tracks.front().events) {
+        if (const auto* message = midiController(event, controller)) values.emplace_back(event.tick, message->value);
+      }
+      const std::vector<std::pair<u64, s32>> expected = startsRunning
+          ? std::vector<std::pair<u64, s32>>{{0, 0}, {12, 127}, {24, 0}}
+          : std::vector<std::pair<u64, s32>>{{0, 0}};
+      expect(values == expected, "MIDI must distinguish stopping and restarting a physical LFO");
+    }
+  }
+}
+
 void physicalModulationProfileDrivesMidiAndSynthFromOnePlan() {
   PerformanceTrack track{
       .id = TrackId{0},
@@ -534,6 +581,7 @@ void observedModulationScalingPreservesQuantizationBoundaries() {
 
 void runValueModulationTests() {
   modulationAnalysisReportsObservedPerformanceMaxima();
+  physicalModulationProfilesRetainStoppedOscillators();
   physicalModulationProfileDrivesMidiAndSynthFromOnePlan();
   tempoRelativeModulationFollowsTheGlobalTempoTimeline();
   tempoRelativeModulationKeepsIndependentRatesAndDelayPolicies();
