@@ -910,8 +910,6 @@ std::vector<detail::MidiTrackEvent> detail::planMidiTrack(
     lowerPitchBends(diagnostics, events, std::move(sourceBends), physicalNotes, notes, noteIndex,
                     pitchBendTransitions, *sourcePitch, track);
   }
-  std::ranges::stable_sort(events, {},
-                           [](const MidiTrackEvent& event) { return performanceEventHeader(event).order(); });
   return events;
 }
 

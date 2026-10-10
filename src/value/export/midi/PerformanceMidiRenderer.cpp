@@ -276,6 +276,8 @@ using MidiTimeline = std::vector<const MidiTrackEvent*>;
   for (const auto& event : globalReverb) {
     timeline.push_back(&event);
   }
+  // Order once, after combining local and song-wide controls. Sorting pointers
+  // also leaves the planned values in place for the renderer's borrowed state.
   std::ranges::stable_sort(timeline, {},
                            [](const MidiTrackEvent* event) { return performanceEventHeader(*event).order(); });
   return timeline;

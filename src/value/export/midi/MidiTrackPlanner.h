@@ -65,6 +65,7 @@ using MidiTrackEvent = std::variant<
 // Completed events for one MIDI track. Instrument pointers borrow the read-only
 // prepared input, which must remain alive through rendering.
 // Source automations, inspection data, banks and address maps stay in that input.
+// The renderer orders these events together with song-wide controls.
 [[nodiscard]] std::vector<MidiTrackEvent> planMidiTrack(
     const ResolvedPerformance& performance, size_t trackIndex, const MidiExportOptions& options,
     const PerformanceTempoMap& tempos, std::vector<Diagnostic>& diagnostics);
