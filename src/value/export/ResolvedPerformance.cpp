@@ -259,9 +259,11 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
   std::set<InstrumentHandle> regionlessInstrumentWarnings;
 
   for (auto& track : performance.tracks) {
-    std::ranges::stable_sort(track.events, {}, [](const PerformanceEvent& event) {
-      return performanceEventHeader(event).order();
-    });
+    // VM output is usually chronological; format finalizers may add earlier events.
+    const auto order = [](const PerformanceEvent& event) { return performanceEventHeader(event).order(); };
+    if (!std::ranges::is_sorted(track.events, {}, order)) {
+      std::ranges::stable_sort(track.events, {}, order);
+    }
     std::unordered_map<PerformanceVoiceId, PerformanceVoiceId> voiceIds;
     InstrumentSelection selected = InstrumentAddress{};
     // Once a track uses signed channel gain, all of its pan must be baked into

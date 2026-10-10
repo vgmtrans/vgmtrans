@@ -382,9 +382,10 @@ public:
         }
       }
       // Future-dated events retain source order at the same tick.
-      std::ranges::stable_sort(track.events, [](const PerformanceEvent& lhs, const PerformanceEvent& rhs) {
-        return performanceEventHeader(lhs).tick < performanceEventHeader(rhs).tick;
-      });
+      const auto tick = [](const PerformanceEvent& event) { return performanceEventHeader(event).tick; };
+      if (!std::ranges::is_sorted(track.events, {}, tick)) {
+        std::ranges::stable_sort(track.events, {}, tick);
+      }
       targetSequence_.tracks.push_back(std::move(track));
     }
   }
