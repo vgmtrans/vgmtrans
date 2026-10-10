@@ -341,6 +341,15 @@ void zeroBasedLfoRangeExportsWithMatchingGeneratorAndController() {
              dlsArt2ContainsConnection(dls.bytes, 0x0000, 0x0114, -16000 * 65536) &&
              dlsArt2ContainsConnection(dls.bytes, 0x0008, 0x0114, 16126 * 65536),
          "serialized frequency bases and controller spans must use the same approximation in SF2 and DLS");
+
+  const SequenceModulationProfile profile{.instruments = bank.instruments.front().modulation};
+  const auto controller = [&](double hertz) {
+    return modulationControllerAmount({.target = ModulationPerformanceTarget::VibratoRate,
+                                        .context = {.frequencyHz = hertz}}, &profile);
+  };
+  expect(controller(0.0) == 0.0 && controller(8.176) == 1.0 &&
+             std::abs(controller(4.088) - 0.925) < 1e-12,
+         "MIDI rate controls must use the same -16000 to 0 cents range as the companion synth");
 }
 
 void regionModulationExportsAtTheRegionScope() {
