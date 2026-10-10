@@ -91,7 +91,7 @@ void decodeSynthPool(PreparedSynthData& prepared, SynthSampleIndexMap& indexes, 
 
     auto decoded = decodeSample(sample, sources.bytes(sample.encodedData.source));
     if (!decoded) {
-      prepared.diagnostics.push_back(exportError("Unsupported sample codec", sample.encodedData));
+      prepared.diagnostics.push_back(exportError("Could not decode sample data", sample.encodedData));
       continue;
     }
 

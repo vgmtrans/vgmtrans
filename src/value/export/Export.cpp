@@ -86,7 +86,7 @@ void appendWavArtifacts(std::vector<Artifact>& artifacts, std::string_view baseN
       } else if (auto decoded = decodeSample(sample, sources.bytes(sample.encodedData.source))) {
         artifact.bytes = encodePcm16Wav(*decoded);
       } else {
-        artifact.diagnostics.push_back(exportError("Unsupported sample codec", sample.encodedData));
+        artifact.diagnostics.push_back(exportError("Could not decode sample data", sample.encodedData));
       }
     } catch (const std::exception& ex) {
       artifact.diagnostics.push_back(exportError(ex.what(), sample.encodedData));
