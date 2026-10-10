@@ -6,6 +6,10 @@ The branch contains 83 recorded audit batches. The architecture still uses
 SequenceVM, typed format playback, immutable snapshots, and neutral performance
 and synth models.
 
+The [follow-up audit and fixes](REVIEW.md) independently assess these changes and
+record the subsequent corrections. This guide and the archive retain the original
+cleanup2 scope described above.
+
 Production C++ source/header changes remove **1,640 net lines from `src/value`**:
 1,290 architecture lines and 350 format lines. UI changes remove another 22 lines.
 Tests gain 1,038 net C++ source/header lines across 53 changed files; this includes

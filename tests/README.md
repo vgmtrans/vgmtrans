@@ -34,3 +34,26 @@ Real game data is optional and is not stored here. The parity executable retains
 its self-test and the `VGMTRANS_PARITY_*` CMake cache options for local corpora.
 Existing format executables with corpus command-line options retain those modes;
 CTest invokes them without arguments to run their synthetic regressions.
+
+To check a change against another value-core revision, build the shell at both
+revisions and put private input paths in a text file, one per line. Then run
+(Python 3.11 or later):
+
+```sh
+python3 tests/compare_value_exports.py /path/to/baseline/vgmtrans-shell \
+  /path/to/candidate/vgmtrans-shell /path/to/inputs.txt /path/to/new-results \
+  --jobs 4 --timeout 900
+```
+
+The output directory must be new. It retains binary/input hashes, raw logs, exit
+statuses, exported MIDI/SF2/DLS files, and per-case SHA-256 comparisons. Each input
+runs with synth modulation and with sampled modulation plus used instruments,
+pitch-bend transitions, and RPN tuning; both use zero extra loops. Large ROMs can
+produce many gigabytes of output because every collection is exported.
+
+Any filename, byte, normalized-log, or exit-status difference produces a nonzero
+exit code. Timeouts also fail, even when both revisions time out. Review intended
+changes separately; the script has no allowed-difference list. Matching export
+failures are reported in `baseline_nonzero_statuses` and are not evidence of
+successful conversion. This checks two value-core revisions, not legacy parity
+or audible accuracy.
