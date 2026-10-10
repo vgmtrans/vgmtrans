@@ -15,13 +15,14 @@ class SessionSnapshot;
 class SourceStore;
 
 // Standard MIDI and SoundFont data prepared from one rendered performance.
-// The retained performance supplies the source timeline used by inspectors.
+// Only the source timeline is retained for inspectors; events and prepared
+// instrument definitions are no longer needed once the output is encoded.
 struct CollectionPlayback {
   CollectionId collection;
   AssetId sequence;
   std::vector<AssetId> assetDependencies;
   std::string title;
-  PerformanceSequence performance;
+  std::vector<SourcePlaybackSpan> sourceSpans;
   std::vector<u8> midi;
   std::vector<u8> soundFont;
   std::vector<Diagnostic> diagnostics;

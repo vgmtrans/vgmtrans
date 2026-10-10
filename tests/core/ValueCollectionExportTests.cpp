@@ -1023,7 +1023,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
   expect(playback.soundFont.size() >= 12 &&
              std::string(playback.soundFont.begin() + 8, playback.soundFont.begin() + 12) == "sfbk",
          "prepared playback should contain an SF2 RIFF file");
-  expect(playback.performance.sourceSpans ==
+  expect(playback.sourceSpans ==
              std::vector<SourcePlaybackSpan>{
                  {.annotation = SourceAnnotationId{40}, .beginTick = 0, .endTick = 4},
                  {.annotation = SourceAnnotationId{41}, .beginTick = 4, .endTick = 5},

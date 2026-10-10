@@ -539,7 +539,8 @@ void completedCollectionsRetainInputsAcrossRenderingOutcomes() {
                     return Effects::wait(4);
                   }},
                   .tracks = {TrackProgram{.startAddress = Address{0}, .commands = {
-                      SourceCommand{.address = Address{0}, .flow = CommandFlow::end(Address{1})}}}}}},
+                      SourceCommand{.address = Address{0}, .annotation = SourceAnnotationId{123},
+                                      .flow = CommandFlow::end(Address{1})}}}}}},
           SoundBankAsset{
               .metadata = {.id = AssetId{1}, .name = "Bank"},
               .instruments = {Instrument{.explicitAddress = InstrumentAddress{0, 5}, .regions = {
@@ -572,8 +573,8 @@ void completedCollectionsRetainInputsAcrossRenderingOutcomes() {
     const bool rendered = scenario == Scenario::Rendered;
     expect(executions == (scenario == Scenario::Failed || rendered ? 1 : 0),
            "construction must execute the sequence only when requested, once even on failure");
-    expect(bool(prepared.performance()) == rendered && bool(prepared.rendering.performance) == rendered &&
-               prepared.rendering.diagnostics.empty() == (scenario != Scenario::Failed),
+    expect(bool(prepared.performance()) == rendered &&
+               prepared.diagnostics.empty() == (scenario != Scenario::Failed),
            "the completed result must distinguish a usable performance from skipped or failed rendering");
     expect(prepared.id == CollectionId{0} && prepared.baseName == "Collection" &&
                prepared.sequenceId.has_value() == (scenario != Scenario::NoSequence) &&
@@ -587,9 +588,11 @@ void completedCollectionsRetainInputsAcrossRenderingOutcomes() {
     if (rendered) {
       const auto& performance = *prepared.performance();
       expect(&prepared.soundBanks() == &performance.soundBanks() &&
-                 !noteById(*prepared.rendering.performance, PerformanceNoteId{0}).instrument &&
                  performance.selectionFor(noteById(performance.performance(), PerformanceNoteId{0})).instrument != nullptr,
-             "resolved events must share the final banks while source events remain available for inspection");
+             "resolved events must share the final banks after the source render has been consumed");
+      expect(performance.performance().sourceSpans == std::vector<SourcePlaybackSpan>{
+                 {.annotation = SourceAnnotationId{123}, .beginTick = 0, .endTick = 4}},
+             "consuming source events must preserve the inspection timeline through adaptation, copies, and moves");
       expect(!renderMidiSequence(performance).tracks.empty(),
              "the retained resolved performance must still render after owner moves and destruction");
     }

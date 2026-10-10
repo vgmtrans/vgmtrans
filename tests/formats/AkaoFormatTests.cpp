@@ -705,8 +705,8 @@ void ff7CollectionBindsNativeEnvelopesAndPreservesDrumDefaults() {
   expect(bound.collection.has_value(), "FF7 envelope fixture should bind successfully");
   const PreparedCollection prepared{*bound.collection, {
       .sequence = SequenceRenderOptions{}, .instruments = {.dynamicEnvelopes = true}}};
-  expect(prepared.rendering.performance.has_value(), "FF7 prepared runtime should render successfully");
-  const auto envelopes = fixtureEvents<EnvelopePerformanceEvent>(*prepared.rendering.performance);
+  expect(prepared.performance() != nullptr, "FF7 prepared runtime should render successfully");
+  const auto envelopes = fixtureEvents<EnvelopePerformanceEvent>(prepared.performance()->performance());
   expect(!envelopes.empty() && envelopes[0].update.values == psxSpuEnvelope(0x00ff, 0x5005),
          "collection preparation should supply the selected sample's native registers to B1");
   const auto& bank = prepared.soundBanks()[0];

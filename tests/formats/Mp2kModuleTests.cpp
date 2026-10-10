@@ -6,6 +6,7 @@
 
 #include "../PerformanceTestSupport.h"
 #include "../TestSupport.h"
+#include "../CollectionTestSupport.h"
 
 #include "value/export/Export.h"
 #include "value/extractors/PsfExtractor.h"
@@ -257,9 +258,10 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
 
   const CollectionPlayback playback =
       session.preparePlayback(collection.id, PlaybackRequest{.sequence = {.sequenceLoops = 0}});
-  expect(playback.playable() && playback.performance.tracks.size() == 1,
+  const auto performance = renderTestCollection(snapshot, collection.id, {.sequenceLoops = 0});
+  expect(playback.playable() && performance.tracks.size() == 1,
          "MP2k collection should prepare source-free playback");
-  const auto& track = playback.performance.tracks.front();
+  const auto& track = performance.tracks.front();
   const auto levels = eventsOfType<LevelPerformanceEvent>(track);
   const auto expressions = eventsOfType<ExpressionPerformanceEvent>(track);
   const auto balances = eventsOfType<StereoBalancePerformanceEvent>(track);
@@ -418,8 +420,8 @@ void mp2kCgbLengthClampsSequenceGateInPhysicalTime() {
   Session session;
   scanMp2k(session, "mp2k-cgb-length.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
-  const CollectionPlayback playback = session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{});
-  const auto notes = eventsOfType<NotePerformanceEvent>(playback.performance.tracks.front());
+  const auto performance = renderTestCollection(snapshot, snapshot.collections().front().id);
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(notes.size() == 1 && notes.front()->maximumDurationMilliseconds == 125.0,
          "CGB length 32 should stop a square voice after (64-32)/256 seconds");
 }
@@ -453,8 +455,8 @@ void mp2kCgbVolumeUsesCombinedHardwareQuantization() {
   Session session;
   scanMp2k(session, "mp2k-cgb-volume.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
-  const CollectionPlayback playback = session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{});
-  const auto& performanceTrack = playback.performance.tracks.front();
+  const auto performance = renderTestCollection(snapshot, snapshot.collections().front().id);
+  const auto& performanceTrack = performance.tracks.front();
   const auto notes = eventsOfType<NotePerformanceEvent>(performanceTrack);
   const auto levels = eventsOfType<LevelPerformanceEvent>(performanceTrack);
   const auto balances = eventsOfType<StereoBalancePerformanceEvent>(performanceTrack);
@@ -520,8 +522,9 @@ void mp2kCgbPanUsesDiscreteHardwareRouting() {
   std::copy(track.begin(), track.end(), bytes.begin() + 0x320);
   Session session;
   scanMp2k(session, "mp2k-cgb-pan.gba", bytes);
-  const auto playback = session.preparePlayback(session.snapshot().collections().front().id, PlaybackRequest{});
-  const auto balances = eventsOfType<StereoBalancePerformanceEvent>(playback.performance.tracks.front());
+  const auto snapshot = session.snapshot();
+  const auto performance = renderTestCollection(snapshot, snapshot.collections().front().id);
+  const auto balances = eventsOfType<StereoBalancePerformanceEvent>(performance.tracks.front());
   const auto routedAt = [&](u64 tick, double left, double right) {
     return std::ranges::any_of(balances, [&](const auto* event) {
       return event->header.tick == tick && event->leftGain == left && event->rightGain == right;
@@ -538,8 +541,8 @@ void mp2kUndefinedJumpSlotsUseFine() {
   Session session;
   scanMp2k(session, "mp2k-undefined-fine.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
-  const CollectionPlayback playback = session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{});
-  const auto notes = eventsOfType<NotePerformanceEvent>(playback.performance.tracks.front());
+  const auto performance = renderTestCollection(snapshot, snapshot.collections().front().id);
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(notes.size() == 1 && notes.front()->durationTicks == 0,
          "undefined MP2k jump-table slots should invoke ply_fine and stop active channels immediately");
 }
@@ -551,8 +554,8 @@ void mp2kPortConsumesItsRegisterOperands() {
   Session session;
   scanMp2k(session, "mp2k-port.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
-  const CollectionPlayback playback = session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{});
-  expect(eventsOfType<NotePerformanceEvent>(playback.performance.tracks.front()).size() == 1,
+  const auto performance = renderTestCollection(snapshot, snapshot.collections().front().id);
+  expect(eventsOfType<NotePerformanceEvent>(performance.tracks.front()).size() == 1,
          "PORT should consume its address and value bytes without terminating the following sequence");
 }
 
@@ -563,8 +566,8 @@ void mp2kUnknownMemaccDoesNotConsumeAJumpPointer() {
   Session session;
   scanMp2k(session, "mp2k-memacc.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
-  const CollectionPlayback playback = session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{});
-  expect(eventsOfType<NotePerformanceEvent>(playback.performance.tracks.front()).size() == 1,
+  const auto performance = renderTestCollection(snapshot, snapshot.collections().front().id);
+  expect(eventsOfType<NotePerformanceEvent>(performance.tracks.front()).size() == 1,
          "unknown MEMACC operations should consume only their three arguments, exactly like the driver");
 }
 

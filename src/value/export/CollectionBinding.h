@@ -87,8 +87,9 @@ public:
   std::string baseName;
   std::optional<AssetId> sequenceId;
   std::vector<const SamplePoolAsset*> samplePools;
-  // Retain source events for inspection independently of export adaptations.
-  RenderedCollection rendering;
+  SequenceModulationProfile modulation;
+  // Rendering failures have no performance in which to retain diagnostics.
+  std::vector<Diagnostic> diagnostics;
   MidiModulationUsage modulationUsage;
 
 private:

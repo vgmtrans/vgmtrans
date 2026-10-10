@@ -5,6 +5,7 @@
  */
 
 #include "../TestSupport.h"
+#include "../CollectionTestSupport.h"
 
 #include "value/export/CollectionBinding.h"
 #include "value/export/Export.h"
@@ -461,7 +462,8 @@ void scanRealArchive(const std::filesystem::path& path) {
   expect(binding.collection.has_value(), "real SquarePS2 collection should bind");
   const auto playback = session.preparePlayback(
       collection->id, PlaybackRequest{.sequence = {.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = 0}});
-  expect(playback.playable() && countEvents<NotePerformanceEvent>(playback.performance) != 0,
+  const auto performance = renderTestCollection(snapshot, collection->id, {.sequenceLoops = 0});
+  expect(playback.playable() && countEvents<NotePerformanceEvent>(performance) != 0,
          "real SquarePS2 BGM should prepare playable MIDI and SoundFont data");
   const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection->selection.sequence);
   size_t commands = 0;
@@ -473,7 +475,7 @@ void scanRealArchive(const std::filesystem::path& path) {
   std::cout << path.filename().string() << ": " << snapshot.sources().size() << " sources, "
             << binding.collection->soundBanks().front().instruments.size() << " instruments, "
             << (sequence == nullptr ? 0 : sequence->program.tracks.size()) << " tracks, " << commands << " commands, "
-            << countEvents<NotePerformanceEvent>(playback.performance) << " notes\n";
+            << countEvents<NotePerformanceEvent>(performance) << " notes\n";
 }
 
 }  // namespace

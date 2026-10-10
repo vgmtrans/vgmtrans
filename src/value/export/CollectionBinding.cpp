@@ -229,22 +229,25 @@ PreparedCollection::PreparedCollection(BoundCollection collection, const Collect
     : id(collection.id_), baseName(std::move(collection.baseName_)),
       sequenceId(collection.sequence_ ? std::optional{collection.sequence_->metadata.id} : std::nullopt),
       samplePools(std::move(collection.samplePools_)), snapshot_(std::move(collection.snapshot_)) {
+  RenderedCollection rendering;
   if (options.sequence) {
     rendering = renderCollection(collection, *options.sequence);
   }
+  modulation = std::move(rendering.modulation);
+  diagnostics = std::move(rendering.diagnostics);
   if (!rendering.performance) {
     soundBanks_ = std::make_shared<const std::vector<SoundBankAsset>>(std::move(collection.soundBanks_));
     return;
   }
   if (options.modulationConversion == ModulationConversionPolicy::SynthModulators &&
-      rendering.modulation.hasSynthModulation()) {
-    for (auto& bank : collection.soundBanks_) applySequenceModulation(bank, rendering.modulation);
+      modulation.hasSynthModulation()) {
+    for (auto& bank : collection.soundBanks_) applySequenceModulation(bank, modulation);
   }
-  performance_ = preparePerformance(*rendering.performance, std::move(collection.soundBanks_), options.instruments);
+  performance_ = preparePerformance(std::move(*rendering.performance), std::move(collection.soundBanks_), options.instruments);
   soundBanks_ = performance_->soundBanks_;
   if (options.modulationConversion == ModulationConversionPolicy::SynthModulators &&
       options.modulationScaling == ModulationScalingPolicy::ObservedSequenceRange) {
-    modulationUsage = analyzePerformanceModulationUsage(performance_->performance(), &rendering.modulation);
+    modulationUsage = analyzePerformanceModulationUsage(performance_->performance(), &modulation);
   }
 }
 

@@ -81,7 +81,7 @@ void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulation
       .modulationScaling = request.modulationScaling,
   });
   if (!prepared->performance()) {
-    append(diagnostics, prepared->rendering.diagnostics);
+    append(diagnostics, prepared->diagnostics);
     return nullptr;
   }
   if (!prepared->performance()->valid()) {
@@ -176,7 +176,7 @@ void appendInitialChannelState(MidiTrack& track, u64 tick, u8 channel, u16 bank,
     auto& part = parts[partIndex];
     part.startTick = cursor;
     auto partMidi = renderMidiSequence(*part.prepared->performance(), request.sequence.midi,
-                                      request.modulationConversion, &part.prepared->rendering.modulation);
+                                      request.modulationConversion, &part.prepared->modulation);
     applyMidiModulationScaling(partMidi, modulationUsage, request.modulationScaling);
     const u32 sourcePpqn = normalizedPpqn(partMidi.timebase.ppqn);
     u64 end = 0;

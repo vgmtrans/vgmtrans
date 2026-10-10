@@ -5,6 +5,7 @@
  */
 
 #include "../TestSupport.h"
+#include "../CollectionTestSupport.h"
 #include "../core/SessionSnapshotBuilder.h"
 
 #include "value/base/LevelScale.h"
@@ -360,41 +361,42 @@ void segSatCollectionBindingSuppliesVlTablesToSequence() {
 
   const CollectionPlayback playback =
       session.preparePlayback(collection.id, PlaybackRequest{.sequence = {.sequenceLoops = 0}});
-  expect(orderedPerformanceEvents<TempoPerformanceEvent>(playback.performance).size() == 1,
+  const auto performance = renderTestCollection(snapshot, collection.id, {.sequenceLoops = 0});
+  expect(orderedPerformanceEvents<TempoPerformanceEvent>(performance).size() == 1,
          "normal-stream controller IDs should not replace commands from the separate tempo stream");
-  const auto* preparedNote = firstNote(playback.performance);
-  const auto* preparedLevel = firstLevel(playback.performance);
+  const auto* preparedNote = firstNote(performance);
+  const auto* preparedLevel = firstLevel(performance);
   const double expectedNoteGain = std::pow(10.0, -(189 * 0.37529) / 20.0);
   expect(playback.playable() && preparedNote != nullptr && preparedLevel != nullptr &&
              LevelScale::midi7FromLinear(preparedNote->linearVelocity) == 33 &&
              std::abs(preparedNote->linearVelocity * preparedLevel->linearGain - expectedNoteGain) < 0.000000001,
          "collection binding should combine the VL curve and channel volume exactly at note-on");
 
-  const auto balance = std::ranges::find_if(playback.performance.tracks[0].events, [](const PerformanceEvent& event) {
+  const auto balance = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<StereoBalancePerformanceEvent>(event);
   });
-  const auto* stereo = balance != playback.performance.tracks[0].events.end()
+  const auto* stereo = balance != performance.tracks[0].events.end()
                            ? std::get_if<StereoBalancePerformanceEvent>(&*balance)
                            : nullptr;
   expect(stereo != nullptr && stereo->leftGain == 1.0 && stereo->rightGain == 0.0,
          "SegSat sequence pan should use the SCSP's stepped left and right gains");
 
   const auto instrument = std::ranges::find_if(
-      playback.performance.tracks[0].events,
+      performance.tracks[0].events,
       [](const PerformanceEvent& event) { return std::holds_alternative<InstrumentPerformanceEvent>(event); });
-  const auto* selection = instrument != playback.performance.tracks[0].events.end()
+  const auto* selection = instrument != performance.tracks[0].events.end()
                               ? std::get_if<InstrumentPerformanceEvent>(&*instrument)
                               : nullptr;
   expect(selection != nullptr && std::get<InstrumentIdentity>(selection->instrument) == segSatInstrumentIdentity(5, 0),
          "SegSat program selection should retain its source identity for collection-time address resolution");
 
-  const auto bend = std::ranges::find_if(playback.performance.tracks[0].events, [](const PerformanceEvent& event) {
+  const auto bend = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<PitchBendPerformanceEvent>(event);
   });
   const auto* pitch =
-      bend != playback.performance.tracks[0].events.end() ? std::get_if<PitchBendPerformanceEvent>(&*bend) : nullptr;
+      bend != performance.tracks[0].events.end() ? std::get_if<PitchBendPerformanceEvent>(&*bend) : nullptr;
   const auto pitchCount = std::ranges::count_if(
-      playback.performance.tracks[0].events,
+      performance.tracks[0].events,
       [](const PerformanceEvent& event) { return std::holds_alternative<PitchBendPerformanceEvent>(event); });
   expect(pitchCount == 1 && pitch != nullptr && std::abs(pitch->semitones - (-0.09375)) < 0.000001 &&
              pitch->normalizedWheelPosition && std::abs(*pitch->normalizedWheelPosition - (-0.046875)) < 0.000001,
@@ -498,7 +500,8 @@ void segSatRuntimeMapSelectsBankInsideAnotherSampleSpan() {
 
   const CollectionPlayback playback =
       session.preparePlayback(collection.id, PlaybackRequest{.sequence = {.sequenceLoops = 0}});
-  const auto* note = firstNote(playback.performance);
+  const auto performance = renderTestCollection(snapshot, collection.id, {.sequenceLoops = 0});
+  const auto* note = firstNote(performance);
   const SegSatVlTable identity{
       .rate0 = 2,
       .point0 = 127,
@@ -530,10 +533,11 @@ void segSatMultiBankPlaybackUsesTheActiveBanksVlTable() {
          "a two-bank SegSat sequence should attach both runtime-mapped instrument sets");
   const CollectionPlayback playback =
       session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{.sequence = {.sequenceLoops = 0}});
+  const auto performance = renderTestCollection(snapshot, snapshot.collections().front().id, {.sequenceLoops = 0});
 
   std::vector<std::pair<u8, const NotePerformanceEvent*>> notes;
   u8 selectedBank = 0;
-  for (const auto& event : playback.performance.tracks.front().events) {
+  for (const auto& event : performance.tracks.front().events) {
     if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
       notes.emplace_back(selectedBank, note);
     } else if (const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&event); instrument != nullptr) {
@@ -847,12 +851,13 @@ void segSatPreservesLoopMarkersWhenTheDestinationIsAController() {
     const auto& region = instrument.regions.front();
     const auto playback = session.preparePlayback(
         collection.id, PlaybackRequest{.sequence = {.loopPolicy = LoopPolicy::Preserve}});
-    expect(playback.playable() && playback.performance.tracks.size() == 16,
+    const auto performance = renderTestCollection(snapshot, collection.id, {.loopPolicy = LoopPolicy::Preserve});
+    expect(playback.playable() && performance.tracks.size() == 16,
            "controller-destination loops should retain sixteen playable Saturn channels");
-    for (size_t channel = 0; channel < playback.performance.tracks.size(); ++channel) {
+    for (size_t channel = 0; channel < performance.tracks.size(); ++channel) {
       size_t starts = 0, ends = 0, levels = 0;
       double gain = 1.0;
-      for (const auto& event : playback.performance.tracks[channel].events) {
+      for (const auto& event : performance.tracks[channel].events) {
         if (const auto* marker = std::get_if<MarkerPerformanceEvent>(&event)) {
           starts += marker->text == "Loop Start";
           ends += marker->text == "Loop End";

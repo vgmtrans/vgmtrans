@@ -231,7 +231,7 @@ std::span<const vgmtrans::core::AssetId> SequencePlayer::activeAssets() const no
 
 std::span<const vgmtrans::core::SourcePlaybackSpan> SequencePlayer::activeSourceSpans() const noexcept {
   return activePlayback_
-             ? std::span<const vgmtrans::core::SourcePlaybackSpan>(activePlayback_->performance.sourceSpans)
+             ? std::span<const vgmtrans::core::SourcePlaybackSpan>(activePlayback_->sourceSpans)
              : std::span<const vgmtrans::core::SourcePlaybackSpan>{};
 }
 
