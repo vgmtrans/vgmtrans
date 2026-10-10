@@ -285,6 +285,64 @@ void fixedPhysicalLfoValuesNeedNoZeroRangeModulators() {
          "fixed physical depth, rate, and delay should live entirely in synth base generators");
 }
 
+void physicalModulationBoundsNumericConversion() {
+  constexpr int invalidMath = FE_INVALID | FE_DIVBYZERO | FE_OVERFLOW | FE_UNDERFLOW;
+  for (const double hertz : {0.0, std::numeric_limits<double>::denorm_min(), 0.00001}) {
+    std::feclearexcept(FE_ALL_EXCEPT);
+    const s32 amount = synthAmountFromHertz(hertz);
+    expect(std::fetestexcept(invalidMath) == 0 && amount == -16000,
+           "zero and unrepresentably slow LFOs must use the synth frequency floor without invalid math");
+  }
+  std::feclearexcept(FE_ALL_EXCEPT);
+  const auto range = synthAmountFromHertzRange(0.0, 8.176);
+  expect(std::fetestexcept(invalidMath) == 0 && range == 16126,
+         "a zero-based rate range must start at the same floor as its base generator");
+  expect(synthAmountFromHertz(8.176) == 0 && synthAmountFromHertz(16.352) == 1200,
+         "ordinary frequencies must retain their absolute-cents conversion");
+
+  std::feclearexcept(FE_ALL_EXCEPT);
+  const double huge = std::numeric_limits<double>::max();
+  const s32 positive = synthAmountFromDecibels(huge);
+  const s32 negative = synthAmountFromCentibels(-huge);
+  const auto lowered = lowerSynthModulation({
+      .vibrato = VibratoSpec{.maxDepthCents = huge, .rateHertz = {8.176, 8.176},
+                             .depthMode = ModulationDepthMode::Fixed},
+      .tremolo = TremoloSpec{.maxDepthDb = huge, .rateHertz = {8.176, 8.176},
+                             .depthMode = ModulationDepthMode::Fixed},
+  });
+  expect(std::fetestexcept(invalidMath) == 0 && positive == std::numeric_limits<s32>::max() &&
+             negative == std::numeric_limits<s32>::min() &&
+             std::ranges::count(lowered.generators, std::numeric_limits<s32>::max(), &SynthGenerator::amount) == 2,
+         "large finite modulation depths must saturate before multiplication, rounding, and integer conversion");
+}
+
+void zeroBasedLfoRangeExportsWithMatchingGeneratorAndController() {
+  SourceStore sources;
+  const auto source = sources.add(SourceFile{.name = "lfo.pcm"}, {0});
+  const SoundBankAsset bank{
+      .metadata = {.id = AssetId{0}},
+      .instruments = {Instrument{
+          .regions = {Region{.sample = SampleRef::resolved(AssetId{0}, 0)}},
+          // MP2k permits a zero minimum in its physical rate range.
+          .modulation = {.vibrato = VibratoSpec{.maxDepthCents = 100, .rateHertz = {0, 8.176}}},
+      }},
+      .localSamples = {.samples = {Sample{.codec = AudioCodec::PcmS8, .encodedData = {source, 0, 1},
+                                          .sampleRate = 16000}}},
+  };
+  const SynthExportInput input{.soundBanks = prepareSynthBanksForTest(std::span{&bank, 1})};
+  std::feclearexcept(FE_ALL_EXCEPT);
+  const auto sf2 = buildSoundFont2(input, sources);
+  const auto dls = buildDls(input, sources);
+  expect(std::fetestexcept(FE_INVALID | FE_DIVBYZERO | FE_OVERFLOW) == 0 &&
+             sf2.diagnostics.empty() && dls.diagnostics.empty(),
+         "both public synth exporters must accept a zero-based physical LFO without invalid math");
+  expect(soundFontGeneratorContains(sf2.bytes, "igen", 24, -16000) &&
+             soundFontImodContains(sf2.bytes, 0x80 | 76, 24, 16126) &&
+             dlsArt2ContainsConnection(dls.bytes, 0x0000, 0x0114, -16000 * 65536) &&
+             dlsArt2ContainsConnection(dls.bytes, 0x0008, 0x0114, 16126 * 65536),
+         "serialized frequency bases and controller spans must use the same approximation in SF2 and DLS");
+}
+
 void regionModulationExportsAtTheRegionScope() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "region-lfo.pcm"}, {0});
@@ -917,6 +975,8 @@ void runValueSynthExportTests() {
   adsrApproximationLowersUnsupportedStages();
   physicalModulationLowersToLegacySynthControls();
   fixedPhysicalLfoValuesNeedNoZeroRangeModulators();
+  physicalModulationBoundsNumericConversion();
+  zeroBasedLfoRangeExportsWithMatchingGeneratorAndController();
   regionModulationExportsAtTheRegionScope();
   wavExporterWritesPcm16RiffFile();
   soundFontExporterWritesSfbkRiffFile();

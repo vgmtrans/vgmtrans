@@ -19,6 +19,13 @@ namespace vgmtrans::core {
 
 namespace {
 
+[[nodiscard]] s32 roundedSynthAmount(double amount) {
+  if (std::isnan(amount)) return 0;
+  return static_cast<s32>(std::round(std::clamp(amount,
+      static_cast<double>(std::numeric_limits<s32>::min()),
+      static_cast<double>(std::numeric_limits<s32>::max()))));
+}
+
 s32 synthAmountFromSecondsRange(double minSeconds, double maxSeconds) {
   const s32 minAmount = synthAmountFromSeconds(synthSecondsRangeMinimum(minSeconds));
   const s32 maxAmount = synthAmountFromSeconds(maxSeconds);
@@ -90,13 +97,18 @@ s32 synthAmountFromSecondsRange(double minSeconds, double maxSeconds) {
 
 s32 synthAmountFromHertz(double hertz) {
   // SF2 and DLS express LFO frequency in absolute cents relative to C-1.
-  return static_cast<s32>(std::lround(1200.0 * std::log2(hertz / 8.176)));
+  // Zero cannot be represented logarithmically. Approximate stopped/very slow
+  // rates with the SF2 LFO floor, also used by the shared controller range.
+  // Test before division so subnormal input cannot underflow into log2(0).
+  const double minimumHertz = 8.176 * std::exp2(-16000.0 / 1200.0);
+  if (!(hertz > minimumHertz)) return -16000;
+  return roundedSynthAmount(1200.0 * std::log2(hertz / 8.176));
 }
 
 s32 synthAmountFromHertzRange(double minHertz, double maxHertz) {
   const double minCents = static_cast<double>(synthAmountFromHertz(minHertz));
   const double maxCents = static_cast<double>(synthAmountFromHertz(maxHertz));
-  return static_cast<s32>(std::lround((maxCents - minCents) * 128.0 / 127.0));
+  return roundedSynthAmount((maxCents - minCents) * 128.0 / 127.0);
 }
 
 s32 synthAmountFromSeconds(double seconds) {
@@ -110,11 +122,12 @@ s32 synthAmountFromSeconds(double seconds) {
 }
 
 s32 synthAmountFromCentibels(double centibels) {
-  return static_cast<s32>(std::lround(centibels));
+  return roundedSynthAmount(centibels);
 }
 
 s32 synthAmountFromDecibels(double decibels) {
-  return static_cast<s32>(std::lround(decibels * 10.0));
+  return roundedSynthAmount(std::clamp(decibels,
+      std::numeric_limits<s32>::min() / 10.0, std::numeric_limits<s32>::max() / 10.0) * 10.0);
 }
 
 double synthSecondsRangeMinimum(double seconds) {
@@ -169,7 +182,7 @@ LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulati
           .amount = 0,
       });
     }
-    addDepth(SynthDestination::VibratoDepth, static_cast<s32>(std::lround(vibrato.maxDepthCents)), vibrato.depthMode);
+    addDepth(SynthDestination::VibratoDepth, roundedSynthAmount(vibrato.maxDepthCents), vibrato.depthMode);
     addTimingModulators(vibrato, SynthDestination::VibratoRate, SynthDestination::VibratoDelay);
   }
 

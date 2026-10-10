@@ -61,6 +61,9 @@ struct LoweredSynthModulation {
 
 // SoundFont/DLS controller units used by modulation lowering and MIDI
 // normalization. Source formats retain physical Hz/seconds instead.
+// Frequencies below the SF2 LFO floor (including zero) use -16000 absolute
+// cents. This is a slow-oscillator approximation, not a native disable command.
+// Amounts saturate before integer conversion; NaN depths become zero.
 [[nodiscard]] s32 synthAmountFromHertz(double hertz);
 [[nodiscard]] s32 synthAmountFromHertzRange(double minHertz, double maxHertz);
 [[nodiscard]] s32 synthAmountFromSeconds(double seconds);
