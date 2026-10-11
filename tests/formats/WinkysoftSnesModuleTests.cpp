@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "../MidiTestSupport.h"
 #include "../PerformanceTestSupport.h"
 #include "../TestSupport.h"
 #include "ValueFormatCorpus.h"
@@ -140,7 +141,10 @@ void lowPitchCorrectionBorrowsFromTheSemitone() {
   const auto performance = SequenceVm().render(fixture.parse().program);
   const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks[0]);
   expect(notes.size() == 1, "low-key fixture must produce one note");
-  const double pitch = 4096 * std::exp2((notes.front()->key - unityKey(data.instruments[0], data)) / 12);
+  const auto bends = eventsOfType<PitchBendPerformanceEvent>(performance.tracks[0]);
+  expect(!bends.empty(), "low-key fixture must retain its fractional pitch");
+  const double pitch = 4096 * std::exp2(
+      (notes.front()->key + bends.front()->semitones - unityKey(data.instruments[0], data)) / 12);
   expect(std::abs(pitch - 158) < 0.0001,
          "source key 15 with unity tuning must produce DSP pitch 158, including the low-key borrow");
 }
@@ -192,7 +196,10 @@ void vibratoMatchesEmulatedPitchWords() {
     const auto performance = SequenceVm().render(fixture.parse().program);
     const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks[0]);
     const auto bends = eventsOfType<PitchBendPerformanceEvent>(performance.tracks[0]);
+    const auto midi = renderTestMidi(performance);
+    const auto midiAttacks = midiNotes(midi.tracks[0].events);
     expect(notes.size() == 1 && performance.diagnostics.empty(), "vibrato fixture must render one sustained voice");
+    expect(midiAttacks.size() == 1, "vibrato must preserve a single MIDI attack");
     const auto& expected = version == Version::Early ? early : modern;
     for (size_t tick = 0; tick < expected.size(); ++tick) {
       double bend = 0;
@@ -202,6 +209,38 @@ void vibratoMatchesEmulatedPitchWords() {
       const double pitch = 4096 * std::exp2((notes[0]->key + bend - unityKey(data.instruments[0], data)) / 12);
       expect(std::abs(pitch - expected[tick]) < 0.0001,
              "vibrato must retain the early multiplier behavior and late low-byte/carry behavior");
+      const double midiKey = midiAttacks[0].key + midiPitchSemitonesAt(midi.tracks[0].events, tick);
+      const double expectedKey = unityKey(data.instruments[0], data) + 12 * std::log2(expected[tick] / 4096.0);
+      expect(std::abs(midiKey - expectedKey) < 0.002,
+             "MIDI vibrato must preserve the fractional attack pitch within wheel precision");
+    }
+  }
+}
+
+void pitchMultipliersAndLegatoPreserveFractionalTuning() {
+  Fixture fixture;
+  fixture.write(0x6000, {0x7b,0,0x72,64,0,0x70,55,0,0x35,0xc0,40,1,
+                        0x70,56,2,0x70,59,2,0x70,64,2,0x35,0x37,0x7e,1,0x39,0xc0,1,2,0x78});
+  const auto data = readDriverData(fixture.reader(), *findLayout(fixture.reader()));
+  const auto performance = SequenceVm().render(fixture.parse().program);
+  expect(performance.diagnostics.empty(), "pitch multiplier fixture must render without diagnostics");
+  // Pitch words for source key $35 at multipliers 55, 56, 59, 64, followed
+  // by legato keys $35/$37 and a fresh $39 attack. The first key is fractional.
+  constexpr std::array<u16, 13> pitches{1228,1251,1251,1318,1318,1430,1430,1430,1430,1606,1606,1804,1804};
+  for (const auto mode : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
+    const auto midi = renderTestMidi(performance, {.pitchTransitions = mode});
+    const auto& events = midi.tracks[0].events;
+    const auto attacks = midiNotes(events);
+    for (u64 tick = 0; tick < pitches.size(); ++tick) {
+      // Native portamento briefly overlaps the old key with the new attack.
+      const auto attack = std::find_if(attacks.rbegin(), attacks.rend(), [tick](const auto& note) {
+        return note.tick <= tick && tick < note.tick + note.duration;
+      });
+      expect(attack != attacks.rend(), "pitch fixture must retain its sounding MIDI voice");
+      const double midiKey = attack->key + midiPitchSemitonesAt(events, tick);
+      const double expectedKey = unityKey(data.instruments[0], data) + 12 * std::log2(pitches[tick] / 4096.0);
+      expect(std::abs(midiKey - expectedKey) < 0.002,
+             "MIDI must preserve multiplier pitch through bends, legato changes, and fresh attacks");
     }
   }
 }
@@ -220,7 +259,8 @@ void repeatsCallsAndPercussionPreserveDriverState() {
   const auto layout = *findLayout(fixture.reader());
   const auto data = readDriverData(fixture.reader(), layout);
   const double drumKey = unityKey(data.instruments[1], data) + 12 * std::log2(512.0 / 4096.0);
-  expect(std::abs(notes.back()->key - drumKey) < 0.0001,
+  const auto bends = eventsOfType<PitchBendPerformanceEvent>(performance.tracks[0]);
+  expect(!bends.empty() && std::abs(notes.back()->key + bends.back()->semitones - drumKey) < 0.0001,
          "percussion uses the instrument pitch word directly rather than melodic note transposition");
 }
 
@@ -276,6 +316,7 @@ void runTests() {
   tempoRampsUseTheCarryAndVersionSpecificCadence();
   panSequencesAndNoiseRetainTheirState();
   vibratoMatchesEmulatedPitchWords();
+  pitchMultipliersAndLegatoPreserveFractionalTuning();
   repeatsCallsAndPercussionPreserveDriverState();
   declaredLoopsUseTheExportLoopPolicy();
   truncatedOperandsCannotExecuteOrLaunchTracks();

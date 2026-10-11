@@ -23,6 +23,9 @@ namespace {
 
 constexpr u32 kCommandLimit = 1'000'000;
 constexpr u32 kDecodeLimit = 65536;
+// Keep DSP tuning/modulation independent of the primary wheel consumed by
+// MIDI portamento when lowering a legato key change.
+constexpr PitchBendLayerId kDspPitchLayer{1};
 
 struct PanStep {
   std::optional<u8> position;
@@ -229,7 +232,7 @@ struct Playback : SequencePlayback<TrackState> {
     }
     const double bend = pitchKey(dspPitch()) - track.key;
     if (bend != track.lastPitch) {
-      out.pitchBend(bend);
+      out.pitchBend(bend, kDspPitchLayer);
       track.lastPitch = bend;
     }
   }
@@ -381,17 +384,21 @@ struct Playback : SequencePlayback<TrackState> {
     const u32 voice = out.sourceTrackNumber() < 8 ? out.sourceTrackNumber() : out.sourceTrackNumber() - 2;
     track.noise = (program.dsp[0x3d] & (1u << voice)) != 0;
     const double soundingKey = track.noise ? 60.0 : pitchKey(dspPitch());
-    NotePerformanceEvent event{.key = soundingKey, .durationTicks = 1,
+    // MIDI keys are integral. Keep the fractional DSP pitch in the bend so
+    // later multipliers, drift, and vibrato retain the same tuning anchor.
+    const double noteKey = std::clamp(std::round(soundingKey), 0.0, 127.0);
+    const double bend = soundingKey - noteKey;
+    NotePerformanceEvent event{.key = noteKey, .durationTicks = 1,
                                 .restartsEnvelope = retrigger, .restartsLfoPhase = retrigger};
     if (track.noise) {
       event.instrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain),
           .key = noiseInstrumentKey(track.instrument, program.dsp[0x6c] & 31)};
     }
-    out.pitchBend(0);
+    out.pitchBend(bend, kDspPitchLayer);
     track.note = !retrigger && track.note.valid() ? out.continueVoice(track.note, std::move(event))
                                                  : out.note(std::move(event));
-    track.key = soundingKey;
-    track.lastPitch = 0;
+    track.key = noteKey;
+    track.lastPitch = bend;
     track.sounding = true;
     // Inline velocity/gate controls apply after the key-on decision.
     if (suffix == 0x7d) {

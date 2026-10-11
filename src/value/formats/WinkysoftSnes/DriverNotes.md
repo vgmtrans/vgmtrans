@@ -166,7 +166,14 @@ adds a fractional correction above key 51 and below key 19, interpolates using
 the **low byte** of the table-word difference, shifts by octave, and applies
 patch tuning. The low-key correction is signed 8.8: its borrow decrements the
 semitone before lookup. Eight-bit key doubling and sixteen-bit truncation are
-preserved. Notes export fractional keys relative to the sample's unity key.
+preserved. Notes use integral MIDI keys relative to the sample's unity key,
+with the fractional pitch retained in the bend. Subsequent pitch updates use
+that same integral anchor, including across legato notes. DSP tuning and
+modulation use a separate bend layer so native MIDI portamento cannot reset
+them when lowering a legato key change. Rounding a note while keeping bends
+relative to its fractional key loses a constant offset:
+about 36 cents in Neo-Granzon's opening slide (SRW EX), and about 42 cents in
+the opening melody of Main Theme ~ Crossing through Time (SRW3).
 
 The early pitch writer doubles the truncated low-byte product, losing its
 carry. Its vibrato overwrites the pitch multiplier with a positive triangle
