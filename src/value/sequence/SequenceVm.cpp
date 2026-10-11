@@ -213,7 +213,8 @@ public:
       : track_(track), sourceTrackId_(sourceTrackId), sequenceRuntime_(runtime), behavior_(program.behavior),
         options_(options), targetSequence_(targetSequence), outputSequence_(outputSequence),
         programState_(programState),
-        position_{.command = program.sectionPlaylist ? std::nullopt : track_.commandIndex(track_.startAddress)} {
+        position_{.command = program.sectionPlaylist || !stream.initiallyActive
+                                 ? std::nullopt : track_.commandIndex(track_.startAddress)} {
     if (stream.channels.empty()) {
       throw std::invalid_argument("A sequence stream must have at least one channel");
     }
@@ -227,7 +228,7 @@ public:
       auto& channel = channels_.back();
       addInitialTrackEvents(outputAt(channel, 0), behavior_, channel.performance.id.value == 0);
     }
-    if (!program.sectionPlaylist && !position_.command && !track_.commands.empty()) {
+    if (!program.sectionPlaylist && stream.initiallyActive && !position_.command && !track_.commands.empty()) {
       warn(fmt::format("Sequence track start ${:04X} was not decoded", track_.startAddress.value), {});
     }
   }
@@ -244,6 +245,9 @@ public:
     return addTicks(tick_, observesEachWaitTick() ? 1 : position_.pendingTicks);
   }
   [[nodiscard]] std::optional<u64> loopStopTick() const noexcept { return loopStopTick_; }
+  [[nodiscard]] std::optional<Effects::StreamStart> takeStreamStart() {
+    return std::exchange(streamStart_, std::nullopt);
+  }
 
   [[nodiscard]] SequenceCoordinatorSignal executeNext() {
     if (!sectionEntered_ && position_.command && executedCommands_ < behavior_.commandLimit) {
@@ -294,7 +298,7 @@ public:
       }
       const SequenceCoordinatorSignal signal = executeCommand();
       position_.delayedCommand = false;
-      if (signal != SequenceCoordinatorSignal::None) {
+      if (signal != SequenceCoordinatorSignal::None || streamStart_) {
         return signal;
       }
       if (!hadLoopStop && loopStopTick_) {
@@ -325,6 +329,11 @@ public:
     if (start && !position_.command) {
       warn(fmt::format("Sequence section target ${:04X} was not decoded", start->value), {});
     }
+  }
+
+  void startStream(Address start, u64 tick) {
+    trimAt(tick, true);
+    beginSection(start, tick);
   }
 
   [[nodiscard]] StreamPosition synchronizedLoopSnapshot(u64 boundary) const {
@@ -497,7 +506,7 @@ private:
       effects = sequenceRuntime_.execute(command, programState_, channel->state, out, vm);
     }
     if (duringWait) {
-      if (effects.advanceTicks != 0 || effects.flowOverride ||
+      if (effects.advanceTicks != 0 || effects.flowOverride || effects.streamStart ||
           command.flow.defaultTransition.kind != CommandTransitionKind::Fallthrough) {
         throw std::logic_error("A command executed during a wait must not advance time or alter control flow");
       }
@@ -505,6 +514,7 @@ private:
       scheduleTicks(commandIndex, effects.advanceTicks);
     }
     const CommandTransition effectiveTransition = effects.flowOverride.value_or(command.flow.defaultTransition);
+    streamStart_ = effects.streamStart;
     if (command.annotation.valid()) {
       u64 endTick = addTicks(tick_, std::max(effects.advanceTicks, 1u));
       if (channel) {
@@ -701,6 +711,7 @@ private:
   std::optional<u64> loopStopTick_;
   u32 loopRepeats_ = 0;
   bool arrivedByControlFlow_ = true;
+  std::optional<Effects::StreamStart> streamStart_;
 };
 
 }  // namespace detail
@@ -768,6 +779,10 @@ Effects VmApi::call(Address destination) const noexcept {
 
 Effects VmApi::return_() const noexcept {
   return Effects{.flowOverride = CommandTransition::return_()};
+}
+
+Effects VmApi::startStream(u32 index, Address destination, u32 delayTicks) const noexcept {
+  return Effects{.streamStart = Effects::StreamStart{index, destination, delayTicks}};
 }
 
 bool VmApi::inSubroutine() const noexcept {
@@ -915,6 +930,15 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
       }
 
       const SequenceCoordinatorSignal signal = executors[selected].executeNext();
+      if (const auto start = executors[selected].takeStreamStart()) {
+        if (start->index < executors.size()) {
+          executors[start->index].startStream(start->destination,
+                                             addTicks(executors[selected].tick(), start->delayTicks));
+        } else {
+          target.diagnostics.push_back(Diagnostic{.severity = Severity::Warning,
+                                                   .message = "Sequence stream-start index is out of range"});
+        }
+      }
       if (signal == SequenceCoordinatorSignal::SynchronizedLoopStart && !playlist) {
         const u64 boundary = executors[selected].tick();
         synchronizedLoopSnapshot.clear();

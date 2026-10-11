@@ -93,6 +93,12 @@ template <class Playback, class Callable, class... Arguments>
     throw std::overflow_error("Compiled sequence command advanced time beyond the supported range");
   }
   first.advanceTicks += second.advanceTicks;
+  if (second.streamStart) {
+    if (first.streamStart) {
+      throw std::logic_error("Compiled sequence command started more than one stream");
+    }
+    first.streamStart = second.streamStart;
+  }
   if (second.flowOverride) {
     if (first.flowOverride) {
       throw std::logic_error("Compiled sequence command produced more than one control-flow override");

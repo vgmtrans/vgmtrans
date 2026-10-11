@@ -195,6 +195,7 @@ struct SourceCommandRef {
 struct SequenceStream {
   // One instruction position, clock, and call/loop state serve these channels.
   std::vector<u32> channels{0};
+  bool initiallyActive = true;
 };
 
 struct TrackProgram {

@@ -327,6 +327,7 @@ public:
   [[nodiscard]] Effects declaredLoop(Address destination) const noexcept;
   [[nodiscard]] Effects call(Address destination) const noexcept;
   [[nodiscard]] Effects return_() const noexcept;
+  [[nodiscard]] Effects startStream(u32 index, Address destination, u32 delayTicks = 0) const noexcept;
   [[nodiscard]] bool inSubroutine() const noexcept;
 
   // Formats can manage repeat counters directly when their driver does not fit

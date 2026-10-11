@@ -413,6 +413,10 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/TriAcePS1/TriAcePS1Module.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/TriAcePS1/TriAcePS1Sequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/TriAcePS1/TriAcePS1Synth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/WinkysoftSnes/WinkysoftSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/WinkysoftSnes/WinkysoftSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/WinkysoftSnes/WinkysoftSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/WinkysoftSnes/WinkysoftSnesSynth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/WolfTeamSnes/WolfTeamSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/WolfTeamSnes/WolfTeamSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/WolfTeamSnes/WolfTeamSnesSequence.cpp
@@ -461,6 +465,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/TamsoftPS1/TamsoftPS1.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/WinkysoftSnes/WinkysoftSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/WolfTeamSnes/WolfTeamSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.h
 )

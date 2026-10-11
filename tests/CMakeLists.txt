@@ -124,6 +124,7 @@ add_value_format_test(vgmtrans-tri-ace-ps1-tests
   formats/TriAcePS1ModuleTests.cpp runTriAcePs1ModuleTests)
 add_value_test(vgmtrans-wolf-team-snes-tests
   formats/WolfTeamSnesModuleTests.cpp formats/WolfTeamSnesTestMain.cpp)
+add_value_test(vgmtrans-winkysoft-snes-tests formats/WinkysoftSnesModuleTests.cpp)
 
 if(ENABLE_UI_QT)
   add_executable(vgmtrans-value-ui-tests ui/ValueUiModelTests.cpp)

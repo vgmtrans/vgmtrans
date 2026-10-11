@@ -1680,6 +1680,51 @@ void sequenceVmClosesActiveNotesAtLoopCutoff() {
          "loop cutoff should retain the finalized Note On source span");
 }
 
+void sequenceVmStartsDormantStreamsAndInterruptsWaits() {
+  SequenceProgram program{
+      .runtime = {.execute = [](const SourceCommand& command, std::any&, std::any&,
+                                PerformanceEmitter& out, VmApi& vm) {
+        switch (command.address.value) {
+          case 0: return Effects::wait(2);
+          case 1: return vm.startStream(1, Address{100});
+          case 2: return Effects::wait(3);
+          case 3: return vm.startStream(1, Address{102});
+          case 100:
+            out.noteOn(60, 1.0);
+            out.note(67, 1.0, 30);
+            return Effects::wait(20);
+          case 102: out.noteOn(64, 1.0); return Effects::wait(2);
+          case 103: out.allNotesOff(); break;
+        }
+        return Effects{};
+      }},
+      .tracks = {{.startAddress = Address{0}},
+                  {.streams = {{.channels = {1}, .initiallyActive = false}}, .startAddress = Address{100}}},
+  };
+  auto& caller = program.tracks[0];
+  for (u32 i = 0; i < 5; ++i) {
+    appendTestCommand(caller, Address{i}, 0, {}, {}, i == 4 ? CommandFlow::end(Address{5})
+                                                          : CommandFlow::fallthroughTo(Address{i + 1}));
+  }
+  auto& child = program.tracks[1];
+  appendTestCommand(child, Address{100}, 0, {}, {}, CommandFlow::fallthroughTo(Address{101}));
+  appendTestCommand(child, Address{101}, 0, {}, {}, CommandFlow::end(Address{102}));
+  appendTestCommand(child, Address{102}, 0, {}, {}, CommandFlow::fallthroughTo(Address{103}));
+  appendTestCommand(child, Address{103}, 0, {}, {}, CommandFlow::end(Address{104}));
+  const auto rendered = SequenceVm().render(program);
+  const auto notes = eventsOfType<NotePerformanceEvent>(rendered.tracks[1]);
+  expect(rendered.diagnostics.empty() && notes.size() == 3 && notes[0]->header.tick == 2 &&
+             notes[0]->durationTicks == 3 && notes[1]->durationTicks == 3 &&
+             notes[2]->header.tick == 5 && notes[2]->durationTicks == 2 &&
+             rendered.tracks[1].endTick == 7,
+         "stream starts must activate dormant streams at the caller tick and interrupt pending waits and notes");
+
+  program.runtime.execute = [](const SourceCommand&, std::any&, std::any&, PerformanceEmitter&, VmApi& vm) {
+    return vm.startStream(99, Address{0});
+  };
+  expect(!SequenceVm().render(program).diagnostics.empty(), "invalid stream indexes must be diagnosed safely");
+}
+
 }  // namespace
 
 void runValueSequenceVmTests() {
@@ -1721,4 +1766,5 @@ void runValueSequenceVmTests() {
   sequenceVmExecutesFiniteAndInfiniteSectionPlaylistRepeats();
   sequenceVmPairsNoteOnAndNoteOffCommands();
   sequenceVmClosesActiveNotesAtLoopCutoff();
+  sequenceVmStartsDormantStreamsAndInterruptsWaits();
 }

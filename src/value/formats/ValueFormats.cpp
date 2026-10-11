@@ -48,6 +48,7 @@
 #include "value/formats/SuzukiSnes/SuzukiSnes.h"
 #include "value/formats/TamsoftPS1/TamsoftPS1.h"
 #include "value/formats/TriAcePS1/TriAcePS1.h"
+#include "value/formats/WinkysoftSnes/WinkysoftSnes.h"
 #include "value/formats/WolfTeamSnes/WolfTeamSnes.h"
 #include "value/session/Session.h"
 
@@ -144,6 +145,7 @@ void registerValueFormats(core::Session& session,
   session.registerFormat(suzuki_snes::module());
   session.registerFormat(tamsoft_ps1::module());
   session.registerFormat(triace_ps1::triAcePs1Module());
+  session.registerFormat(winkysoft_snes::module());
   session.registerFormat(wolf_team_snes::module());
 }
 

@@ -70,6 +70,15 @@ struct Effects {
   // instead of the decoded default.
   std::optional<CommandTransition> flowOverride;
 
+  // Start or replace one execution stream relative to this command's tick. The index
+  // follows SequenceProgram's track/stream order, as playlist entries do.
+  struct StreamStart {
+    u32 index = 0;
+    Address destination;
+    u32 delayTicks = 0;
+  };
+  std::optional<StreamStart> streamStart;
+
   [[nodiscard]] static constexpr Effects wait(u32 ticks) noexcept { return Effects{.advanceTicks = ticks}; }
 };
 
