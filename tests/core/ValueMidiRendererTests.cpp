@@ -817,6 +817,35 @@ void performanceMidiRendererLowersStructuredScalarAutomationPoints() {
          "structured scalar automation should lower identically to the same exact flat performance points");
 }
 
+void performanceMidiRendererPreservesSourceVoiceCuts() {
+  PerformanceTrackFixture fixture{16};
+  fixture.out.note(60, 1.0, 2);  // Its release tail can still be sounding.
+  fixture.out.at(4).note(62, 1.0, 12);
+  fixture.out.at(6).silence();
+  fixture.out.at(6).pitchBend(1.0);
+  fixture.out.at(8).note(64, 1.0, 4);
+  PerformanceSequence performance{.timebase = {.ppqn = 48}, .tracks = {fixture.track}};
+  performance.tracks.push_back(PerformanceTrack{
+      .id = TrackId{1},
+      .sourceTrackNumber = 1,
+      .endTick = 16,
+      .events = {NotePerformanceEvent{.header = {.track = TrackId{1}}, .key = 48, .durationTicks = 16}}});
+  const auto midi = renderTestMidi(performance);
+  const auto& events = midi.tracks[0].events;
+  const auto cut = std::ranges::find_if(
+      events, [](const MidiEvent& event) { return isMidiController(event, MidiController::AllSoundOff); });
+  const auto bend = std::ranges::find_if(events, [](const MidiEvent& event) {
+    return event.tick == 6 && isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+  });
+  expect(cut != events.end() && cut->tick == 6 && bend != events.end() && cut->priority < bend->priority,
+         "source voice cuts must stop release tails before same-tick pitch changes, without an export option");
+  const auto notes = midiNotes(midi.tracks[0].events);
+  expect(notes.size() == 3 && notes[0].duration == 2 && notes[1].duration == 2 && notes[2].duration == 4,
+         "a cut must truncate open duration gates so their later note-offs cannot stop replacement voices");
+  expect(midiNotes(midi.tracks[1].events).front().duration == 16,
+         "a source cut must leave other tracks' voices untouched");
+}
+
 void performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates() {
   PerformanceTrack track{.id = TrackId{0}, .endTick = 4};
   u64 nextSequence = 0;
@@ -958,6 +987,7 @@ void runValueMidiRendererTests() {
   performanceMidiRendererRetainsPanLawDuringLfoSimulation();
   performanceMidiRendererHonorsMidiExportOptions();
   performanceMidiRendererCanTerminatePreviousVoices();
+  performanceMidiRendererPreservesSourceVoiceCuts();
   performanceMidiRendererLowersStructuredScalarAutomationPoints();
   performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates();
   performanceMidiRendererSuppressesRedundantReverbSends();

@@ -230,6 +230,64 @@ void samplesAreDiscoveredWithoutTheDspDirectory() {
          "a one-shot BRR sample must ignore its unused loop offset");
 }
 
+void capturedGainRampsContinueOncePerDriverTick() {
+  for (const auto version : {Version::Waterworld, Version::JurassicPark2}) {
+    Fixture f(version);
+    f.word(0x6b, 0);
+    f.word(0x6f, 0x2000);
+    f.bytes[0x64] = 3;
+    f.bytes[0x67] = 96;
+    const auto p = SequenceVm().render(f.program());
+    for (const auto& track : p.tracks) {
+      const auto levels = eventsOfType<StereoBalancePerformanceEvent>(track);
+      expect(levels.size() >= 3 && levels[0]->header.tick == 0 && levels[0]->leftGain == 3.0 / 128 &&
+                 levels[1]->header.tick == 2 && levels[1]->leftGain == 7.0 / 128 && levels[2]->header.tick == 4 &&
+                 levels[2]->leftGain == 11.0 / 128,
+             "a captured fade-in must advance on base ticks, once for all eight voices");
+    }
+
+    // Mission Theme 1 is captured at zero gain, one tick before target 96.
+    f.bytes[0x64] = 1;
+    f.word(0x6f, 1);  // Final ticks snap to the target, independent of rounding.
+    const auto unmuted = SequenceVm().render(f.program());
+    expect(eventsOfType<StereoBalancePerformanceEvent>(unmuted.tracks.front())[0]->leftGain == 11.0 / 128,
+           "a one-tick fade-in must restore music gain before the first delayed KON");
+
+    f.word(0x6b, 0x60aa);
+    f.word(0x6f, static_cast<u16>(-0x2055));
+    f.bytes[0x64] = 3;
+    f.bytes[0x67] = 0;
+    const auto faded = SequenceVm().render(f.program());
+    const auto levels = eventsOfType<StereoBalancePerformanceEvent>(faded.tracks.front());
+    expect(levels.size() >= 3 && levels[0]->leftGain == 7.0 / 128 && levels[1]->leftGain == 3.0 / 128 &&
+               levels[2]->leftGain == 0,
+           "signed 8.8 fade-out steps must retain their fraction and reach an exact zero target");
+
+    f.bytes[0x64] = 0;
+    f.word(0x6b, 0x6000);
+    f.bytes[0x63] = 1;
+    f.bytes[0x66] = 0;
+    const auto masterMuted = SequenceVm().render(f.program());
+    expect(eventsOfType<StereoBalancePerformanceEvent>(masterMuted.tracks.front())[0]->leftGain == 0,
+           "song initialization must retain a pending host master-gain ramp");
+  }
+}
+
+void retriggersCutReleaseTailsButReleasesAndSlidesDoNot() {
+  Fixture f;
+  for (u32 track = 0; track < 8; ++track) {
+    f.commands(track, {0xea, 0x99, 1, 0x99, 1, 0xbe, 1, 0x99, 1, 0xcf, 0x99, 1, 1, 0xbe, 1, 0xc7});
+  }
+  const auto p = SequenceVm().render(f.program());
+  const auto notes = eventsOfType<NotePerformanceEvent>(p.tracks.front());
+  const auto cuts = eventsOfType<SilencePerformanceEvent>(p.tracks.front());
+  expect(notes.size() == 3 && cuts.size() == 2 && cuts[0]->header.tick == 4 && cuts[1]->header.tick == 12,
+         "only retriggers must cut the hardware voice, including a tail from an already released note");
+  expect(notes[0]->header.tick == 2 && notes[0]->durationTicks == 2 && notes[1]->header.tick == 6 &&
+             notes[2]->header.tick == 14,
+         "KOFF must precede the next delayed KON by one base tick without changing ordinary note gates");
+}
+
 void zeroSustainThresholdNeverStartsTheSustainTimer() {
   Fixture f;
   f.bytes[0x3005 + 4] = 31;
@@ -486,6 +544,8 @@ int main(int argc, char** argv) {
     partialBarrierPrimesTheNextStream();
     revisionVolumeAndSlidesUseDriverArithmetic();
     samplesAreDiscoveredWithoutTheDspDirectory();
+    capturedGainRampsContinueOncePerDriverTick();
+    retriggersCutReleaseTailsButReleasesAndSlidesDoNot();
     zeroSustainThresholdNeverStartsTheSustainTimer();
     zeroPitchIsSilentAndRecoversOnTheNextNote();
     alternatingSpeedsFollowEachRevision();

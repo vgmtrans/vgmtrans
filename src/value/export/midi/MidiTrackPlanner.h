@@ -54,13 +54,13 @@ struct MidiInstrumentEvent {
 // Controls retain their musical values until encoding. Source-only envelope
 // updates and pitch-transition settings have already been consumed by preparation
 // and lowering, respectively. Notes and instrument changes use completed decisions.
-using MidiTrackEvent = std::variant<
-    MidiNoteBoundary, MidiInstrumentEvent, LevelPerformanceEvent, ExpressionPerformanceEvent,
-    PanPerformanceEvent, ChannelPanPerformanceEvent,
-    StereoBalancePerformanceEvent, MasterLevelPerformanceEvent, ReverbPerformanceEvent, MonoModePerformanceEvent,
-    TuningPerformanceEvent, MidiPortamentoEvent, PortamentoEnablePerformanceEvent, PitchBendPerformanceEvent,
-    PitchBendRangePerformanceEvent,
-    LegatoPedalPerformanceEvent, ModulationPerformanceEvent, MarkerPerformanceEvent>;
+using MidiTrackEvent =
+    std::variant<MidiNoteBoundary, SilencePerformanceEvent, MidiInstrumentEvent, LevelPerformanceEvent,
+                 ExpressionPerformanceEvent, PanPerformanceEvent, ChannelPanPerformanceEvent,
+                 StereoBalancePerformanceEvent, MasterLevelPerformanceEvent, ReverbPerformanceEvent,
+                 MonoModePerformanceEvent, TuningPerformanceEvent, MidiPortamentoEvent,
+                 PortamentoEnablePerformanceEvent, PitchBendPerformanceEvent, PitchBendRangePerformanceEvent,
+                 LegatoPedalPerformanceEvent, ModulationPerformanceEvent, MarkerPerformanceEvent>;
 
 // Completed events for one MIDI track. Instrument pointers borrow the read-only
 // prepared input, which must remain alive through rendering.

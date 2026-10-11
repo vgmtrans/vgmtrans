@@ -101,6 +101,12 @@ struct NotePerformanceEvent {
   PerformanceVoiceId voice;
 };
 
+// Stops every sounding voice on this track, including released notes' tails.
+// Ordinary note gates only start the instrument's release envelope.
+struct SilencePerformanceEvent {
+  PerformanceEventHeader header;
+};
+
 struct TempoPerformanceEvent {
   PerformanceEventHeader header;
   u32 microsecondsPerQuarter = 500000;
@@ -411,14 +417,14 @@ struct MarkerPerformanceEvent {
 };
 
 using PerformanceEvent =
-    std::variant<NotePerformanceEvent, TempoPerformanceEvent, TimeSignaturePerformanceEvent, InstrumentPerformanceEvent,
-                 EnvelopePerformanceEvent, LevelPerformanceEvent, ExpressionPerformanceEvent, PanPerformanceEvent,
-                 ChannelPanPerformanceEvent, StereoBalancePerformanceEvent, MasterLevelPerformanceEvent,
-                 ReverbPerformanceEvent, MonoModePerformanceEvent, TuningPerformanceEvent,
-                 GlobalTransposePerformanceEvent, PortamentoEnablePerformanceEvent,
-                 PitchBendPerformanceEvent, PitchBendRangePerformanceEvent, PitchTransitionSettingsPerformanceEvent,
-                 LegatoPedalPerformanceEvent, ModulationPerformanceEvent, MarkerPerformanceEvent>;
-
+    std::variant<NotePerformanceEvent, SilencePerformanceEvent, TempoPerformanceEvent, TimeSignaturePerformanceEvent,
+                 InstrumentPerformanceEvent, EnvelopePerformanceEvent, LevelPerformanceEvent,
+                 ExpressionPerformanceEvent, PanPerformanceEvent, ChannelPanPerformanceEvent,
+                 StereoBalancePerformanceEvent, MasterLevelPerformanceEvent, ReverbPerformanceEvent,
+                 MonoModePerformanceEvent, TuningPerformanceEvent, GlobalTransposePerformanceEvent,
+                 PortamentoEnablePerformanceEvent, PitchBendPerformanceEvent, PitchBendRangePerformanceEvent,
+                 PitchTransitionSettingsPerformanceEvent, LegatoPedalPerformanceEvent, ModulationPerformanceEvent,
+                 MarkerPerformanceEvent>;
 
 enum class PerformanceAutomationTarget {
   Tempo,

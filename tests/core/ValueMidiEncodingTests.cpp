@@ -91,6 +91,18 @@ void midiExporterWritesAllSoundOffImmediatelyBeforeNoteOn() {
          "MIDI exporter should write All Sound Off immediately before the replacement note-on");
 }
 
+void midiExporterReleasesBeforeCuttingAndRetuningAVoice() {
+  MidiSequence sequence{.timebase = {.ppqn = 48}};
+  sequence.tracks.push_back(
+      MidiTrack{.endTick = 8,
+                .events = {midi::note(0, 2, 60, 100, 4), midi::controller(4, 2, MidiController::AllSoundOff, 0, 7),
+                           midi::pitchBend(4, 2, 0), midi::note(4, 2, 62, 100, 4)}});
+  const auto bytes = encodeMidiFile(sequence);
+  const std::vector<u8> ordered{4, 0x82, 60, 64, 0, 0xb2, 120, 0, 0, 0xe2, 0, 64, 0, 0x92, 62, 100};
+  expect(std::search(bytes.begin(), bytes.end(), ordered.begin(), ordered.end()) != bytes.end(),
+         "same-tick output must order Note Off, All Sound Off, new pitch, then Note On");
+}
+
 void midiExporterPreservesLegacyPortamentoTimeByteOrder() {
   MidiSequence midiSequence{.timebase = Timebase{.ppqn = 48}};
   MidiTrack track;
@@ -246,6 +258,7 @@ void runValueMidiEncodingTests() {
   midiExporterWritesVariableLengthBoundaries();
   midiExporterKeeps14BitControllerPairsAdjacent();
   midiExporterWritesAllSoundOffImmediatelyBeforeNoteOn();
+  midiExporterReleasesBeforeCuttingAndRetuningAVoice();
   midiExporterPreservesLegacyPortamentoTimeByteOrder();
   midiExporterOrdersFineTuneBeforeSameTickProgramChange();
   midiExporterKeepsSameTickBankProgramPairsAdjacent();

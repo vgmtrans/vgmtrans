@@ -69,6 +69,11 @@ void Voice::start(const RuntimeConfig& config, u8 program, u8 encodedNote, u8 ra
     return;
   }
   release(out);
+  if (note.valid()) {
+    // Preparing a new KON asserts KOFF first. A BE release, in contrast,
+    // leaves the voice running with the region's exponential GAIN envelope.
+    out.silence();
+  }
   tuning = static_cast<u16>(config.data->samples[region->sample]->tuning + region->tuning);
   pendingNote = encodedNote;
   pendingOutput.emplace(out.after(2));

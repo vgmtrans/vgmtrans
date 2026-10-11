@@ -29,6 +29,24 @@ struct Channel {
   std::optional<u64> preparedTick;
 };
 
+struct GainRamp {
+  u16 level = 0, step = 0;
+  u8 ticks = 0, target = 0;
+
+  bool advance() {
+    if (ticks == 0) {
+      return false;
+    }
+    level = static_cast<u16>(level + step);
+    if (--ticks == 0) {
+      level = (u16(target) << 8) | (level & 0xff);
+    }
+    return true;
+  }
+
+  u8 volume() const { return level >> 8; }
+};
+
 struct ProgramState {
   explicit ProgramState(const RuntimeConfig& settings) : config(settings) {
     const auto reader = config.source.reader();
@@ -36,10 +54,14 @@ struct ProgramState {
     speed = reader.u8At(h + 6);
     phase = static_cast<u8>(speed - 1);
     transpose = reader.u8At(h + 7);
-    masterVolume = reader.u8At(h + 8);
-    // Host controls have no score equivalent. Retain the captured music gain
-    // and output mode, while restarting the authored music and all its voices.
-    musicVolume = reader.u8At(0x6c);
+    // Song initialization replaces the master gain's integer byte. Host gain
+    // ramps survive it, including snapshots taken just before a fade-in.
+    masterVolume = {.level = static_cast<u16>((u16(reader.u8At(h + 8)) << 8) | reader.u8At(0x6d)),
+                    .step = reader.le16(0x71),
+                    .ticks = reader.u8At(0x63),
+                    .target = reader.u8At(0x66)};
+    musicVolume = {
+        .level = reader.le16(0x6b), .step = reader.le16(0x6f), .ticks = reader.u8At(0x64), .target = reader.u8At(0x67)};
     outputMode = reader.u8At(0xd3);
     for (u32 i = 0; i < channels.size(); ++i) {
       channels[i].voice.trackVolume = reader.u8At(h + 9 + i);
@@ -55,12 +77,13 @@ struct ProgramState {
   u8 nextOrder = 1, barrier = 0;
   u8 speed = 1, phase = 0, swingPhase = 0;
   std::array<u8, 2> swing{};
-  u8 transpose = 0, masterVolume = 255, musicVolume = 96, outputMode = 1;
+  u8 transpose = 0, outputMode = 1;
+  GainRamp masterVolume, musicVolume;
   u8 lfoPhase = 0, lfoRate = 0, lfoAmplitude = 0, lfoBias = 0;
   u16 random = 0;
   u8 bendPatternIndex = 0;
   bool musicRow = false;
-  std::optional<u64> preparedTick, lfoTick;
+  std::optional<u64> preparedTick, globalsTick;
   std::bitset<256> warnings;
 
   void clearSlides() {
@@ -98,11 +121,18 @@ struct ProgramState {
     return low & 0x7f;
   }
 
-  void updateLfo(u64 tick) {
-    if (lfoTick == tick) {
+  void updateGlobals(u64 tick) {
+    if (globalsTick == tick) {
       return;
     }
-    lfoTick = tick;
+    globalsTick = tick;
+    const bool masterChanged = masterVolume.advance();
+    const bool musicChanged = musicVolume.advance();
+    if (masterChanged || musicChanged) {
+      for (auto& c : channels) {
+        c.voice.volumeDirty = true;
+      }
+    }
     if ((tick / 2) % 2 == 0) {
       return;
     }
@@ -184,9 +214,10 @@ struct Playback : SequencePlayback<TrackState> {
     if (vm.tick() % 2 == 0) {
       return;
     }
-    song.updateLfo(vm.tick());
+    song.updateGlobals(vm.tick());
     auto output = out.at(vm.tick() - 1);
-    voice().tick(song.config, song.transpose, song.masterVolume, song.musicVolume, song.outputMode, output);
+    voice().tick(song.config, song.transpose, song.masterVolume.volume(), song.musicVolume.volume(), song.outputMode,
+                 output);
   }
 
   Effects wait() {

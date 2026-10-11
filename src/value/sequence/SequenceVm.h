@@ -84,6 +84,8 @@ public:
   void sustainPedal(bool down);
   // Immediately closes every active note, independent of the pedal state.
   void allNotesOff();
+  // Closes all gates and stops their voices, including existing release tails.
+  void silence();
   // Closes notes whose keys are still down while retaining notes already held
   // by the sustain pedal. This is MIDI All Notes Off rather than All Sound Off.
   void releaseAllNotes();

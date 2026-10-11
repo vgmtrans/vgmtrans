@@ -11,9 +11,10 @@ Ocean-published games or assume that all Ocean drivers share this format.
 
 The host's music pointer at direct page `$E8` identifies the 26-byte header.
 Import starts at order zero, rather than the independently advancing stream
-cursors in the snapshot. Captured host music gain, output mode, and PRNG seed
-are retained. SFX allocation, host commands, and their interruption of music
-are outside the authored score.
+cursors in the snapshot. Captured host music gain, pending music/master gain
+ramps, output mode, and PRNG seed are retained. The header replaces the master
+gain's integer byte, as in the driver. SFX allocation, subsequent host commands,
+and their interruption of music are outside the authored score.
 
 The header points to an order table, instrument pointer table, and sample
 pointer table. Orders contain eight stream pointers. A pointer with high byte
@@ -36,6 +37,8 @@ Important executable behavior (addresses below are for the canonical build):
 | `$09CF`, `$1076` | BF forces fetches until a common continuation clears it; instrument commands force fetch. |
 | `$1097` | C7 primes the next stream immediately, even before all tracks reach the barrier. Order identity, rather than shared pattern addresses, defines loops. |
 | `$0C75` | First inclusive key-region match; null pointers retain the old header and region; a region miss replaces only the header. |
+| `$0D6A`, `$0714` | A retrigger cuts the preceding voice with KOFF before its delayed KON; it does not stack release tails. |
+| `$0746`, `$075A` | Pending host gain ramps advance once per base tick, retain their 8.8 fraction, and snap to the target integer on the final tick. |
 | `$0FB3` | C1's voice lookup replaces the requested duration with the logical slot (`2 * track`); track zero's ramp remains idle. |
 | `$100D`, `$0FF3` | C4 consumes a byte without setting pan. C3 updates the volume cache without marking it dirty. |
 | `$1204` | C5 ignores its operand and reads the shared 16-byte bend pattern; its track-side store uses the pattern index. |
@@ -56,6 +59,10 @@ export as pitch bends. Zero DSP pitch freezes a sample; that interval is
 muted in exported playback because MIDI cannot express zero frequency. GAIN envelopes use the shared SNES envelope conversion;
 asynchronous ENVX polling and DSP counter phase are approximated. Sustain
 countdowns are reflected in note gates. Threshold zero never enters sustain.
+Explicit releases retain their GAIN decay. Retriggers emit a track voice cut;
+MIDI uses All Sound Off after closing old note gates and before changing the
+next attack's controls. This approximates the DSP's at-most-8-ms KOFF fade as
+an immediate stop, preserving the gap before KON.
 
 Both builds leave DSP FLG at `$20`, disabling echo writes. Echo and FIR commands
 remain annotated source data; the importer does not substitute generic reverb
@@ -93,10 +100,23 @@ before delayed KON and account for the zero-pitch muting convention above.
 The opcode runner checks parsing and register arithmetic, not cycle-accurate
 DSP audio or ENVX polling.
 
+Waterworld's Map and Mission Theme 1 were additionally checked with SPC
+emulation and FluidSynth rendering. Map's short lead notes exposed accumulated
+release tails on retriggers; the opening's extra pitches disappeared after
+preserving KOFF and ordering MIDI Note Off before All Sound Off. Mission Theme 1
+is captured at zero music gain with a one-tick ramp to 96. Keeping the gain
+without that ramp made it permanently silent. The same pending fade-in occurs
+in seven other Waterworld snapshots. All 15 Waterworld exports now produce
+nonzero audio. A further 52,339 voice/frame comparisons, with the captured
+ramps retained in the opcode runner, cover Map, those eight fade-in snapshots,
+and a JP2 song without pitch or volume mismatches.
+
 The checked-in test executable needs no game data. It covers both revisions,
 barriers and reused orders, continuation/duration rules, source associations,
 retained and overlapping regions, portamento arithmetic, volume behavior,
-sample discovery, malformed operands, and deterministic mutated streams.
+sample discovery, pending gain ramps, retrigger cuts versus normal releases,
+malformed operands, and deterministic mutated streams. Shared export tests
+cover track-scoped voice cuts, gate truncation, and MIDI termination ordering.
 An optional corpus argument also runs structural validation and verifies
 positive/negative detection. A second optional directory writes note and
 controller CSV traces for external comparisons:

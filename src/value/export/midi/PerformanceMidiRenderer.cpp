@@ -1124,6 +1124,8 @@ private:
               addController(typedEvent.header.tick, MidiController::Reverb, value);
               lastReverbValue = value;
             }
+          } else if constexpr (std::is_same_v<TypedEvent, SilencePerformanceEvent>) {
+            addController(typedEvent.header.tick, MidiController::AllSoundOff, 0, kVoiceTerminationPriority);
           } else if constexpr (std::is_same_v<TypedEvent, MonoModePerformanceEvent>) {
             addController(typedEvent.header.tick, MidiController::MonoMode, typedEvent.channels);
           } else if constexpr (std::is_same_v<TypedEvent, TuningPerformanceEvent>) {

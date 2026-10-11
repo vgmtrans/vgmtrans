@@ -151,6 +151,13 @@ void PerformanceEmitter::allNotesOff() {
   state.notes.clear();
 }
 
+void PerformanceEmitter::silence() {
+  if (activeNotes_ != nullptr) {
+    allNotesOff();
+  }
+  append(SilencePerformanceEvent{});
+}
+
 void PerformanceEmitter::releaseAllNotes() {
   auto& state = activeNotes();
   std::erase_if(state.notes, [&](const auto& active) {

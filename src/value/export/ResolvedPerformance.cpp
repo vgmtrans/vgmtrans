@@ -265,6 +265,7 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
       std::ranges::stable_sort(track.events, {}, order);
     }
     std::unordered_map<PerformanceVoiceId, PerformanceVoiceId> voiceIds;
+    std::vector<PerformanceVoiceId> soundingVoices;
     InstrumentSelection selected = InstrumentAddress{};
     // Once a track uses signed channel gain, all of its pan must be baked into
     // variants so ordinary MIDI pan does not also affect the layered output.
@@ -284,6 +285,17 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
     };
 
     for (auto& event : track.events) {
+      if (const auto* silence = std::get_if<SilencePerformanceEvent>(&event)) {
+        for (const auto id : soundingVoices) {
+          auto& limit = voices[id.value].endLimit;
+          limit = std::min(limit.value_or(silence->header.tick), silence->header.tick);
+        }
+        soundingVoices.clear();
+        for (auto& [_, lane] : lanes) {
+          lane.voiceEnd = std::min(lane.voiceEnd, silence->header.tick);
+        }
+        continue;
+      }
       if (auto* selection = std::get_if<InstrumentPerformanceEvent>(&event)) {
         selected = selection->instrument;
         selection->forceBankSelect |= std::holds_alternative<InstrumentIdentity>(selected);
@@ -356,7 +368,10 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
       } else {
         note->voice = nextVoice;
       }
-      if (fresh) voices.emplace_back();
+      if (fresh) {
+        voices.emplace_back();
+        soundingVoices.push_back(note->voice);
+      }
       auto& voice = voices[note->voice.value];
       if (note->maximumDurationMilliseconds) {
         const u64 limit = addTicks(note->header.tick,
