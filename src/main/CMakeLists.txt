@@ -353,6 +353,11 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/HOSA/HOSAModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/HOSA/HOSASequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/HOSA/HOSASynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/OceanSnes/OceanSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/OceanSnes/OceanSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/OceanSnes/OceanSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/OceanSnes/OceanSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/OceanSnes/OceanSnesVoice.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/PandoraBoxSnes/PandoraBoxSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/PandoraBoxSnes/PandoraBoxSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/PandoraBoxSnes/PandoraBoxSnesSequence.cpp
@@ -449,6 +454,8 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/NeverlandSnes/NeverlandSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/HOSA/HOSA.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/OceanSnes/OceanSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/OceanSnes/OceanSnesVoice.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/PandoraBoxSnes/PandoraBoxSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/PrismSnes/PrismSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/RareSnes/RareSnes.h

@@ -34,6 +34,7 @@
 #include "value/formats/NeverlandSnes/NeverlandSnes.h"
 #include "value/formats/NinSnes/NinSnes.h"
 #include "value/formats/HOSA/HOSA.h"
+#include "value/formats/OceanSnes/OceanSnes.h"
 #include "value/formats/PandoraBoxSnes/PandoraBoxSnes.h"
 #include "value/formats/PrismSnes/PrismSnes.h"
 #include "value/formats/RareSnes/RareSnes.h"
@@ -131,6 +132,7 @@ void registerValueFormats(core::Session& session,
   session.registerFormat(neverland_snes::module());
   session.registerFormat(nin_snes::module());
   session.registerFormat(hosa::module());
+  session.registerFormat(ocean_snes::module());
   session.registerFormat(pandora_box_snes::module());
   session.registerFormat(prism_snes::module());
   session.registerFormat(rare_snes::module());

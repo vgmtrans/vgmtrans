@@ -98,6 +98,7 @@ add_value_format_test(vgmtrans-neverland-snes-tests
   formats/NeverlandSnesModuleTests.cpp runNeverlandSnesModuleTests)
 add_value_test(vgmtrans-nin-snes-tests
   formats/NinSnesModuleTests.cpp formats/NinSnesTestMain.cpp)
+add_value_test(vgmtrans-ocean-snes-tests formats/OceanSnesModuleTests.cpp)
 add_value_format_test(vgmtrans-pandora-box-snes-tests
   formats/PandoraBoxSnesModuleTests.cpp runPandoraBoxSnesModuleTests)
 add_value_format_test(vgmtrans-prism-snes-tests
