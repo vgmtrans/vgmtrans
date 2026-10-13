@@ -23,38 +23,33 @@ constexpr auto kWaterworldSlide = makeMaskedBytePattern("\x3f\x07\x0c\x1c\xc4\x5
 constexpr auto kJp2Slide =
     makeMaskedBytePattern("\x3f\x04\x0c\x10\x09\x48\xff\xbc\x5c\x48\xff\xbc\x2f\x01\x5c", "xxxxxxxxxxxxxxx");
 
+bool matchesDriver(ByteReader reader, u16 dispatch, u16 headerLoader, u16 slide, MaskedBytePattern slidePattern) {
+  const u32 commands = dispatch + kDispatch.size();
+  return matchesBytePattern(reader, dispatch, kDispatch) && matchesBytePattern(reader, headerLoader, kHeader) &&
+         matchesBytePattern(reader, slide, slidePattern) && reader.le16(dispatch + 6) == commands + 1 &&
+         reader.le16(dispatch + 10) == commands && reader.le16(commands + 4) == slide;
+}
+
 }  // namespace
 
 std::optional<Layout> findLayout(ByteReader reader) {
-  if (reader.size() != kAramSize) {
-    return std::nullopt;
-  }
-  const auto dispatch = findBytePattern(reader, kDispatch);
-  const auto headerLoader = findBytePattern(reader, kHeader);
-  if (!dispatch || !headerLoader || reader.u8At(0x640) != 0x8f || reader.le16(0x641) != 0xfaa2) {
+  if (reader.size() != kAramSize || reader.u8At(0x640) != 0x8f || reader.le16(0x641) != 0xfaa2) {
     return std::nullopt;
   }
   Layout layout;
-  const u16 commands = reader.le16(*dispatch + 10);
-  if (*dispatch == 0xa1a && commands == 0xa28 && *headerLoader == 0xaaa &&
-      findBytePattern(reader, kWaterworldSlide) == 0xfe0) {
+  if (matchesDriver(reader, 0xa1a, 0xaaa, 0xfe0, kWaterworldSlide)) {
     layout.version = Version::Waterworld;
     layout.pitchTable = 0xe6d;
     layout.sineTable = 0x18f3;
     layout.randomSeed = 0xa7c;
     layout.bendPattern = 0xa96;
-  } else if (*dispatch == 0xa17 && commands == 0xa25 && *headerLoader == 0xaa7 &&
-             findBytePattern(reader, kJp2Slide) == 0xfdd) {
+  } else if (matchesDriver(reader, 0xa17, 0xaa7, 0xfdd, kJp2Slide)) {
     layout.version = Version::JurassicPark2;
     layout.pitchTable = 0xe6a;
     layout.sineTable = 0x18f0;
     layout.randomSeed = 0xa79;
     layout.bendPattern = 0xa93;
   } else {
-    return std::nullopt;
-  }
-  if (reader.le16(*dispatch + 6) != commands + 1 ||
-      reader.le16(commands + 4) != (layout.version == Version::Waterworld ? 0xfe0 : 0xfdd)) {
     return std::nullopt;
   }
 

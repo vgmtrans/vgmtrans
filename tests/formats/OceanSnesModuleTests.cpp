@@ -102,7 +102,15 @@ struct Fixture {
 void detectionValidatesRevisionAndSong() {
   for (const auto version : {Version::Waterworld, Version::JurassicPark2}) {
     Fixture f(version);
-    expect(findLayout(f.reader())->version == version, "Ocean revisions must be distinguished by executable code");
+    const auto original = findLayout(f.reader());
+    expect(original && original->version == version, "Ocean revisions must be distinguished by executable code");
+    const u32 dispatch = version == Version::Waterworld ? 0xa1a : 0xa17;
+    const u32 header = version == Version::Waterworld ? 0xaaa : 0xaa7;
+    std::copy_n(f.bytes.begin() + dispatch, 14, f.bytes.begin() + 0x400);
+    std::copy_n(f.bytes.begin() + header, 17, f.bytes.begin() + 0x450);
+    const auto duplicated = findLayout(f.reader());
+    expect(duplicated && duplicated->version == version,
+           "copies of signatures in runtime RAM must not hide the resident driver at its known addresses");
     f.bytes[version == Version::Waterworld ? 0xa7c : 0xa79] = 0x73;
     expect(findLayout(f.reader()).has_value(), "mutable RNG bytes must not affect recognition");
     f.bytes[0x640] = 0;
@@ -288,18 +296,42 @@ void retriggersCutReleaseTailsButReleasesAndSlidesDoNot() {
          "KOFF must precede the next delayed KON by one base tick without changing ordinary note gates");
 }
 
-void zeroSustainThresholdNeverStartsTheSustainTimer() {
+void invalidNotesCancelPendingRetriggers() {
   Fixture f;
-  f.bytes[0x3005 + 4] = 31;
-  f.bytes[0x3005 + 5] = 0;
-  f.bytes[0x3005 + 7] = 1;
   for (u32 track = 0; track < 8; ++track) {
-    f.commands(track, {0xea, 0x99, 100, 0xbe, 1, 0xc7});
+    // Program 1 is invalid. It replaces a valid retrigger in the same frame,
+    // before KON; the next valid note must still play normally.
+    f.commands(track, {0xea, 0x99, 1, 0x99, 0, 0xeb, 0x99, 1, 0xea, 0x9a, 1, 0xbe, 1, 0xc7});
   }
   const auto p = SequenceVm().render(f.program());
   const auto notes = eventsOfType<NotePerformanceEvent>(p.tracks.front());
-  expect(notes.size() == 1 && notes.front()->durationTicks == 398,
-         "ENVX cannot fall strictly below zero, so only the explicit release closes this note's gate");
+  expect(!p.diagnostics.empty(), "invalid instruments must be diagnosed");
+  expect(notes.size() == 2 && notes[0]->header.tick == 2 && notes[1]->header.tick == 10 && notes[1]->key == 49,
+         "suppressing an invalid note must cancel a pending retrigger without preventing later valid notes");
+}
+
+void gainEnvelopesControlAutomaticRelease() {
+  struct Case {
+    u8 attack, decay, sustain, sustainTicks;
+    u64 duration;
+  };
+  // At rate 31, attack + decay to ENVX < 64 takes 227 DSP samples: less than
+  // one base tick. Zero rates freeze a stage; zero thresholds/timers hold.
+  for (const auto test : {Case{31, 31, 64, 3, 6}, Case{31, 31, 127, 3, 6}, Case{0, 31, 64, 3, 398},
+                          Case{31, 0, 64, 3, 398}, Case{31, 31, 0, 1, 398}, Case{31, 31, 64, 0, 398}}) {
+    Fixture f;
+    f.bytes[0x3005 + 3] = test.attack;
+    f.bytes[0x3005 + 4] = test.decay;
+    f.bytes[0x3005 + 5] = test.sustain;
+    f.bytes[0x3005 + 7] = test.sustainTicks;
+    for (u32 track = 0; track < 8; ++track) {
+      f.commands(track, {0xea, 0x99, 100, 0xbe, 1, 0xc7});
+    }
+    const auto p = SequenceVm().render(f.program());
+    const auto notes = eventsOfType<NotePerformanceEvent>(p.tracks.front());
+    expect(notes.size() == 1 && notes.front()->durationTicks == test.duration,
+           "automatic gates must use physical GAIN timing and wait for explicit release when the envelope holds");
+  }
 }
 
 void zeroPitchIsSilentAndRecoversOnTheNextNote() {
@@ -326,12 +358,13 @@ void alternatingSpeedsFollowEachRevision() {
 
 void portamentoKeepsFractionAndSnapsToItsTarget() {
   Fixture f;
+  f.word(0x3102, 0xff00);
+  f.word(0x3005 + 11, 0x200);  // Combined tuning wraps to 0x100 (1.0).
   const auto layout = *findLayout(f.reader());
   std::vector<Diagnostic> diagnostics;
   auto data = std::make_shared<const DriverData>(readDriverData(f.reader(), layout, diagnostics));
   const RuntimeConfig config{.source = RetainedSource::copyOf(f.reader()), .layout = layout, .data = data};
   Voice v{.region = &data->instruments[0]->regions[0]};
-  v.tuning = 256;
   v.pitch = 0x42;
   v.pitchFraction = 200;
   v.vibratoAmount = 3;
@@ -400,6 +433,7 @@ void regionsUseFirstMatchAndRetainStateOnAMiss() {
 void pitchArithmeticPreservesRevisionSpecificWrapping() {
   for (const auto version : {Version::Waterworld, Version::JurassicPark2}) {
     Fixture f(version);
+    f.word(0x3102, 256);
     const auto layout = *findLayout(f.reader());
     f.word(layout.pitchTable + 254, 0x1234);
     std::vector<Diagnostic> diagnostics;
@@ -408,7 +442,6 @@ void pitchArithmeticPreservesRevisionSpecificWrapping() {
     Voice v{.region = &data->instruments[0]->regions[0], .instrumentTranspose = 255};
     v.pendingNote = 0x81;
     v.calculatePitch = true;
-    v.tuning = 256;
     PerformanceTrackFixture output;
     v.tick(config, 0, 255, 96, 1, output.out);
     expect(v.pitch == 0x42, "ordinary negative transposition must clamp to pitch-table entry zero");
@@ -416,7 +449,35 @@ void pitchArithmeticPreservesRevisionSpecificWrapping() {
     v.tick(config, 0, 255, 96, 1, output.out);
     expect(v.pitch == (version == Version::Waterworld ? 0x42 : 0x1234),
            "JP2 portamento omits the negative-index clamp and wraps its table byte index");
+    f.word(layout.pitchTable + 96, 0xffff);
+    f.word(0x3102, 0xffff);
+    const auto extreme = readDriverData(f.reader(), layout, diagnostics);
+    const double unityKey = extreme.instruments[0]->regions[0].unityKey;
+    expect(unityKey > -72.0 && unityKey < -71.99,
+           "full-width pitch and tuning words must not overflow during instrument calibration");
   }
+}
+
+void retainedRegionsKeepAPlayableKeyAcrossOverlaps() {
+  Fixture f;
+  f.bytes[0x3002] = 2;
+  std::copy_n(f.bytes.begin() + 0x3005, 23, f.bytes.begin() + 0x301c);
+  f.bytes[0x3005] = 0x90;
+  f.bytes[0x3006] = 0x99;
+  f.bytes[0x301c] = 0x81;
+  f.bytes[0x301d] = 0x90;
+  f.bytes[0x301f] = 8;      // The second region has a different attack envelope.
+  f.word(0xe6d + 8, 0x54);  // A nonzero pitch for the first note.
+  for (u32 track = 0; track < 8; ++track) {
+    f.commands(track, {0xea, 0x85, 1, 0x9a, 1, 0xbe, 1, 0xc7});
+  }
+  const auto p = SequenceVm().render(f.program());
+  const auto notes = eventsOfType<NotePerformanceEvent>(p.tracks.front());
+  expect(notes.size() == 2 && notes[0]->key == 28 && notes[1]->key == 28,
+         "a region miss must retain a playable key; clamping to 0x90 would select the earlier region");
+  const auto bends = eventsOfType<PitchBendPerformanceEvent>(p.tracks.front());
+  expect(!bends.empty() && bends.back()->semitones > 12,
+         "the retained region's key must not replace the newly requested hardware pitch");
 }
 
 void malformedCommandsAndInstrumentsAreBounded() {
@@ -546,12 +607,14 @@ int main(int argc, char** argv) {
     samplesAreDiscoveredWithoutTheDspDirectory();
     capturedGainRampsContinueOncePerDriverTick();
     retriggersCutReleaseTailsButReleasesAndSlidesDoNot();
-    zeroSustainThresholdNeverStartsTheSustainTimer();
+    invalidNotesCancelPendingRetriggers();
+    gainEnvelopesControlAutomaticRelease();
     zeroPitchIsSilentAndRecoversOnTheNextNote();
     alternatingSpeedsFollowEachRevision();
     portamentoKeepsFractionAndSnapsToItsTarget();
     nullInstrumentsAndConditionalOperandsPreserveTheStream();
     regionsUseFirstMatchAndRetainStateOnAMiss();
+    retainedRegionsKeepAPlayableKeyAcrossOverlaps();
     pitchArithmeticPreservesRevisionSpecificWrapping();
     malformedCommandsAndInstrumentsAreBounded();
     if (argc >= 2) {

@@ -27,9 +27,6 @@ namespace vgmtrans::core {
 
 namespace {
 
-// Immediately before per-voice tuning RPNs (priority 8) and all other attack state.
-constexpr int kVoiceTerminationPriority = 7;
-
 [[nodiscard]] u8 data7(double value) {
   return static_cast<u8>(std::lround(std::clamp(value, 0.0, 127.0)));
 }
@@ -1062,7 +1059,7 @@ private:
             if (attack.silencePreviousVoice && hasNote) {
               // Silence the old voice before bank, range, controller, or bend
               // state for this attack can affect it.
-              addController(typedEvent.header.tick, MidiController::AllSoundOff, 0, kVoiceTerminationPriority);
+              addController(typedEvent.header.tick, MidiController::AllSoundOff, 0, midi::kVoiceTerminationPriority);
             }
             if (!lastVolume && (levelHeadroom != 1.0 || sourceLevelGain != 1.0 || panLevelGain != 1.0)) {
               addCombinedLevel(typedEvent.header.tick);
@@ -1125,7 +1122,7 @@ private:
               lastReverbValue = value;
             }
           } else if constexpr (std::is_same_v<TypedEvent, SilencePerformanceEvent>) {
-            addController(typedEvent.header.tick, MidiController::AllSoundOff, 0, kVoiceTerminationPriority);
+            addController(typedEvent.header.tick, MidiController::AllSoundOff, 0, midi::kVoiceTerminationPriority);
           } else if constexpr (std::is_same_v<TypedEvent, MonoModePerformanceEvent>) {
             addController(typedEvent.header.tick, MidiController::MonoMode, typedEvent.channels);
           } else if constexpr (std::is_same_v<TypedEvent, TuningPerformanceEvent>) {

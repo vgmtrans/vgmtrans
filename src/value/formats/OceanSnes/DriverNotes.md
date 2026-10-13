@@ -3,9 +3,10 @@
 This module imports the eight music tracks of the Ocean driver used by
 Waterworld, Addams Family Values, The Flintstones, and Jurassic Park II.
 The first three share a build; JP2 needs a small number of different arithmetic
-and scheduling rules. Detection requires independent executable signatures,
-the command table, and a bounded song header. It does not identify arbitrary
-Ocean-published games or assume that all Ocean drivers share this format.
+and scheduling rules. Detection checks independent executable signatures at
+the known code addresses, the command table, and a bounded song header. It does
+not identify arbitrary Ocean-published games or assume that all Ocean drivers
+share this format.
 
 ## Source and playback model
 
@@ -22,6 +23,9 @@ pointer table. Orders contain eight stream pointers. A pointer with high byte
 and ordered 23-byte key regions. Sample objects contain a tuning word and a
 BRR-relative loop offset, followed by BRR data. Samples are discovered through
 regions; the live DSP directory is populated lazily and is not authoritative.
+When retaining a previous region, playback keeps a key that selects that region
+in the exported bank, including when earlier regions overlap it. Pitch remains
+independent of that sample-selection key.
 
 Timer 0 is `$A2`, giving a 20.25 ms base tick. The VM uses two ticks per base
 tick so all music streams execute before voice updates. The latter emit at

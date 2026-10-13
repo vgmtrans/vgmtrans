@@ -265,7 +265,8 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
       std::ranges::stable_sort(track.events, {}, order);
     }
     std::unordered_map<PerformanceVoiceId, PerformanceVoiceId> voiceIds;
-    std::vector<PerformanceVoiceId> soundingVoices;
+    // Voices are appended contiguously for each track; cuts advance this boundary.
+    size_t firstUncutVoice = voices.size();
     InstrumentSelection selected = InstrumentAddress{};
     // Once a track uses signed channel gain, all of its pan must be baked into
     // variants so ordinary MIDI pan does not also affect the layered output.
@@ -286,11 +287,10 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
 
     for (auto& event : track.events) {
       if (const auto* silence = std::get_if<SilencePerformanceEvent>(&event)) {
-        for (const auto id : soundingVoices) {
-          auto& limit = voices[id.value].endLimit;
+        for (; firstUncutVoice < voices.size(); ++firstUncutVoice) {
+          auto& limit = voices[firstUncutVoice].endLimit;
           limit = std::min(limit.value_or(silence->header.tick), silence->header.tick);
         }
-        soundingVoices.clear();
         for (auto& [_, lane] : lanes) {
           lane.voiceEnd = std::min(lane.voiceEnd, silence->header.tick);
         }
@@ -370,7 +370,6 @@ ResolvedPerformance preparePerformance(PerformanceSequence performance, std::vec
       }
       if (fresh) {
         voices.emplace_back();
-        soundingVoices.push_back(note->voice);
       }
       auto& voice = voices[note->voice.value];
       if (note->maximumDurationMilliseconds) {

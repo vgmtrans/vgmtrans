@@ -41,14 +41,15 @@ struct Layout {
 struct InstrumentRegion {
   core::SourceRange range;
   u8 low = 0, high = 0, sample = 0;
-  u8 attack = 0, decay = 0, sustain = 0, release = 0, sustainTicks = 0;
-  u8 echo = 0, volume = 0, transpose = 0;
-  u16 tuning = 0;
+  u8 volume = 0, transpose = 0;
+  u16 pitchScale = 0;  // Combined sample and region tuning, in 8.8 fixed point.
   u8 pan = 0;
   u16 vibratoDelay = 0;
   u8 vibratoDepth = 0, vibratoRate = 0, bendScale = 0, lfo = 0;
-  u8 pitchModulation = 0, alternateBank = 0, surround = 0;
+  u8 pitchModulation = 0, surround = 0;
   double unityKey = 60.0;
+  core::Envelope envelope;
+  std::optional<u64> gateTicks;  // Base ticks until automatic release; empty means indefinite.
 };
 
 struct InstrumentData {
@@ -73,7 +74,6 @@ struct DriverData {
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);
 [[nodiscard]] DriverData readDriverData(core::ByteReader reader, const Layout& layout,
                                         std::vector<core::Diagnostic>& diagnostics);
-[[nodiscard]] core::Envelope regionEnvelope(const InstrumentRegion& region);
 [[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
                                                                const DriverData& data, std::string_view name);
 [[nodiscard]] core::SequenceProgram decodeSequence(core::RetainedSource source, const Layout& layout,

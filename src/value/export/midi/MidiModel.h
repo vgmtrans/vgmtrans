@@ -107,6 +107,11 @@ struct MidiSequence {
 
 namespace midi {
 
+// Close old note gates, then cut release tails, before per-voice tuning RPNs
+// (priority 8) and the next attack's controls.
+inline constexpr int kNoteOffPriority = 6;
+inline constexpr int kVoiceTerminationPriority = 7;
+
 [[nodiscard]] MidiEvent note(u64 tick, u8 channel, u8 key, u8 velocity, u32 duration);
 [[nodiscard]] MidiEvent bankSelect(u64 tick, u8 channel, u16 bank, bool writeLsb);
 [[nodiscard]] MidiEvent controller(u64 tick, u8 channel, MidiController controller, s32 value, int priority = 20,

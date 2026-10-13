@@ -108,11 +108,11 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
           const int noteOnPriority = noteEnd == tick ? 40 : event.priority;
           messages.push_back({tick, noteOnPriority,
                               {static_cast<u8>(0x90 | channel4(payload.channel)), data7(payload.key), payload.velocity}});
-          // Close old gates before voice termination (priority 7) and the next
+          // Close old gates before voice termination and the next
           // attack's controls. A later Note Off can revive a just-killed release
           // envelope in synthesizers that queue their DSP updates.
           messages.push_back({noteEnd,
-                              noteEnd == tick ? 40 : 6,
+                              noteEnd == tick ? 40 : midi::kNoteOffPriority,
                               {static_cast<u8>(0x80 | channel4(payload.channel)), data7(payload.key), 64}});
           endTick = std::max(endTick, noteEnd);
         } else if constexpr (std::is_same_v<Payload, BankSelect>) {

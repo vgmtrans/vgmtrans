@@ -9,10 +9,9 @@
 #include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceProgramConfig.h"
 
-#include <fmt/format.h>
-#include <algorithm>
 #include <bitset>
 #include <utility>
+#include <variant>
 
 namespace vgmtrans::formats::ocean_snes {
 using namespace core;
@@ -22,11 +21,13 @@ namespace {
 struct Channel {
   Voice voice;
   u8 program = 0;
-  u8 low = 1, high = 0, cachedLow = 0, cachedHigh = 0, durationHigh = 0;
+  u8 remainingLow = 1, remainingHigh = 0, cachedLow = 0, cachedHigh = 0, durationHigh = 0;
   u8 autoPortamento = 0;
   s8 bendStep = 0;
   bool enabled = true, ready = true, immediate = false;
   std::optional<u64> preparedTick;
+
+  void clearSlides() { bendStep = voice.bendStep = voice.volumeStep = 0; }
 };
 
 struct GainRamp {
@@ -88,9 +89,7 @@ struct ProgramState {
 
   void clearSlides() {
     for (auto& c : channels) {
-      c.bendStep = 0;
-      c.voice.bendStep = 0;
-      c.voice.volumeStep = 0;
+      c.clearSlides();
     }
   }
 
@@ -113,14 +112,6 @@ struct ProgramState {
     }
   }
 
-  u8 randomPan() {
-    const u8 a = static_cast<u8>(random) ^ static_cast<u8>(random >> 8);
-    const u8 low = static_cast<u8>((random & 0xff) >> 1) | ((a & 2) ? 0 : 0x80);
-    const u8 high = static_cast<u8>((random >> 9) | ((random & 1) << 7));
-    random = low | (u16(high) << 8);
-    return low & 0x7f;
-  }
-
   void updateGlobals(u64 tick) {
     if (globalsTick == tick) {
       return;
@@ -138,43 +129,18 @@ struct ProgramState {
     }
     const auto reader = config.source.reader();
     const s8 wave = static_cast<s8>(reader.u8At(config.layout.sineTable + lfoPhase) + lfoBias);
-    const int delta = (std::abs(int(wave)) * lfoAmplitude / 64) * (wave < 0 ? -1 : 1);
+    const int delta = int(wave) * lfoAmplitude / 64;
     lfoPhase = static_cast<u8>(lfoPhase + lfoRate);
     for (auto& c : channels) {
-      auto& v = c.voice;
-      switch (v.lfoTarget) {
-        case 2:
-          v.changeVibratoDepth(static_cast<u8>(delta));
-          break;
-        case 3:
-          v.vibratoRate = static_cast<u8>(v.vibratoRate + delta);
-          break;
-        case 4:
-          v.lfoPitch = static_cast<s16>(delta);
-          break;
-        case 5:
-          v.pan = static_cast<u16>(v.pan + delta * 256);
-          v.volumeDirty = true;
-          break;
-        case 8:
-          v.regionVolume = static_cast<u8>(v.regionVolume + delta);
-          break;
-        default:
-          break;  // Echo/FIR destinations have no write-enabled echo buffer.
-      }
+      c.voice.applyLfo(delta);
     }
   }
 };
 
-struct TrackState {
-  explicit TrackState(TrackStateContext context) : index(context.sourceTrackNumber) {}
-  u32 index;
-};
-
-struct Playback : SequencePlayback<TrackState> {
+struct Playback : SequencePlayback<std::monostate> {
   ProgramState& song;
 
-  Channel& channel() { return song.channels[track.index]; }
+  Channel& channel() { return song.channels[out.sourceTrackNumber()]; }
   Voice& voice() { return channel().voice; }
 
   void warning(u8 kind, std::string message) {
@@ -196,12 +162,10 @@ struct Playback : SequencePlayback<TrackState> {
       return;
     }
     c.immediate = false;
-    c.bendStep = 0;
-    c.voice.volumeStep = 0;
-    c.voice.bendStep = 0;
-    if (--c.low == 0) {
-      c.low = 127;
-      if ((--c.high & 0x80) != 0) {
+    c.clearSlides();
+    if (--c.remainingLow == 0) {
+      c.remainingLow = 127;
+      if ((--c.remainingHigh & 0x80) != 0) {
         c.durationHigh = 0;
         c.ready = true;
       }
@@ -220,8 +184,8 @@ struct Playback : SequencePlayback<TrackState> {
                  output);
   }
 
-  Effects wait() {
-    auto effect = vm.finiteBranch(Address{vm.sourceRange().offset});
+  Effects waitAt(Address next) {
+    auto effect = vm.finiteBranch(next);
     effect.advanceTicks = 2;
     return effect;
   }
@@ -237,12 +201,10 @@ struct Playback : SequencePlayback<TrackState> {
     if (force || peek < 0x80 || peek == 0xca || c.cachedLow == 0) {
       return vm.finiteBranch(next);
     }
-    c.low = c.cachedLow;
-    c.high = c.cachedHigh;
+    c.remainingLow = c.cachedLow;
+    c.remainingHigh = c.cachedHigh;
     c.ready = false;
-    auto effect = vm.finiteBranch(next);
-    effect.advanceTicks = 2;
-    return effect;
+    return waitAt(next);
   }
 
   Effects enterOrder(Address start) { return vm.finiteBranch(start); }
@@ -258,7 +220,7 @@ struct Playback : SequencePlayback<TrackState> {
       return vm.end();
     }
     const Address target{song.config.layout.orders + song.nextOrder * 2u};
-    song.barrier |= static_cast<u8>(1u << track.index);
+    song.barrier |= static_cast<u8>(1u << out.sourceTrackNumber());
     if (song.barrier == 0xff) {
       for (auto& other : song.channels) {
         other.enabled = true;
@@ -275,24 +237,17 @@ struct Playback : SequencePlayback<TrackState> {
 
   void note(u8 encoded, bool retrigger = false) {
     auto& c = channel();
+    auto& v = c.voice;
     if (!retrigger && c.autoPortamento != 0) {
-      voice().portamento(song.config, encoded, c.autoPortamento, song.transpose);
+      v.portamento(song.config, encoded, c.autoPortamento, song.transpose);
       return;
     }
-    u8 pan = 64;
-    if (const auto& instrument = song.config.data->instruments[c.program & 0x7f]) {
-      const auto region = std::ranges::find_if(
-          instrument->regions, [&](const InstrumentRegion& r) { return r.low <= encoded && encoded <= r.high; });
-      if (region != instrument->regions.end() && region->pan == 0x80) {
-        pan = song.randomPan();
-      }
-    }
-    voice().start(song.config, c.program, encoded, pan, out, vm);
-    voice().bendStep = c.bendStep;
-    if (voice().region && voice().region->pitchModulation) {
+    v.start(song.config, c.program, encoded, song.random, out, vm);
+    v.bendStep = c.bendStep;
+    if (v.region && v.region->pitchModulation) {
       warning(0xd8, "OceanSnes hardware pitch modulation is retained in the region metadata but cannot be exported");
     }
-    if (voice().lfoTarget > 14) {
+    if (v.lfoTarget > 14) {
       warning(0xce, "OceanSnes global LFO selector is outside its dispatch table");
     }
   }
@@ -301,7 +256,7 @@ struct Playback : SequencePlayback<TrackState> {
     auto& c = channel();
     auto& v = voice();
     if (!c.ready) {
-      return wait();
+      return waitAt(Address{vm.sourceRange().offset});
     }
     if (opcode < 0x80) {
       c.cachedLow = opcode;
@@ -309,12 +264,10 @@ struct Playback : SequencePlayback<TrackState> {
       if (opcode == 0) {
         return continueAt(next, true);
       }
-      c.low = opcode;
-      c.high = c.cachedHigh;
+      c.remainingLow = opcode;
+      c.remainingHigh = c.cachedHigh;
       c.ready = false;
-      auto effect = vm.finiteBranch(next);
-      effect.advanceTicks = 2;
-      return effect;
+      return waitAt(next);
     }
     if (opcode < 0xbe) {
       note(opcode);
@@ -337,7 +290,7 @@ struct Playback : SequencePlayback<TrackState> {
           return continueAt(next, true);
         case 0xc1:
           if (v.region) {
-            v.panTo(value, track.index * 2);
+            v.panTo(value, out.sourceTrackNumber() * 2);
           }
           break;
         case 0xc2:
@@ -571,7 +524,7 @@ DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 address, std::vector
     }
   }
   auto event = cursor.command(info.name, info.semantic);
-  event.invoke<&Playback::execute>({opcode, operand, second, Address{address + 1u + info.operands}});
+  event.invoke<&Playback::execute>({opcode, operand, second, cursor.nextAddress()});
   if (opcode == 0xe8) {
     event.jump(Address{operand});
   } else if (opcode == 0xc7 || opcode == 0xc9 || opcode == 0xd2 || opcode == 0xd3) {

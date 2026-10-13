@@ -825,11 +825,12 @@ void performanceMidiRendererPreservesSourceVoiceCuts() {
   fixture.out.at(6).pitchBend(1.0);
   fixture.out.at(8).note(64, 1.0, 4);
   PerformanceSequence performance{.timebase = {.ppqn = 48}, .tracks = {fixture.track}};
-  performance.tracks.push_back(PerformanceTrack{
-      .id = TrackId{1},
-      .sourceTrackNumber = 1,
-      .endTick = 16,
-      .events = {NotePerformanceEvent{.header = {.track = TrackId{1}}, .key = 48, .durationTicks = 16}}});
+  performance.tracks.push_back(
+      PerformanceTrack{.id = TrackId{1},
+                       .sourceTrackNumber = 1,
+                       .endTick = 16,
+                       .events = {NotePerformanceEvent{.header = {.track = TrackId{1}}, .key = 48, .durationTicks = 16},
+                                  SilencePerformanceEvent{.header = {.track = TrackId{1}, .tick = 10}}}});
   const auto midi = renderTestMidi(performance);
   const auto& events = midi.tracks[0].events;
   const auto cut = std::ranges::find_if(
@@ -841,9 +842,9 @@ void performanceMidiRendererPreservesSourceVoiceCuts() {
          "source voice cuts must stop release tails before same-tick pitch changes, without an export option");
   const auto notes = midiNotes(midi.tracks[0].events);
   expect(notes.size() == 3 && notes[0].duration == 2 && notes[1].duration == 2 && notes[2].duration == 4,
-         "a cut must truncate open duration gates so their later note-offs cannot stop replacement voices");
-  expect(midiNotes(midi.tracks[1].events).front().duration == 16,
-         "a source cut must leave other tracks' voices untouched");
+         "cuts must truncate old gates and leave replacement voices and other tracks' voices untouched");
+  expect(midiNotes(midi.tracks[1].events).front().duration == 10,
+         "each track's cuts must stop only its own voices, regardless of track iteration order");
 }
 
 void performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates() {

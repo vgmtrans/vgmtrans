@@ -33,6 +33,32 @@ u32 pointerTableEnd(ByteReader reader, u16 table, u32 limit) {
   return end;
 }
 
+void readEnvelope(ByteReader reader, u32 at, InstrumentRegion& region) {
+  const u8 attack = reader.u8At(at) | 0xc0;
+  const u8 decay = reader.u8At(at + 1) | 0xa0;
+  const u8 sustain = reader.u8At(at + 2);
+  const u8 release = (reader.u8At(at + 3) & 31) | 0xa0;
+  const u8 sustainTicks = reader.u8At(at + 4);
+  const s16 threshold = static_cast<s16>(std::clamp<int>(sustain * 16 - 1, 0, 0x7ff));
+  region.envelope = {.attackSeconds = snesDspGainPhysicalSeconds(attack, 0, 0x7ff),
+                     .holdSeconds = 0.0,
+                     .decaySeconds = sustain == 0x7f ? std::numeric_limits<double>::infinity()
+                                                     : snesDspGainEnvelopeSeconds(decay, 0x7ff, threshold),
+                     .releaseSeconds = snesDspGainEnvelopeSeconds(release, 0x7ff, 0),
+                     .sustainAmplitude = sustain == 0x7f ? 1.0 : threshold / 2047.0};
+  // Threshold zero never passes ENVX < threshold. Otherwise the gate uses
+  // physical GAIN timing, not the exported envelope's decay approximation.
+  if (sustainTicks != 0 && sustain != 0) {
+    double seconds = *region.envelope.attackSeconds;
+    if (sustain != 0x7f) {
+      seconds += snesDspGainPhysicalSeconds(decay, 0x7ff, threshold);
+    }
+    if (std::isfinite(seconds)) {
+      region.gateTicks = static_cast<u64>(std::ceil(seconds / kTickSeconds)) + sustainTicks - 1;
+    }
+  }
+}
+
 }  // namespace
 
 DriverData readDriverData(ByteReader reader, const Layout& layout, std::vector<Diagnostic>& diagnostics) {
@@ -68,15 +94,8 @@ DriverData readDriverData(ByteReader reader, const Layout& layout, std::vector<D
                               .low = reader.u8At(r),
                               .high = reader.u8At(r + 1),
                               .sample = reader.u8At(r + 2),
-                              .attack = reader.u8At(r + 3),
-                              .decay = reader.u8At(r + 4),
-                              .sustain = reader.u8At(r + 5),
-                              .release = reader.u8At(r + 6),
-                              .sustainTicks = reader.u8At(r + 7),
-                              .echo = reader.u8At(r + 8),
                               .volume = reader.u8At(r + 9),
                               .transpose = reader.u8At(r + 10),
-                              .tuning = reader.le16(r + 11),
                               .pan = reader.u8At(r + 13),
                               .vibratoDelay = reader.le16(r + 14),
                               .vibratoDepth = reader.u8At(r + 16),
@@ -84,12 +103,12 @@ DriverData readDriverData(ByteReader reader, const Layout& layout, std::vector<D
                               .bendScale = reader.u8At(r + 18),
                               .lfo = reader.u8At(r + 19),
                               .pitchModulation = reader.u8At(r + 20),
-                              .alternateBank = reader.u8At(r + 21),
                               .surround = reader.u8At(r + 22)};
       if (region.low > region.high || region.high < 0x80 || region.low > 0xbd || region.sample >= 128) {
         warn(fmt::format("OceanSnes instrument {} has an invalid key range or sample", i), region.range);
         continue;
       }
+      readEnvelope(reader, r + 3, region);
       referencedSamples.set(region.sample);
       instrument.regions.push_back(region);
     }
@@ -134,27 +153,16 @@ DriverData readDriverData(ByteReader reader, const Layout& layout, std::vector<D
     }
     for (auto& region : instrument->regions) {
       if (const auto& sample = data.samples[region.sample]) {
-        const u16 tuning = static_cast<u16>(sample->tuning + region.tuning);
+        region.pitchScale = static_cast<u16>(sample->tuning + reader.le16(region.range.offset + 11));
         // Encoded $81 is displayed as C1 (MIDI 24). Anchor tuning at table
         // index 48; the sequence retains the table's integer pitch rounding.
-        const double pitch = reader.le16(layout.pitchTable + 96) * tuning / 256.0;
+        const double pitch = u32(reader.le16(layout.pitchTable + 96)) * region.pitchScale / 256.0;
         region.unityKey = 72.0 - 12.0 * std::log2(std::max(1.0, pitch) / 4096.0) -
                           static_cast<s8>(instrument->transpose) - static_cast<s8>(region.transpose);
       }
     }
   }
   return data;
-}
-
-Envelope regionEnvelope(const InstrumentRegion& region) {
-  const s16 threshold = static_cast<s16>(std::clamp<int>(region.sustain * 16 - 1, 0, 0x7ff));
-  return Envelope{.attackSeconds = snesDspGainPhysicalSeconds(region.attack | 0xc0, 0, 0x7ff),
-                  .holdSeconds = 0.0,
-                  .decaySeconds = region.sustain == 0x7f
-                                      ? std::numeric_limits<double>::infinity()
-                                      : snesDspGainEnvelopeSeconds(region.decay | 0xa0, 0x7ff, threshold),
-                  .releaseSeconds = snesDspGainEnvelopeSeconds((region.release & 31) | 0xa0, 0x7ff, 0),
-                  .sustainAmplitude = region.sustain == 0x7f ? 1.0 : threshold / 2047.0};
 }
 
 std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout, const DriverData& data,
@@ -246,7 +254,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
                              .sample = sample,
                              .range = region.range,
                              .unityKey = region.unityKey,
-                             .envelope = regionEnvelope(region)})
+                             .envelope = region.envelope})
               .source("Playable Region", region.range, "ocean-snes-playable-region")
               .parent(annotation.id());
         }
