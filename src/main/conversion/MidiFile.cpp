@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <iterator>
 #include <ranges>
 
 #include <spdlog/fmt/fmt.h>
@@ -159,17 +160,17 @@ MidiEvent* MidiTrack::sinkEvent(std::unique_ptr<MidiEvent>&& event) {
 }
 
 void MidiTrack::prependEvents(std::vector<std::unique_ptr<MidiEvent>> events) {
+  std::erase_if(events, [](const auto& event) { return !event; });
   std::vector<MidiEvent*> rawEvents;
   rawEvents.reserve(events.size());
 
-  for (auto& event : events) {
-    if (!event) {
-      continue;
-    }
+  for (const auto& event : events) {
     rawEvents.push_back(event.get());
-    m_ownedEvents.push_back(std::move(event));
   }
 
+  m_ownedEvents.insert(m_ownedEvents.begin(),
+                      std::make_move_iterator(events.begin()),
+                      std::make_move_iterator(events.end()));
   m_events.insert(m_events.begin(), rawEvents.begin(), rawEvents.end());
 }
 

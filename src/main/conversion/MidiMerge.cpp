@@ -22,6 +22,7 @@
 #include <array>
 #include <filesystem>
 #include <limits>
+#include <map>
 #include <memory>
 #include <numeric>
 #include <set>
@@ -401,16 +402,38 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
   auto mergedMidi = std::make_unique<MidiFile>(firstSequence);
   mergedMidi->setPPQN(targetPPQN);
 
+  // Reuse one track per MIDI port/channel across all chunks.
+  std::map<std::pair<int, u8>, MidiTrack*> channelTracks;
+  u32 endTick = 0;
+  auto channelTrack = [&](int port, u8 channel) {
+    auto& track = channelTracks[{port, channel}];
+    if (!track) {
+      track = mergedMidi->addTrack();
+      track->setChannelGroup(port);
+      track->addMidiPort(static_cast<u8>(port));
+      track->addEvent<TrackNameEvent>(track, 0,
+          "Port " + std::to_string(port + 1) + ", Channel " + std::to_string(channel + 1));
+    }
+    return track;
+  };
+
   for (size_t i = 0; i < parts.size(); ++i) {
     MidiFile* source = parts[i].midi.get();
     const u16 sourcePPQN = parts[i].ppqn;
     const u32 startTick = startTicks[i];
     const u8 bankOffset = options.bankOffsets.empty() ? 0 : options.bankOffsets[i];
 
+    const u64 partEnd = rescaleTick(parts[i].durationTicks, sourcePPQN, targetPPQN) + startTick;
+    if (partEnd > std::numeric_limits<u32>::max()) {
+      L_ERROR("Merged MIDI exceeds maximum 32-bit tick duration.");
+      return nullptr;
+    }
+    endTick = std::max(endTick, static_cast<u32>(partEnd));
+
     retimeTrack(&source->globalTrack, sourcePPQN, targetPPQN, startTick);
     auto globalEvents = source->globalTrack.releaseEvents();
     for (auto& event : globalEvents) {
-      if (!event) {
+      if (!event || event->eventType() == MIDIEVENT_ENDOFTRACK) {
         continue;
       }
 
@@ -430,9 +453,47 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
         return nullptr;
       }
 
-      track->parentSeq = mergedMidi.get();
-      mergedMidi->sinkTrack(std::move(track));
+      auto events = track->releaseEvents();
+      std::stable_sort(events.begin(), events.end(), [](const auto& a, const auto& b) {
+        if (a->absTime != b->absTime) {
+          return a->absTime < b->absTime;
+        }
+        return a->priority < b->priority;
+      });
+      u8 firstChannel = 0;
+      for (const auto& event : events) {
+        if (!event->isMetaEvent() && !event->isSysexEvent()) {
+          firstChannel = event->channel & 0x0F;
+          break;
+        }
+      }
+      int port = track->channelGroup;
+      for (auto& event : events) {
+        const MidiEventType eventType = event->eventType();
+        if (eventType == MIDIEVENT_MIDIPORT) {
+          if (auto* portEvent = dynamic_cast<MidiPortEvent*>(event.get())) {
+            port = portEvent->port;
+            continue;
+          }
+        }
+        if (eventType == MIDIEVENT_ENDOFTRACK ||
+            (eventType == MIDIEVENT_TEXT &&
+             (dynamic_cast<TrackNameEvent*>(event.get()) ||
+              dynamic_cast<SeqNameEvent*>(event.get())))) {
+          continue;
+        }
+        const u8 channel = event->isMetaEvent() || event->isSysexEvent()
+            ? firstChannel : event->channel & 0x0F;
+        MidiTrack* destination = channelTrack(port, channel);
+        event->prntTrk = destination;
+        destination->sinkEvent(std::move(event));
+      }
     }
+  }
+
+  // A source EOT would terminate a consolidated track before later chunks.
+  for (MidiTrack* track : mergedMidi->tracks()) {
+    track->insertEndOfTrack(endTick);
   }
 
   if (result) {
