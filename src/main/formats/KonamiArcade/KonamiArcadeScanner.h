@@ -31,7 +31,7 @@ public:
   const std::vector<KonamiArcadeSeq*> loadSeqTable(
     RawFile *file,
     u32 offset,
-    const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
+    const KonamiArcadeInstrSet::DrumTable& drums,
     float nmiRate,
     std::string gameName,
     KonamiArcadeFormatVer fmtVer

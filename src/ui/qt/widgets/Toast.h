@@ -5,6 +5,9 @@
  */
 
 #pragma once
+
+#include "main/base/ToastType.h"
+
 #include <QTimer>
 #include <QWidget>
 
@@ -13,7 +16,6 @@ class QPushButton;
 class QGraphicsOpacityEffect;
 class QVariantAnimation;
 class QFrame;
-enum class ToastType;
 
 struct ToastTheme {
   QColor bg, text, border;

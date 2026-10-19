@@ -1,75 +1,86 @@
 /*
- * VGMTrans (c) 2002-2021
+ * VGMTrans (c) 2002-2026
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
 
 #pragma once
-#include "SeqEventTimeIndex.h"
+
+#include "PlaybackPosition.h"
+#include "util/CapsuleText.h"
+#include "value/model/SourceInspection.h"
+#include "value/model/SessionSnapshot.h"
+#include "value/sequence/PerformanceModel.h"
 
 #include <memory>
-#include <unordered_map>
 #include <vector>
 
 #include <QColor>
 #include <QFont>
-#include <QMdiSubWindow>
+#include <QIcon>
+#include <QWidget>
 
-class MidiTrack;
-class SnappingSplitter;
-class VGMFile;
-class VGMSeq;
 class HexView;
+class SnappingSplitter;
 class VGMFileTreeView;
-class VGMItem;
-class SeqEvent;
-class SeqTrack;
-struct SeqTimedEvent;
-enum class PositionChangeOrigin;
 
-class VGMFileView final : public QMdiSubWindow {
+// The existing two-pane file inspector, reworked directly around immutable
+// value annotations instead of legacy VGMFile/VGMItem object graphs.
+class VGMFileView final : public QWidget {
   Q_OBJECT
 
 public:
-  explicit VGMFileView(VGMFile *vgmFile);
+  explicit VGMFileView(std::shared_ptr<const vgmtrans::core::SourceInspection> inspection,
+                       const vgmtrans::core::Asset& asset,
+                       QWidget* parent = nullptr);
+
+  [[nodiscard]] vgmtrans::core::AssetId asset() const noexcept { return inspection_->asset(); }
+
+signals:
+  void statusChanged(const QString& name, const CapsuleText& description, const QIcon& icon,
+                     int offset, int size);
+  // Inspector interactions stay source-ID based; the playback timeline resolves
+  // seek requests to ticks without introducing a model adapter.
+  void seekToAnnotationRequested(vgmtrans::core::SourceAnnotationId annotation);
+  void notePreviewRequested(vgmtrans::core::SourceAnnotationId annotation, bool includeActiveNotesAtTick);
+  void notePreviewStopped();
+  void playbackSeekRequested(int position, PositionChangeOrigin origin);
+
+public slots:
+  void onSelectionChange(vgmtrans::core::SourceInspectionItem item);
+  void seekToAnnotation(vgmtrans::core::SourceAnnotationId annotation);
+  void setSeekModifierActive(bool active);
+  void setPlaybackTimeline(std::vector<vgmtrans::core::SourcePlaybackSpan> timeline);
+  void onPlaybackPositionChanged(int current, int maximum, PositionChangeOrigin origin);
+  void refreshStatus();
+  void resetHexViewFont();
+  void increaseHexViewFont();
+  void decreaseHexViewFont();
+
+protected:
+  void focusInEvent(QFocusEvent* event) override;
 
 private:
   static constexpr int treeViewMinimumWidth = 220;
 
   void resetSnapRanges() const;
-  void focusInEvent(QFocusEvent* event) override;
-  void closeEvent(QCloseEvent *closeEvent) override;
-  int hexViewFullWidth() const;
-  int hexViewWidthSansAscii() const;
-  int hexViewWidthSansAsciiAndAddress() const;
   void updateHexViewFont(qreal sizeIncrement) const;
   void applyHexViewFont(QFont font) const;
-  void ensureTrackIndexMap(VGMSeq* seq);
-  int trackIndexForEvent(const SeqEvent* event) const;
+  void updateStatus(vgmtrans::core::SourceInspectionItem item);
+  void setPlaybackAnnotations(const std::vector<vgmtrans::core::SourceAnnotationId>& annotations,
+                              const std::vector<QColor>& colors = {});
+  void clearPlaybackAnnotations(bool fade = true);
+  [[nodiscard]] u32 playbackTrackIndex(vgmtrans::core::SourceAnnotationId annotation) const;
+  [[nodiscard]] std::vector<vgmtrans::core::SourcePlaybackSpan> playbackSpansInRange(int startTick,
+                                                                                    int endTick) const;
 
-  VGMFileTreeView* m_treeview{};
-  VGMFile* m_vgmfile{};
-  HexView* m_hexview{};
-  SnappingSplitter* m_splitter;
-  QFont m_defaultHexFont;
-  std::vector<const SeqTimedEvent*> m_playbackTimedEvents;
-  std::vector<const VGMItem*> m_playbackItems;
-  std::vector<QColor> m_playbackItemColors;
-  std::vector<const VGMItem*> m_lastPlaybackItems;
-  std::vector<QColor> m_lastPlaybackItemColors;
-  int m_lastPlaybackPosition = 0;
-  const SeqEventTimeIndex* m_playbackTimeline = nullptr;
-  std::unique_ptr<SeqEventTimeIndex::Cursor> m_playbackCursor;
-  VGMSeq* m_trackIndexSeq = nullptr;
-  std::unordered_map<const SeqTrack*, int> m_trackIndexByPtr;
-  std::unordered_map<const MidiTrack*, int> m_trackIndexByMidiPtr;
-
-public slots:
-  void onSelectionChange(VGMItem* item) const;
-  void seekToEvent(VGMItem* item) const;
-  void onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin);
-  void onPlayerStatusChanged(bool playing);
-  void resetHexViewFont();
-  void increaseHexViewFont();
-  void decreaseHexViewFont();
+  std::shared_ptr<const vgmtrans::core::SourceInspection> inspection_;
+  VGMFileTreeView* treeView_{};
+  HexView* hexView_{};
+  SnappingSplitter* splitter_{};
+  QFont defaultHexFont_;
+  std::vector<vgmtrans::core::SourcePlaybackSpan> playbackTimeline_;
+  std::vector<vgmtrans::core::SourceAnnotationId> lastPlaybackAnnotations_;
+  std::vector<QColor> lastPlaybackColors_;
+  int lastPlaybackPosition_ = 0;
 };
