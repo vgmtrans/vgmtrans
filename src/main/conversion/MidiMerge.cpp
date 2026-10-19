@@ -529,6 +529,10 @@ bool saveMergedSoundfont(const std::vector<MidiMergeEntry>& entries,
     return false;
   }
 
+  if (!SF2File::canRepresent(*mergedSynth, context)) {
+    L_ERROR("Merged collection exceeds SoundFont 2.01 structural limits.");
+    return false;
+  }
   SF2File sf2(mergedSynth.get(), context);
   const bool success = sf2.saveSF2File(filepath);
   if (!success) {

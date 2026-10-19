@@ -40,6 +40,9 @@
 * **Breath of Fire 3:** Fixed delay effects playing at too high volume.
 * **Stability:** Fixed a crash when loading certain PS1 music files
 
+**Procyon Studio Digital Sound Elements (Nintendo DS, Wii, PS2)**
+
+* Added support for various DSE versions across NDS, Wii, PS2. For a non-exhaustive list of supported games, see [here](https://github.com/vgmtrans/vgmtrans/pull/929#:~:text=Format%20%2F%20Game%20Coverage).
 
 ### User Interface & Tools
 

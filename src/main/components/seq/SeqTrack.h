@@ -327,8 +327,8 @@ private:
   void addProgramChange(u32 offset, u32 length, u32 progNum, bool requireBank, const std::string &sEventName = "Program Change");
   void addProgramChange(u32 offset, u32 length, u32 progNum, bool requireBank, u8 chan, const std::string &sEventName = "Program Change");
   void addProgramChangeNoItem(u32 progNum, bool requireBank) const;
-  void addBankSelect(u32 offset, u32 length, u8 bank, const std::string& sEventName = "Bank Select");
-  void addBankSelectNoItem(u8 bank) const;
+  void addBankSelect(u32 offset, u32 length, u16 bank, const std::string& sEventName = "Bank Select");
+  void addBankSelectNoItem(u16 bank) const;
   void addTempo(u32 offset, u32 length, u32 microsPerQuarter, const std::string &sEventName = "Tempo");
   void addTempoNoItem(u32 microsPerQuarter) const;
   void insertTempo(u32 offset, u32 length, u32 microsPerQuarter, u32 absTime, const std::string &sEventName = "Tempo");

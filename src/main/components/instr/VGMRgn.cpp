@@ -40,7 +40,7 @@ void VGMRgn::setUnityKey(u8 theUnityKey) {
   unityKey = theUnityKey;
 }
 
-void VGMRgn::setSampNum(u8 sampNumber) {
+void VGMRgn::setSampNum(u32 sampNumber) {
   sampNum = sampNumber;
 }
 

@@ -75,6 +75,7 @@ protected:
    std::vector<std::unique_ptr<VGMInstr>> releaseInstrs();
    void clearInstrs();
    void sinkTempInstr(std::unique_ptr<VGMInstr>&& instr);
+   void setExportInstrs(std::vector<VGMInstr*> instrs) { m_exportInstrs = std::move(instrs); }
    void disableAutoAddInstrumentsAsChildren() { m_auto_add_instruments_as_children = false; }
 
 private:
