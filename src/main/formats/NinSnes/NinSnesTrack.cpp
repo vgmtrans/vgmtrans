@@ -4,12 +4,17 @@
 #include "SeqEvent.h"
 
 #include <algorithm>
+#include <array>
 
 #include "spdlog/fmt/fmt.h"
 
 namespace {
 constexpr size_t MAX_TRACKS = kNinSnesTrackCount;
 constexpr u8 SEQ_KEYOFS = 24;
+
+constexpr std::array<u8, 16> kAddmusicKStandardVelocityTable = {
+    0x19, 0x33, 0x4c, 0x66, 0x72, 0x7f, 0x8c, 0x99, 0xa5, 0xb2, 0xbf, 0xcc, 0xd8, 0xe5, 0xf2, 0xfc,
+};
 }  // namespace
 
 NinSnesTrackState::NinSnesTrackState() {
@@ -18,12 +23,17 @@ NinSnesTrackState::NinSnesTrackState() {
 
 void NinSnesTrackState::resetVars() {
   loopCount = 0;
+  addmusicKSubloopStartAddress = 0;
+  addmusicKSubloopCount = 0;
+  addmusicKSubloopActive = false;
   spcTranspose = 0;
 
   // just in case
   spcNoteDuration = 1;
   spcNoteDurRate = 0xfc;
   spcNoteVolume = 0xfc;
+  spcVolume = 0xff;
+  addmusicKVolumeMultiplier = 0;
 
   // Konami:
   konamiLoopStart = 0;
@@ -208,6 +218,14 @@ NinSnesIntelliModeId NinSnesTrack::intelliMode() const {
   return seq().profile().intelliMode;
 }
 
+u8 NinSnesTrack::midiVolumeForCurrentState() const {
+  u32 effectiveVolume = state.spcVolume;
+  if (seq().profileId == NinSnesProfileId::AddmusicK) {
+    effectiveVolume += (effectiveVolume * state.addmusicKVolumeMultiplier) >> 8;
+  }
+  return static_cast<u8>(std::min<u32>(effectiveVolume / 2, 127));
+}
+
 void NinSnesTrack::readStandardNoteParam(u32 beginOffset, u8 statusByte,
                                          std::string& desc) {
   auto& parentSeq = seq();
@@ -220,11 +238,18 @@ void NinSnesTrack::readStandardNoteParam(u32 beginOffset, u8 statusByte,
     const u8 velIndex = quantizeAndVelocity & 15;
 
     state.spcNoteDurRate = parentSeq.durRateTable[durIndex];
-    state.spcNoteVolume = parentSeq.volumeTable[velIndex];
+    state.spcNoteVolume =
+        parentSeq.profileId == NinSnesProfileId::AddmusicK && parentSeq.addmusicKVelocityTableId != 0
+            ? kAddmusicKStandardVelocityTable[velIndex]
+            : parentSeq.volumeTable[velIndex];
 
     fmt::format_to(std::back_inserter(desc),
                    "  Quantize: {:d} ({:d}/256)  Velocity: {:d} ({:d}/256)", durIndex,
                    state.spcNoteDurRate, velIndex, state.spcNoteVolume);
+    if (parentSeq.profileId == NinSnesProfileId::AddmusicK) {
+      fmt::format_to(std::back_inserter(desc), "  Velocity Table: ${:02X}",
+                     parentSeq.addmusicKVelocityTableId);
+    }
   }
 
   addGenericEvent(beginOffset, curOffset - beginOffset, "Note Param", desc, Type::DurationChange);
@@ -263,38 +288,20 @@ bool NinSnesTrack::handleCoreEvent(NinSnesSeqEventType eventType, u32 beginOffse
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       return true;
 
-    case EVENT_UNKNOWN1: {
-      const u8 arg1 = readByte(curOffset++);
-      desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}", statusByte, arg1);
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
-      return true;
-    }
-
-    case EVENT_UNKNOWN2: {
-      const u8 arg1 = readByte(curOffset++);
-      const u8 arg2 = readByte(curOffset++);
-      desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}", statusByte, arg1, arg2);
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
-      return true;
-    }
-
-    case EVENT_UNKNOWN3: {
-      const u8 arg1 = readByte(curOffset++);
-      const u8 arg2 = readByte(curOffset++);
-      const u8 arg3 = readByte(curOffset++);
-      desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}", statusByte, arg1,
-                         arg2, arg3);
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
-      return true;
-    }
-
-    case EVENT_UNKNOWN4: {
-      const u8 arg1 = readByte(curOffset++);
-      const u8 arg2 = readByte(curOffset++);
-      const u8 arg3 = readByte(curOffset++);
-      const u8 arg4 = readByte(curOffset++);
-      desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}  Arg4: {:d}",
-                         statusByte, arg1, arg2, arg3, arg4);
+    case EVENT_UNKNOWN1:
+    case EVENT_UNKNOWN2:
+    case EVENT_UNKNOWN3:
+    case EVENT_UNKNOWN4:
+    case EVENT_UNKNOWN5:
+    case EVENT_UNKNOWN6:
+    case EVENT_UNKNOWN7:
+    case EVENT_UNKNOWN8: {
+      const u8 argCount = static_cast<u8>(eventType - EVENT_UNKNOWN0);
+      desc = fmt::format("Event: 0x{:02X}", statusByte);
+      for (u8 argIndex = 0; argIndex < argCount; argIndex++) {
+        const u8 arg = readByte(curOffset++);
+        desc += fmt::format("  Arg{:d}: {:d}", argIndex + 1, arg);
+      }
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       return true;
     }
@@ -425,6 +432,10 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, u32 begi
                                          std::string& desc) {
   auto& parentSeq = seq();
 
+  if (eventType == EVENT_ADDMUSICK_SUBLOOP) {
+    return handleAddmusicKEvent(eventType, beginOffset, desc);
+  }
+
   switch (eventType) {
     case EVENT_PAN: {
       const u8 newPan = readByte(curOffset++);
@@ -536,14 +547,16 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, u32 begi
 
     case EVENT_VOLUME: {
       const u8 newVol = readByte(curOffset++);
-      addVol(beginOffset, curOffset - beginOffset, newVol / 2);
+      state.spcVolume = newVol;
+      addVol(beginOffset, curOffset - beginOffset, midiVolumeForCurrentState());
       return true;
     }
 
     case EVENT_VOLUME_FADE: {
       const u8 fadeLength = readByte(curOffset++);
       const u8 newVol = readByte(curOffset++);
-      addVolSlide(beginOffset, curOffset - beginOffset, fadeLength, newVol / 2);
+      state.spcVolume = newVol;
+      addVolSlide(beginOffset, curOffset - beginOffset, fadeLength, midiVolumeForCurrentState());
       return true;
     }
 
@@ -676,6 +689,11 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, u32 begi
 bool NinSnesTrack::handleVariantEvent(NinSnesSeqEventType eventType, u32 beginOffset,
                                       u8 statusByte, std::string& desc) {
   auto& parentSeq = seq();
+
+  if (eventType >= EVENT_ADDMUSICK_ADSR_GAIN &&
+      eventType <= EVENT_ADDMUSICK_REMOTE_COMMAND) {
+    return handleAddmusicKEvent(eventType, beginOffset, desc);
+  }
 
   switch (eventType) {
     case EVENT_RD2_PROGCHANGE_AND_ADSR: {
