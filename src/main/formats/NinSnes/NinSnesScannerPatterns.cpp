@@ -42,12 +42,19 @@ BytePattern NinSnesScanner::makeInitSectionPtrYIPattern(u8 addrSectionPtr) {
 }
 
 BytePattern NinSnesScanner::makeInitSectionPtrSMWPattern(u8 addrSectionPtr) {
-  return makePatchedBytePattern(
-      "\x1c\xfd\xf6\x5e\x13\xc4\x40\xf6"
-      "\x5f\x13\xc4\x41",
-      "xxx??xxx"
-      "??xx",
-      {{6, addrSectionPtr}, {11, static_cast<u8>(addrSectionPtr + 1)}});
+  return makePatchedBytePattern("\x1c\xfd\xf6\x5e\x13\xc4\x40\xf6"
+                                "\x5f\x13\xc4\x41",
+                                "xxx??xxx"
+                                "??xx",
+                                {{6, addrSectionPtr}, {11, static_cast<u8>(addrSectionPtr + 1)}});
+}
+
+BytePattern NinSnesScanner::makeInitSectionPtrSMWAddmusicKPattern(u8 addrSectionPtr) {
+  return makePatchedBytePattern("\x1c\xfd\xf6\x5b\x23\x2d\xc4\x40"
+                                "\xf6\x5c\x23\x2d\xc4\x41",
+                                "xxx??xxx"
+                                "x??xxx",
+                                {{7, addrSectionPtr}, {13, static_cast<u8>(addrSectionPtr + 1)}});
 }
 
 BytePattern NinSnesScanner::makeInitSectionPtrGD3Pattern(u8 addrSectionPtr) {
@@ -59,12 +66,11 @@ BytePattern NinSnesScanner::makeInitSectionPtrGD3Pattern(u8 addrSectionPtr) {
 }
 
 BytePattern NinSnesScanner::makeInitSectionPtrYSFRPattern(u8 addrSectionPtr) {
-  return makePatchedBytePattern(
-      "\xfd\xf7\x48\xc4\x4c\xfc\xf7\x48"
-      "\xc4\x4d",
-      "xx?xxxx?"
-      "xx",
-      {{4, addrSectionPtr}, {9, static_cast<u8>(addrSectionPtr + 1)}});
+  return makePatchedBytePattern("\xfd\xf7\x48\xc4\x4c\xfc\xf7\x48"
+                                "\xc4\x4d",
+                                "xx?xxxx?"
+                                "xx",
+                                {{4, addrSectionPtr}, {9, static_cast<u8>(addrSectionPtr + 1)}});
 }
 
 BytePattern NinSnesScanner::makeInitSectionPtrTSPattern(u8 addrSectionPtr) {
@@ -86,9 +92,8 @@ BytePattern NinSnesScanner::makeInitSectionPtrYs4Pattern(u8 addrSectionPtr) {
 }
 
 BytePattern NinSnesScanner::makeInitSongListPtrYSFRPattern(u8 addrSongListPtr) {
-  return makePatchedBytePattern(
-      "\x8f\x00\x48\x8f\x1e\x49", "x?xx?x",
-      {{2, addrSongListPtr}, {5, static_cast<u8>(addrSongListPtr + 1)}});
+  return makePatchedBytePattern("\x8f\x00\x48\x8f\x1e\x49", "x?xx?x",
+                                {{2, addrSongListPtr}, {5, static_cast<u8>(addrSongListPtr + 1)}});
 }
 
 //; Yoshi's Island SPC
@@ -163,6 +168,25 @@ BytePattern NinSnesScanner::ptnReadVcmdLengthSMW("\x68\xda\x90\x0a\x6d\xfd\xae\x
                                                  "x??xx?",
                                                  14);
 
+//; AddmusicK-style Super Mario World SPC
+//; read vcmd length table
+// 14e8: 68 da     cmp   a,#$da
+// ...
+// 1509: fd        mov   y,a
+// 150a: ae        pop   a
+// 150b: 60        clrc
+// 150c: 96 04 13  adc   a,$1304+y
+// 150f: fd        mov   y,a
+BytePattern NinSnesScanner::ptnReadVcmdLengthSMWAddmusicK("\x68\xda\x90\x24\x6d\x68\xfb\xd0"
+                                                          "\x16\xee\xfc\xf7\x14\x10\x06\xdd"
+                                                          "\x60\x88\x03\x2f\x10\xc4\x10\xdd"
+                                                          "\x60\x84\x10\xbc\xbc\x2f\x06\xfd"
+                                                          "\xae\x60\x96\x04\x13\xfd\x2f\xc9",
+                                                          "x?x?????????????"
+                                                          "????????????????"
+                                                          "xxx??xx?",
+                                                          40);
+
 //; Yoshi's Island SPC
 // 07fb: 2d        push  a
 // 07fc: 9f        xcn   a
@@ -224,6 +248,28 @@ BytePattern NinSnesScanner::ptnLoadInstrTableAddressSMW("\x8d\x05\x8f\x46\x14\x8
                                                         "xxx??x??"
                                                         "xx?x?",
                                                         13);
+
+//; AddmusicK-style Super Mario World SPC
+// 0d52: 8f 44 14  mov   $14,#$44
+// 0d55: 8f 18 15  mov   $15,#$18          ; instrument table base = $1844
+// ...
+// 0d75: 8d 06     mov   y,#$06
+// 0d77: cf        mul   ya
+// 0d78: 7a 14     addw  ya,$14
+// 0d7a: da 14     movw  $14,ya
+BytePattern NinSnesScanner::ptnLoadInstrTableAddressSMWAddmusicK("\x8f\x44\x14\x8f\x18\x15\x8d\x06"
+                                                                 "\xbc\xd4\xc1\x9c\x10\x0c\x8f\xbc"
+                                                                 "\x14\x8f\x18\x15\x80\xa8\xcf\xfc"
+                                                                 "\x2f\x0f\x68\x1e\x90\x0b\x2d\xba"
+                                                                 "\x6c\xda\x14\xae\x80\xa8\x1e\x8d"
+                                                                 "\x06\xcf\x7a\x14\xda\x14",
+                                                                 "x?xx?xxx"
+                                                                 "????????"
+                                                                 "????????"
+                                                                 "????????"
+                                                                 "???????x"
+                                                                 "xxxxxx",
+                                                                 46);
 
 //; Kirby Super Star SPC
 // 071e: 8f 5d f2  mov   $f2,#$5d

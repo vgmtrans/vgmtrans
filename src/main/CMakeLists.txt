@@ -227,6 +227,7 @@ target_sources(vgmtranscore
     formats/NeverlandSnes/NeverlandSnesScanner.cpp
     formats/NeverlandSnes/NeverlandSnesSeq.cpp
     formats/NinSnes/NinSnesInstr.cpp
+    formats/NinSnes/NinSnesAddmusicK.cpp
     formats/NinSnes/NinSnesProfile.cpp
     formats/NinSnes/NinSnesScanner.cpp
     formats/NinSnes/NinSnesScannerPatterns.cpp

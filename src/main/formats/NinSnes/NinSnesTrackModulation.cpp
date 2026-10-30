@@ -36,20 +36,26 @@ u8 convertVibratoDelayToMidi(u8 delay, double tempo) {
                                     nin_snes::vibrato::kMaxDelaySeconds);
 }
 
-s32 notePitch(u8 note) {
+s32 notePitch(s16 note) {
   // NinSnes stores slide pitch in semitone units with an 8-bit fractional part.
-  return static_cast<s32>(note & 0x7f) << 8;
+  return static_cast<s32>(note) << 8;
 }
 
 }  // namespace
 
 NinSnesTrack::PitchSlideEvent NinSnesTrack::readPitchSlide(u32 offset) {
+  const u8 delay = readByte(curOffset++);
+  const u8 length = readByte(curOffset++);
+  const u8 targetNote = readByte(curOffset++);
   return PitchSlideEvent {
     offset,
     4,
-    readByte(curOffset++),
-    readByte(curOffset++),
-    readByte(curOffset++),
+    delay,
+    length,
+    targetNote,
+    state.spcTranspose,
+    seq().profileId != NinSnesProfileId::AddmusicK ||
+        seq().addmusicKHotPatch.pitchSlideAccountsForSemitoneTune(),
   };
 }
 
@@ -76,11 +82,18 @@ void NinSnesTrack::addPitchSlideEvent(const PitchSlideEvent& slide) {
                           slide.delay,
                           slide.length,
                           slide.targetNote & 0x7f);
+  if (!slide.accountForSemitoneTune && slide.semitoneTune != 0) {
+    fmt::format_to(std::back_inserter(desc),
+                   "  Hot Patch: ignores semitone tune ({:d})",
+                   slide.semitoneTune);
+  }
   addGenericEvent(slide.offset, slide.eventLength, "Pitch Slide", desc, Type::PitchBendSlide);
 }
 
 void NinSnesTrack::beginPitchSlide(const PitchSlideEvent& slide) {
-  activatePitchMotion(slide.delay, slide.length, notePitch(slide.targetNote));
+  const s16 targetNote =
+      slide.accountForSemitoneTune ? slide.targetNote : slide.targetNote - slide.semitoneTune;
+  activatePitchMotion(slide.delay, slide.length, notePitch(targetNote));
 }
 
 void NinSnesTrack::activatePitchMotion(u8 delay, u8 length, s32 targetPitch) {
