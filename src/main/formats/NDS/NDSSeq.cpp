@@ -87,6 +87,61 @@ void NDSTrack::resetVars() {
   noteWithDelta = false;
 }
 
+bool NDSTrack::canRunEventAtStopTime(u32 stopOffset) const {
+  if (curOffset >= stopOffset) {
+    return false;
+  }
+
+  const u8 status = readByte(curOffset);
+  if (status < 0x80) {
+    return false;
+  }
+
+  switch (status) {
+    case 0x80:  // Rest advances track time.
+    case 0x94:  // Jump can start another loop pass.
+    case 0x95:  // Call can enter an arbitrary same-tick command stream.
+    case 0xFD:  // Return can jump back into arbitrary same-tick code.
+      return false;
+    default:
+      return true;
+  }
+}
+
+// SSEQ tracks can place final same-tick controller cleanup just before End.
+// The generic non-tick converter stops at the computed tick boundary, so NDS
+// drains bounded non-timing commands at that boundary during MIDI conversion.
+void NDSTrack::loadTrackMainLoop(u32 stopOffset, s32 stopTime) {
+  if (parentSeq->bLoadTickByTick || readMode != READMODE_CONVERT_TO_MIDI) {
+    SeqTrack::loadTrackMainLoop(stopOffset, stopTime);
+    return;
+  }
+
+  if (!active) {
+    return;
+  }
+
+  if (stopTime == -1) {
+    stopTime = 0x7FFFFFFF;
+  }
+
+  while (curOffset < stopOffset) {
+    const auto currentTime = getTime();
+    if (currentTime > static_cast<u32>(stopTime)) {
+      break;
+    }
+    if (currentTime == static_cast<u32>(stopTime) && !canRunEventAtStopTime(stopOffset)) {
+      break;
+    }
+
+    if (!readEvent()) {
+      totalTicks = getTime();
+      active = false;
+      break;
+    }
+  }
+}
+
 bool NDSTrack::readEvent(void) {
   u32 beginOffset = curOffset;
   u8 status_byte = readByte(curOffset++);

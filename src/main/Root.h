@@ -5,6 +5,7 @@
  */
 #pragma once
 
+#include "base/ToastType.h"
 #include "base/Types.h"
 #include "components/VGMFileVariant.h"
 #include "VGMTag.h"
@@ -39,8 +40,6 @@ T* variantToType(VGMFileVariant variant) {
 }
 VGMFile* variantToVGMFile(VGMFileVariant variant);
 VGMFileVariant vgmFileToVariant(VGMFile* vgmfile);
-
-enum class ToastType { Info, Warning, Error, Success };
 
 class VGMRoot {
 public:

@@ -5,7 +5,6 @@
 #include "util/Metrics.h"
 #include "util/UIHelpers.h"
 #include "widgets/ItemViewDensity.h"
-#include "workarea/VGMCollListView.h"
 
 #include <algorithm>
 #include <utility>
@@ -15,6 +14,7 @@
 #include <QDockWidget>
 #include <QEvent>
 #include <QLayout>
+#include <QListView>
 #include <QMainWindow>
 #include <QMouseEvent>
 #include <QSize>
