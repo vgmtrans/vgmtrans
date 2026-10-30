@@ -25,7 +25,7 @@ class VGMRgn : public VGMItem {
 
   void setRanges(u8 keyLow, u8 keyHigh, u8 velLow = 0, u8 velHigh = 0x7F);
   void setUnityKey(u8 unityNote);
-  void setSampNum(u8 sampNumber);
+  void setSampNum(u32 sampNumber);
   void setLoopInfo(int theLoopStatus, u32 theLoopStart, u32 theLoopLength);
   void setADSR(long attack_time, u16 atk_transform, long decay_time, long sustain_lev,
                u16 rls_transform, long release_time);
