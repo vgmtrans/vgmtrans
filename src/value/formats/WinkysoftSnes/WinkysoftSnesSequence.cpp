@@ -13,6 +13,7 @@
 #include <deque>
 #include <map>
 #include <memory>
+#include <span>
 #include <utility>
 
 namespace vgmtrans::formats::winkysoft_snes {
@@ -23,9 +24,15 @@ namespace {
 
 constexpr u32 kCommandLimit = 1'000'000;
 constexpr u32 kDecodeLimit = 65536;
+constexpr u16 kLengthUnit = 125;
+constexpr size_t kRepeatDepth = 8;
 // Keep DSP tuning/modulation independent of the primary wheel consumed by
 // MIDI portamento when lowering a legato key change.
 constexpr PitchBendLayerId kDspPitchLayer{1};
+
+[[nodiscard]] double masterLevel(const std::array<u8, 128>& dsp) {
+  return (std::abs(static_cast<s8>(dsp[0x0c])) + std::abs(static_cast<s8>(dsp[0x1c]))) / 256.0;
+}
 
 struct PanStep {
   std::optional<u8> position;
@@ -54,11 +61,8 @@ struct ProgramState {
   std::array<u16, kTrackCount> launchRemainders{};
   std::array<u16, kTrackCount> panCursors{};
   std::array<u8, 128> dsp;
-  bool initialized = false;
 
-  [[nodiscard]] bool early() const {
-    return settings->layout.version == Version::Early || settings->layout.version == Version::Jojo;
-  }
+  [[nodiscard]] bool early() const { return isEarly(settings->layout.version); }
 
   void advanceTempo() {
     if (tempoStep == 0) {
@@ -69,16 +73,6 @@ struct ProgramState {
       tempoScale = static_cast<u8>(std::max<int>(tempoTarget, tempoScale - tempoStep - 1));
     }
     tempo = static_cast<u8>((settings->layout.initialTempo * tempoScale * 2) >> 8);
-  }
-
-  void advance(u64 tick) {
-    if (frame == tick) {
-      return;
-    }
-    frame = tick;
-    if (!early()) {
-      advanceTempo();
-    }
   }
 };
 
@@ -115,8 +109,7 @@ struct TrackState {
   double key = 60;
   std::vector<Repeat> repeats;
   std::optional<Address> returnAddress;
-  u16 panSequence = 0;
-  size_t panIndex = 0;
+  std::span<const PanStep> panSteps;
   u8 panWait = 0;
   double lastPitch = 0;
   double lastLeft = -2;
@@ -127,7 +120,7 @@ struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   [[nodiscard]] const Settings& settings() const { return *program.settings; }
-  [[nodiscard]] const Instrument& patch() const { return settings().data.instruments[track.instrument]; }
+  [[nodiscard]] const Patch& patch() const { return settings().data.patches[track.instrument]; }
 
   void emitEcho() {
     const auto& dsp = program.dsp;
@@ -140,20 +133,22 @@ struct Playback : SequencePlayback<TrackState> {
     });
   }
 
-  void beforeCommand() {
-    beginFrame();
-    if (!program.initialized) {
-      program.initialized = true;
-      emitEcho();
-    }
-  }
+  void beforeCommand() { beginFrame(); }
 
   void beginFrame() {
     if (track.frame == vm.tick()) {
       return;
     }
     track.frame = vm.tick();
-    program.advance(vm.tick());
+    if (program.frame != track.frame) {
+      if (!program.frame) {
+        emitEcho();
+      }
+      program.frame = track.frame;
+      if (!program.early()) {
+        program.advanceTempo();
+      }
+    }
     track.frameTempo = program.tempo;
     // Early drivers advance the ramp only when channel zero is ready to
     // decode. That channel has already copied the old tempo for this frame.
@@ -238,19 +233,44 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   void advancePan() {
-    if (track.panWait == 0 || --track.panWait != 0) {
+    if (track.panWait == 0 || --track.panWait != 0 || track.panSteps.empty()) {
       return;
     }
-    const auto found = settings().panSequences.find(track.panSequence);
-    if (found == settings().panSequences.end() || track.panIndex >= found->second.size()) {
-      return;
-    }
-    const PanStep& step = found->second[track.panIndex++];
+    const PanStep& step = track.panSteps.front();
+    track.panSteps = track.panSteps.subspan(1);
     program.panCursors[out.sourceTrackNumber()] = step.nextAddress;
     if (step.position) {
       track.pan = *step.position;
     }
     track.panWait = step.frames;
+  }
+
+  void advanceVibrato() {
+    if (track.vibratoDepth == 0) {
+      track.vibratoPhase = 0x80;
+      track.vibratoDescending = false;
+      return;
+    }
+    if (program.early()) {
+      // Vibrato writes the multiplier itself. Disabling it retains the
+      // previous frame's multiplier until a pitch command replaces it.
+      track.pitchMultiplier = static_cast<u8>(0x80 + ((track.vibratoDepth * track.vibratoPhase) >> 8));
+    }
+    if (track.vibratoDescending) {
+      if (track.vibratoPhase < track.vibratoSpeed) {
+        track.vibratoPhase = program.early() ? 0 : 1;
+        track.vibratoDescending = false;
+      } else {
+        track.vibratoPhase = static_cast<u8>(track.vibratoPhase - track.vibratoSpeed);
+      }
+    } else {
+      // Late drivers retain the carry from centering the vibrato sample.
+      const u8 carry = !program.early() &&
+          ((track.vibratoDepth * 2 * track.vibratoPhase) >> 8) >= track.vibratoDepth ? 1 : 0;
+      const u32 next = track.vibratoPhase + track.vibratoSpeed + carry;
+      track.vibratoPhase = static_cast<u8>(std::min(next, 255u));
+      track.vibratoDescending = next > 255;
+    }
   }
 
   void tick() {
@@ -265,35 +285,7 @@ struct Playback : SequencePlayback<TrackState> {
         out.setNoteEnd(track.note, vm.tick() + 1);
       }
     }
-    if (track.vibratoDepth != 0) {
-      if (program.early()) {
-        // Vibrato writes the multiplier itself. Disabling it retains the
-        // previous frame's multiplier until a pitch command replaces it.
-        track.pitchMultiplier = static_cast<u8>(0x80 + ((track.vibratoDepth * track.vibratoPhase) >> 8));
-      }
-      if (track.vibratoDescending) {
-        if (track.vibratoPhase < track.vibratoSpeed) {
-          track.vibratoPhase = program.early() ? 0 : 1;
-          track.vibratoDescending = false;
-        } else {
-          track.vibratoPhase = static_cast<u8>(track.vibratoPhase - track.vibratoSpeed);
-        }
-      } else {
-        // Late drivers retain the carry from centering the vibrato sample.
-        const u8 carry = !program.early() &&
-            ((track.vibratoDepth * 2 * track.vibratoPhase) >> 8) >= track.vibratoDepth ? 1 : 0;
-        const u32 next = track.vibratoPhase + track.vibratoSpeed + carry;
-        if (next > 255) {
-          track.vibratoPhase = 255;
-          track.vibratoDescending = true;
-        } else {
-          track.vibratoPhase = static_cast<u8>(next);
-        }
-      }
-    } else {
-      track.vibratoPhase = 0x80;
-      track.vibratoDescending = false;
-    }
+    advanceVibrato();
     track.pitchOffset = static_cast<u16>(track.pitchOffset + track.pitchStep);
     emitLevel();
     emitPitch();
@@ -318,9 +310,21 @@ struct Playback : SequencePlayback<TrackState> {
     return vm.fallthrough();
   }
 
+  [[nodiscard]] Effects waitForLength(std::optional<u8> length) {
+    if (length) {
+      // Packed events and controllers leave the previous length unchanged
+      // when an explicit zero requests a state change without a wait.
+      if (*length == 0) {
+        return vm.fallthrough();
+      }
+      track.noteLength = *length * kLengthUnit;
+    }
+    return wait(track.noteLength);
+  }
+
   void instrument(u8 index, bool drum = false) {
     track.instrument = index;
-    const Instrument& value = patch();
+    const Patch& value = patch();
     track.basePitch = value.pitch;
     out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = index});
     if (drum) {
@@ -364,7 +368,6 @@ struct Playback : SequencePlayback<TrackState> {
     const bool retrigger = track.gateLength < track.noteLength;
     if (track.percussion && !noise) {
       instrument(key, true);
-      track.basePitch = patch().pitch;
     } else if (!noise) {
       track.basePitch = melodicPitch(static_cast<u8>(key + track.transpose));
     }
@@ -376,12 +379,12 @@ struct Playback : SequencePlayback<TrackState> {
     if (track.sounding) {
       out.setNoteEnd(track.note, vm.tick());
     }
+    const u32 channel = out.sourceTrackNumber();
+    const u32 voice = channel < 8 ? channel : channel - 2;
     if (noise) {
-      program.dsp[0x3d] = static_cast<u8>(1u << (out.sourceTrackNumber() < 8 ? out.sourceTrackNumber()
-                                                                                  : out.sourceTrackNumber() - 2));
+      program.dsp[0x3d] = static_cast<u8>(1u << voice);
       program.dsp[0x6c] = static_cast<u8>((program.dsp[0x6c] & 0xe0) | key);
     }
-    const u32 voice = out.sourceTrackNumber() < 8 ? out.sourceTrackNumber() : out.sourceTrackNumber() - 2;
     track.noise = (program.dsp[0x3d] & (1u << voice)) != 0;
     const double soundingKey = track.noise ? 60.0 : pitchKey(dspPitch());
     // MIDI keys are integral. Keep the fractional DSP pitch in the bend so
@@ -404,26 +407,21 @@ struct Playback : SequencePlayback<TrackState> {
     if (suffix == 0x7d) {
       track.velocity = value;
     } else if (suffix == 0x7e) {
-      track.gateLength = static_cast<u16>(value * 125);
+      track.gateLength = value * kLengthUnit;
     }
     track.gateRemaining = track.gateLength;
     emitLevel();
     return advances ? wait(track.noteLength) : vm.fallthrough();
   }
 
-  [[nodiscard]] Effects packed(u8 velocity, u8 gate, u8 duration) {
+  [[nodiscard]] Effects packed(u8 velocity, u8 gateLength, u8 duration) {
     if (track.waiting) {
       return wait(0);
     }
     track.velocity = velocity;
-    track.gateLength = static_cast<u16>(gate * 125);
-    track.gateRemaining = track.gateLength;
+    gate(gateLength);
     emitLevel();
-    if (duration != 0) {
-      track.noteLength = static_cast<u16>(duration * 125);
-      return wait(track.noteLength);
-    }
-    return vm.fallthrough();
+    return waitForLength(duration);
   }
 
   [[nodiscard]] Effects duration(u8 length, bool rest) {
@@ -434,12 +432,15 @@ struct Playback : SequencePlayback<TrackState> {
       track.gateLength &= 0xff;
       track.gateRemaining &= 0xff;
     }
-    track.noteLength = static_cast<u16>(length * 125);
+    track.noteLength = length * kLengthUnit;
     return wait(track.noteLength);
   }
 
   void velocity(u8 value) { track.velocity = value; emitLevel(); }
-  void gate(u8 value) { track.gateLength = static_cast<u16>(value * 125); track.gateRemaining = track.gateLength; }
+  void gate(u8 value) {
+    track.gateLength = value * kLengthUnit;
+    track.gateRemaining = track.gateLength;
+  }
 
   [[nodiscard]] Effects control(u8 kind, u8 value, std::optional<u8> duration) {
     if (track.waiting) {
@@ -452,13 +453,7 @@ struct Playback : SequencePlayback<TrackState> {
     }
     emitLevel();
     emitPitch();
-    if (duration) {
-      if (*duration == 0) {
-        return vm.fallthrough();
-      }
-      track.noteLength = static_cast<u16>(*duration * 125);
-    }
-    return wait(track.noteLength);
+    return waitForLength(duration);
   }
 
   void tempo(u8 target, u8 step) { program.tempoTarget = target; program.tempoStep = step; }
@@ -469,8 +464,7 @@ struct Playback : SequencePlayback<TrackState> {
     reg &= 0x7f;
     program.dsp[reg] = value;
     if (reg == 0x0c || reg == 0x1c) {
-      out.masterLevel((std::abs(static_cast<s8>(program.dsp[0x0c])) +
-                       std::abs(static_cast<s8>(program.dsp[0x1c]))) / 256.0);
+      out.masterLevel(masterLevel(program.dsp));
     } else if (reg == 0x2c || reg == 0x3c || reg == 0x4d || reg == 0x6c || reg == 0x7d || reg == 0x0d) {
       emitEcho();
     }
@@ -488,9 +482,8 @@ struct Playback : SequencePlayback<TrackState> {
   void slide(s8 value) { track.pitchStep = value; track.pitchOffset = static_cast<u16>(value); emitPitch(); }
 
   void panSequence(u16 address) {
-    track.panSequence = address;
+    track.panSteps = settings().panSequences.at(address);
     program.panCursors[out.sourceTrackNumber()] = address;
-    track.panIndex = 0;
     track.panWait = 1;
     advancePan();
     emitLevel();
@@ -528,7 +521,7 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   [[nodiscard]] Effects beginRepeat(Address start) {
-    if (track.repeats.size() == 8) {
+    if (track.repeats.size() == kRepeatDepth) {
       vm.diagnostic(Diagnostic{.severity = Severity::Warning, .message = "WinkysoftSnes repeat stack overflow"});
       return vm.end();
     }
@@ -696,14 +689,14 @@ DecodedBytecodeCommand decodeCommand(ByteReader reader, Walk& walk, Settings& se
       return cursor.command("Noise Off", SequenceSemantic::State).invoke<&Playback::noiseOff>();
     }
     case 0x6c:
-      if (layout.version == Version::Early || layout.version == Version::Jojo) {
+      if (isEarly(layout.version)) {
         cursor.u8("port value", SourceValueDisplay::Hex);
         return cursor.sourceOnly("CPU Port Write", "cpu-port-write");
       }
       return cursor.command("Pitch Slide", SequenceSemantic::Pitch)
           .invoke<&Playback::slide>({cursor.s8("pitch step per frame")});
     case 0x6d:
-      if (layout.version == Version::Early || layout.version == Version::Jojo) {
+      if (isEarly(layout.version)) {
         auto event = cursor.command("CPU Conditional Branch", SequenceSemantic::Jump);
         const u8 condition = cursor.u8("condition");
         const Address target{cursor.u16le("destination", SourceValueDisplay::Address, SemanticOperandRole::JumpTarget)};
@@ -727,7 +720,7 @@ DecodedBytecodeCommand decodeCommand(ByteReader reader, Walk& walk, Settings& se
     case 0x73:
       return cursor.command("Pan", SequenceSemantic::Pan).invoke<&Playback::pan>({cursor.u8("position")});
     case 0x74: {
-      if (walk.loops.size() >= 8) { return cursor.unsupported("Repeat Stack Overflow").stop(); }
+      if (walk.loops.size() >= kRepeatDepth) { return cursor.unsupported("Repeat Stack Overflow").stop(); }
       const Address start{walk.offset + 1};
       walk.loops.push_back(static_cast<u32>(start.value));
       return cursor.command("Repeat Begin", SequenceSemantic::Repeat).invoke<&Playback::beginRepeat>({start});
@@ -798,8 +791,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, const Driv
                    .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
                    .initialSourceInstrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0},
                    .initialLevel = 1.0,
-                   .initialMasterLevel = (std::abs(static_cast<s8>(layout.initialDsp[0x0c])) +
-                                          std::abs(static_cast<s8>(layout.initialDsp[0x1c]))) / 256.0,
+                   .initialMasterLevel = masterLevel(layout.initialDsp),
                    .initialReverbSend = 0.0, .initialPitchBendRangeSemitones = 24,
                    .initialTempoMicrosecondsPerQuarter = layout.frameMicroseconds * kPpqn},
   };

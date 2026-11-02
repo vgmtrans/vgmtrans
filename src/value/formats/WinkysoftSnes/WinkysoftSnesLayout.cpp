@@ -7,8 +7,6 @@
 #include "value/formats/WinkysoftSnes/WinkysoftSnes.h"
 #include "value/scan/BytePattern.h"
 
-#include <algorithm>
-
 namespace vgmtrans::formats::winkysoft_snes {
 
 using namespace core;
@@ -59,10 +57,10 @@ std::optional<Layout> findLayout(ByteReader reader) {
 
   Layout layout;
   layout.commandMap = reader.le16(*dispatch + 10);
-  layout.commandTable = reader.le16(*dispatch + 16);
+  const u16 commandTable = reader.le16(*dispatch + 16);
   layout.instrumentTable = immediateAddress(reader, *addresses);
   layout.pitchTable = reader.le16(*pitch + 6);
-  if (!reader.has(layout.commandMap, 128) || !reader.has(layout.commandTable, 60) ||
+  if (!reader.has(layout.commandMap, 128) || !reader.has(commandTable, 60) ||
       !reader.has(layout.instrumentTable, 8) || !reader.has(layout.pitchTable, 26)) {
     return std::nullopt;
   }
@@ -78,10 +76,11 @@ std::optional<Layout> findLayout(ByteReader reader) {
     }
   }
   const auto handler = [&](u8 opcode) {
-    return reader.le16(layout.commandTable + reader.u8At(layout.commandMap + opcode));
+    return reader.le16(commandTable + reader.u8At(layout.commandMap + opcode));
   };
   for (u32 opcode = 0x67; opcode < 0x80; ++opcode) {
-    if (reader.u8At(layout.commandMap + opcode) > 0x3a) {
+    const u8 slot = reader.u8At(layout.commandMap + opcode);
+    if ((slot & 1) != 0 || slot > 0x3a) {
       return std::nullopt;
     }
   }
@@ -127,6 +126,9 @@ std::optional<Layout> findLayout(ByteReader reader) {
       return std::nullopt;
     }
     layout.panSequenceTable = reader.le16(*code + 3);
+    if (!reader.has(layout.panSequenceTable, 256)) {
+      return std::nullopt;
+    }
     // Masoukishin removed the duration/tempo reset in the infinite-loop arm.
     const std::array<u8, 6> reset{0xe8, 0, 0xc4, 0x0f, 0xc4, 0x0e};
     const auto found = findBytes(reader, reset, handler(0x75));
@@ -172,7 +174,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
     u32 header = songs + selected * 6;
     if (!valid(header)) {
       header = songs;
-      for (u32 i = 0; i < 256 && !valid(header); ++i) {
+      for (u32 i = 1; i < 256 && !valid(header); ++i) {
         header += 6;
       }
     }
@@ -194,12 +196,12 @@ std::optional<Layout> findLayout(ByteReader reader) {
 
 DriverData readDriverData(ByteReader reader, const Layout& layout) {
   DriverData data;
-  for (u32 i = 0; i < data.instruments.size(); ++i) {
+  for (u32 i = 0; i < data.patches.size(); ++i) {
     const u32 address = layout.instrumentTable + i * 8;
     if (!reader.has(address, 8)) {
       break;
     }
-    data.instruments[i] = Instrument{
+    data.patches[i] = Patch{
         .range = reader.range(address, 8), .sample = reader.u8At(address),
         .adsr1 = reader.u8At(address + 1), .adsr2 = reader.u8At(address + 2),
         .pitch = reader.be16(address + 3), .volume = reader.u8At(address + 5),

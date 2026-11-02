@@ -8,6 +8,7 @@
 #include "value/platform/SnesSampleDirectory.h"
 #include "value/synth/SnesDsp.h"
 
+#include <algorithm>
 #include <cmath>
 #include <fmt/format.h>
 
@@ -15,10 +16,10 @@ namespace vgmtrans::formats::winkysoft_snes {
 
 using namespace core;
 
-double unityKey(const Instrument& instrument, const DriverData& data) {
+double unityKey(const Patch& patch, const DriverData& data) {
   // At source key 60 the pitch table is unshifted. Instrument tuning is an
   // unsigned, big-endian 8.8 multiplier, also used as an absolute drum pitch.
-  const double pitch = data.pitches[0] * instrument.pitch / 256.0;
+  const double pitch = static_cast<double>(data.pitches[0]) * patch.pitch / 256.0;
   return 60.0 - 12.0 * std::log2(std::max(1.0, pitch) / 4096.0);
 }
 
@@ -28,14 +29,14 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
                                           std::string_view name) {
   const ByteReader reader = builder.reader();
   const auto catalog = readSnesBrrCatalog(reader, layout.directory, programs,
-                                         [&](u8 index) { return data.instruments[index].sample; });
+                                         [&](u8 index) { return data.patches[index].sample; });
   if (catalog.empty() && noiseRates.empty()) {
     return std::nullopt;
   }
   auto bank = builder.soundBank(fmt::format("{} Instruments", name));
   const auto samples = addSnesBrrSamples(bank.localSamples(), reader, catalog);
   for (const u8 index : programs) {
-    const Instrument& patch = data.instruments[index];
+    const Patch& patch = data.patches[index];
     const auto sample = samples.findSrcn(patch.sample);
     if (!patch.range.valid() || patch.pitch == 0 || sample.empty()) {
       continue;
@@ -68,7 +69,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
                                    .codecParameter = rate}).ref();
     // Noise ignores SRCN and pitch, but retains the selected patch's ADSR.
     for (const u8 index : programs) {
-      const Instrument& patch = data.instruments[index];
+      const Patch& patch = data.patches[index];
       if (!patch.range.valid()) {
         continue;
       }

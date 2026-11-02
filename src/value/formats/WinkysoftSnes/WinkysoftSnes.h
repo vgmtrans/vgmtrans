@@ -30,10 +30,13 @@ inline constexpr std::string_view kInstrumentDomain = "winkysoft-snes.instrument
 
 enum class Version { Early, Jojo, Standard, Extended };
 
+[[nodiscard]] constexpr bool isEarly(Version version) {
+  return version == Version::Early || version == Version::Jojo;
+}
+
 struct Layout {
   Version version = Version::Standard;
   u16 commandMap = 0;
-  u16 commandTable = 0;
   u16 instrumentTable = 0;
   u16 directory = 0;
   u16 pitchTable = 0;
@@ -53,7 +56,7 @@ struct Layout {
   std::array<u8, 128> initialDsp{};
 };
 
-struct Instrument {
+struct Patch {
   core::SourceRange range;
   u8 sample = 0;
   u8 adsr1 = 0;
@@ -65,7 +68,7 @@ struct Instrument {
 };
 
 struct DriverData {
-  std::array<Instrument, 256> instruments;
+  std::array<Patch, 256> patches;
   std::array<u16, 13> pitches{};
   std::array<u8, 16> panLeft{};
   std::array<u8, 16> panRight{};
@@ -79,7 +82,7 @@ struct SequenceParse {
 
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);
 [[nodiscard]] DriverData readDriverData(core::ByteReader reader, const Layout& layout);
-[[nodiscard]] double unityKey(const Instrument& instrument, const DriverData& data);
+[[nodiscard]] double unityKey(const Patch& patch, const DriverData& data);
 [[nodiscard]] SequenceParse decodeSequence(core::ByteReader reader, const Layout& layout, const DriverData& data,
                                            core::AssetId id, core::SourceMapBuilder* sourceMap = nullptr,
                                            std::vector<core::Diagnostic>* diagnostics = nullptr);

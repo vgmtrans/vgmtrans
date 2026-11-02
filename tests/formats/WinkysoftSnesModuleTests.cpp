@@ -12,8 +12,8 @@
 
 #include <array>
 #include <cmath>
-#include <fstream>
 #include <iostream>
+#include <span>
 
 using namespace vgmtrans::core;
 using namespace vgmtrans::formats::winkysoft_snes;
@@ -24,7 +24,7 @@ struct Fixture {
   std::vector<u8> bytes = std::vector<u8>(kAramSize);
 
   explicit Fixture(Version version = Version::Standard) {
-    const bool early = version == Version::Early || version == Version::Jojo;
+    const bool early = isEarly(version);
     write(0x9000, {0xf7,8,0x30,0,0xc4,0,0x5d,0x3a,8,0xf5,0,0x70,0x5d,0xf7,8,0x1f,0x80,0x70});
     write(0x9040, {0x8d,0x12,0xe8,0,0xda,0x0a,0x8d,0x40,0xe8,0,0xda,0x0c});
     write(0x9060, {0xf6,1,0x30,0xc4,1,0xf6,0,0x30,0xc4,0,0xf6,3,0x30,0x2d,0xf6,2,0x30,0xee,0x9a,0});
@@ -73,12 +73,41 @@ struct Fixture {
   void write(u32 offset, std::initializer_list<u8> values) { std::ranges::copy(values, bytes.begin() + offset); }
   void word(u32 offset, u16 value) { bytes[offset] = value; bytes[offset + 1] = value >> 8; }
   ByteReader reader() const { return ByteReader(SourceId{701}, bytes); }
-  SequenceParse parse(std::vector<Diagnostic>* diagnostics = nullptr) const {
+  SequenceParse parse() const {
     const auto layout = findLayout(reader());
     expect(layout.has_value(), "Winkysoft fixture must be recognized");
-    return decodeSequence(reader(), *layout, readDriverData(reader(), *layout), AssetId{701}, nullptr, diagnostics);
+    std::vector<Diagnostic> diagnostics;
+    auto parsed = decodeSequence(reader(), *layout, readDriverData(reader(), *layout), AssetId{701}, nullptr, &diagnostics);
+    expect(diagnostics.empty(), "Winkysoft fixture must decode without diagnostics");
+    return parsed;
+  }
+  PerformanceSequence render() const {
+    auto performance = SequenceVm().render(parse().program);
+    expect(performance.diagnostics.empty(), "Winkysoft fixture must render without diagnostics");
+    return performance;
   }
 };
+
+void expectMidiPitchWords(const PerformanceSequence& performance, std::span<const u16> pitches) {
+  // Fixture patch 0 has unity multiplier $0100; the pitch table starts at $085f.
+  const double unity = 60 - 12 * std::log2(0x085f / 4096.0);
+  for (const auto mode : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
+    const auto midi = renderTestMidi(performance, {.pitchTransitions = mode});
+    const auto& events = midi.tracks[0].events;
+    const auto attacks = midiNotes(events);
+    for (u64 tick = 0; tick < pitches.size(); ++tick) {
+      // Native portamento briefly overlaps the old key with the new attack.
+      const auto attack = std::find_if(attacks.rbegin(), attacks.rend(), [tick](const auto& note) {
+        return note.tick <= tick && tick < note.tick + note.duration;
+      });
+      expect(attack != attacks.rend(), "pitch fixture must retain its sounding MIDI voice");
+      const double midiKey = attack->key + midiPitchSemitonesAt(events, tick);
+      const double expectedKey = unity + 12 * std::log2(pitches[tick] / 4096.0);
+      expect(std::abs(midiKey - expectedKey) < 0.002,
+             "MIDI pitch must match the driver's DSP word within pitch-wheel precision");
+    }
+  }
+}
 
 void recognizesRelocatedProfilesAndRejectsBrokenTables() {
   for (const auto version : {Version::Early, Version::Jojo, Version::Standard, Version::Extended}) {
@@ -92,17 +121,45 @@ void recognizesRelocatedProfilesAndRejectsBrokenTables() {
   }
 }
 
+void rejectsInvalidDispatchAndPanTables() {
+  Fixture fixture;
+  fixture.bytes[0x7074] |= 1;
+  expect(!findLayout(fixture.reader()), "dispatch slots must address complete aligned handler words");
+
+  Fixture extended(Version::Extended);
+  extended.word(0x73c3, 0xff01);
+  expect(!findLayout(extended.reader()), "the complete pan pointer table must fit inside ARAM");
+}
+
+void descriptorSearchStaysWithinTheByteSizedIndex() {
+  Fixture fixture(Version::Early);
+  fixture.bytes[0x4001] = 0;
+  fixture.write(0x4600, {0,125,255,0,0,0x60});
+  expect(!findLayout(fixture.reader()), "descriptor fallback must not accept entry 256");
+  fixture.write(0x45fa, {0,125,255,0,0,0x60});
+  const auto layout = findLayout(fixture.reader());
+  expect(layout && layout->songHeader == 0x45fa, "descriptor fallback must still accept entry 255");
+}
+
+void instrumentTuningAvoidsIntegerOverflow() {
+  DriverData data;
+  data.pitches[0] = 0xffff;
+  data.patches[0].pitch = 0xffff;
+  const double expected = 60 - 12 * std::log2(65535.0 * 65535.0 / (256 * 4096));
+  expect(std::abs(unityKey(data.patches[0], data) - expected) < 1e-9,
+         "full-width table and instrument pitch words must not overflow before conversion to floating point");
+}
+
 void lookaheadLengthsAndRepeatedControllersStayAligned() {
   Fixture fixture;
   fixture.write(0x6000, {0x7b,0,0x72,64,0,0x24,0xc0,3,4,0x25,0x7d,80,
                         0x70,0xc0,2,0xc1,0x40,3,0x26,0x78});
-  std::vector<Diagnostic> diagnostics;
-  const auto parsed = fixture.parse(&diagnostics);
+  const auto parsed = fixture.parse();
   fixture.bytes.clear();
   fixture.bytes.shrink_to_fit();
   const auto performance = SequenceVm().render(parsed.program);
   const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks[0]);
-  expect(diagnostics.empty() && performance.diagnostics.empty() && notes.size() == 3,
+  expect(performance.diagnostics.empty() && notes.size() == 3,
          "packed timing, note lookahead, and implicit controller bytes must all decode");
   expect(notes[0]->header.tick == 0 && notes[1]->header.tick == 4 && notes[2]->header.tick == 15 &&
              performance.tracks[0].endTick == 18,
@@ -114,10 +171,9 @@ void launchesAndRestartsTracksAtRuntime() {
   fixture.write(0x6000, {0x7f,2,0x6e,1,0,0x61,0x7f,3,0x6e,1,0x20,0x61,0x7f,5,0x78});
   fixture.write(0x6100, {0x7b,0,0x72,64,0,0x30,0xc0,20,20,0x78});
   fixture.write(0x6120, {0x7b,1,0x72,64,0,0x32,0xc0,1,2,0x78});
-  const auto parsed = fixture.parse();
-  const auto performance = SequenceVm().render(parsed.program);
+  const auto performance = fixture.render();
   const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks[1]);
-  expect(performance.diagnostics.empty() && notes.size() == 2 && notes[0]->header.tick == 2 &&
+  expect(notes.size() == 2 && notes[0]->header.tick == 2 &&
              notes[1]->header.tick == 5 && notes[0]->durationTicks == 3,
          "a track launch must run at the caller's time and replacement must release the previous voice");
 }
@@ -127,37 +183,27 @@ void launchesLowerChannelsOnTheFollowingFrame() {
   fixture.write(0x6000, {0x6e,1,0,0x61,0x78});
   fixture.write(0x6100, {0x6e,0,0,0x62,0x78});
   fixture.write(0x6200, {0x7b,0,0x72,64,0,0x30,0xc0,1,2,0x78});
-  const auto performance = SequenceVm().render(fixture.parse().program);
+  const auto performance = fixture.render();
   const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks[0]);
-  expect(performance.diagnostics.empty() && notes.size() == 1 && notes[0]->header.tick == 1,
+  expect(notes.size() == 1 && notes[0]->header.tick == 1,
          "a launch of an already-visited channel must wait until the next hardware frame");
 }
 
 void lowPitchCorrectionBorrowsFromTheSemitone() {
   Fixture fixture;
   fixture.write(0x6000, {0x7b,0,0x72,64,0,0x0f,0xc0,1,2,0x78});
-  const auto layout = *findLayout(fixture.reader());
-  const auto data = readDriverData(fixture.reader(), layout);
-  const auto performance = SequenceVm().render(fixture.parse().program);
-  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks[0]);
-  expect(notes.size() == 1, "low-key fixture must produce one note");
-  const auto bends = eventsOfType<PitchBendPerformanceEvent>(performance.tracks[0]);
-  expect(!bends.empty(), "low-key fixture must retain its fractional pitch");
-  const double pitch = 4096 * std::exp2(
-      (notes.front()->key + bends.front()->semitones - unityKey(data.instruments[0], data)) / 12);
-  expect(std::abs(pitch - 158) < 0.0001,
-         "source key 15 with unity tuning must produce DSP pitch 158, including the low-key borrow");
+  expectMidiPitchWords(fixture.render(), std::array<u16, 1>{158});
 }
 
 void tempoRampsUseTheCarryAndVersionSpecificCadence() {
   for (const auto version : {Version::Early, Version::Standard}) {
     Fixture fixture(version);
     fixture.write(0x6000, {0x7b,0,0x72,64,0,0x79,144,3,0x40,0xc0,6,8,0x40,0x40,0x40,0x40,0x40,0x78});
-    const auto performance = SequenceVm().render(fixture.parse().program);
+    const auto performance = fixture.render();
     const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks[0]);
     const std::array<u64, 6> expected = version == Version::Early
         ? std::array<u64, 6>{0,8,15,23,30,37} : std::array<u64, 6>{0,7,14,21,28,35};
-    expect(performance.diagnostics.empty() && notes.size() == expected.size(), "tempo ramp must keep all notes");
+    expect(notes.size() == expected.size(), "tempo ramp must keep all notes");
     for (size_t i = 0; i < expected.size(); ++i) {
       expect(notes[i]->header.tick == expected[i], "tempo ramp must preserve the driver's carry and frame cadence");
     }
@@ -191,29 +237,10 @@ void vibratoMatchesEmulatedPitchWords() {
   for (const auto version : {Version::Early, Version::Standard}) {
     Fixture fixture(version);
     fixture.write(0x6000, {0x7b,0,0x72,64,0,0x71,12,0,0x30,0xc0,20,24,0x78});
-    const auto layout = *findLayout(fixture.reader());
-    const auto data = readDriverData(fixture.reader(), layout);
-    const auto performance = SequenceVm().render(fixture.parse().program);
-    const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks[0]);
-    const auto bends = eventsOfType<PitchBendPerformanceEvent>(performance.tracks[0]);
+    const auto performance = fixture.render();
     const auto midi = renderTestMidi(performance);
-    const auto midiAttacks = midiNotes(midi.tracks[0].events);
-    expect(notes.size() == 1 && performance.diagnostics.empty(), "vibrato fixture must render one sustained voice");
-    expect(midiAttacks.size() == 1, "vibrato must preserve a single MIDI attack");
-    const auto& expected = version == Version::Early ? early : modern;
-    for (size_t tick = 0; tick < expected.size(); ++tick) {
-      double bend = 0;
-      for (const auto* event : bends) {
-        if (event->header.tick <= tick) { bend = event->semitones; }
-      }
-      const double pitch = 4096 * std::exp2((notes[0]->key + bend - unityKey(data.instruments[0], data)) / 12);
-      expect(std::abs(pitch - expected[tick]) < 0.0001,
-             "vibrato must retain the early multiplier behavior and late low-byte/carry behavior");
-      const double midiKey = midiAttacks[0].key + midiPitchSemitonesAt(midi.tracks[0].events, tick);
-      const double expectedKey = unityKey(data.instruments[0], data) + 12 * std::log2(expected[tick] / 4096.0);
-      expect(std::abs(midiKey - expectedKey) < 0.002,
-             "MIDI vibrato must preserve the fractional attack pitch within wheel precision");
-    }
+    expect(midiNotes(midi.tracks[0].events).size() == 1, "vibrato must preserve a single MIDI attack");
+    expectMidiPitchWords(performance, version == Version::Early ? early : modern);
   }
 }
 
@@ -221,28 +248,10 @@ void pitchMultipliersAndLegatoPreserveFractionalTuning() {
   Fixture fixture;
   fixture.write(0x6000, {0x7b,0,0x72,64,0,0x70,55,0,0x35,0xc0,40,1,
                         0x70,56,2,0x70,59,2,0x70,64,2,0x35,0x37,0x7e,1,0x39,0xc0,1,2,0x78});
-  const auto data = readDriverData(fixture.reader(), *findLayout(fixture.reader()));
-  const auto performance = SequenceVm().render(fixture.parse().program);
-  expect(performance.diagnostics.empty(), "pitch multiplier fixture must render without diagnostics");
   // Pitch words for source key $35 at multipliers 55, 56, 59, 64, followed
   // by legato keys $35/$37 and a fresh $39 attack. The first key is fractional.
   constexpr std::array<u16, 13> pitches{1228,1251,1251,1318,1318,1430,1430,1430,1430,1606,1606,1804,1804};
-  for (const auto mode : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
-    const auto midi = renderTestMidi(performance, {.pitchTransitions = mode});
-    const auto& events = midi.tracks[0].events;
-    const auto attacks = midiNotes(events);
-    for (u64 tick = 0; tick < pitches.size(); ++tick) {
-      // Native portamento briefly overlaps the old key with the new attack.
-      const auto attack = std::find_if(attacks.rbegin(), attacks.rend(), [tick](const auto& note) {
-        return note.tick <= tick && tick < note.tick + note.duration;
-      });
-      expect(attack != attacks.rend(), "pitch fixture must retain its sounding MIDI voice");
-      const double midiKey = attack->key + midiPitchSemitonesAt(events, tick);
-      const double expectedKey = unityKey(data.instruments[0], data) + 12 * std::log2(pitches[tick] / 4096.0);
-      expect(std::abs(midiKey - expectedKey) < 0.002,
-             "MIDI must preserve multiplier pitch through bends, legato changes, and fresh attacks");
-    }
-  }
+  expectMidiPitchWords(fixture.render(), pitches);
 }
 
 void repeatsCallsAndPercussionPreserveDriverState() {
@@ -258,7 +267,7 @@ void repeatsCallsAndPercussionPreserveDriverState() {
          "calls share duration state, finite repeats count total plays, and drum notes select instruments");
   const auto layout = *findLayout(fixture.reader());
   const auto data = readDriverData(fixture.reader(), layout);
-  const double drumKey = unityKey(data.instruments[1], data) + 12 * std::log2(512.0 / 4096.0);
+  const double drumKey = unityKey(data.patches[1], data) + 12 * std::log2(512.0 / 4096.0);
   const auto bends = eventsOfType<PitchBendPerformanceEvent>(performance.tracks[0]);
   expect(!bends.empty() && std::abs(notes.back()->key + bends.back()->semitones - drumKey) < 0.0001,
          "percussion uses the instrument pitch word directly rather than melodic note transposition");
@@ -309,6 +318,9 @@ void scanBuildsSelfContainedBankAndExports() {
 
 void runTests() {
   recognizesRelocatedProfilesAndRejectsBrokenTables();
+  rejectsInvalidDispatchAndPanTables();
+  descriptorSearchStaysWithinTheByteSizedIndex();
+  instrumentTuningAvoidsIntegerOverflow();
   lookaheadLengthsAndRepeatedControllersStayAligned();
   launchesAndRestartsTracksAtRuntime();
   launchesLowerChannelsOnTheFollowingFrame();
