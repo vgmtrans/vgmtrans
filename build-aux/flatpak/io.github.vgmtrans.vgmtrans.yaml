@@ -1,5 +1,6 @@
 app-id: io.github.vgmtrans.vgmtrans
 runtime: org.kde.Platform
+# Keep this branch aligned with the KDE builder image in .github/workflows/build.yml.
 runtime-version: '6.11'
 sdk: org.kde.Sdk
 command: vgmtrans
