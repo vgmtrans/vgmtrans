@@ -9,7 +9,7 @@ class MainWindow;
 class QDockWidget;
 class QEvent;
 class QTimer;
-class VGMCollListView;
+class QListView;
 
 // Encapsulates MainWindow dock policy, persistence, and layout reconciliation.
 class MainWindowDockLayout final : public QObject {
@@ -20,7 +20,7 @@ public:
     QDockWidget* collections{};
     QDockWidget* collectionContents{};
     QDockWidget* logs{};
-    VGMCollListView* collectionListView{};
+    QListView* collectionListView{};
   };
 
   MainWindowDockLayout(MainWindow* window, Docks docks);
@@ -105,7 +105,7 @@ private:
   QDockWidget* m_collectionsDock{};
   QDockWidget* m_collectionContentsDock{};
   QDockWidget* m_loggerDock{};
-  VGMCollListView* m_collectionListView{};
+  QListView* m_collectionListView{};
 
   // Precomputed dock groups shared by the placement heuristics.
   QList<QDockWidget*> m_allDocks{};

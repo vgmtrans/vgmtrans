@@ -10,6 +10,8 @@
 #include "CapcomSnesFormat.h"
 #include "SNESDSP.h"
 
+#include <algorithm>
+
 #include <spdlog/fmt/fmt.h>
 
 // ****************
@@ -180,7 +182,7 @@ CapcomSnesRgn::CapcomSnesRgn(CapcomSnesInstr *instr, u32 offset) :
     fine += 100;
   }
 
-  addUnityKey(baseUnityKey - coarse, offset + 4, 1);
+  addUnityKey(static_cast<u8>(std::clamp(baseUnityKey - coarse, 0, 127)), offset + 4, 1);
   addFineTune(static_cast<s16>(fine), offset + 5, 1);
   snesConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 

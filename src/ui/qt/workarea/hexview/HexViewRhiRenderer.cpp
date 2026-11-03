@@ -6,15 +6,12 @@
 
 #include "HexViewRhiRenderer.h"
 
-#include "base/Types.h"
+#include "value/base/Types.h"
 #include "HexView.h"
-#include "LogManager.h"
-#include "VGMFile.h"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <unordered_map>
 #include <utility>
 
 #include <QColor>
@@ -119,8 +116,8 @@ void HexViewRhiRenderer::initIfNeeded(QRhi* rhi) {
   m_rhi = rhi;
 
   if (!m_loggedInit) {
-    L_DEBUG("{} init: backend={} baseInstance={}", m_logLabel, int(m_rhi->backend()),
-            m_rhi->isFeatureSupported(QRhi::BaseInstance));
+    qDebug() << m_logLabel << "init: backend=" << int(m_rhi->backend())
+             << "baseInstance=" << m_rhi->isFeatureSupported(QRhi::BaseInstance);
     m_loggedInit = true;
   }
   m_supportsBaseInstance = m_rhi->isFeatureSupported(QRhi::BaseInstance);
@@ -267,13 +264,13 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     return;
   }
   if (!target.renderTarget || target.pixelSize.isEmpty()) {
-    L_DEBUG("{} renderFrame skipped: render target pixel size empty", m_logLabel);
+    qDebug() << m_logLabel << "renderFrame skipped: render target pixel size empty";
     return;
   }
 
   const float dpr = target.dpr > 0.0f ? target.dpr : 1.0f;
   const HexViewFrame::Data frame = m_view->captureRhiFrameData(dpr);
-  if (!frame.vgmfile) {
+  if (frame.bytes.empty()) {
     return;
   }
   const int viewportWidth = frame.viewportSize.width();
@@ -288,8 +285,8 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   }
 
   if (!m_loggedFrame) {
-    L_DEBUG("{} frame started viewport={}x{} pixelSize={}x{}", m_logLabel, viewportWidth,
-            viewportHeight, target.pixelSize.width(), target.pixelSize.height());
+    qDebug() << m_logLabel << "frame started viewport=" << frame.viewportSize
+             << "pixelSize=" << target.pixelSize;
     m_loggedFrame = true;
   }
 
@@ -849,7 +846,7 @@ void HexViewRhiRenderer::ensureGlyphTexture(QRhiResourceUpdateBatch* u,
 void HexViewRhiRenderer::ensureItemIdTexture(QRhiResourceUpdateBatch* u, int startLine,
                                              int endLine, int totalLines,
                                              const HexViewFrame::Data& frame) {
-  if (!m_rhi || !u || !frame.vgmfile) {
+  if (!m_rhi || !u || frame.bytes.empty()) {
     return;
   }
 
@@ -899,29 +896,14 @@ void HexViewRhiRenderer::ensureItemIdTexture(QRhiResourceUpdateBatch* u, int sta
   QImage img(size, QImage::Format_RGBA8888);
   img.fill(Qt::transparent);
 
-  std::unordered_map<const VGMItem*, u16> idMap;
-  idMap.reserve(static_cast<size_t>(size.width() * size.height()));
-  u16 nextId = 1;
-
-  const u32 baseOffset = frame.vgmfile->offset();
-  const u32 endOffset = frame.vgmfile->offset() + frame.vgmfile->length();
-
   for (int row = 0; row < size.height(); ++row) {
     const int lineIndex = padStart + row;
     uchar* dst = img.scanLine(row);
     for (int byte = 0; byte < kBytesPerLine; ++byte) {
-      const u32 offset = baseOffset + static_cast<u32>(lineIndex * kBytesPerLine + byte);
       u16 id = 0;
-      if (offset < endOffset) {
-        if (VGMItem* item = frame.vgmfile->getItemAtOffset(offset, false)) {
-          if (item->children().empty()) {
-            auto [it, inserted] = idMap.emplace(item, nextId);
-            if (inserted) {
-              ++nextId;
-            }
-            id = it->second;
-          }
-        }
+      const size_t index = static_cast<size_t>(lineIndex * kBytesPerLine + byte);
+      if (index < frame.itemIds.size()) {
+        id = frame.itemIds[index];
       }
       const int px = byte * 4;
       dst[px + 0] = static_cast<uchar>(id & 0xFF);
@@ -1243,12 +1225,12 @@ void HexViewRhiRenderer::ensureCacheWindow(int startLine, int endLine, int total
 // Rebuild cached line bytes and style ids for the current cache window.
 void HexViewRhiRenderer::rebuildCacheWindow(const HexViewFrame::Data& frame) {
   m_cachedLines.clear();
-  if (m_cacheEndLine < m_cacheStartLine || !frame.vgmfile) {
+  if (m_cacheEndLine < m_cacheStartLine || frame.bytes.empty()) {
     return;
   }
 
-  const u32 fileLength = frame.vgmfile->length();
-  const auto* baseData = reinterpret_cast<const u8*>(frame.vgmfile->data());
+  const size_t fileLength = frame.bytes.size();
+  const auto* baseData = frame.bytes.data();
   const auto styleIds = frame.styleIds;
   const size_t count = static_cast<size_t>(m_cacheEndLine - m_cacheStartLine + 1);
   m_cachedLines.reserve(count);
@@ -1257,8 +1239,8 @@ void HexViewRhiRenderer::rebuildCacheWindow(const HexViewFrame::Data& frame) {
     CachedLine entry{};
     entry.line = line;
     const int lineOffset = line * kBytesPerLine;
-    if (lineOffset < static_cast<int>(fileLength)) {
-      entry.bytes = std::min(kBytesPerLine, static_cast<int>(fileLength) - lineOffset);
+    if (lineOffset >= 0 && static_cast<size_t>(lineOffset) < fileLength) {
+      entry.bytes = std::min(kBytesPerLine, static_cast<int>(fileLength - static_cast<size_t>(lineOffset)));
       if (entry.bytes > 0) {
         std::copy_n(baseData + lineOffset, entry.bytes, entry.data.data());
         for (int i = 0; i < entry.bytes; ++i) {
@@ -1340,7 +1322,7 @@ void HexViewRhiRenderer::buildBaseInstances(const HexViewFrame::Data& frame,
     const float y = entry.line * lineHeight;
 
     if (frame.shouldDrawOffset) {
-      u32 address = frame.vgmfile->offset() + (entry.line * kBytesPerLine);
+      u32 address = frame.baseOffset + static_cast<u32>(entry.line * kBytesPerLine);
       if (frame.addressAsHex) {
         char buf[NUM_ADDRESS_NIBBLES];
         for (int i = NUM_ADDRESS_NIBBLES - 1; i >= 0; --i) {
@@ -1444,8 +1426,8 @@ void HexViewRhiRenderer::buildSelectionEffectInstances(int startLine, int endLin
   ctx.startLine = startLine;
   ctx.endLine = endLine;
   ctx.visibleCount = visibleCount;
-  ctx.fileBaseOffset = frame.vgmfile ? frame.vgmfile->offset() : 0;
-  ctx.fileLength = frame.vgmfile ? frame.vgmfile->length() : 0;
+  ctx.fileBaseOffset = frame.baseOffset;
+  ctx.fileLength = static_cast<u32>(frame.bytes.size());
   ctx.charWidth = layout.charWidth;
   ctx.lineHeight = layout.lineHeight;
   ctx.hexStartX = layout.hexStartX;
@@ -1553,8 +1535,8 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
   ctx.startLine = startLine;
   ctx.endLine = endLine;
   ctx.visibleCount = visibleCount;
-  ctx.fileBaseOffset = frame.vgmfile ? frame.vgmfile->offset() : 0;
-  ctx.fileLength = frame.vgmfile ? frame.vgmfile->length() : 0;
+  ctx.fileBaseOffset = frame.baseOffset;
+  ctx.fileLength = static_cast<u32>(frame.bytes.size());
   ctx.charWidth = layout.charWidth;
   ctx.lineHeight = layout.lineHeight;
   ctx.hexStartX = layout.hexStartX;

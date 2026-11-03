@@ -6,21 +6,29 @@
 
 #pragma once
 
-#include "Root.h"
+#include "main/base/ToastType.h"
 
 #include <QList>
 #include <QMainWindow>
 #include <QUrl>
 
+#include <filesystem>
+#include <span>
+#include <vector>
+
 class QWidget;
+class QAbstractItemView;
 class QDockWidget;
 class MenuBar;
 class MainWindowDockLayout;
 class PlaybackControls;
+class SequencePlayer;
 class Logger;
-class VGMCollListView;
-class VGMCollView;
+class QListView;
+class QSortFilterProxyModel;
 class StatusBarContent;
+class TableView;
+class CollectionListView;
 class ToastHost;
 class WindowBar;
 class QDragEnterEvent;
@@ -34,26 +42,61 @@ namespace QWK {
 class WidgetWindowAgent;
 }
 
+namespace vgmtrans::ui {
+class CollectionContentsModel;
+class StitchPlanModel;
+class CollectionTableModel;
+class WorkspaceController;
+}  // namespace vgmtrans::ui
+
+namespace vgmtrans::core {
+struct Artifact;
+enum class SynthExportFormat;
+}  // namespace vgmtrans::core
+
 class MainWindow final : public QMainWindow {
   Q_OBJECT
 
 public:
-  MainWindow();
+  explicit MainWindow(vgmtrans::ui::WorkspaceController& workspace);
+  void openPaths(std::span<const std::filesystem::path> paths);
   void showEvent(QShowEvent* event) override;
   void showDragOverlay();
   void hideDragOverlay();
   void handleDroppedUrls(const QList<QUrl>& urls);
+  void setCollectionStitchAvailable(bool available);
+  void setCollectionStitchOpen(bool open);
+
+public slots:
+  void showToast(const QString& message, ToastType type, int durationMs = 3000);
+
+signals:
+  void manualCollectionRequested();
+  void collectionStitchRequested();
+  void seekModifierActiveChanged(bool active);
 
 protected:
-  void dragEnterEvent(QDragEnterEvent *event) override;
-  void dragMoveEvent(QDragMoveEvent *event) override;
-  void dragLeaveEvent(QDragLeaveEvent *event) override;
-  void dropEvent(QDropEvent *event) override;
-  void closeEvent(QCloseEvent *event) override;
-  void resizeEvent(QResizeEvent *event) override;
+  void dragEnterEvent(QDragEnterEvent* event) override;
+  void dragMoveEvent(QDragMoveEvent* event) override;
+  void dragLeaveEvent(QDragLeaveEvent* event) override;
+  void dropEvent(QDropEvent* event) override;
+  void closeEvent(QCloseEvent* event) override;
+  void resizeEvent(QResizeEvent* event) override;
   bool eventFilter(QObject* obj, QEvent* event) override;
 
 private:
+  enum class SelectionStatusKind {
+    Source,
+    Asset,
+    Collection,
+    CollectionContents,
+  };
+
+  enum class OriginalItemKind {
+    Source,
+    Asset,
+  };
+
   void createElements();
   void configureWindowAgent();
   void createStatusBar();
@@ -63,22 +106,43 @@ private:
 
   void openFile();
   void openFileInternal(const QString& filename);
-  void showToast(const QString& message, ToastType type, int duration_ms);
+  void removeSelectedSources();
+  void removeSelectedAssets();
+  void saveOriginal(QAbstractItemView* view, OriginalItemKind kind);
+  void saveArtifact(const QModelIndex& index, vgmtrans::core::Artifact artifact, const QString& failureMessage,
+                    const char* extension);
+  void saveArtifacts(const QModelIndex& index, std::vector<vgmtrans::core::Artifact> artifacts,
+                     const QString& failureMessage);
+  [[nodiscard]] QAbstractItemView* activeAssetView() const;
+  void exportSequenceMidi(const QModelIndex& index);
+  void exportSoundBank(const QModelIndex& index, vgmtrans::core::SynthExportFormat format);
+  void exportSamples(const QModelIndex& index);
+  void togglePlayback();
+  void updateSelectionStatus(const QModelIndex& index, SelectionStatusKind kind);
 
-  QDockWidget *m_rawfile_dock{};
-  QDockWidget *m_vgmfile_dock{};
-  QDockWidget *m_coll_dock{};
-  QDockWidget *m_coll_view_dock{};
-  MenuBar *m_menu_bar{};
-  PlaybackControls *m_playback_controls{};
-  StatusBarContent *statusBarContent{};
-  Logger *m_logger{};
-  VGMCollListView *m_coll_listview{};
-  QToolButton *m_stitchButton{};
-  VGMCollView *m_coll_view{};
-  ToastHost *m_toastHost{};
-  WindowBar *m_windowBar{};
-  QWidget *m_dragOverlay{};
-  QWK::WidgetWindowAgent *m_windowAgent{};
-  MainWindowDockLayout *m_dockLayout{};
+  vgmtrans::ui::WorkspaceController& m_workspace;
+  TableView* m_rawfile_listview{};
+  TableView* m_vgmfile_listview{};
+  CollectionListView* m_coll_listview{};
+  QListView* m_coll_view{};
+  QSortFilterProxyModel* m_collection_filter{};
+  vgmtrans::ui::CollectionTableModel* m_collection_model{};
+  vgmtrans::ui::StitchPlanModel* m_stitch_plan_model{};
+  vgmtrans::ui::CollectionContentsModel* m_collection_contents_model{};
+
+  QDockWidget* m_rawfile_dock{};
+  QDockWidget* m_vgmfile_dock{};
+  QDockWidget* m_coll_dock{};
+  QDockWidget* m_coll_view_dock{};
+  MenuBar* m_menu_bar{};
+  PlaybackControls* m_playback_controls{};
+  SequencePlayer* m_sequence_player{};
+  StatusBarContent* statusBarContent{};
+  Logger* m_logger{};
+  QToolButton* m_stitchButton{};
+  ToastHost* m_toastHost{};
+  WindowBar* m_windowBar{};
+  QWidget* m_dragOverlay{};
+  QWK::WidgetWindowAgent* m_windowAgent{};
+  MainWindowDockLayout* m_dockLayout{};
 };

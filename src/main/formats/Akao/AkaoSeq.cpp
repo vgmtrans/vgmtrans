@@ -570,7 +570,8 @@ bool AkaoTrack::readEvent() {
       : status_byte;
 
     const bool op_rest = note_byte >= 0x8F;
-    const bool op_tie = !op_rest && note_byte >= 0x83;
+    // 12 pitches * 11 durations: 0x83 is the final B note, ties begin at 0x84.
+    const bool op_tie = !op_rest && note_byte >= 0x84;
     const bool op_note = !op_rest && !op_tie;
     const auto delta_time_from_op = static_cast<u8>(DELTA_TIME_TABLE[note_byte % 11]);
 
@@ -1508,7 +1509,7 @@ bool AkaoTrack::readEvent() {
       const u8 beatsPerMeasure = readByte(curOffset++);
       if (ticksPerBeat != 0 && beatsPerMeasure != 0) {
         const u8 denom = static_cast<u8>((parentSeq->ppqn() * 4) / ticksPerBeat); // or should it always be 4? no idea
-        addTimeSig(beginOffset, curOffset - beginOffset, beatsPerMeasure, denom, ticksPerBeat);
+        insertTimeSig(beginOffset, curOffset - beginOffset, beatsPerMeasure, denom, ticksPerBeat, getTime());
       } else {
         addGenericEvent(beginOffset, curOffset - beginOffset, "Time Signature", "", Type::TimeSignature);
       }

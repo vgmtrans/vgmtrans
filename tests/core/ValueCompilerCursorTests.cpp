@@ -1,0 +1,788 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include "../TestSupport.h"
+#include "SequenceTestSupport.h"
+
+#include "value/base/LevelScale.h"
+#include "value/scan/ScanTypes.h"
+#include "value/sequence/CommandSourceMap.h"
+#include "value/sequence/CompilerCursor.h"
+
+#include <algorithm>
+#include <array>
+
+using namespace vgmtrans::core;
+
+namespace {
+
+struct CompilerProbeState {
+  s8 transpose = 0;
+  bool enabled = false;
+  u8 pitchBendRange = 2;
+  u8 readyDuringWaitAtTick = 0;
+};
+
+struct CompilerProbeProgramState {
+  u32 executedCommands = 0;
+};
+
+struct CompilerPrepassProgramState : CompilerProbeProgramState {
+  u32 completedPrepasses = 0;
+  void finishPrepass() { ++completedPrepasses; }
+};
+
+struct CompilerProbePlayback : SequencePlayback<CompilerProbeState> {
+  CompilerProbeProgramState& program;
+
+  void beforeCommand() { ++program.executedCommands; }
+
+  Effects note(u8 key, u32 duration) {
+    out.note(static_cast<double>(key + track.transpose), track.enabled ? 1.0 : 0.5, duration);
+    return Effects::wait(duration);
+  }
+
+  [[nodiscard]] bool readyDuringWait() const { return vm.tick() >= track.readyDuringWaitAtTick; }
+
+  void duringWaitExpression(u8 value) { out.expression(value / 127.0); }
+
+  void pitchBend(s8 encoded) { out.pitchBend((encoded / 128.0) * track.pitchBendRange); }
+
+  void enabledExpression(bool enabled) { out.expression(enabled ? 0.75 : 0.25); }
+};
+
+using ProbeCursor = CompilerCursor<CompilerProbePlayback>;
+
+template <class Event>
+concept AcceptsUnorderedNoteArguments =
+    requires(Event& event) { event.template invoke<&CompilerProbePlayback::note>(u8{}, u32{}); };
+static_assert(!AcceptsUnorderedNoteArguments<ProbeCursor::Event>);
+
+template <class Event>
+concept AcceptsEmptyNoteArguments =
+    requires(Event& event) { event.template invoke<&CompilerProbePlayback::note>({}); } ||
+    requires(Event& event) { event.template invokeFlow<&CompilerProbePlayback::note>({}); } ||
+    requires(Event& event) { event.invoke([](CompilerProbePlayback&, u8) {}, {}); } ||
+    requires(Event& event) { event.invokeFlow([](CompilerProbePlayback&, u8) { return Effects{}; }, {}); };
+static_assert(!AcceptsEmptyNoteArguments<ProbeCursor::Event>);
+
+DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
+                                          std::vector<Diagnostic>* diagnostics = nullptr) {
+  ProbeCursor cursor(reader, begin, end, "compiler-probe", diagnostics);
+  if (!cursor.hasOpcode()) {
+    return cursor.truncated();
+  }
+
+  switch (cursor.opcode()) {
+    case 0x10:
+      return cursor.command("Volume", SequenceSemantic::Level)
+          .invoke([](CompilerProbePlayback& p, u8 volume) { p.out.level(LevelScale::linearFromMidi7(volume)); },
+                  {cursor.u8("volume")});
+    case 0x20:
+      return cursor.command("Transpose", SequenceSemantic::State)
+          .set<&CompilerProbeState::transpose>(cursor.s8("semitones"));
+    case 0x21:
+      return cursor.command("Toggle Enabled", SequenceSemantic::State).toggle<&CompilerProbeState::enabled>();
+    case 0x22: {
+      auto event = cursor.command("Pitch Bend Range", SequenceSemantic::Pitch);
+      const u8 semitones = cursor.u8("semitones");
+      return event.set<&CompilerProbeState::pitchBendRange>(semitones).emitPitchBendRange(semitones);
+    }
+    case 0x23:
+      return cursor.command("Pitch Bend", SequenceSemantic::Pitch)
+          .invoke<&CompilerProbePlayback::pitchBend>({cursor.s8("fraction")});
+    case 0x24: {
+      auto event = cursor.command("Separate Actions", SequenceSemantic::State);
+      event.set<&CompilerProbeState::transpose>(cursor.s8("semitones"));
+      event.emitExpression(0.5);
+      return event.wait(3);
+    }
+    case 0x25: {
+      auto event = cursor.command("Inline Handler", SequenceSemantic::Pan);
+      const u8 pan = cursor.u8("pan");
+      return event.invoke(
+          [pan](CompilerProbePlayback& playback, std::pair<double, double> scale) {
+            playback.out.pan((pan / scale.first) - scale.second);
+          },
+          {std::pair{63.5, 1.0}});
+    }
+    case 0x26: {
+      auto event = cursor.command("Conflicting Flow", SequenceSemantic::State);
+      return event.invokeFlow([](CompilerProbePlayback& playback) { return playback.vm.end(); })
+          .invoke([](CompilerProbePlayback& playback) { return playback.vm.return_(); });
+    }
+    case 0x27: {
+      auto event = cursor.command("Runtime State", SequenceSemantic::State);
+      return event.invoke([](CompilerProbePlayback& playback) {
+        playback.track.enabled = !playback.track.enabled;
+        playback.out.legatoPedal(playback.track.enabled);
+        playback.enabledExpression(playback.track.enabled);
+      });
+    }
+    case 0x28:
+      return cursor.sourceOnly("Promoted Action").set<&CompilerProbeState::enabled>(true);
+    case 0x29: {
+      auto event = cursor.sourceOnly("Ignored Action");
+      event.set<&CompilerProbeState::enabled>(false).jump(Address{0});
+      return event.ignore();
+    }
+    case 0x2a:
+      return cursor.command("Wait Readiness", SequenceSemantic::State)
+          .set<&CompilerProbeState::readyDuringWaitAtTick>(cursor.u8("tick"));
+    case 0x2b:
+      return cursor.command("During-Wait Expression", SequenceSemantic::State)
+          .invoke<&CompilerProbePlayback::duringWaitExpression>({cursor.u8("value")})
+          .duringWaitWhen<&CompilerProbePlayback::readyDuringWait>();
+    case 0x2c: {
+      auto event = cursor.command("Invalid During-Wait Wait", SequenceSemantic::State);
+      event.set<&CompilerProbeState::readyDuringWaitAtTick>(1);
+      return event.wait<&CompilerProbeState::readyDuringWaitAtTick>()
+          .duringWaitWhen<&CompilerProbePlayback::readyDuringWait>();
+    }
+    case 0x2d: {
+      auto event = cursor.command("Owned Output", SequenceSemantic::Program);
+      std::string domain = "temporary source instrument domain";
+      event.emitInstrument(domain, 257, InstrumentEnvelopeMode::PreserveDynamicOverride);
+      event.invoke(
+          [](CompilerProbePlayback& playback, std::string_view instrumentDomain) {
+            playback.out.instrument(InstrumentIdentity{.domain = std::string(instrumentDomain), .key = 257},
+                                    InstrumentEnvelopeMode::PreserveDynamicOverride);
+          },
+          {std::string_view(domain)});
+      domain.assign(domain.size(), 'x');
+      return event.emitLevel(0.5).emitLevel(0.75, ValueQuantization{.levels = 64});
+    }
+    case 0x2e:
+      return cursor.command("Envelope Stages", SequenceSemantic::State)
+          .emitEnvelopeField<EnvelopeFields::Attack>(1.0)
+          .emitEnvelopeField<EnvelopeFields::Hold>(2.0)
+          .emitEnvelopeField<EnvelopeFields::Decay>(3.0)
+          .emitEnvelopeField<EnvelopeFields::SecondDecay>(4.0)
+          .emitEnvelopeField<EnvelopeFields::Release>(5.0)
+          .emitEnvelopeField<EnvelopeFields::Sustain>(0.5, VoiceEnvelopeScope::ActiveVoices);
+    case 0x30:
+      return cursor.command("Note", SequenceSemantic::Note)
+          .invoke<&CompilerProbePlayback::note>({cursor.u8("key"), cursor.varLen("duration")});
+    case 0x40:
+    case 0x41:
+    case 0x42:
+    case 0x43: {
+      auto event = cursor.command("Note", SequenceSemantic::Note);
+      const u8 key = cursor.opcodeBits<0, 2>("key", SourceValueDisplay::MidiNote);
+      return event.invoke<&CompilerProbePlayback::note>({static_cast<u8>(60 + key), cursor.varLen("duration")});
+    }
+    case 0x50:
+      return cursor.command("Rest", SequenceSemantic::Rest)
+          .invoke([](CompilerProbePlayback&, u32 duration) { return Effects::wait(duration); },
+                  {cursor.varLen("duration")});
+    case 0x60: {
+      auto event = cursor.command("Jump", SequenceSemantic::Jump);
+      return event.jump(cursor.address("destination", SemanticOperandRole::JumpTarget));
+    }
+    case 0x61: {
+      auto event = cursor.command("Repeat", SequenceSemantic::Repeat);
+      const u8 slot = cursor.u8("slot");
+      const u32 totalPlays = cursor.u8("total_plays");
+      const Address destination = cursor.address("destination", SemanticOperandRole::RepeatTarget);
+      return event.repeatUntil(slot, totalPlays, destination);
+    }
+    case 0x62: {
+      auto event = cursor.command("Call", SequenceSemantic::Call);
+      return event.call(cursor.address("destination", SemanticOperandRole::CallTarget));
+    }
+    case 0x63:
+      return cursor.command("Return", SequenceSemantic::Return).return_();
+    case 0x64: {
+      auto event = cursor.command("Equal-Valued Target", SequenceSemantic::Jump);
+      const Address destination = cursor.address("destination", SemanticOperandRole::JumpTarget);
+      cursor.u16be("count");
+      return event.jump(destination);
+    }
+    case 0x69: {
+      auto event = cursor.command("Duplicate Static Flow", SequenceSemantic::Jump);
+      const Address jumpDestination = cursor.address("jump_destination", SemanticOperandRole::JumpTarget);
+      const Address callDestination = cursor.address("call_destination", SemanticOperandRole::CallTarget);
+      event.jump(jumpDestination);
+      return event.call(callDestination);
+    }
+    case 0x6a: {
+      auto event = cursor.command("Return Boundary Before Jump", SequenceSemantic::Jump);
+      const Address destination = cursor.address("destination", SemanticOperandRole::JumpTarget);
+      event.return_();
+      return event.jump(destination);
+    }
+    case 0x6b: {
+      auto event = cursor.command("Return Boundary After Jump", SequenceSemantic::Jump);
+      const Address destination = cursor.address("destination", SemanticOperandRole::JumpTarget);
+      event.jump(destination);
+      return event.return_();
+    }
+    case 0x70: {
+      auto event = cursor.sourceOnly("Conditional Fields");
+      const u8 wide = cursor.u8("wide");
+      if (wide != 0) {
+        cursor.u16be("value");
+      } else {
+        cursor.u8("value");
+      }
+      return event;
+    }
+    case 0x71: {
+      auto event = cursor.sourceOnly("Resolved Fields");
+      const auto relative = cursor.rawS8("relative");
+      cursor.resolvedValue("destination", relative, Address{12}, SourceValueDisplay::Address,
+                           SemanticOperandRole::JumpTarget);
+      enum class Mode : s8 { Alternate = -2 };
+      cursor.derived("enabled", true);
+      cursor.derived("mode", Mode::Alternate, SourceValueDisplay::Enum);
+      cursor.derived("label", "source label");
+      cursor.derived("fine", 1.5);
+      cursor.s8("signed");
+      return event;
+    }
+    case 0xff:
+      return cursor.command("End", SequenceSemantic::End).end();
+    default: {
+      auto event = cursor.unsupported("Unsupported Opcode");
+      cursor.warning("Unsupported compiler-cursor probe opcode");
+      return event.stop();
+    }
+  }
+}
+
+SequenceProgramConfig compilerProbeConfig() {
+  return SequenceProgramConfig{
+      .timebase = Timebase{.ppqn = 48},
+      .behavior =
+          SequenceProgramBehavior{
+              .panLaw = PanLaw::EqualPower,
+          },
+  };
+}
+
+SequenceRuntime compilerProbeRuntime() {
+  return makeCompiledRuntime<CompilerProbePlayback, CompilerProbeProgramState>();
+}
+
+bool hasLinkRole(const SourceAnnotation& annotation, SourceLinkRole role) {
+  return std::ranges::any_of(annotation.links, [role](const SourceLink& link) { return link.role == role; });
+}
+
+bool hasField(const SourceAnnotation& annotation, std::string_view name) {
+  return std::ranges::any_of(annotation.fields, [name](const SourceField& field) { return field.name == name; });
+}
+
+TrackProgram decodeProbeTrack(ByteReader reader, u32 end, SourceMapBuilder* sourceMap = nullptr,
+                              std::vector<Diagnostic>* diagnostics = nullptr) {
+  const TrackDecodeScope tracks{
+      .reader = reader,
+      .bytecodeEnd = end,
+      .sourceMap = sourceMap,
+  };
+  return tracks.decode(0, 0, [=](u32 offset) { return decodeProbeCommand(reader, offset, end, diagnostics); });
+}
+
+void compilerCursorCompilesAndExecutesTypedCommands() {
+  TrackProgram track;
+  SourceMap sourceMap;
+  {
+    const std::vector<u8> bytes{0x10, 0x40, 0x20, 0x02, 0x21, 0x30, 63, 0x04, 0x50, 0x03, 0x28, 0x29, 0xff};
+    const ByteReader reader(SourceId{7}, bytes);
+    ScanIdAllocator ids;
+    SourceMapBuilder sourceMapBuilder([&ids]() { return ids.nextSourceAnnotationId(); });
+    track = decodeProbeTrack(reader, static_cast<u32>(bytes.size()), &sourceMapBuilder);
+    sourceMap = sourceMapBuilder.finish();
+  }
+
+  expect(std::ranges::all_of(track.commands, [](const SourceCommand& command) { return command.range.size != 0; }),
+         "compiler-cursor commands should retain source ranges instead of source bytes");
+  expect(track.commands.size() == 8, "compiler cursor should decode every probe command once");
+  expect(track.commands[0].execution.valid() && track.commands[1].execution.valid() &&
+             track.commands[2].execution.valid() && track.commands[3].execution.valid(),
+         "output, state, toggle, and local handlers should compile to command bodies");
+
+  const auto annotations = sourceMap.withRole(SourceId{7}, SourceRole::Command);
+  expect(annotations.size() == 8, "compiler cursor should project one annotation per source command");
+  const SourceAnnotation& volume = sourceMap.get(annotations[0]);
+  expect(volume.label == "Volume" && volume.fields.size() == 2 && volume.fields[1].name == "volume" &&
+             volume.fields[1].range.offset == 1,
+         "field reads should automatically preserve names and exact source ranges");
+  const auto& noteFields = sourceMap.get(annotations[3]).fields;
+  expect(noteFields.size() == 3 && noteFields[1].name == "key" && noteFields[1].range.offset == 6 &&
+             noteFields[2].name == "duration" && noteFields[2].range.offset == 7,
+         "braced arguments should read and annotate fields in source order");
+  expect(sourceMap.get(annotations[5]).playbackStatus == CommandPlaybackStatus::AffectsPlayback &&
+             sourceMap.get(annotations[6]).playbackStatus == CommandPlaybackStatus::SourceOnly,
+         "compiled behavior should promote source-only presentation unless the event is explicitly ignored");
+
+  const SequenceProgramConfig config = compilerProbeConfig();
+  const SequenceProgram program{
+      .runtime = compilerProbeRuntime(),
+      .timebase = config.timebase,
+      .behavior = config.behavior,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program);
+  expect(performance.diagnostics.empty(), "compiled probe should render without diagnostics");
+  expect(performance.tracks.size() == 1 && performance.tracks[0].endTick == 7,
+         "compiled waits and local note behavior should advance VM time");
+  expect(performance.tracks[0].events.size() == 2,
+         "compiled probe should emit its level and note after source storage is gone");
+
+  const auto& level = std::get<LevelPerformanceEvent>(performance.tracks[0].events[0]);
+  const auto& note = std::get<NotePerformanceEvent>(performance.tracks[0].events[1]);
+  expect(LevelScale::midi7FromLinear(level.linearGain) == 0x40,
+         "compiled direct output should preserve its decoded value");
+  expect(note.key == 65.0 && note.linearVelocity == 1.0 && note.durationTicks == 4,
+         "generated member invocation should observe preceding typed track-state operations");
+}
+
+void compilerCursorOwnsOutputValuesAfterDecoding() {
+  TrackProgram track;
+  {
+    const std::vector<u8> bytes{0x2d, 0xff};
+    track = decodeProbeTrack(ByteReader(SourceId{7}, bytes), static_cast<u32>(bytes.size()));
+  }
+  const SequenceProgram program{
+      .runtime = compilerProbeRuntime(),
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {track},
+  };
+  const auto performance = SequenceVm().render(program);
+  const auto& events = performance.tracks[0].events;
+  expect(events.size() == 4, "compiled output must retain every operation after source storage is gone");
+  const auto& instrument = std::get<InstrumentPerformanceEvent>(events[0]);
+  const auto& boundInstrument = std::get<InstrumentPerformanceEvent>(events[1]);
+  const auto& continuous = std::get<LevelPerformanceEvent>(events[2]);
+  const auto& quantized = std::get<LevelPerformanceEvent>(events[3]);
+  expect(std::get<InstrumentIdentity>(instrument.instrument) ==
+                 InstrumentIdentity{.domain = "temporary source instrument domain", .key = 257} &&
+             instrument.envelopeMode == InstrumentEnvelopeMode::PreserveDynamicOverride &&
+             boundInstrument.instrument == instrument.instrument &&
+             boundInstrument.envelopeMode == instrument.envelopeMode,
+         "direct output and bound arguments must own the source domain and preserve envelope policy");
+  expect(continuous.linearGain == 0.5 && continuous.sourceQuantization.levels == 0 && quantized.linearGain == 0.75 &&
+             quantized.sourceQuantization.levels == 64,
+         "compiled level output must distinguish unspecified quantization from a declared native scale");
+}
+
+void compilerCursorEmitsIndividualEnvelopeStages() {
+  const std::vector<u8> bytes{0x2e, 0xff};
+  const SequenceProgram program{
+      .runtime = compilerProbeRuntime(),
+      .tracks = {decodeProbeTrack(ByteReader(SourceId{7}, bytes), static_cast<u32>(bytes.size()))},
+  };
+  const auto performance = SequenceVm().render(program);
+  const auto& events = performance.tracks[0].events;
+  const std::array expected{
+      Envelope{.attackSeconds = 1.0}, Envelope{.holdSeconds = 2.0}, Envelope{.decaySeconds = 3.0},
+      Envelope{.secondDecaySeconds = 4.0}, Envelope{.releaseSeconds = 5.0}, Envelope{.sustainAmplitude = 0.5},
+  };
+  expect(performance.diagnostics.empty() && events.size() == expected.size(),
+         "compiled envelope operations must emit one update per selected stage");
+  for (size_t i = 0; i < expected.size(); ++i) {
+    const auto& event = std::get<EnvelopePerformanceEvent>(events[i]);
+    expect(event.update.values == expected[i] && event.update.fields == static_cast<EnvelopeFields>(1 << i) &&
+               event.scope == (i == 5 ? VoiceEnvelopeScope::ActiveVoices : VoiceEnvelopeScope::FutureAttacks),
+           "each compiled update must affect exactly its selected envelope stage and voice scope");
+  }
+}
+
+void compilerCursorPreservesEncodedAndResolvedSourceFields() {
+  const std::vector<u8> bytes{0x71, 0xfc, 0xff, 0xff};
+  SourceMapBuilder builder;
+  const auto track = decodeProbeTrack(ByteReader(SourceId{7}, bytes), static_cast<u32>(bytes.size()), &builder);
+  const auto sourceMap = builder.finish();
+  const auto& annotation = sourceMap.get(track.commands[0].annotation);
+  const auto& fields = annotation.fields;
+  expect(fields.size() == 8 && std::get<s64>(fields[1].value) == -4 && fields[1].range.offset == 1 &&
+             fields[1].range.size == 1 && std::get<u64>(fields[2].value) == 12 && !fields[2].range.valid() &&
+             hasLinkRole(annotation, SourceLinkRole::JumpTarget),
+         "resolved addresses must retain the encoded signed field, derived numeric address, and source link");
+  expect(std::get<bool>(fields[3].value) && std::get<s64>(fields[4].value) == -2 &&
+             std::get<std::string>(fields[5].value) == "source label" && std::get<double>(fields[6].value) == 1.5 &&
+             std::get<s64>(fields[7].value) == -1,
+         "decoded source fields must preserve booleans, enum signedness, strings, fractions, and signed reads");
+}
+
+void compilerCursorCompilesControlFlow() {
+  const std::vector<u8> bytes{
+      0x62, 0x00, 0x08,  // call subroutine
+      0x50, 0x02,        // wait
+      0x60, 0x00, 0x0b,  // jump to end
+      0x41, 0x01,        // subroutine note
+      0x63,              // return
+      0xff,              // end
+  };
+  SourceMapBuilder sourceMapBuilder;
+  const TrackProgram track =
+      decodeProbeTrack(ByteReader(SourceId{8}, bytes), static_cast<u32>(bytes.size()), &sourceMapBuilder);
+  const SourceMap sourceMap = sourceMapBuilder.finish();
+  expect(track.commands.size() == 6, "reachable decoding should compile call and jump targets");
+  expect(track.commands[0].flow.callTarget() && track.commands[2].flow.unconditionalJump(),
+         "compiled flow should preserve discovery targets beside runtime behavior");
+  expect(!track.commands[0].execution.valid() && !track.commands[2].execution.valid() &&
+             !track.commands[4].execution.valid() && !track.commands[5].execution.valid(),
+         "static call, jump, return, and end flow should compile no redundant runtime bodies");
+  const SourceAnnotation& callAnnotation = sourceMap.get(track.commands[0].annotation);
+  const SourceAnnotation& jumpAnnotation = sourceMap.get(track.commands[2].annotation);
+  const SourceAnnotation& returnAnnotation = sourceMap.get(track.commands[4].annotation);
+  expect(callAnnotation.playbackStatus == CommandPlaybackStatus::AffectsControlFlow &&
+             jumpAnnotation.playbackStatus == CommandPlaybackStatus::AffectsControlFlow &&
+             returnAnnotation.playbackStatus == CommandPlaybackStatus::AffectsControlFlow,
+         "compiler-cursor flow operations should annotate their playback status automatically");
+  expect(hasLinkRole(callAnnotation, SourceLinkRole::CallTarget) &&
+             hasLinkRole(jumpAnnotation, SourceLinkRole::JumpTarget),
+         "target roles declared at operand creation should project to the matching source links");
+
+  const SequenceProgramConfig config = compilerProbeConfig();
+  const SequenceProgram program{
+      .runtime = compilerProbeRuntime(),
+      .timebase = config.timebase,
+      .behavior = config.behavior,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program);
+  expect(performance.diagnostics.empty() && performance.tracks[0].endTick == 3,
+         "compiled call, return, wait, and jump should execute through SequenceVm");
+  expect(performance.tracks[0].events.size() == 1 &&
+             std::get<NotePerformanceEvent>(performance.tracks[0].events[0]).header.tick == 0,
+         "compiled call should execute its decoded subroutine before returning to fallthrough");
+
+  const TrackDecodeScope bounds{.reader = ByteReader(SourceId{8}, bytes)};
+  const auto overflowingContinuation = [&](u32 offset) {
+    auto decoded = decodeProbeCommand(bounds.reader, offset, static_cast<u32>(bytes.size()));
+    decoded.flow = CommandFlow::fallthroughTo(Address{(u64{1} << 32) + 3});
+    return decoded;
+  };
+  expect(bounds.decode(0, 0, overflowingContinuation).commands.size() == 1,
+         "an out-of-range continuation must not wrap into a decoded source address");
+  const std::array starts{Address{u64{1} << 32}};
+  const auto rejected = bounds.decode(0, starts, overflowingContinuation);
+  expect(rejected.commands.empty() && rejected.startAddress.value == starts.front().value,
+         "an out-of-range entry point must retain its address without decoding wrapped source bytes");
+}
+
+void compilerCursorCompilesRepeatsAndConditionalFields() {
+  const std::vector<u8> repeatBytes{
+      0x40, 0x01,                    // note
+      0x61, 0x00, 0x02, 0x00, 0x00,  // play twice from address zero
+      0xff,
+  };
+  SourceMapBuilder repeatSourceMapBuilder;
+  const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{9}, repeatBytes),
+                                              static_cast<u32>(repeatBytes.size()), &repeatSourceMapBuilder);
+  const SourceMap repeatSourceMap = repeatSourceMapBuilder.finish();
+  expect(hasLinkRole(repeatSourceMap.get(track.commands[1].annotation), SourceLinkRole::RepeatTarget),
+         "compiled repeats should project their destination to a repeat source link");
+  const SequenceProgramConfig config = compilerProbeConfig();
+  const SequenceProgram program{
+      .runtime = compilerProbeRuntime(),
+      .timebase = config.timebase,
+      .behavior = config.behavior,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program);
+  expect(performance.tracks[0].endTick == 2 && performance.tracks[0].events.size() == 2,
+         "compiled counted repeat should replay through shared VM state");
+
+  const std::vector<u8> conditionalBytes{0x70, 0x01, 0x12, 0x34, 0xff};
+  SourceMapBuilder conditionalSourceMapBuilder;
+  const TrackProgram conditional =
+      decodeProbeTrack(ByteReader(SourceId{10}, conditionalBytes), static_cast<u32>(conditionalBytes.size()),
+                       &conditionalSourceMapBuilder);
+  const SourceMap conditionalSourceMap = conditionalSourceMapBuilder.finish();
+  const SourceAnnotation& conditionalAnnotation = conditionalSourceMap.get(conditional.commands[0].annotation);
+  expect(hasField(conditionalAnnotation, "wide") && hasField(conditionalAnnotation, "value") &&
+             conditional.commands[0].range.size == 4,
+         "imperative compiler cursor should naturally decode conditional field layouts");
+}
+
+void compilerCursorComposesOperationsIntoOneBody() {
+  const std::vector<u8> bytes{
+      0x22, 0x0c,  // set and emit pitch-bend range
+      0x23, 0x40,  // bend halfway across that range
+      0x24, 0x03,  // separate state, expression, and wait operations
+      0x40, 0x01,  // note after the wait, using the new transpose
+      0x25, 0x7f,  // value-capturing inline body
+      0xff,
+  };
+  const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{12}, bytes), static_cast<u32>(bytes.size()));
+  expect(track.commands.size() == 6 && track.commands[0].execution.valid() && track.commands[2].execution.valid(),
+         "chained and separate compiler-cursor calls should compose into one command body");
+
+  const SequenceProgramConfig config = compilerProbeConfig();
+  const SequenceProgram program{
+      .runtime = compilerProbeRuntime(),
+      .timebase = config.timebase,
+      .behavior = config.behavior,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program);
+  expect(performance.diagnostics.empty() && performance.tracks[0].endTick == 4,
+         "composed operations should execute through one source command before VM scheduling continues");
+  const auto& events = performance.tracks[0].events;
+  expect(events.size() == 5 && std::get<PitchBendRangePerformanceEvent>(events[0]).cents == 1200 &&
+             std::get<PitchBendPerformanceEvent>(events[1]).semitones == 6.0 &&
+             std::get<ExpressionPerformanceEvent>(events[2]).linearGain == 0.5,
+         "composed state and output operations should execute in their written order");
+  expect(std::get<NotePerformanceEvent>(events[3]).header.tick == 3 &&
+             std::get<NotePerformanceEvent>(events[3]).key == 63.0 &&
+             std::get<PanPerformanceEvent>(events[4]).stereoPosition == 1.0,
+         "separate state calls and a value-capturing body should preserve typed runtime behavior");
+}
+
+void compilerCursorReadsRuntimeStateInsideCommandBody() {
+  const std::vector<u8> bytes{0x27, 0x27, 0xff};
+  const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{14}, bytes), static_cast<u32>(bytes.size()));
+  expect(track.commands.size() == 3 && track.commands[0].execution.valid(),
+         "runtime-state fixture should compile its related effects into one body");
+
+  const SequenceProgramConfig config = compilerProbeConfig();
+  const SequenceProgram program{
+      .runtime = compilerProbeRuntime(),
+      .timebase = config.timebase,
+      .behavior = config.behavior,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program);
+  const auto& events = performance.tracks[0].events;
+  expect(events.size() == 4 && std::get<LegatoPedalPerformanceEvent>(events[0]).enabled &&
+             !std::get<LegatoPedalPerformanceEvent>(events[2]).enabled,
+         "a command body should observe the track state immediately after updating it");
+  expect(std::get<ExpressionPerformanceEvent>(events[1]).linearGain == 0.75 &&
+             std::get<ExpressionPerformanceEvent>(events[3]).linearGain == 0.25,
+         "a local playback operation should select output from runtime state");
+}
+
+void compilerCursorExecutesEligibleCommandsDuringWaits() {
+  const auto render = [](std::initializer_list<u8> bytes) {
+    const std::vector<u8> source(bytes);
+    const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{16}, source), static_cast<u32>(source.size()));
+    const SequenceProgramConfig config = compilerProbeConfig();
+    const SequenceProgram program{
+        .runtime = compilerProbeRuntime(),
+        .timebase = config.timebase,
+        .behavior = config.behavior,
+        .tracks = {track},
+    };
+    return std::pair{track, SequenceVm().render(program)};
+  };
+
+  const auto [gatedTrack, gated] = render({0x2a, 0x02, 0x50, 0x04, 0x2b, 0x20, 0x2b, 0x40, 0xff});
+  expect(gatedTrack.commands.size() == 5 && gatedTrack.commands[2].execution.duringWait &&
+             gatedTrack.commands[3].execution.duringWait,
+         "during-wait eligibility should remain attached to each independently decoded command");
+  const auto& gatedEvents = gated.tracks[0].events;
+  expect(gated.tracks[0].endTick == 4 && gatedEvents.size() == 2 &&
+             std::get<ExpressionPerformanceEvent>(gatedEvents[0]).header.tick == 2 &&
+             std::get<ExpressionPerformanceEvent>(gatedEvents[1]).header.tick == 3,
+         "the VM should retain a gated command and execute at most one eligible command per wait tick");
+
+  const auto [boundaryTrack, boundary] = render({0x2a, 0x00, 0x50, 0x02, 0x2b, 0x10, 0x2b, 0x20, 0x2b, 0x30, 0xff});
+  const auto& boundaryEvents = boundary.tracks[0].events;
+  expect(boundaryTrack.commands.size() == 6 && boundary.tracks[0].endTick == 2 && boundaryEvents.size() == 3 &&
+             std::get<ExpressionPerformanceEvent>(boundaryEvents[0]).header.tick == 0 &&
+             std::get<ExpressionPerformanceEvent>(boundaryEvents[1]).header.tick == 1 &&
+             std::get<ExpressionPerformanceEvent>(boundaryEvents[2]).header.tick == 2,
+         "the VM should poll once when a wait begins and resume ordinary command execution at its final boundary");
+
+  expectThrows<std::logic_error>([&] { static_cast<void>(render({0x2a, 0x00, 0x50, 0x02, 0x2c, 0xff})); },
+                                 "a command executed during another command's wait must remain a zero-time operation");
+}
+
+void compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior() {
+  for (const auto& bytes : {std::vector<u8>{0x10}, {0x30, 63}, {0x30, 63, 0x80}}) {
+    std::vector<Diagnostic> diagnostics;
+    const TrackProgram track =
+        decodeProbeTrack(ByteReader(SourceId{11}, bytes), static_cast<u32>(bytes.size()), nullptr, &diagnostics);
+    expect(track.commands.size() == 1 && track.commands[0].flow.endsPlayback(),
+           "truncated compiler command should become a terminal command automatically");
+    expect(track.commands[0].range.size == bytes.size() && !track.commands[0].execution.valid(),
+           "truncated compiler command should retain its partial source range but no executable behavior");
+    expect(!diagnostics.empty() && diagnostics[0].code == "truncated-record",
+           "truncated compiler field should retain the shared RecordReader diagnostic");
+  }
+}
+
+void compilerCursorKeepsExactTargetOperandRoles() {
+  const std::vector<u8> bytes{0x64, 0x12, 0x34, 0x12, 0x34};
+  const DecodedBytecodeCommand command =
+      decodeProbeCommand(ByteReader(SourceId{17}, bytes), 0, static_cast<u32>(bytes.size()));
+  expect(command.fields.size() == 2 && command.fields[0].value == command.fields[1].value,
+         "equal-valued target fixture should preserve both source fields");
+  expect(command.operands.size() == 1 && command.operands[0].role == SemanticOperandRole::JumpTarget,
+         "only the tagged target should contribute a semantic operand");
+}
+
+void compilerCursorRejectsConflictingDefaultFlowDeclarations() {
+  for (const auto& bytes : {std::vector<u8>{0x69, 0x00, 0x01, 0x00, 0x02}, std::vector<u8>{0x6a, 0x00, 0x01},
+                            std::vector<u8>{0x6b, 0x00, 0x01}}) {
+    expectThrows<std::logic_error>(
+        [&] {
+          static_cast<void>(decodeProbeCommand(ByteReader(SourceId{18}, bytes), 0, static_cast<u32>(bytes.size())));
+        },
+        "a command must reject competing default transitions, regardless of declaration order");
+  }
+}
+
+void compilerCursorRejectsConflictingComposedFlow() {
+  const std::vector<u8> bytes{0x26, 0xff};
+  ScanIdAllocator ids;
+  SourceMapBuilder sourceMapBuilder([&ids]() { return ids.nextSourceAnnotationId(); });
+  const TrackProgram track =
+      decodeProbeTrack(ByteReader(SourceId{13}, bytes), static_cast<u32>(bytes.size()), &sourceMapBuilder);
+  const SourceMap sourceMap = sourceMapBuilder.finish();
+  expect(sourceMap.get(track.commands[0].annotation).playbackStatus == CommandPlaybackStatus::AffectsControlFlow,
+         "runtime-selected flow should be classified as control flow without a separate annotation call");
+  const SequenceProgramConfig config = compilerProbeConfig();
+  const SequenceProgram program{
+      .runtime = compilerProbeRuntime(),
+      .timebase = config.timebase,
+      .behavior = config.behavior,
+      .tracks = {track},
+  };
+
+  expectThrows<std::logic_error>([&] { static_cast<void>(SequenceVm().render(program)); },
+                                 "one compiled source command should not produce multiple control-flow results");
+}
+
+void compilerCursorAnalysisStopsAfterItsScheduledPrepass() {
+  const std::vector<u8> bytes{0x21, 0xff};
+  const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{15}, bytes), static_cast<u32>(bytes.size()));
+  const SequenceProgramConfig config = compilerProbeConfig();
+  SequenceProgram program{
+      .runtime = makeCompiledRuntime<CompilerProbePlayback, CompilerPrepassProgramState>(),
+      .timebase = config.timebase,
+      .behavior = config.behavior,
+      .tracks = {track},
+  };
+
+  const auto state = analyzeCompiledProgram<CompilerPrepassProgramState>(
+      program, [](const CompilerPrepassProgramState& state) { return state; });
+  expect(state.executedCommands == 2 && state.completedPrepasses == 1,
+         "compiled analysis should finish one scheduled prepass without executing a discarded output pass");
+
+  program.runtime = compilerProbeRuntime();
+  const u32 executed =
+      analyzeCompiledProgram<CompilerProbeProgramState>(program, &CompilerProbeProgramState::executedCommands);
+  expect(executed == 2, "analysis without a prepass hook must still execute the program exactly once");
+}
+
+void compilerCursorAnalysisReportsPrepassDiagnostics() {
+  const std::vector<u8> bytes{0x60, 0x00, 0x20};
+  const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{16}, bytes), static_cast<u32>(bytes.size()));
+  const SequenceProgramConfig config = compilerProbeConfig();
+  const SequenceProgram program{
+      .runtime = makeCompiledRuntime<CompilerProbePlayback, CompilerPrepassProgramState>(),
+      .timebase = config.timebase,
+      .behavior = config.behavior,
+      .tracks = {track},
+  };
+
+  std::vector<Diagnostic> diagnostics;
+  static_cast<void>(analyzeCompiledProgram<CompilerPrepassProgramState>(
+      program, &CompilerPrepassProgramState::executedCommands, &diagnostics));
+  expect(diagnostics.size() == 1 && diagnostics.front().message == "Sequence jump target $0020 was not decoded",
+         "compiled analysis should preserve diagnostics from its discarded prepass");
+}
+
+void trackDecodeSessionOrdersExceptionalWalkerCommands() {
+  const std::vector<u8> bytes{0x40, 0x01, 0xff};
+  const u32 end = static_cast<u32>(bytes.size());
+  const ByteReader reader(SourceId{30}, bytes);
+  SourceMapBuilder sourceMap;
+  SequenceDecodeSession sequence{reader, compilerProbeConfig(), AssetId{30}, reader.range(0, 1), &sourceMap, 4096, end};
+  const auto header = sequence.header().label("Custom Header");
+  const auto pointer = sequence.trackPointer(0, reader.range(0, 1), 0).derived("custom_field", 1);
+  auto session = sequence.trackScope().begin(0, 0);
+  session.findOrAppend(decodeProbeCommand(reader, 2, end), 2);
+  session.findOrAppend(decodeProbeCommand(reader, 0, end), 0);
+  const DecodedBytecodeCommand& retained = session.findOrAppend(decodeProbeCommand(reader, 1, end), 0);
+  TrackProgram track = session.finish();
+
+  expect(retained.opcode == 0x40 && track.commands.size() == 2 && track.commands[0].address.value == 0 &&
+             track.commands[1].address.value == 2,
+         "track decode session should retain the first command per address and order commands by source address");
+
+  const auto trackAnnotation = track.annotation;
+  sequence.addTrack(std::move(track));
+  const PerformanceSequence performance = SequenceVm().render(sequence.finish(compilerProbeRuntime()));
+  expect(
+      performance.diagnostics.empty() && performance.tracks[0].events.size() == 1 && performance.tracks[0].endTick == 1,
+      "ordered exceptional-walker commands should retain their decoded execution flow");
+  const SourceMap annotations = sourceMap.finish();
+  expect(annotations.find(header.id())->label == "Custom Header" &&
+             annotations.find(pointer.id())->parent == header.id() &&
+             annotations.find(pointer.id())->fields.back().name == "custom_field" &&
+             !annotations.find(trackAnnotation)->parent && annotations.assetOwner(trackAnnotation) == AssetId{30},
+         "custom walkers should share editable sequence annotations and track ownership");
+}
+
+void trackDecodeSourceHierarchyDistinguishesTrackedAndTracklessFormats() {
+  const std::vector<u8> bytes{0xff};
+  const ByteReader reader(SourceId{31}, bytes);
+  const AssetId asset{31};
+  for (const bool sourceHasTracks : {false, true}) {
+    for (const bool hasParent : {false, true}) {
+      SourceMapBuilder sourceMap;
+      const auto parent = hasParent ? std::optional{sourceMap.section("Pattern", reader.range(0, 1))
+                                                       .owner(ObjectRefs::sequence(asset)).id()}
+                                    : std::nullopt;
+      TrackDecodeScope scope{
+          .reader = reader,
+          .sourceHasTracks = sourceHasTracks,
+          .sequenceAsset = asset,
+          .parentAnnotation = parent,
+          .sourceMap = &sourceMap,
+      };
+      const auto decode = [&](u32 offset) { return decodeProbeCommand(reader, offset, 1); };
+      const TrackProgram program = scope.decode(0, 0, decode);
+      const SourceMap annotations = sourceMap.finish();
+      const auto* command = annotations.find(program.commands.front().annotation);
+      const auto commandParent = sourceHasTracks ? std::optional{program.annotation} : parent;
+      expect(program.annotation.valid() == sourceHasTracks && command != nullptr &&
+                 command->parent == commandParent && annotations.assetOwner(command->id) == asset,
+             "commands should inherit sequence ownership through the selected source hierarchy");
+      if (sourceHasTracks) {
+        expect(annotations.get(program.annotation).parent == parent && !command->owner,
+               "a source track should retain its optional parent and own its commands");
+      } else {
+        const auto owner = hasParent ? std::nullopt : std::optional{ObjectRefs::sequence(asset)};
+        expect(annotations.withRole(reader.source(), SourceRole::SequenceTrack).empty() && command->owner == owner,
+               "trackless commands should inherit from a parent or own the sequence directly at the root");
+      }
+
+      scope.sourceMap = nullptr;
+      const TrackProgram unannotated = scope.decode(0, 0, decode);
+      expect(!unannotated.annotation.valid() && unannotated.commands.size() == program.commands.size() &&
+                 !unannotated.commands.front().annotation.valid(),
+             "decoding without a source map should keep executable commands without annotation handles");
+    }
+  }
+}
+
+}  // namespace
+
+void runValueCompilerCursorTests() {
+  compilerCursorCompilesAndExecutesTypedCommands();
+  compilerCursorOwnsOutputValuesAfterDecoding();
+  compilerCursorEmitsIndividualEnvelopeStages();
+  compilerCursorPreservesEncodedAndResolvedSourceFields();
+  compilerCursorCompilesControlFlow();
+  compilerCursorCompilesRepeatsAndConditionalFields();
+  compilerCursorComposesOperationsIntoOneBody();
+  compilerCursorReadsRuntimeStateInsideCommandBody();
+  compilerCursorExecutesEligibleCommandsDuringWaits();
+  compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior();
+  compilerCursorKeepsExactTargetOperandRoles();
+  compilerCursorRejectsConflictingDefaultFlowDeclarations();
+  compilerCursorRejectsConflictingComposedFlow();
+  compilerCursorAnalysisStopsAfterItsScheduledPrepass();
+  compilerCursorAnalysisReportsPrepassDiagnostics();
+  trackDecodeSessionOrdersExceptionalWalkerCommands();
+  trackDecodeSourceHierarchyDistinguishesTrackedAndTracklessFormats();
+}

@@ -13,6 +13,7 @@
 #include "VGMColl.h"
 
 #include <algorithm>
+#include <cmath>
 #include <memory>
 
 #include <spdlog/fmt/fmt.h>
@@ -372,7 +373,7 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr *instr,
     unityKey += static_cast<int>(percussionNote) - kKonamiSnesPercussionBaseNote;
   }
   addUnityKey(static_cast<u8>(std::clamp(unityKey, 0, 127)), offset + 1, 1);
-  addFineTune((s16) (fine_tuning * 100.0), offset + 2, 1);
+  addFineTune(static_cast<s16>(std::lround(fine_tuning * 100.0)), offset + 2, 1);
   addChild(offset + 3, 1, "ADSR1");
   if (legacyLayout) {
     addChild(offset + 4, 1, "ADSR2");
