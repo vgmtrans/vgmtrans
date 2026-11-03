@@ -8,12 +8,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-env:
-  # Node 20 is deprecated, not all actions are ready.
-  # Dependabot will get them, for now force them to Node 24
-  # to silence warnings
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   prepare:
     name: Prepare metadata
@@ -26,7 +20,7 @@ jobs:
     steps:
       - name: Compute build metadata
         id: meta
-        uses: actions/github-script@v9
+        uses: actions/github-script@v9.0.0
         with:
           script: |
             const ref = context.ref || '';
@@ -63,7 +57,7 @@ jobs:
   macos:
     name: macOS 13.x+
     needs: prepare
-    runs-on: ${{ (matrix.target == 'intel' && 'macos-15') || 'macos-15' }}
+    runs-on: macos-15
     strategy:
       matrix:
         target: [ "intel", "arm64" ]
@@ -75,16 +69,17 @@ jobs:
       HOMEBREW_PREFIX: ${{ (matrix.target == 'intel' && '/usr/local') || '/opt/homebrew' }}
       ARTIFACT_BASENAME: ${{ format('VGMTrans-macOS-{0}-{1}', matrix.target, needs.prepare.outputs.artifact_label) }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           submodules: recursive
           show-progress: false
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@v4.5.0
         with:
-            aqtversion: '==3.1.*'
-            version: '6.10.2'
+            aqtversion: '==3.3.*'
+            # Qt 6.12 requires macOS 14.4; keep the macOS 13 deployment target.
+            version: '6.11.3'
             host: 'mac'
             target: 'desktop'
             arch: 'clang_64'
@@ -115,11 +110,11 @@ jobs:
           cmake --build --preset "macos-${{ matrix.target }}-release" --target install
 
       - name: "Checkout create-dmg"
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           repository: create-dmg/create-dmg
           path: "./build/macos-${{ matrix.target }}/create-dmg"
-          ref: master
+          ref: v1.3.0
           show-progress: false
 
       - name: Build macOS DMG
@@ -144,14 +139,14 @@ jobs:
             "dist/usr/local/"
 
       - name: Generate artifact attestation
-        uses: actions/attest@v4
+        uses: actions/attest@v4.2.2
         if: ${{ github.event_name == 'push' }}
         with:
           subject-name: ${{ env.ARTIFACT_BASENAME }}
           subject-path: "build/macos-${{ matrix.target }}/${{ env.ARTIFACT_BASENAME }}.dmg"
 
       - name: "Upload artifact"
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           path: "build/macos-${{ matrix.target }}/${{ env.ARTIFACT_BASENAME }}.dmg"
           archive: false
@@ -159,7 +154,7 @@ jobs:
     needs: prepare
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.10
+      image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.11@sha256:b0a8a2acb9e420dd0e3e083ff552bea5a817e17e41532f1d2287ff49ef9aae0e
       options: --privileged
     name: Linux, x64
     permissions:
@@ -170,13 +165,13 @@ jobs:
       ARTIFACT_BASENAME: ${{ format('VGMTrans-Linux-x86_64-{0}', needs.prepare.outputs.artifact_label) }}
       VGMTRANS_WARNINGS_AS_ERRORS: ON
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           submodules: recursive
           show-progress: false
 
       - name: "Build Flatpak"
-        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6.8
         with:
           bundle: ${{ env.ARTIFACT_BASENAME }}.flatpak
           manifest-path: build-aux/flatpak/io.github.vgmtrans.vgmtrans.yaml
@@ -198,14 +193,14 @@ jobs:
         shell: bash
 
       - name: Generate artifact attestation
-        uses: actions/attest@v4
+        uses: actions/attest@v4.2.2
         if: ${{ github.event_name == 'push' }}
         with:
           subject-name: ${{ env.ARTIFACT_BASENAME }}
           subject-path: "${{ env.ARTIFACT_BASENAME }}.flatpak"
 
       - name: "Upload artifact"
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           path: ${{ env.ARTIFACT_BASENAME }}.flatpak
           archive: false
@@ -225,22 +220,34 @@ jobs:
     env:
       PACKAGE_FILE_NAME: ${{ format('VGMTrans-Windows-{0}-{1}', matrix.target == 'x64-clang' && 'x64' || 'x64-msvc', needs.prepare.outputs.artifact_label) }}
     steps:
-       - uses: actions/checkout@v7
+       - uses: actions/checkout@v7.0.1
          with:
           submodules: recursive
           show-progress: false
 
        - name: "Source vcvars for ${{ matrix.target }}"
          if: ${{ !contains(matrix.target, '-clang') }}
-         uses: ilammy/msvc-dev-cmd@v1
-         with:
-            arch: ${{ matrix.target != 'x64' && (format('{0}_{1}', 'amd64', matrix.target)) || matrix.target }}
+         shell: pwsh
+         run: |
+           $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+           if (!$vs) { throw "Visual Studio C++ tools not found" }
+           $before = [Environment]::GetEnvironmentVariables()
+           $environment = cmd /d /c "call `"$vs\Common7\Tools\VsDevCmd.bat`" -no_logo -arch=${{ matrix.target }} -host_arch=x64 >nul && set"
+           if ($LASTEXITCODE -ne 0) { throw "VsDevCmd.bat failed" }
+           $environment | ForEach-Object {
+             $name, $value = $_ -split '=', 2
+             if ($name -and $value -cne $before[$name]) {
+               "$name=$value" >> $env:GITHUB_ENV
+             }
+           }
 
        - name: Install Qt
-         uses: jurplel/install-qt-action@v4
+         uses: jurplel/install-qt-action@v4.5.0
          with:
-           aqtversion: '==3.1.*'
-           version: '6.10.2'
+           aqtversion: '==3.3.*'
+           # aqtinstall 3.3.0 cannot read the Windows Qt 6.11+ repository layout:
+           # https://github.com/miurahr/aqtinstall/issues/1007
+           version: '6.10.3'
            host: 'windows'
            target: 'desktop'
            arch: 'win64_msvc2022_64'
@@ -274,13 +281,13 @@ jobs:
             --target package
 
        - name: Generate artifact attestation
-         uses: actions/attest@v4
+         uses: actions/attest@v4.2.2
          if: ${{ github.event_name == 'push' }}
          with:
            subject-path: "build/win-${{ matrix.target }}/${{ env.PACKAGE_FILE_NAME }}.zip"
 
        - name: "Upload artifact"
-         uses: actions/upload-artifact@v7
+         uses: actions/upload-artifact@v7.0.2
          with:
            path: "build/win-${{ matrix.target }}/${{ env.PACKAGE_FILE_NAME }}.zip"
            archive: false
@@ -293,12 +300,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           show-progress: false
 
       - name: Download build artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.2
         with:
           path: release-assets
           skip-decompress: true
@@ -338,12 +345,12 @@ jobs:
       VGMTRANS_PREVIEW_TARGET: main
       VGMTRANS_PREVIEW_VERSION: ${{ needs.prepare.outputs.short_sha }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           show-progress: false
 
       - name: Download build artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.2
         with:
           path: release-assets
           skip-decompress: true
@@ -378,7 +385,7 @@ jobs:
 
       - name: Generate preview app token
         id: preview-app-token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@v3.3.0
         with:
           # This is https://github.com/apps/vgmtrans-helper
           app-id: ${{ vars.VGMTRANS_HELPER_APP_ID }}
