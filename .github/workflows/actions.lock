@@ -11,7 +11,6 @@ workflows:
         - 'actions/github-script@v9.0.0'
         - 'actions/upload-artifact@v7.0.2'
         - 'flatpak/flatpak-github-actions@v6.8'
-        - 'ilammy/msvc-dev-cmd@v1.13.0'
         - 'jurplel/install-qt-action@v4.5.0'
     '.github/workflows/verify-lockfile.yml':
         - 'actions/checkout@v7.0.1'
@@ -56,11 +55,6 @@ dependencies:
         commit: 'sha1-79327416609af08178ad73b352877e51450790b3'
         owner_id: 19473042
         repo_id: 211923252
-    'ilammy/msvc-dev-cmd@v1.13.0':
-        ref: 'v1.13.0'
-        commit: 'sha1-0b201ec74fa43914dc39ae48a89fd1d8cb592756'
-        owner_id: 1256587
-        repo_id: 212181767
     'jurplel/install-qt-action@v4.5.0':
         ref: 'v4.5.0'
         commit: 'sha1-b344308e4483fc892e0d27b3cd1b173ebdd95f06'

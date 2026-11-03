@@ -8,11 +8,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-env:
-  # Some third-party actions still declare Node 20; run them on Node 24
-  # until their upstream runtimes are updated.
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   prepare:
     name: Prepare metadata
@@ -232,9 +227,19 @@ jobs:
 
        - name: "Source vcvars for ${{ matrix.target }}"
          if: ${{ !contains(matrix.target, '-clang') }}
-         uses: ilammy/msvc-dev-cmd@v1.13.0
-         with:
-            arch: ${{ matrix.target != 'x64' && (format('{0}_{1}', 'amd64', matrix.target)) || matrix.target }}
+         shell: pwsh
+         run: |
+           $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+           if (!$vs) { throw "Visual Studio C++ tools not found" }
+           $before = [Environment]::GetEnvironmentVariables()
+           $environment = cmd /d /c "call `"$vs\Common7\Tools\VsDevCmd.bat`" -no_logo -arch=${{ matrix.target }} -host_arch=x64 >nul && set"
+           if ($LASTEXITCODE -ne 0) { throw "VsDevCmd.bat failed" }
+           $environment | ForEach-Object {
+             $name, $value = $_ -split '=', 2
+             if ($name -and $value -cne $before[$name]) {
+               "$name=$value" >> $env:GITHUB_ENV
+             }
+           }
 
        - name: Install Qt
          uses: jurplel/install-qt-action@v4.5.0
