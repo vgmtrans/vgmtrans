@@ -84,7 +84,8 @@ NDSTrack::NDSTrack(NDSSeq *parentFile, u32 offset, u32 length)
 
 void NDSTrack::resetVars() {
   SeqTrack::resetVars();
-  noteWithDelta = false;
+  // Nitro starts tracks with note wait enabled; C7 can explicitly disable it.
+  noteWithDelta = true;
 }
 
 bool NDSTrack::readEvent(void) {
