@@ -37,6 +37,9 @@
 
 #include <QAction>
 #include <QApplication>
+#if QT_CONFIG(accessibility)
+#include <QAccessibleWidget>
+#endif
 #include <QCloseEvent>
 #if defined(Q_OS_LINUX)
 #include <QDBusConnection>
@@ -58,6 +61,7 @@
 #include <QMessageBox>
 #include <QMimeData>
 #include <QMouseEvent>
+#include <QProxyStyle>
 #include <QResizeEvent>
 #include <QShortcut>
 #include <QStandardPaths>
@@ -394,7 +398,33 @@ void MainWindow::configureWindowAgent() {
   m_windowAgent->setSystemButton(QWK::WindowAgentBase::Minimize, m_windowBar->minimizeButton());
   m_windowAgent->setSystemButton(QWK::WindowAgentBase::Maximize, m_windowBar->maximizeButton());
   m_windowAgent->setSystemButton(QWK::WindowAgentBase::Close, m_windowBar->closeButton());
-  setMenuWidget(m_windowBar);
+  QStyle *windowStyle = style();
+  while (auto *proxyStyle = qobject_cast<QProxyStyle *>(windowStyle)) {
+    windowStyle = proxyStyle->baseStyle();
+  }
+  if (windowStyle->inherits("Breeze::Style")) {
+    // Breeze calls QMainWindow::menuBar() when polishing the window. If the menu
+    // widget is not a QMenuBar, Qt replaces it and deletes our entire title bar.
+    auto *titleBarContainer = new QMenuBar(this);
+#if QT_CONFIG(accessibility)
+    // Expose the embedded menu bar and title bar controls to accessibility-tree
+    // navigation; QMenuBar's default interface only exposes its actions.
+    QAccessible::registerAccessibleInterface(
+        new QAccessibleWidget(titleBarContainer, QAccessible::Grouping));
+#endif
+    titleBarContainer->setNativeMenuBar(false);
+    titleBarContainer->setFixedHeight(m_windowBar->height());
+    auto *titleBarLayout = new QHBoxLayout(titleBarContainer);
+    titleBarLayout->setSizeConstraint(QLayout::SetMinimumSize);
+    titleBarLayout->setContentsMargins(0, 0, 0, 0);
+    titleBarLayout->setSpacing(0);
+    titleBarLayout->addWidget(m_windowBar);
+    setMenuBar(titleBarContainer);
+    // Only the embedded menu bar should handle Alt-key navigation.
+    removeEventFilter(titleBarContainer);
+  } else {
+    setMenuWidget(m_windowBar);
+  }
 #endif
 }
 
