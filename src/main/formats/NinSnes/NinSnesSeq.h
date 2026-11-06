@@ -66,6 +66,8 @@ public:
   u8 spcPercussionBase;
   u8 sectionRepeatCount;
   s8 globalTranspose;
+  NinSnesAddmusicKHotPatchState addmusicKHotPatch;
+  u8 addmusicKVelocityTableId;
   u8 tempo;
   SeqFixedPointAutomation<> tempoFade;
   double maxVibratoDepthCents;
@@ -207,6 +209,8 @@ public:
     u8 delay = 0;
     u8 length = 0;
     u8 targetNote = 0;
+    s8 semitoneTune = 0;
+    bool accountForSemitoneTune = true;
   };
 
   NinSnesTrack(NinSnesSeq* parentSeq, u32 offset = 0, u32 length = 0,
@@ -244,8 +248,11 @@ private:
                              std::string& desc);
   bool handleVariantEvent(NinSnesSeqEventType eventType, u32 beginOffset, u8 statusByte,
                           std::string& desc);
+  bool handleAddmusicKEvent(NinSnesSeqEventType eventType, u32 beginOffset,
+                            std::string& desc);
   bool handleIntelliEvent(NinSnesSeqEventType eventType, u32 beginOffset, u8 statusByte,
                           std::string& desc);
+  u8 midiVolumeForCurrentState() const;
   PitchSlideEvent readPitchSlide(u32 offset);
   bool consumeQueuedPitchSlide();
   void addPitchSlideEvent(const PitchSlideEvent& slide);

@@ -6,6 +6,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 
 enum NinSnesSeqEventType {
   // start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get
@@ -15,6 +16,10 @@ enum NinSnesSeqEventType {
   EVENT_UNKNOWN2,
   EVENT_UNKNOWN3,
   EVENT_UNKNOWN4,
+  EVENT_UNKNOWN5,
+  EVENT_UNKNOWN6,
+  EVENT_UNKNOWN7,
+  EVENT_UNKNOWN8,
   EVENT_NOP,
   EVENT_NOP1,
   EVENT_END,
@@ -50,6 +55,18 @@ enum NinSnesSeqEventType {
   EVENT_ECHO_VOLUME_FADE,
   EVENT_PITCH_SLIDE,
   EVENT_PERCUSSION_PATCH_BASE,
+  EVENT_ADDMUSICK_SUBLOOP,
+  EVENT_ADDMUSICK_ADSR_GAIN,
+  EVENT_ADDMUSICK_SAMPLE_LOAD,
+  EVENT_ADDMUSICK_OPTION,
+  EVENT_ADDMUSICK_FIR_FILTER,
+  EVENT_ADDMUSICK_DSP_WRITE,
+  EVENT_ADDMUSICK_DATA_WRITE,
+  EVENT_ADDMUSICK_NOISE,
+  EVENT_ADDMUSICK_DATA_SEND,
+  EVENT_ADDMUSICK_EXTENDED,
+  EVENT_ADDMUSICK_ARPEGGIO,
+  EVENT_ADDMUSICK_REMOTE_COMMAND,
 
   // Nintendo RD2:
   EVENT_RD2_PROGCHANGE_AND_ADSR,
@@ -100,10 +117,15 @@ class NinSnesTrackState {
   u8 spcNoteDuration;
   u8 spcNoteDurRate;
   u8 spcNoteVolume;
+  u8 spcVolume;
   s8 spcTranspose;
   u16 loopReturnAddress;
   u16 loopStartAddress;
   u8 loopCount;
+  u16 addmusicKSubloopStartAddress;
+  u8 addmusicKSubloopCount;
+  bool addmusicKSubloopActive;
+  u8 addmusicKVolumeMultiplier;
 
   // Konami:
   u16 konamiLoopStart;
@@ -130,6 +152,40 @@ class NinSnesTrackState {
   SeqSynthLfoAutomation vibrato;
   StoredPitchEnvelope pitchEnvelope;
   SeqPitchBendAutomation<s32> pitch {100.0 / 256.0};
+};
+
+struct NinSnesAddmusicKHotPatchState {
+  enum Byte0Bit : u8 {
+    ArpeggioSkipsRests = 1 << 0,
+    GainBeforeAdsr = 1 << 1,
+    ReadaheadScansLoops = 1 << 2,
+    PitchSlideAccountsForSemitoneTune = 1 << 3,
+    SampleLoadClearsPitchFraction = 1 << 4,
+    ZeroDelayEchoWritesDisabled = 1 << 5,
+    GlissandoStopsAfterOneNote = 1 << 6,
+  };
+
+  enum Byte1Bit : u8 {
+    RestsKeyOffOnlyInReadahead = 1 << 0,
+  };
+
+  void reset() {
+    applyPreset(1);
+  }
+
+  bool applyPreset(u8 preset);
+  void applyBytes(std::span<const u8> bytes);
+
+  [[nodiscard]] bool pitchSlideAccountsForSemitoneTune() const {
+    return (byte0 & PitchSlideAccountsForSemitoneTune) != 0;
+  }
+
+  [[nodiscard]] bool sampleLoadClearsPitchFraction() const {
+    return (byte0 & SampleLoadClearsPitchFraction) != 0;
+  }
+
+  u8 byte0 = 0xff;
+  u8 byte1 = 0x00;
 };
 
 struct NinSnesPercussionDef {
