@@ -87,6 +87,10 @@ std::unique_ptr<MidiFile> VGMSeq::convertToMidi(const VGMColl* coll, const Conve
   long stopTime = 0;
   for (size_t i = 0; i < numTracks; i++)
     stopTime = std::max(stopTime, m_tracks[i]->totalTicks);
+  // A sequence can schedule notes at tick zero and finish without advancing
+  // track time. Give that first tick a conversion pass so those events and
+  // their duration-scheduled note-offs are not discarded as an empty song.
+  stopTime = std::max(stopTime, 1L);
 
   auto newMidi = std::make_unique<MidiFile>(this);
   this->midi = newMidi.get();
