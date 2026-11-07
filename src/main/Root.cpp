@@ -101,7 +101,9 @@ bool VGMRoot::loadRawFile(std::unique_ptr<RawFile> newRawFile) {
     return loaded->path() == newRawFile->path() && loaded->size() == newRawFile->size() &&
            std::memcmp(loaded->data(), newRawFile->data(), newRawFile->size()) == 0;
   });
-  if (duplicate != m_ownedRawFiles.end()) {
+  // MAME loaders can register VGMFiles before passing their backing RawFile
+  // here. Keep those files alive even when their contents match a loaded file.
+  if (duplicate != m_ownedRawFiles.end() && newRawFile->containedVGMFiles().empty()) {
     L_DEBUG("Skipping duplicate raw file '{}'", newRawFile->name());
     return true;
   }
