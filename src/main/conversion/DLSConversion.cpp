@@ -110,7 +110,11 @@ bool mainDLSCreation(DLSFile& dls, std::span<VGMInstrSet* const> m_instrsets, st
        * where F = 0 if the instrument is melodic, 1 otherwise
        * (length of each CC is 7 bits, obviously)
        */
-      if (auto bs = context.bankSelectStyle; bs == BankSelectStyle::GS) {
+      if (bank_no == 128) {
+        // Bank 128 denotes percussion in our exports. DLS stores that
+        // distinction in bit 31 rather than in the MIDI bank number.
+        bank_no = F_INSTRUMENT_DRUMS;
+      } else if (auto bs = context.bankSelectStyle; bs == BankSelectStyle::GS) {
         bank_no &= 0x7f;
         bank_no = bank_no << 8;
       } else if (bs == BankSelectStyle::MMA) {
