@@ -61,7 +61,7 @@ void saveAs(const VGMColl &coll, const std::filesystem::path &dir_path) {
 
   if constexpr (hasTarget(options, Target::MIDI)) {
     auto midiPath = filepath;
-    midiPath.replace_extension(".mid");
+    midiPath += ".mid";
     coll.seq()->saveAsMidi(midiPath, &coll, context);
   }
 
@@ -69,7 +69,7 @@ void saveAs(const VGMColl &coll, const std::filesystem::path &dir_path) {
     DLSFile dlsfile;
     if (createDLSFile(dlsfile, coll, context)) {
       auto dlsPath = filepath;
-      dlsPath.replace_extension(".dls");
+      dlsPath += ".dls";
       dlsfile.saveDLSFile(dlsPath);
     }
   }
@@ -77,7 +77,7 @@ void saveAs(const VGMColl &coll, const std::filesystem::path &dir_path) {
   if constexpr (hasTarget(options, Target::SF2)) {
     if (auto sf2file = createSF2File(coll, context)) {
       auto sf2Path = filepath;
-      sf2Path.replace_extension(".sf2");
+      sf2Path += ".sf2";
       sf2file->saveSF2File(sf2Path);
     }
   }

@@ -31,7 +31,7 @@ public:
 
 protected:
   void resetVars() override;
-  void onTickBegin() override;
+  void onTickEnd() override;
 
 private:
   enum class State : u8 {

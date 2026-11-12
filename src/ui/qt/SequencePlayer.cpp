@@ -7,15 +7,22 @@
 #include "SequencePlayer.h"
 
 #include "base/Types.h"
+#include "ConversionContext.h"
 #include "LogManager.h"
+#include "MidiFile.h"
+#include "Options.h"
 #include "QtVGMRoot.h"
 #include "SF2Conversion.h"
 #include "SF2File.h"
 #include "VGMColl.h"
+#include "VGMInstrSet.h"
 #include "VGMSeq.h"
 
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstddef>
+#include <optional>
 
 #include "bass.h"
 #include "bassmidi.h"
@@ -82,6 +89,58 @@ static constexpr BASS_FILEPROCS memory_file_callbacks{MemFile::mem_close, MemFil
                                                       MemFile::mem_read, MemFile::mem_seek};
 /* How often (in ms) the current ticks are polled */
 static constexpr auto TICK_POLL_INTERVAL_MS = 1000/60;
+
+namespace {
+
+std::optional<u16> previewVibratoRange(const VGMColl& coll) {
+  std::optional<s32> rangeCents;
+  for (const auto* set : coll.instrSets()) {
+    for (const auto* instr : set->instrs()) {
+      if (instr->regions().empty()) {
+        continue;
+      }
+      std::optional<s32> instrumentRange;
+      for (const auto& modulator : instr->modulators()) {
+        const auto source = modulator.source.value_or(ModSource::ModWheel);
+        if (modulator.destination == ModDest::VibLfoToPitch && source == ModSource::ModWheel) {
+          instrumentRange = modulator.amount;
+        }
+      }
+      // A channel-wide range cannot represent different ranges in the same bank.
+      if (!instrumentRange || *instrumentRange < 0 ||
+          (rangeCents && *rangeCents != *instrumentRange)) {
+        return std::nullopt;
+      }
+      rangeCents = instrumentRange;
+    }
+  }
+  if (!rangeCents) {
+    return std::nullopt;
+  }
+
+  return static_cast<u16>(std::clamp<long>(std::lround(*rangeCents * 128.0 / 100.0), 0, 16383));
+}
+
+void applyPreviewVibratoRange(MidiFile& midi, u16 range) {
+  // BASS ignores CC1 -> vibLfoToPitch SoundFont modulators. RPN 5 supplies the
+  // equivalent range, and keeping it in the MIDI also restores it after seeking.
+  for (auto* track : midi.tracks()) {
+    std::array<bool, 16> channels{};
+    for (auto* event : track->events()) {
+      if (!event->isMetaEvent() && !event->isSysexEvent() && event->channel < channels.size()) {
+        channels[event->channel] = true;
+      }
+    }
+    for (u8 channel = 0; channel < channels.size(); ++channel) {
+      if (channels[channel]) {
+        track->insertModulationDepthRange(channel, range >> 7, range & 0x7f, 0);
+      }
+    }
+  }
+  midi.sort();
+}
+
+} // namespace
 
 SequencePlayer::SequencePlayer() {
   /* Use the system default output device.
@@ -190,7 +249,10 @@ bool SequencePlayer::loadCollection(const VGMColl *coll, bool startPlaying) {
     return false;
   }
 
-  auto sf2 = conversion::createSF2File(*coll);
+  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont);
+  const auto vibratoRange = context.midiSourceFor(ModDest::VibLfoToPitch) == ModSource::ModWheel
+      ? previewVibratoRange(*coll) : std::nullopt;
+  auto sf2 = conversion::createSF2File(*coll, context);
   if (!sf2) {
     L_ERROR("Failed to play collection as a soundfont file could not be produced.");
     return false;
@@ -210,11 +272,14 @@ bool SequencePlayer::loadCollection(const VGMColl *coll, bool startPlaying) {
   }
   sf2_data_blob.release();
 
-  auto midi = seq->convertToMidi(coll);
+  auto midi = seq->convertToMidi(coll, context);
   if (!midi) {
     BASS_MIDI_FontFree(sf2_handle);
     L_ERROR("Failed to convert sequence to MIDI");
     return false;
+  }
+  if (vibratoRange) {
+    applyPreviewVibratoRange(*midi, *vibratoRange);
   }
   std::vector<u8> raw_midi;
   midi->writeMidiToBuffer(raw_midi);

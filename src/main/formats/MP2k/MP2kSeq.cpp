@@ -44,6 +44,7 @@ const char* mp2kModTypeName(u8 type) {
 MP2kSeq::MP2kSeq(RawFile *file, u32 offset, std::string name)
     : VGMSeq(MP2kFormat::name, file, offset, 0, std::move(name)) {
   setAllowDiscontinuousTrackData(true);
+  bLoadTickByTick = true;
 }
 
 bool MP2kSeq::parseHeader() {
@@ -124,7 +125,7 @@ void MP2kTrack::resetVars() {
   tremoloLfo.configure(0, kDefaultLfoSpeed, 0);
 }
 
-void MP2kTrack::onTickBegin() {
+void MP2kTrack::onTickEnd() {
   updateLfoFade();
 }
 
@@ -553,14 +554,15 @@ void MP2kTrack::beginNoteLfo() {
     return;
   }
 
+  // Driver clocks use the same doubled MIDI-tick scale as waits and note durations.
   if (modType == kMp2kModTypeVibrato) {
     emitVibratoDepth(vibratoLfo, 0, false);
     vibratoLfo.setReusableFadeToConfiguredDepth(1);
-    vibratoLfo.beginReusableFadeToConfiguredDepth();
+    vibratoLfo.beginReusableFade(static_cast<u32>(delay) * 2, vibratoLfo.configuredDepth());
   } else if (modType == kMp2kModTypeTremolo) {
     emitTremoloDepth(tremoloLfo, 0, false);
     tremoloLfo.setReusableFadeToConfiguredDepth(1);
-    tremoloLfo.beginReusableFadeToConfiguredDepth();
+    tremoloLfo.beginReusableFade(static_cast<u32>(delay) * 2, tremoloLfo.configuredDepth());
   }
 }
 
