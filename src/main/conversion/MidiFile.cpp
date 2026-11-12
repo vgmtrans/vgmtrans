@@ -546,8 +546,8 @@ void MidiTrack::addModulationDepthRange(u8 channel, u8 msb, u8 lsb) {
 void MidiTrack::insertModulationDepthRange(u8 channel, u8 msb, u8 lsb, u32 absTime) {
   addEvent<ControllerEvent>(this, channel, absTime, 101, 0, PRIORITY_HIGHER - 1);
   addEvent<ControllerEvent>(this, channel, absTime, 100, 5, PRIORITY_HIGHER - 1);
-  addEvent<ControllerEvent>(this, channel, absTime, 38, lsb, PRIORITY_HIGHER - 1);
   addEvent<ControllerEvent>(this, channel, absTime, 6, msb, PRIORITY_HIGHER - 1);
+  addEvent<ControllerEvent>(this, channel, absTime, 38, lsb, PRIORITY_HIGHER - 1);
 }
 
 void MidiTrack::addModulationDepthRange(u8 channel, double semitones) {
