@@ -8,6 +8,7 @@
 #include "formats/PS1/PS1Format.h"
 #include "Root.h"
 
+#include <algorithm>
 #include <memory>
 
 using namespace std;
@@ -334,12 +335,23 @@ static bool isValidSampleStart(const RawFile* file, u32 offset, bool allowShort)
   return true;
 }
 
-std::vector<PSXSampColl*> PSXSampColl::searchForPSXADPCMs(RawFile* file, const std::string& format) {
+std::vector<PSXSampColl*>
+PSXSampColl::searchForPSXADPCMs(RawFile* file, const std::string& format,
+                                std::span<const std::pair<u32, u32>> excludedRanges) {
   std::vector<PSXSampColl*> sampColls;
   const size_t len = file->size();
+  size_t excludedRangeIndex = 0;
 
   for (u32 i = 0; i + 16 + NUM_CHUNKS_READAHEAD * 16 < len; ++i)
   {
+    while (excludedRangeIndex < excludedRanges.size() && excludedRanges[excludedRangeIndex].second <= i) {
+      ++excludedRangeIndex;
+    }
+    if (excludedRangeIndex < excludedRanges.size() && i >= excludedRanges[excludedRangeIndex].first) {
+      i = excludedRanges[excludedRangeIndex].second - 1;
+      continue;
+    }
+
     // Look for a 16-byte silent frame which usually indicates the start of a sample
     if (!isZero16(file, i))
     {
