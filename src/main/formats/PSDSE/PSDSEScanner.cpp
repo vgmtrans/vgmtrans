@@ -12,7 +12,6 @@
 
 #include <algorithm>
 #include <cctype>
-#include <cstring>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -407,32 +406,33 @@ void PSDSEScanner::onSampCollClose(PSDSEPS2SampColl* sampColl) {
 
 void PSDSEScanner::scan(RawFile* file, void* offset) {
   const size_t nFileLength = file->size();
+  if (nFileLength < 4) {
+    return;
+  }
   const auto* fileData = reinterpret_cast<const uint8_t*>(file->data());
   std::vector<PSDSESeq*> sequences;
   std::vector<PSDSEPS2Seq*> ps2Sequences;
 
+  // Only search positions with room for a complete four-byte signature.
+  const auto* signatureEnd = fileData + nFileLength - 3;
   size_t scanOffset = 0;
-  while (scanOffset + 4 <= nFileLength) {
+  while (scanOffset <= nFileLength - 4) {
     // [Professor Layton and the Diabolical Box]: Large retail images can exceed 4 GiB, and every supported DSE/SSD
     // object begins with ASCII S/s. Keep the index wide and seek directly to the next candidate byte instead of
     // reading four virtual bytes at every offset in an archive payload.
-    const auto* lower = static_cast<const uint8_t*>(std::memchr(fileData + scanOffset, 's', nFileLength - scanOffset));
-    const auto* upper = static_cast<const uint8_t*>(std::memchr(fileData + scanOffset, 'S', nFileLength - scanOffset));
-    if (lower == nullptr && upper == nullptr) {
+    const auto* candidate = std::ranges::find_if(fileData + scanOffset, signatureEnd,
+                                                [](uint8_t value) { return value == 's' || value == 'S'; });
+    if (candidate == signatureEnd) {
       break;
     }
-    const auto* candidate = lower == nullptr || (upper != nullptr && upper < lower) ? upper : lower;
     const size_t candidateOffset = static_cast<size_t>(candidate - fileData);
     if (candidateOffset > std::numeric_limits<uint32_t>::max()) {
       break;
     }
     const uint32_t i = static_cast<uint32_t>(candidateOffset);
-    if ((fileData[i] | 0x20) != 's') {
-      scanOffset = candidateOffset + 1;
-      continue;
-    }
-    const uint32_t word = (static_cast<uint32_t>(fileData[i]) << 24) | (static_cast<uint32_t>(fileData[i + 1]) << 16) |
-                          (static_cast<uint32_t>(fileData[i + 2]) << 8) | fileData[i + 3];
+    const uint32_t word = (static_cast<uint32_t>(candidate[0]) << 24) |
+                          (static_cast<uint32_t>(candidate[1]) << 16) |
+                          (static_cast<uint32_t>(candidate[2]) << 8) | candidate[3];
 
     if (word == 0x73616462) {
       PSDSESADBHeader header;
@@ -509,10 +509,6 @@ void PSDSEScanner::scan(RawFile* file, void* offset) {
           if (instrSet) {
             if (sampColl) {
               instrSet->attachSampColl(sampColl);
-            } else if (PSDSESampColl* externalSampColl = findSampCollForInstrSet(instrSet)) {
-              instrSet->attachSampColl(externalSampColl);
-            } else if (header.hasExternalPcmd) {
-              L_WARN("PSDSE: Could not identify the external sample bank for '{}'", header.intName);
             }
             g_loadedInstrSets.push_back(instrSet);
           }
@@ -559,6 +555,19 @@ void PSDSEScanner::scan(RawFile* file, void* offset) {
     }
 
     scanOffset = candidateOffset + 1;
+  }
+
+  // Program banks can precede their waveform banks in the same payload.
+  // Resolve shared samples after discovering every bank, before building collections.
+  for (auto* instrSet : g_loadedInstrSets) {
+    if (instrSet->sampColl()) {
+      continue;
+    }
+    if (auto* sampColl = findSampCollForInstrSet(instrSet)) {
+      instrSet->attachSampColl(sampColl);
+    } else if (instrSet->rawFile() == file && instrSet->m_header.hasExternalPcmd) {
+      L_WARN("PSDSE: Could not identify the external sample bank for '{}'", instrSet->name());
+    }
   }
 
   for (PSDSEPS2Seq* seq : ps2Sequences) {
