@@ -94,6 +94,7 @@ if(USE_SYSTEM_LIBCHDR)
 else()
   message(STATUS "Using vendored libchdr library")
   set(WITH_SYSTEM_ZLIB ${USE_SYSTEM_ZLIB} CACHE BOOL "[libchdr] Use system provided zlib library" FORCE)
+  set(CHDR_WANT_TESTS OFF CACHE BOOL "[libchdr] Build tests for the library" FORCE)
   add_subdirectory(${PROJECT_SOURCE_DIR}/lib/libchdr ${CMAKE_CURRENT_BINARY_DIR}/lib/libchdr EXCLUDE_FROM_ALL SYSTEM)
 endif()
 
