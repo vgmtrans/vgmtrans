@@ -91,95 +91,97 @@ bool AkaoMatcher::tryCreateCollection(int id) {
   auto itSeq = seqs.find(id);
   auto itInstrSet = instrSets.find(id);
 
-  if (itSeq != seqs.end() && itInstrSet != instrSets.end() && !sampColls.empty()) {
-    AkaoSeq* seq = itSeq->second;
-    AkaoInstrSet* instrSet = itInstrSet->second;
+  // A sequence and its instrument set are required to form a collection. The sample
+  // collection is optional: a sequence recovered without its sample data (for example a
+  // sequence block extracted on its own, separate from the sample bank) still produces a
+  // collection so it can be exported to MIDI. SF2/DLS export simply has no samples to use.
+  if (itSeq == seqs.end() || itInstrSet == instrSets.end()) {
+    return false;
+  }
 
-    std::vector<AkaoSampColl *> sampCollsToCheck;
-    // seq->id() represents the associated sample set id
-    if (seq->id() > 0) {
-      auto it = std::find_if(sampColls.rbegin(), sampColls.rend(), [seq](AkaoSampColl *sc) {
-        return sc->id() == seq->id();
-      });
-      if (it != sampColls.rend()) {
-        sampCollsToCheck.push_back(*it);
-      } else {
-        // PSF files may optimize out the IDs, so be lenient
-        if (!isPsfFile(seq->rawFile()))
-          return false;
-      }
+  AkaoSeq* seq = itSeq->second;
+  AkaoInstrSet* instrSet = itInstrSet->second;
+
+  std::vector<AkaoSampColl *> sampCollsToCheck;
+  // seq->id() represents the associated sample set id
+  if (seq->id() > 0) {
+    auto it = std::find_if(sampColls.rbegin(), sampColls.rend(), [seq](AkaoSampColl *sc) {
+      return sc->id() == seq->id();
+    });
+    // If the associated sample collection is present, check it first; otherwise proceed
+    // without it (PSF files may optimize out the IDs, and standalone sequence blocks ship
+    // no samples at all).
+    if (it != sampColls.rend()) {
+      sampCollsToCheck.push_back(*it);
     }
-    // Add the rest of the sample collections that are not already in sampCollsToCheck.
-    // Iterate in reverse to prioritize sample collections most recently scanned.
-    for (auto* sc : std::ranges::reverse_view(sampColls)) {
-      if (std::find(sampCollsToCheck.begin(), sampCollsToCheck.end(), sc) == sampCollsToCheck.end()) {
-        sampCollsToCheck.push_back(sc);
-      }
+  }
+  // Add the rest of the sample collections that are not already in sampCollsToCheck.
+  // Iterate in reverse to prioritize sample collections most recently scanned.
+  for (auto* sc : std::ranges::reverse_view(sampColls)) {
+    if (std::find(sampCollsToCheck.begin(), sampCollsToCheck.end(), sc) == sampCollsToCheck.end()) {
+      sampCollsToCheck.push_back(sc);
     }
+  }
 
-    std::vector<u32> requiredArtIds;
-    for (const auto &instr : instrSet->instrs()) {
-      for (const auto &region : instr->regions()) {
-        AkaoRgn* akaoRegion = static_cast<AkaoRgn*>(region);
-        // We will exclude articulation id 0, as it often just indicates an unused region
-        if (akaoRegion->artNum != 0)
-          requiredArtIds.emplace_back(akaoRegion->artNum);
-      }
+  std::vector<u32> requiredArtIds;
+  for (const auto &instr : instrSet->instrs()) {
+    for (const auto &region : instr->regions()) {
+      AkaoRgn* akaoRegion = static_cast<AkaoRgn*>(region);
+      // We will exclude articulation id 0, as it often just indicates an unused region
+      if (akaoRegion->artNum != 0)
+        requiredArtIds.emplace_back(akaoRegion->artNum);
     }
-    std::sort(requiredArtIds.begin(), requiredArtIds.end());
-    requiredArtIds.erase(std::unique(requiredArtIds.begin(), requiredArtIds.end()), requiredArtIds.end());
+  }
+  std::sort(requiredArtIds.begin(), requiredArtIds.end());
+  requiredArtIds.erase(std::unique(requiredArtIds.begin(), requiredArtIds.end()), requiredArtIds.end());
 
-    std::vector<AkaoSampColl *> matchingSampColls;
+  std::vector<AkaoSampColl *> matchingSampColls;
 
-    for (auto *sc : sampCollsToCheck) {
-      bool matches = std::any_of(requiredArtIds.begin(), requiredArtIds.end(), [sc](u32 artId) {
+  for (auto *sc : sampCollsToCheck) {
+    bool matches = std::any_of(requiredArtIds.begin(), requiredArtIds.end(), [sc](u32 artId) {
+      return artId >= sc->starting_art_id && artId < (sc->starting_art_id + sc->nNumArts);
+    });
+
+    // It is possible that no instrument regions reference any articulations in the associated
+    // sample collection (FF8 106, for ex). In this case, the sequence still references the
+    // sample collection via "Key-split" program changes where an articulation is specified rather
+    // than an instrument. Therefore, always include the associated sample collection.
+    if (matches || sc->id() == seq->id()) {
+      matchingSampColls.push_back(sc);
+
+      // Remove the IDs covered by this sample collection
+      auto end = std::remove_if(requiredArtIds.begin(), requiredArtIds.end(), [sc](u32 artId) {
         return artId >= sc->starting_art_id && artId < (sc->starting_art_id + sc->nNumArts);
       });
 
-      // It is possible that no instrument regions reference any articulations in the associated
-      // sample collection (FF8 106, for ex). In this case, the sequence still references the
-      // sample collection via "Key-split" program changes where an articulation is specified rather
-      // than an instrument. Therefore, always include the associated sample collection.
-      if (matches || sc->id() == seq->id()) {
-        matchingSampColls.push_back(sc);
-
-        // Remove the IDs covered by this sample collection
-        auto end = std::remove_if(requiredArtIds.begin(), requiredArtIds.end(), [sc](u32 artId) {
-          return artId >= sc->starting_art_id && artId < (sc->starting_art_id + sc->nNumArts);
-        });
-
-        // Erase the removed elements
-        requiredArtIds.erase(end, requiredArtIds.end());
-        if (requiredArtIds.empty())
-          break;
-      }
-    }
-
-    if (matchingSampColls.size() > 0) {
-      auto coll = fmt->createCollection();
-      if (!coll) return false;
-
-      coll->setName(seq->name());
-      coll->attachSeq(seq);
-      coll->attachInstrSet(instrSet);
-
-      // Sort the vector by starting_art_id in ascending order
-      std::sort(matchingSampColls.begin(), matchingSampColls.end(),
-      [](AkaoSampColl* a, AkaoSampColl* b) {
-          return a->starting_art_id < b->starting_art_id;
-      });
-      for (auto *sc : matchingSampColls) {
-        coll->attachSampColl(sc);
-      }
-
-      seqs.erase(seq->seq_id);
-
-      if (!pRoot->loadVGMColl(std::move(coll))) {
-        return false;
-      }
-
-      return true;
+      // Erase the removed elements
+      requiredArtIds.erase(end, requiredArtIds.end());
+      if (requiredArtIds.empty())
+        break;
     }
   }
-  return false;
+
+  auto coll = fmt->createCollection();
+  if (!coll) return false;
+
+  coll->setName(seq->name());
+  coll->attachSeq(seq);
+  coll->attachInstrSet(instrSet);
+
+  // Sort the vector by starting_art_id in ascending order
+  std::sort(matchingSampColls.begin(), matchingSampColls.end(),
+  [](AkaoSampColl* a, AkaoSampColl* b) {
+      return a->starting_art_id < b->starting_art_id;
+  });
+  for (auto *sc : matchingSampColls) {
+    coll->attachSampColl(sc);
+  }
+
+  seqs.erase(seq->seq_id);
+
+  if (!pRoot->loadVGMColl(std::move(coll))) {
+    return false;
+  }
+
+  return true;
 }
