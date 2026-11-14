@@ -2,24 +2,28 @@
 
 #include "base/Types.h"
 #include "NinSnesVibrato.h"
-#include "Options.h"
 
 #include <algorithm>
-
-#include "spdlog/fmt/fmt.h"
 
 DECLARE_FORMAT(NinSnes);
 
 //  **********
 //  NinSnesSeq
 //  **********
-#define SEQ_PPQN 48
+constexpr u16 SEQ_PPQN = 48;
+constexpr u16 ADDMUSICK_SEQ_PPQN = 48;
+constexpr u8 ADDMUSICK_DEFAULT_TEMPO = 0x36;
 
 namespace {
 
 constexpr size_t MAX_TRACKS = kNinSnesTrackCount;
 constexpr u16 kNinSnesDefaultPitchBendRangeCents =
     NinSnesTrackState::kDefaultPitchBendRangeCents;
+
+constexpr u8 defaultTempoForProfile(NinSnesProfileId profileId) {
+  return profileId == NinSnesProfileId::AddmusicK ? ADDMUSICK_DEFAULT_TEMPO
+                                                  : nin_snes::vibrato::kDefaultTempo;
+}
 
 }  // namespace
 
@@ -29,7 +33,7 @@ NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesProfileId profile, u32 offset,
     : VGMSeq(NinSnesFormat::name, file, offset, 0, name),
       signature(NinSnesSignatureId::None), profileId(profile),
       volumeTable(volumeTable), durRateTable(durRateTable),
-      tempo(nin_snes::vibrato::kDefaultTempo),
+      tempo(defaultTempoForProfile(profile)),
       maxVibratoDepthCents(nin_snes::vibrato::kMinMaxDepthCents),
       maxVibratoRateHz(nin_snes::vibrato::kMinMaxRateHz),
       dwStartOffset(offset), curOffset(offset),
@@ -82,7 +86,9 @@ void NinSnesSeq::resetVars() {
   sectionRepeatCount = 0;
   m_sectionForeverLoops = 0;
   globalTranspose = 0;
-  setImmediateTempo(nin_snes::vibrato::kDefaultTempo);
+  addmusicKHotPatch.reset();
+  addmusicKVelocityTableId = 0;
+  setImmediateTempo(defaultTempoForProfile(profileId));
 
   if (readMode != READMODE_CONVERT_TO_MIDI) {
     maxVibratoDepthCents = nin_snes::vibrato::kMinMaxDepthCents;
@@ -220,7 +226,7 @@ bool NinSnesSeq::addLoopForeverNoItem() {
 }
 
 bool NinSnesSeq::parseHeader() {
-  setPPQN(SEQ_PPQN);
+  setPPQN(profileId == NinSnesProfileId::AddmusicK ? ADDMUSICK_SEQ_PPQN : SEQ_PPQN);
   nNumTracks = MAX_TRACKS;
   createTracks();
 
@@ -420,6 +426,12 @@ double NinSnesSeq::getTempoInBPM() {
 
 double NinSnesSeq::getTempoInBPM(u8 tempoValue) {
   if (tempoValue != 0) {
+    if (profileId == NinSnesProfileId::AddmusicK) {
+      // AddmusicKFF's length estimator treats one music tick as 1 / (2 * tempo) seconds.
+      constexpr double kAddmusicKTempoTicksPerSecond = 2.0;
+      return static_cast<double>(tempoValue) *
+             (60.0 * kAddmusicKTempoTicksPerSecond / ADDMUSICK_SEQ_PPQN);
+    }
     return static_cast<double>(60000000) / (SEQ_PPQN * 2000) * (static_cast<double>(tempoValue) / 256);
   } else {
     return 1.0;  // since tempo 0 cannot be expressed, this function returns a very small value.

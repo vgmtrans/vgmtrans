@@ -15,6 +15,7 @@ enum class NinSnesSignatureId {
 enum class NinSnesProfileId {
   Unknown = 0,
   Earlier,
+  AddmusicK,
   Standard,
   Rd1,
   Rd2,
