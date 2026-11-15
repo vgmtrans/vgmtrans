@@ -44,6 +44,8 @@ const char* mp2kModTypeName(u8 type) {
 MP2kSeq::MP2kSeq(RawFile *file, u32 offset, std::string name)
     : VGMSeq(MP2kFormat::name, file, offset, 0, std::move(name)) {
   setAllowDiscontinuousTrackData(true);
+  // MP2k multiplies track volume and note velocity directly into the PCM amplitude.
+  setUseLinearAmplitudeScale(true);
   bLoadTickByTick = true;
 }
 
