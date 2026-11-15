@@ -88,6 +88,15 @@ std::unique_ptr<MidiFile> VGMSeq::convertToMidi(const VGMColl* coll, const Conve
   for (size_t i = 0; i < numTracks; i++)
     stopTime = std::max(stopTime, m_tracks[i]->totalTicks);
 
+  // The loader's stop time is exclusive. Naturally ending sequences still have
+  // note-offs and end commands to read at their final tick. Keep loop cutoffs
+  // exclusive so conversion does not start another iteration at the boundary.
+  if (std::ranges::all_of(m_tracks, [](const auto* track) {
+        return track->infiniteLoops == 0 && track->totalTicks >= 0;
+      })) {
+    ++stopTime;
+  }
+
   auto newMidi = std::make_unique<MidiFile>(this);
   this->midi = newMidi.get();
   if (!loadTracks(READMODE_CONVERT_TO_MIDI, stopTime)) {

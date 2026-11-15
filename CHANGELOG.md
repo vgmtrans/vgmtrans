@@ -27,6 +27,7 @@
 * **Sappy (mp2k):** Restored delayed vibrato/tremolo and matching playback vibrato depth after seeking.
 * **Sappy (mp2k):** Preserved song reverb settings and kept PSG regions dry in exported SoundFonts.
 * **Sappy (mp2k):** Corrected programmable-wave pitch and centered percussion without per-key pan settings.
+* **Sappy (mp2k):** Corrected fixed-rate PCM percussion pitch and restored valid square-wave instruments mistaken for unused entries.
 
 **Nintendo DS (SDAT)**
 
@@ -60,6 +61,7 @@
 ### General
 
 * **SF2:** Compensated SF2 attenuation to improve sound compatibility with most synths and players.
+* **MIDI:** Preserved final note-offs, control changes, and trailing rests in sequences without detected infinite loops.
 * **Crash Fix:** Fixed a crash when removing a collection that was currently being played.
 * **Memory Leaks:** Fixed various memory leaks, most notably one which occurred during collection playback.
 

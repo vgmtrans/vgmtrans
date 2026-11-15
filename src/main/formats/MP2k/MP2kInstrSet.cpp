@@ -210,11 +210,6 @@ MP2kInstr::MP2kInstr(MP2kInstrSet *set, size_t offset, size_t length, u32 bank, 
 }
 
 bool MP2kInstr::loadInstr() {
-  /* Unused instrument marking */
-  if (m_data.w0 == 0x3c01 && m_data.w1 == 0x02 && m_data.w2 == 0x0F0000) {
-    return true;
-  }
-
   auto& psgSampColl = static_cast<MP2kInstrSet *>(parInstrSet)->psgSampColl();
 
   auto addPsgRgn = [this](VGMSampColl &psgColl, u8 sampNum, u32 adsr,
@@ -416,12 +411,19 @@ bool MP2kInstr::loadInstr() {
               sample_id != -1) {
             VGMRgn *rgn = addRgn(offset(), length(), sample_id, key, key);
             // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl();
-            u32 pitch = rawFile()->get<u32>(sample_pointer + 4);
-            double delta_note = 12.0 * log2(static_cast<MP2kInstrSet *>(parInstrSet)->sampleRate() *
-                                            1024.0 / pitch);
-            int rootkey = 60 + int(round(delta_note));
-
-            rgn->setUnityKey(rootkey - keynum + key);
+            if ((type & 0x08) != 0) {
+              // Fixed PCM advances at the mixer rate, ignoring the tone key and sample tuning.
+              // This region contains one MIDI key, so its root can be that same key.
+              const auto* sample = parInstrSet->sampColl()->sample(sample_id);
+              rgn->setUnityKey(static_cast<u8>(key));
+              rgn->setFineTune(-sample->fineTune);
+            } else {
+              u32 pitch = rawFile()->get<u32>(sample_pointer + 4);
+              double delta_note = 12.0 * log2(static_cast<MP2kInstrSet *>(parInstrSet)->sampleRate() *
+                                              1024.0 / pitch);
+              int rootkey = 60 + int(round(delta_note));
+              rgn->setUnityKey(rootkey - keynum + key);
+            }
             applyRhythmPan(rgn);
             setADSR(rgn, rawFile()->get<u32>(off + 8));
           }
