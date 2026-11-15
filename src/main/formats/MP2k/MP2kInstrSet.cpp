@@ -396,6 +396,13 @@ bool MP2kInstr::loadInstr() {
         u32 keynum = rawFile()->get<u8>(off + 1);
         u32 pan = rawFile()->get<u8>(off + 3);
 
+        auto applyRhythmPan = [pan](VGMRgn* rgn) {
+          // Unflagged pan bytes do not override the centered region default.
+          if ((pan & 0x80) != 0) {
+            rgn->setPan(static_cast<u8>(pan));
+          }
+        };
+
         u32 raw_sample_pointer = rawFile()->get<u32>(off + 4);
         u32 sample_pointer = raw_sample_pointer & 0x3ffffff;
 
@@ -409,25 +416,24 @@ bool MP2kInstr::loadInstr() {
               sample_id != -1) {
             VGMRgn *rgn = addRgn(offset(), length(), sample_id, key, key);
             // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl();
-            rgn->setPan(pan);
-
             u32 pitch = rawFile()->get<u32>(sample_pointer + 4);
             double delta_note = 12.0 * log2(static_cast<MP2kInstrSet *>(parInstrSet)->sampleRate() *
                                             1024.0 / pitch);
             int rootkey = 60 + int(round(delta_note));
 
             rgn->setUnityKey(rootkey - keynum + key);
+            applyRhythmPan(rgn);
             setADSR(rgn, rawFile()->get<u32>(off + 8));
           }
         } else if ((type & 0x0f) == 3 || (type & 0x0f) == 11) {
           if (auto sample_id = psgSampColl.makeOrGetProgrammableWave(raw_sample_pointer);
               sample_id != -1) {
             auto rgn = addPsgRgn(psgSampColl, sample_id, rawFile()->get<u32>(off + 8), key, key);
-            rgn->setPan(pan);
+            applyRhythmPan(rgn);
           }
         } else if ((type & 0x0f) == 4 || (type & 0x0f) == 12) {
           auto rgn = addPsgRgn(psgSampColl, kPsgNoiseIndex, rawFile()->get<u32>(off + 8), key, key);
-          rgn->setPan(pan);
+          applyRhythmPan(rgn);
         }
       }
       break;
@@ -594,7 +600,9 @@ int MP2kPSGColl::makeOrGetProgrammableWave(size_t wavePointer) {
 
   int sample_id = static_cast<int>(sampleCount());
   auto name = fmt::format("PSG programmable wave {:#x}", wave_offset);
-  constexpr u32 kCgbWaveSampleRate = kCgbWaveRamSamples * 440;
+  // MP2k uses the square-channel timer table for wave voices. The wave channel
+  // has half the square-channel fundamental at the same timer setting.
+  constexpr u32 kCgbWaveSampleRate = (kCgbWaveRamSamples / 2) * 440;
   addSamp<MP2kPSGWaveSamp>(this, wave_offset, kCgbWaveSampleRate, name);
   m_programmable_waves.emplace(wave_offset, sample_id);
   return sample_id;
