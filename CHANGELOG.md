@@ -22,6 +22,11 @@
 * **Sappy (mp2k):** When possible, track names from GSF files are used instead of the song table index.
 * **Sappy (mp2k):** Fixed sequences being exported 0.45% faster than they should be.
 * **Sappy (mp2k):** Fixed instruments potentially having very long release times.
+* **Sappy (mp2k):** Restored missing tracks in GSF files and sparse song tables, including Super Mario Advance and Castlevania: Circle of the Moon.
+* **Sappy (mp2k):** Corrected volume balance and PCM decay/release timing.
+* **Sappy (mp2k):** Restored delayed vibrato/tremolo and matching playback vibrato depth after seeking.
+* **Sappy (mp2k):** Preserved song reverb settings and kept PSG regions dry in exported SoundFonts.
+* **Sappy (mp2k):** Corrected programmable-wave pitch and centered percussion without per-key pan settings.
 
 **Nintendo DS (SDAT)**
 
@@ -50,6 +55,7 @@
 * **Stitched Export:** Added stitched export for collection chunks. You can now drag collections into a stitch queue, reorder them, and export them as a merged MIDI + SF2.
 * **Hotkeys:** The space-bar hotkey to toggle playback no longer requires clicking on a collection first.
 * **Bug Reporting:** Added an in-app dialog to help with reporting bugs.
+* **Export:** Preserved periods in collection filenames to prevent files being overwritten.
 
 ### General
 
