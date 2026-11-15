@@ -168,6 +168,7 @@ SynthRgn::SynthRgn(const SynthRgn& other)
       coarseTuneSemitones(other.coarseTuneSemitones),
       fineTuneCents(other.fineTuneCents),
       attenDb(other.attenDb),
+      reverbSendScale(other.reverbSendScale),
       m_lfoVibFreqHz(other.m_lfoVibFreqHz),
       m_lfoVibDepthCents(other.m_lfoVibDepthCents),
       m_lfoVibDelaySeconds(other.m_lfoVibDelaySeconds) {
@@ -193,6 +194,7 @@ SynthRgn::SynthRgn(SynthRgn&& other) noexcept
       coarseTuneSemitones(other.coarseTuneSemitones),
       fineTuneCents(other.fineTuneCents),
       attenDb(other.attenDb),
+      reverbSendScale(other.reverbSendScale),
       m_sampinfo(std::move(other.m_sampinfo)),
       m_art(std::move(other.m_art)),
       m_lfoVibFreqHz(other.m_lfoVibFreqHz),
@@ -220,6 +222,7 @@ SynthRgn& SynthRgn::operator=(const SynthRgn& other) {
   coarseTuneSemitones = other.coarseTuneSemitones;
   fineTuneCents = other.fineTuneCents;
   attenDb = other.attenDb;
+  reverbSendScale = other.reverbSendScale;
   m_lfoVibFreqHz = other.m_lfoVibFreqHz;
   m_lfoVibDepthCents = other.m_lfoVibDepthCents;
   m_lfoVibDelaySeconds = other.m_lfoVibDelaySeconds;
@@ -248,6 +251,7 @@ SynthRgn& SynthRgn::operator=(SynthRgn&& other) noexcept {
   coarseTuneSemitones = other.coarseTuneSemitones;
   fineTuneCents = other.fineTuneCents;
   attenDb = other.attenDb;
+  reverbSendScale = other.reverbSendScale;
   m_lfoVibFreqHz = other.m_lfoVibFreqHz;
   m_lfoVibDepthCents = other.m_lfoVibDepthCents;
   m_lfoVibDelaySeconds = other.m_lfoVibDelaySeconds;

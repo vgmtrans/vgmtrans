@@ -5,6 +5,7 @@
 #include "SynthFile.h"
 #include "VGMItem.h"
 
+#include <optional>
 #include <string>
 
 class VGMInstr;
@@ -88,6 +89,9 @@ public:
   double sustain_time   {0};     // in seconds (we don't support positive rate here, as is possible on psx)
   u16 release_transform {no_transform};
   double release_time   {0};     // in seconds
+
+  // Maximum CC91-controlled SoundFont reverb send (0..1). Unset retains the synth's default.
+  std::optional<double> reverbSendScale;
 
 private:
   double m_attenDb      {0};     // attenuation in decibels;
