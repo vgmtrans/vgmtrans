@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <numbers>
 
 #include <spdlog/fmt/fmt.h>
 
@@ -27,30 +28,25 @@ constexpr u8 kPsgSquareCount = 4;
 constexpr u8 kPsgNoiseIndex = kPsgSquareCount;
 constexpr u8 kPsgUnityKey = 69;
 constexpr size_t kGbaRomPointerMask = 0x03FFFFFF;
+constexpr double kGbaFrameRateHz = 16777216.0 / 280896.0;
 
 double mp2kAttackTimeSeconds(int attack) {
   if (attack <= 0) {
     return 0.0;
   }
-  constexpr double kEnvelopeTicksPerSecond = 60.0;
   constexpr double kEnvelopeMaxLevel = 256.0;
-  return kEnvelopeMaxLevel / (kEnvelopeTicksPerSecond * attack);
+  return kEnvelopeMaxLevel / (kGbaFrameRateHz * attack);
 }
 
 double mp2kEnvelopeRateTimeSeconds(int rate) {
   if (rate <= 0) {
     return 0.0;
   }
-  constexpr double kEnvelopeTicksPerSecond = 60.0;
   constexpr double kEnvelopeMaxLevel = 256.0;
-  const double logMaxLevel = std::log(kEnvelopeMaxLevel);
-  return logMaxLevel / (logMaxLevel - std::log(static_cast<double>(rate))) /
-         kEnvelopeTicksPerSecond;
-}
-
-double mp2kDecayTimeSeconds(int decay) {
-  constexpr double kEnvelopeMaxLevel = 256.0;
-  return mp2kEnvelopeRateTimeSeconds(decay) * 10.0 / std::log(kEnvelopeMaxLevel);
+  // Each frame multiplies amplitude by rate/256. SoundFont decay/release times
+  // describe a full 100 dB slope, rather than the time to reach one 8-bit unit.
+  constexpr double kLogAmplitudeRange = 5.0 * std::numbers::ln10;
+  return kLogAmplitudeRange / (kGbaFrameRateHz * std::log(kEnvelopeMaxLevel / rate));
 }
 
 double cgbEnvelopeRateTimeSeconds(int rate) {
@@ -476,7 +472,7 @@ void MP2kInstr::setADSR(VGMRgn *rgn, u32 adsr) {
 
   if (sustain != 0xFF) {
     rgn->sustain_level = sustain / kEnvelopeMaxLevel;
-    rgn->decay_time = mp2kDecayTimeSeconds(decay);
+    rgn->decay_time = mp2kEnvelopeRateTimeSeconds(decay);
   }
 
   if (release != 0x00) {
