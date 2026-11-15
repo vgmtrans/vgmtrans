@@ -41,8 +41,8 @@ const char* mp2kModTypeName(u8 type) {
   }
 }
 
-MP2kSeq::MP2kSeq(RawFile *file, u32 offset, std::string name)
-    : VGMSeq(MP2kFormat::name, file, offset, 0, std::move(name)) {
+MP2kSeq::MP2kSeq(RawFile *file, u32 offset, std::string name, u8 defaultReverb)
+    : VGMSeq(MP2kFormat::name, file, offset, 0, std::move(name)), m_defaultReverb(defaultReverb) {
   setAllowDiscontinuousTrackData(true);
   // MP2k multiplies track volume and note velocity directly into the PCM amplitude.
   setUseLinearAmplitudeScale(true);
@@ -70,6 +70,9 @@ bool MP2kSeq::parseHeader() {
   seqHdr->addChild(offset() + 1, 1, "Unknown");
   seqHdr->addChild(offset() + 2, 1, "Priority");
   seqHdr->addChild(offset() + 3, 1, "Reverb");
+  // Bit 7 requests a global reverb change; otherwise retain the engine's initial setting.
+  const u8 reverb = readByte(offset() + 3);
+  setAlwaysWriteInitialReverb((reverb & 0x80) != 0 ? reverb & 0x7f : m_defaultReverb);
 
   u32 dwInstPtr = readWord(offset() + 4);
   seqHdr->addPointer(offset() + 4, 4, dwInstPtr - 0x8000000, true, "Instrument pointer");
@@ -410,18 +413,19 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
         }
       };
 
-      if (subCommand == 0x08 && subParam <= 127) {
+      if (subCommand == 0x08) {
         curOffset++;
         constexpr const char* kEventName = "Pseudo Echo Volume";
         const auto desc = fmt::format("Raw value: {} ({:#04x})", static_cast<unsigned>(subParam),
                                       static_cast<unsigned>(subParam));
         addGenericEvent(beginOffset, curOffset - beginOffset, kEventName, desc, Type::Reverb);
         addEchoTextNoItem(kEventName, desc);
-        addReverbNoItem(subParam);
-      } else if (subCommand == 0x09 && subParam <= 127) {
+        // This is an envelope floor after release, not a send to the reverb effect.
+      } else if (subCommand == 0x09) {
         curOffset++;
         constexpr const char* kEventName = "Pseudo Echo Length";
-        const double seconds = static_cast<double>(subParam) / 60.0;
+        constexpr double kGbaFrameRateHz = 16777216.0 / 280896.0;
+        const double seconds = static_cast<double>(subParam) / kGbaFrameRateHz;
         const auto desc = fmt::format("Raw value: {} ({:#04x}), length: {:.2f}s",
                                       static_cast<unsigned>(subParam),
                                       static_cast<unsigned>(subParam), seconds);

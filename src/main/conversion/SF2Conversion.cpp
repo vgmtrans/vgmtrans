@@ -176,6 +176,7 @@ std::unique_ptr<SynthFile> createSynthFile(
         newRgn->setWaveLinkInfo(0, 0, 1, static_cast<u32>(realSampNum));
         newRgn->setFineTune(rgn->coarseTune, rgn->fineTune);
         newRgn->setAttenuationDb(rgn->attenDb());
+        newRgn->reverbSendScale = rgn->reverbSendScale;
         newRgn->setLfoVibFreqHz(rgn->lfoVibFreqHz());
         newRgn->setLfoVibDepthCents(rgn->lfoVibDepthCents());
         newRgn->setLfoVibDelaySeconds(rgn->lfoVibDelaySeconds());

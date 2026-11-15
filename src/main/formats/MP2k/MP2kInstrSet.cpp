@@ -210,6 +210,7 @@ int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
 MP2kInstr::MP2kInstr(MP2kInstrSet *set, size_t offset, size_t length, u32 bank, u32 number,
                      MP2kInstrData data)
     : VGMInstr(set, offset, length, bank, number), m_type(data.w0 & 0xFF), m_data(data) {
+  reverb = 0.0f;
 }
 
 bool MP2kInstr::loadInstr() {
@@ -443,6 +444,10 @@ bool MP2kInstr::loadInstr() {
   }
 
   if (!regions().empty()) {
+    for (auto* rgn : regions()) {
+      // Only Direct Sound PCM voices enter the driver's reverb mix, including in split banks.
+      rgn->reverbSendScale = rgn->sampCollPtr == &psgSampColl ? 0.0 : 1.0;
+    }
     constexpr double kDefaultLfoFrequencyHz = 60.0 * 22.0 / 256.0;
     constexpr double kVibratoMaxDepthCents = 127.0 * 4.0 * 100.0 / 64.0;
     addStandardVibratoHandling(kVibratoMaxDepthCents, kDefaultLfoFrequencyHz,

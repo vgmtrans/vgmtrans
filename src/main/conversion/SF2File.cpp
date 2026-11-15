@@ -324,6 +324,9 @@ SF2File::SF2File(SynthFile* synthfile, const ConversionContext& context)
       instBag.wInstGenNdx = static_cast<u16>(instGenCounter);
       instGenCounter += numOfGeneratorsForRgn(instr->regions()[j]);
       instBag.wInstModNdx = static_cast<u16>(instModCounter);
+      if (instr->regions()[j]->reverbSendScale.has_value()) {
+        instModCounter++;
+      }
 
       memcpy(ibagCk->data.get() + (instBagCounter++ * sizeof(sfInstBag)), &instBag, sizeof(sfInstBag));
     }
@@ -342,6 +345,9 @@ SF2File::SF2File(SynthFile* synthfile, const ConversionContext& context)
     if (hasInstrumentGlobalZone(instr, context)) {
       numTotalMods += static_cast<u32>(numSf2ModulatorsForInstr(instr, context));
     }
+    numTotalMods += static_cast<u32>(std::ranges::count_if(instr->regions(), [](const auto* rgn) {
+      return rgn->reverbSendScale.has_value();
+    }));
   }
 
   auto* imodCk = pdtaCk->addChildChunk<Chunk>("imod");
@@ -363,6 +369,20 @@ SF2File::SF2File(SynthFile* synthfile, const ConversionContext& context)
       instModList.sfModTransOper = linear;
       memcpy(imodCk->data.get() + dataPtr, &instModList, sizeof(sfInstModList));
       dataPtr += sizeof(sfInstModList);
+    }
+    for (const auto* rgn : instr->regions()) {
+      if (!rgn->reverbSendScale.has_value()) {
+        continue;
+      }
+      // Replace the default CC91 -> reverb modulator at the local instrument zone.
+      // A zero amount keeps a dry region dry even when another region shares its MIDI channel.
+      sfInstModList reverbMod{};
+      reverbMod.sfModSrcOper = *sf2SourceForModSource(ModSource::ReverbSend);
+      reverbMod.sfModDestOper = reverbEffectsSend;
+      reverbMod.modAmount = static_cast<s16>(std::lround(std::clamp(*rgn->reverbSendScale, 0.0, 1.0) * 1000));
+      reverbMod.sfModTransOper = linear;
+      memcpy(imodCk->data.get() + dataPtr, &reverbMod, sizeof(reverbMod));
+      dataPtr += sizeof(reverbMod);
     }
   }
   sfInstModList instModList{};

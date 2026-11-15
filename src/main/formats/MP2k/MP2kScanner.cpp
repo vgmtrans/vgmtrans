@@ -110,6 +110,8 @@ void MP2kScanner::scan(RawFile *file, void *) {
   EngineParams engine_settings(file->get<u32>(engine->settingsOffset));
   const int engine_sample_rate = samplerate_LUT[engine_settings.sampling_rate_index];
   const u32 psg_sample_rate = engine_sample_rate > 0 ? static_cast<u32>(engine_sample_rate) : 32768;
+  const u8 reverb_mode = file->get<u8>(engine->settingsOffset);
+  const u8 default_reverb = (reverb_mode & 0x80) != 0 ? reverb_mode & 0x7f : 0;
 
   const u32 song_tbl_ptr = engine->songTableOffset;
   if (song_tbl_ptr >= file->size()) {
@@ -146,7 +148,7 @@ void MP2kScanner::scan(RawFile *file, void *) {
     const bool hasHintTitle = hint != nullptr && hint->tag.hasTitle();
     const auto seq_name = hasHintTitle ? hint->tag.title : std::string("MP2kSeq");
 
-    auto* nseq = pRoot->loadVGMFile<MP2kSeq>(file, song_pointer, seq_name);
+    auto* nseq = pRoot->loadVGMFile<MP2kSeq>(file, song_pointer, seq_name, default_reverb);
     if (!nseq) {
       continue;
     }
