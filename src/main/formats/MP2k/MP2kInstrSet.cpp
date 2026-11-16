@@ -31,6 +31,97 @@ constexpr u8 kPsgUnityKey = 69;
 constexpr size_t kGbaRomPointerMask = 0x03FFFFFF;
 constexpr double kGbaFrameRateHz = 16777216.0 / 280896.0;
 
+// Tone records contain a channel number plus independent playback and bank flags.
+enum class VoiceType : u8 {
+  Pcm = 0,
+  Square1 = 1,
+  Square2 = 2,
+  Wave = 3,
+  Noise = 4,
+  KeySplit = 0x40,
+  Rhythm = 0x80,
+  Unsupported = 0xff,
+};
+
+constexpr u8 kVoiceChannelMask = 0x07;
+constexpr u8 kFixedPitchFlag = 0x08;
+constexpr u8 kPcmModeFlags = 0x30;
+constexpr u8 kKeySplitFlag = 0x40;
+constexpr u8 kRhythmFlag = 0x80;
+constexpr u8 kRhythmPanOverrideFlag = 0x80;
+constexpr u32 kSquareDutyMask = 0x03;
+constexpr u32 kToneRecordSize = 12;
+constexpr int kMidiKeyCount = 128;
+
+constexpr VoiceType voiceChannel(u8 type) {
+  return static_cast<VoiceType>(type & kVoiceChannelMask);
+}
+
+constexpr bool isNestedBank(u8 type) {
+  return (type & (kKeySplitFlag | kRhythmFlag)) != 0;
+}
+
+constexpr VoiceType instrumentVoice(u8 type) {
+  if (type == kKeySplitFlag) {
+    return VoiceType::KeySplit;
+  }
+  if (type == kRhythmFlag) {
+    return VoiceType::Rhythm;
+  }
+
+  const auto voice = voiceChannel(type);
+  const u8 allowedFlags = voice == VoiceType::Pcm ? kFixedPitchFlag | kPcmModeFlags : kFixedPitchFlag;
+  if ((type & ~(kVoiceChannelMask | allowedFlags)) != 0) {
+    return VoiceType::Unsupported;
+  }
+  return voice;
+}
+
+constexpr u32 romOffset(u32 pointer) {
+  return pointer & kGbaRomPointerMask;
+}
+
+struct Tone {
+  u8 type;
+  u8 key;
+  u8 pan;
+  u32 sampleOrTable;
+
+  constexpr VoiceType voice() const { return voiceChannel(type); }
+  constexpr bool fixedPitch() const { return (type & kFixedPitchFlag) != 0; }
+  constexpr u8 squareDuty() const { return static_cast<u8>(sampleOrTable & kSquareDutyMask); }
+  constexpr u32 sampleOffset() const { return romOffset(sampleOrTable); }
+
+  void applyRhythmPan(VGMRgn* region) const {
+    // Preserve the existing raw pan conversion when the tone requests an override.
+    if ((pan & kRhythmPanOverrideFlag) != 0) {
+      region->setPan(pan);
+    }
+  }
+};
+
+constexpr Tone decodeTone(MP2kInstrData data) {
+  return {static_cast<u8>(data.w0), static_cast<u8>(data.w0 >> 8),
+          static_cast<u8>(data.w0 >> 24), data.w1};
+}
+
+Tone readTone(const RawFile* file, u32 offset, u8 type) {
+  return {type, file->get<u8>(offset + 1), file->get<u8>(offset + 3),
+          file->get<u32>(offset + 4)};
+}
+
+struct Envelope {
+  int attack;
+  int decay;
+  int sustain;
+  int release;
+};
+
+constexpr Envelope decodeEnvelope(u32 data) {
+  return {static_cast<u8>(data), static_cast<u8>(data >> 8),
+          static_cast<u8>(data >> 16), static_cast<u8>(data >> 24)};
+}
+
 double mp2kAttackTimeSeconds(int attack) {
   if (attack <= 0) {
     return 0.0;
@@ -51,7 +142,8 @@ double mp2kEnvelopeRateTimeSeconds(int rate) {
 }
 
 double cgbEnvelopeRateTimeSeconds(int rate) {
-  rate &= 0x07;
+  constexpr int kCgbEnvelopeRateMask = 0x07;
+  rate &= kCgbEnvelopeRateMask;
   if (rate == 0) {
     return 0.0;
   }
@@ -206,7 +298,7 @@ int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
 
 MP2kInstr::MP2kInstr(MP2kInstrSet *set, size_t offset, size_t length, u32 bank, u32 number,
                      MP2kInstrData data)
-    : VGMInstr(set, offset, length, bank, number), m_type(data.w0 & 0xFF), m_data(data) {
+    : VGMInstr(set, offset, length, bank, number), m_data(data) {
   reverb = 0.0f;
 }
 
@@ -222,240 +314,186 @@ bool MP2kInstr::loadInstr() {
     return rgn;
   };
 
-  switch (m_type) {
-    /* Sampled instruments (single region) */
-    case 0x00:
-      [[fallthrough]];
-    case 0x08:
-      [[fallthrough]];
-    case 0x10:
-      [[fallthrough]];
-    case 0x18:
-      [[fallthrough]];
-    case 0x20:
-      [[fallthrough]];
-    case 0x28:
-      [[fallthrough]];
-    case 0x30:
-      [[fallthrough]];
-    case 0x38: {
-      setName("Single-region instrument");
-      setLength(12);
+  const Tone instrument = decodeTone(m_data);
+  const u32 envelopeOrKeyMap = m_data.w2;
+  auto& instrSet = *static_cast<MP2kInstrSet*>(parInstrSet);
 
-      bool no_resampling = (m_type & 0xFF) == 0x08;
-      if (no_resampling) {
+  switch (instrumentVoice(instrument.type)) {
+    case VoiceType::Pcm: {
+      setName("Single-region instrument");
+      setLength(kToneRecordSize);
+
+      // Preserve the existing warning for the plain fixed-PCM type only.
+      if (instrument.type == kFixedPitchFlag) {
         L_WARN("Ignoring resampling shenaningans!");
       }
-
-      if (m_data.w1 == 0 || !isGbaRomPointer(m_data.w1)) {
-        /* Sometimes the instrument table can have weird values */
+      if (instrument.sampleOrTable == 0 || !isGbaRomPointer(instrument.sampleOrTable)) {
         break;
       }
 
-      size_t sample_pointer = m_data.w1 & kGbaRomPointerMask;
-      if (auto sample_id =
-              static_cast<MP2kInstrSet *>(parInstrSet)->makeOrGetSample(sample_pointer);
-          sample_id != -1) {
-        VGMRgn *rgn = addRgn(offset(), length(), sample_id);
-        setADSR(rgn, m_data.w2);
+      const auto sampleOffset = instrument.sampleOffset();
+      if (const int sampleId = instrSet.makeOrGetSample(sampleOffset); sampleId != -1) {
+        auto* region = addRgn(offset(), length(), sampleId);
+        setADSR(region, envelopeOrKeyMap);
       } else {
-        L_WARN("No sample could be loaded for {:#x}", sample_pointer);
+        L_WARN("No sample could be loaded for {:#x}", sampleOffset);
         setName(name() + " (sample missing)");
       }
-
       break;
     }
 
-    /* PSQ Square (GameBoy channel 2) */
-    case 0x01:
-      [[fallthrough]];
-    case 0x02:
-      [[fallthrough]];
-    case 0x09:
-      [[fallthrough]];
-    case 0x0a: {
-      static constexpr const char *cycles[] = {"12,5%", "25%", "50%", "75%"};
-      setName(fmt::format("PSG square {}", m_data.w1 < 4 ? cycles[m_data.w1] : "???"));
-      setLength(12);
-      u8 duty = static_cast<u8>(m_data.w1 & 0x03);
-      addPsgRgn(psgSampColl, duty, m_data.w2);
+    case VoiceType::Square1:
+    case VoiceType::Square2: {
+      static constexpr const char* cycles[] = {"12,5%", "25%", "50%", "75%"};
+      setName(fmt::format("PSG square {}", instrument.sampleOrTable < kPsgSquareCount
+                                              ? cycles[instrument.sampleOrTable] : "???"));
+      setLength(kToneRecordSize);
+      addPsgRgn(psgSampColl, instrument.squareDuty(), envelopeOrKeyMap);
       break;
     }
 
-    /* GameBoy channel 3 (programmable) */
-    case 0x03:
-      [[fallthrough]];
-    case 0x0b: {
+    case VoiceType::Wave: {
       setName("PSG programmable waveform");
-      setLength(12);
-      if (auto sample_id = psgSampColl.makeOrGetProgrammableWave(m_data.w1); sample_id != -1) {
-        addPsgRgn(psgSampColl, sample_id, m_data.w2);
+      setLength(kToneRecordSize);
+      if (const int sampleId = psgSampColl.makeOrGetProgrammableWave(instrument.sampleOrTable); sampleId != -1) {
+        addPsgRgn(psgSampColl, sampleId, envelopeOrKeyMap);
       } else {
-        L_DEBUG("No programmable wave could be loaded for {:#x}", m_data.w1);
+        L_DEBUG("No programmable wave could be loaded for {:#x}", instrument.sampleOrTable);
         setName(name() + " (wave missing)");
       }
       break;
     }
 
-    /* PSG Noise */
-    case 0x04:
-      [[fallthrough]];
-    case 0x0c: {
+    case VoiceType::Noise:
       setName("PSG noise");
-      setLength(12);
-      addPsgRgn(psgSampColl, kPsgNoiseIndex, m_data.w2);
+      setLength(kToneRecordSize);
+      addPsgRgn(psgSampColl, kPsgNoiseIndex, envelopeOrKeyMap);
       break;
-    }
 
-    /* Multi-region instrument */
-    case 0x40: {
+    case VoiceType::KeySplit: {
       setName("Multi-region instrument");
-      setLength(12);
-
-      u32 base_pointer = m_data.w1 & 0x3ffffff;
-      u32 region_table = m_data.w2 & 0x3ffffff;
-
-      std::vector<u8> split_list, index_list;
-
-      int prev_index = -1;
-      /* Scan the whole table for changes and keep track of splits */
-      for (u8 key = 0; key < 128; key++) {
-        u8 current_index = rawFile()->get<u8>(region_table + key);
-
-        if (prev_index != current_index) {
-          split_list.push_back(key);
-          index_list.push_back(current_index);
-
-          prev_index = current_index;
+      setLength(kToneRecordSize);
+      const u32 toneTable = instrument.sampleOffset();
+      const u32 keyMap = romOffset(envelopeOrKeyMap);
+      std::vector<u8> splitKeys;
+      std::vector<u8> toneIndices;
+      int previousIndex = -1;
+      for (int key = 0; key < kMidiKeyCount; ++key) {
+        const u8 toneIndex = rawFile()->get<u8>(keyMap + key);
+        if (toneIndex != previousIndex) {
+          splitKeys.push_back(static_cast<u8>(key));
+          toneIndices.push_back(toneIndex);
+          previousIndex = toneIndex;
         }
       }
+      splitKeys.push_back(kMidiKeyCount);
 
-      /* Final entry for the last split */
-      split_list.push_back(0x80);
-
-      for (size_t i = 0; i < index_list.size(); i++) {
-        u32 off = base_pointer + 12 * index_list[i];
-
-        auto type = rawFile()->get<u8>(off);
-        if (type & (0x40 | 0x80)) {
+      for (size_t split = 0; split < toneIndices.size(); ++split) {
+        const u32 toneOffset = toneTable + kToneRecordSize * toneIndices[split];
+        const u8 type = rawFile()->get<u8>(toneOffset);
+        if (isNestedBank(type)) {
           L_DEBUG("Recursive split/rhythm instrument in key-split");
           continue;
         }
-
-        u32 raw_sample_pointer = rawFile()->get<u32>(off + 4);
-        u32 sample_pointer = raw_sample_pointer & 0x3ffffff;
-        u8 cgb_type = type & 0x07;
-
-        if (cgb_type == 0) {
-          if (sample_pointer == 0 || !isGbaRomPointer(raw_sample_pointer)) {
-            continue;
-          }
-
-          if (auto sample_id =
-                  static_cast<MP2kInstrSet *>(parInstrSet)->makeOrGetSample(sample_pointer);
-              sample_id != -1) {
-            VGMRgn *rgn = addRgn(off, 12, sample_id, split_list[i], split_list[i + 1] - 1);
-
-            // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl();
-            setADSR(rgn, rawFile()->get<u32>(off + 8));
-          }
-        } else if (cgb_type == 1 || cgb_type == 2) {
-          u8 duty = static_cast<u8>(raw_sample_pointer & 0x03);
-          addPsgRgn(psgSampColl, duty, rawFile()->get<u32>(off + 8), split_list[i],
-                    split_list[i + 1] - 1);
-        } else if (cgb_type == 3) {
-          if (auto sample_id = psgSampColl.makeOrGetProgrammableWave(raw_sample_pointer);
-              sample_id != -1) {
-            addPsgRgn(psgSampColl, sample_id, rawFile()->get<u32>(off + 8), split_list[i],
-                      split_list[i + 1] - 1);
-          }
-        } else if (cgb_type == 4) {
-          addPsgRgn(psgSampColl, kPsgNoiseIndex, rawFile()->get<u32>(off + 8), split_list[i],
-                    split_list[i + 1] - 1);
-        }
-      }
-
-      break;
-    }
-
-    /* Full-keyboard instrument */
-    case 0x80: {
-      setName("Full-keyboard instrument");
-      setLength(12);
-
-      u32 base_pointer = m_data.w1 & 0x3ffffff;
-
-      for (int key = 0; key < 128; key++) {
-        u32 off = base_pointer + 12 * key;
-
-        u32 type = rawFile()->get<u8>(off);
-        u32 keynum = rawFile()->get<u8>(off + 1);
-        u32 pan = rawFile()->get<u8>(off + 3);
-
-        auto applyRhythmPan = [pan](VGMRgn* rgn) {
-          // Unflagged pan bytes do not override the centered region default.
-          if ((pan & 0x80) != 0) {
-            rgn->setPan(static_cast<u8>(pan));
-          }
-        };
-
-        u32 raw_sample_pointer = rawFile()->get<u32>(off + 4);
-        u32 sample_pointer = raw_sample_pointer & 0x3ffffff;
-
-        if ((type & 0x0f) == 0 || (type & 0x0f) == 8) {
-          if (sample_pointer == 0 || !isGbaRomPointer(raw_sample_pointer)) {
-            continue;
-          }
-
-          if (auto sample_id =
-                  static_cast<MP2kInstrSet *>(parInstrSet)->makeOrGetSample(sample_pointer);
-              sample_id != -1) {
-            VGMRgn *rgn = addRgn(offset(), length(), sample_id, key, key);
-            // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl();
-            if ((type & 0x08) != 0) {
-              // Fixed PCM advances at the mixer rate, ignoring the tone key and sample tuning.
-              // This region contains one MIDI key, so its root can be that same key.
-              const auto* sample = parInstrSet->sampColl()->sample(sample_id);
-              rgn->setUnityKey(static_cast<u8>(key));
-              rgn->setFineTune(-sample->fineTune);
-            } else {
-              u32 pitch = rawFile()->get<u32>(sample_pointer + 4);
-              double delta_note = 12.0 * log2(static_cast<MP2kInstrSet *>(parInstrSet)->sampleRate() *
-                                              1024.0 / pitch);
-              int rootkey = 60 + int(round(delta_note));
-              rgn->setUnityKey(rootkey - keynum + key);
+        const Tone tone = readTone(rawFile(), toneOffset, type);
+        const auto envelope = [this, toneOffset] { return rawFile()->get<u32>(toneOffset + 8); };
+        const u8 keyLow = splitKeys[split];
+        const u8 keyHigh = splitKeys[split + 1] - 1;
+        switch (tone.voice()) {
+          case VoiceType::Pcm: {
+            if (tone.sampleOffset() == 0 || !isGbaRomPointer(tone.sampleOrTable)) {
+              break;
             }
-            applyRhythmPan(rgn);
-            setADSR(rgn, rawFile()->get<u32>(off + 8));
+            if (const int sampleId = instrSet.makeOrGetSample(tone.sampleOffset()); sampleId != -1) {
+              auto* region = addRgn(toneOffset, kToneRecordSize, sampleId, keyLow, keyHigh);
+              setADSR(region, envelope());
+            }
+            break;
           }
-        } else if ((type & 0x0f) == 1 || (type & 0x0f) == 2 ||
-                   (type & 0x0f) == 9 || (type & 0x0f) == 10) {
-          const u8 duty = static_cast<u8>(raw_sample_pointer & 0x03);
-          auto* rgn = addPsgRgn(psgSampColl, duty, rawFile()->get<u32>(off + 8), key, key);
-          // A rhythm key selects the tone; its own key byte determines the square pitch.
-          const int rootKey = kPsgUnityKey - static_cast<int>(keynum) + key;
-          const int storedRootKey = std::clamp(rootKey, 0, 127);
-          rgn->setUnityKey(static_cast<u8>(storedRootKey));
-          rgn->coarseTune = static_cast<s16>(storedRootKey - rootKey);
-          applyRhythmPan(rgn);
-        } else if ((type & 0x0f) == 3 || (type & 0x0f) == 11) {
-          if (auto sample_id = psgSampColl.makeOrGetProgrammableWave(raw_sample_pointer);
-              sample_id != -1) {
-            auto rgn = addPsgRgn(psgSampColl, sample_id, rawFile()->get<u32>(off + 8), key, key);
-            applyRhythmPan(rgn);
-          }
-        } else if ((type & 0x0f) == 4 || (type & 0x0f) == 12) {
-          auto rgn = addPsgRgn(psgSampColl, kPsgNoiseIndex, rawFile()->get<u32>(off + 8), key, key);
-          applyRhythmPan(rgn);
+          case VoiceType::Square1:
+          case VoiceType::Square2:
+            addPsgRgn(psgSampColl, tone.squareDuty(), envelope(), keyLow, keyHigh);
+            break;
+          case VoiceType::Wave:
+            if (const int sampleId = psgSampColl.makeOrGetProgrammableWave(tone.sampleOrTable); sampleId != -1) {
+              addPsgRgn(psgSampColl, sampleId, envelope(), keyLow, keyHigh);
+            }
+            break;
+          case VoiceType::Noise:
+            addPsgRgn(psgSampColl, kPsgNoiseIndex, envelope(), keyLow, keyHigh);
+            break;
+          default:
+            break;
         }
       }
       break;
     }
 
-    default: {
-      L_WARN("{:x}: Unhandled instrument type {}", offset(), m_type);
-      return false;
+    case VoiceType::Rhythm: {
+      setName("Full-keyboard instrument");
+      setLength(kToneRecordSize);
+      const u32 toneTable = instrument.sampleOffset();
+      for (int key = 0; key < kMidiKeyCount; ++key) {
+        const u32 toneOffset = toneTable + kToneRecordSize * key;
+        const Tone tone = readTone(rawFile(), toneOffset, rawFile()->get<u8>(toneOffset));
+        const auto envelope = [this, toneOffset] { return rawFile()->get<u32>(toneOffset + 8); };
+        VGMRgn* region = nullptr;
+        switch (tone.voice()) {
+          case VoiceType::Pcm: {
+            const u32 sampleOffset = tone.sampleOffset();
+            if (sampleOffset == 0 || !isGbaRomPointer(tone.sampleOrTable)) {
+              break;
+            }
+            const int sampleId = instrSet.makeOrGetSample(sampleOffset);
+            if (sampleId == -1) {
+              break;
+            }
+            region = addRgn(offset(), length(), sampleId, key, key);
+            if (tone.fixedPitch()) {
+              // Fixed PCM advances at the mixer rate, ignoring the tone key and sample tuning.
+              const auto* sample = parInstrSet->sampColl()->sample(sampleId);
+              region->setUnityKey(static_cast<u8>(key));
+              region->setFineTune(-sample->fineTune);
+            } else {
+              const u32 pitch = rawFile()->get<u32>(sampleOffset + 4);
+              const double deltaNote = 12.0 * log2(instrSet.sampleRate() * 1024.0 / pitch);
+              const int rootKey = 60 + int(round(deltaNote));
+              region->setUnityKey(rootKey - tone.key + key);
+            }
+            setADSR(region, envelope());
+            break;
+          }
+          case VoiceType::Square1:
+          case VoiceType::Square2: {
+            region = addPsgRgn(psgSampColl, tone.squareDuty(), envelope(), key, key);
+            // A rhythm key selects the tone; the tone's key byte determines square pitch.
+            const int rootKey = kPsgUnityKey - static_cast<int>(tone.key) + key;
+            const int storedRootKey = std::clamp(rootKey, 0, 127);
+            region->setUnityKey(static_cast<u8>(storedRootKey));
+            region->coarseTune = static_cast<s16>(storedRootKey - rootKey);
+            break;
+          }
+          case VoiceType::Wave:
+            if (const int sampleId = psgSampColl.makeOrGetProgrammableWave(tone.sampleOrTable); sampleId != -1) {
+              region = addPsgRgn(psgSampColl, sampleId, envelope(), key, key);
+            }
+            break;
+          case VoiceType::Noise:
+            region = addPsgRgn(psgSampColl, kPsgNoiseIndex, envelope(), key, key);
+            break;
+          default:
+            break;
+        }
+        if (region != nullptr) {
+          tone.applyRhythmPan(region);
+        }
+      }
+      break;
     }
+
+    default:
+      L_WARN("{:x}: Unhandled instrument type {}", offset(), instrument.type);
+      return false;
   }
 
   if (!regions().empty()) {
@@ -479,10 +517,7 @@ bool MP2kInstr::loadInstr() {
 }
 
 void MP2kInstr::setADSR(VGMRgn *rgn, u32 adsr) {
-  int attack = adsr & 0xFF;
-  int decay = (adsr >> 8) & 0xFF;
-  int sustain = (adsr >> 16) & 0xFF;
-  int release = adsr >> 24;
+  const auto [attack, decay, sustain, release] = decodeEnvelope(adsr);
   constexpr double kEnvelopeMaxLevel = 256.0;
 
   if (attack != 0xFF) {
@@ -500,10 +535,7 @@ void MP2kInstr::setADSR(VGMRgn *rgn, u32 adsr) {
 }
 
 void MP2kInstr::setCgbADSR(VGMRgn *rgn, u32 adsr) {
-  int attack = adsr & 0xFF;
-  int decay = (adsr >> 8) & 0xFF;
-  int sustain = (adsr >> 16) & 0xFF;
-  int release = adsr >> 24;
+  const auto [attack, decay, sustain, release] = decodeEnvelope(adsr);
 
   rgn->attack_time = cgbEnvelopeRateTimeSeconds(attack);
   rgn->decay_time = cgbEnvelopeRateTimeSeconds(decay);
@@ -574,7 +606,7 @@ constexpr u8 kCgbWaveRamSamples = kCgbWaveRamBytes * 2;
 
 double psgDutyRatio(u8 dutyIndex) {
   constexpr double kDutyRatios[4] = {0.125, 0.25, 0.5, 0.75};
-  return kDutyRatios[dutyIndex & 0x03];
+  return kDutyRatios[dutyIndex & kSquareDutyMask];
 }
 }
 
