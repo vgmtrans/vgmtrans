@@ -14,6 +14,7 @@
 #include "VGMRgn.h"
 #include "VGMSampColl.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -427,6 +428,16 @@ bool MP2kInstr::loadInstr() {
             applyRhythmPan(rgn);
             setADSR(rgn, rawFile()->get<u32>(off + 8));
           }
+        } else if ((type & 0x0f) == 1 || (type & 0x0f) == 2 ||
+                   (type & 0x0f) == 9 || (type & 0x0f) == 10) {
+          const u8 duty = static_cast<u8>(raw_sample_pointer & 0x03);
+          auto* rgn = addPsgRgn(psgSampColl, duty, rawFile()->get<u32>(off + 8), key, key);
+          // A rhythm key selects the tone; its own key byte determines the square pitch.
+          const int rootKey = kPsgUnityKey - static_cast<int>(keynum) + key;
+          const int storedRootKey = std::clamp(rootKey, 0, 127);
+          rgn->setUnityKey(static_cast<u8>(storedRootKey));
+          rgn->coarseTune = static_cast<s16>(storedRootKey - rootKey);
+          applyRhythmPan(rgn);
         } else if ((type & 0x0f) == 3 || (type & 0x0f) == 11) {
           if (auto sample_id = psgSampColl.makeOrGetProgrammableWave(raw_sample_pointer);
               sample_id != -1) {
