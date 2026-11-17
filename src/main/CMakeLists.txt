@@ -394,6 +394,7 @@ target_sources(vgmtranscore
       formats/KonamiTMNT2/KonamiTMNT2Scanner.h
       formats/KonamiTMNT2/KonamiTMNT2Seq.h
       formats/KonamiTMNT2/KonamiVendettaInstr.h
+      formats/MP2k/MP2kDriver.h
       formats/MP2k/MP2kFormat.h
       formats/MP2k/MP2kInstrSet.h
       formats/MP2k/MP2kScanner.h
