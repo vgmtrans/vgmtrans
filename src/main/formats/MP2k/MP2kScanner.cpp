@@ -118,7 +118,9 @@ void MP2kScanner::scan(RawFile *file, void *) {
     return;
   }
 
-  auto* psg_sampcoll = pRoot->loadVGMFile<MP2kPSGColl>(file, psg_sample_rate, psg_sample_rate);
+  const u32 noise_sample_rate = 32768u << (9 - engine_settings.dac_bits);
+  auto* psg_sampcoll = pRoot->loadVGMFile<MP2kPSGColl>(
+      file, psg_sample_rate, psg_sample_rate, noise_sample_rate);
   if (!psg_sampcoll) {
     return;
   }

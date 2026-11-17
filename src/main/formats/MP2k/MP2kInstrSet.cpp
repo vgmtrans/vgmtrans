@@ -21,6 +21,7 @@
 #include <cstring>
 #include <memory>
 #include <numbers>
+#include <numeric>
 
 #include <spdlog/fmt/fmt.h>
 
@@ -50,6 +51,7 @@ constexpr u8 kKeySplitFlag = 0x40;
 constexpr u8 kRhythmFlag = 0x80;
 constexpr u8 kRhythmPanOverrideFlag = 0x80;
 constexpr u32 kSquareDutyMask = 0x03;
+constexpr u32 kNoiseShortModeFlag = 0x01;
 constexpr u32 kToneRecordSize = 12;
 constexpr int kMidiKeyCount = 128;
 
@@ -90,6 +92,7 @@ struct Tone {
   constexpr VoiceType voice() const { return voiceChannel(type); }
   constexpr bool fixedPitch() const { return (type & kFixedPitchFlag) != 0; }
   constexpr u8 squareDuty() const { return static_cast<u8>(sampleOrTable & kSquareDutyMask); }
+  constexpr bool shortNoise() const { return (sampleOrTable & kNoiseShortModeFlag) != 0; }
   constexpr u32 sampleOffset() const { return romOffset(sampleOrTable); }
 
   void applyRhythmPan(VGMRgn* region) const {
@@ -305,7 +308,7 @@ MP2kInstr::MP2kInstr(MP2kInstrSet *set, size_t offset, size_t length, u32 bank, 
 bool MP2kInstr::loadInstr() {
   auto& psgSampColl = static_cast<MP2kInstrSet *>(parInstrSet)->psgSampColl();
 
-  auto addPsgRgn = [this](VGMSampColl &psgColl, u8 sampNum, u32 adsr,
+  auto addPsgRgn = [this](VGMSampColl &psgColl, int sampNum, u32 adsr,
                           u8 keyLow = 0, u8 keyHigh = 127) {
     VGMRgn* rgn = this->addRgn(offset(), length(), sampNum, keyLow, keyHigh);
     rgn->sampCollPtr = &psgColl;
@@ -478,9 +481,12 @@ bool MP2kInstr::loadInstr() {
               region = addPsgRgn(psgSampColl, sampleId, envelope(), key, key);
             }
             break;
-          case VoiceType::Noise:
-            region = addPsgRgn(psgSampColl, kPsgNoiseIndex, envelope(), key, key);
+          case VoiceType::Noise: {
+            const int sampleId = psgSampColl.makeOrGetNoise(tone.key, tone.shortNoise());
+            region = addPsgRgn(psgSampColl, sampleId, envelope(), key, key);
+            region->setUnityKey(static_cast<u8>(key));
             break;
+          }
           default:
             break;
         }
@@ -604,16 +610,103 @@ namespace {
 constexpr u8 kCgbWaveRamBytes = 16;
 constexpr u8 kCgbWaveRamSamples = kCgbWaveRamBytes * 2;
 
+constexpr u64 kNoiseClockHz = 524288;
+constexpr u8 kNoiseDivisorMask = 0x07;
+constexpr u8 kNoiseWidthFlag = 0x08;
+constexpr unsigned kNoiseClockShiftPosition = 4;
+constexpr unsigned kLongNoiseFeedbackBit = 14;
+constexpr unsigned kShortNoiseFeedbackBit = 6;
+constexpr u16 kShortNoiseFeedbackMask = u16{1} << kShortNoiseFeedbackBit;
+constexpr u16 kNoiseInitialState = 0x7fff;
+constexpr u64 kLongNoisePeriod = 32767;
+constexpr u64 kShortNoisePeriod = 127;
+constexpr u32 kMinNoiseSampleRate = 512;
+constexpr u32 kTargetNoiseLoopSamples = 512 * 1024;
+
+struct NoiseControl {
+  u8 divisorCode;
+  u8 clockShift;
+  bool shortMode;
+
+  constexpr u8 registerValue() const {
+    const u8 widthFlag = shortMode ? kNoiseWidthFlag : 0;
+    return static_cast<u8>((clockShift << kNoiseClockShiftPosition) | widthFlag | divisorCode);
+  }
+
+  constexpr u64 clockDenominator(u32 sampleRate) const {
+    // Code zero means one half; double all divisors to use an integer clock ratio.
+    const u64 doubledDivisor = divisorCode == 0 ? 1 : 2 * divisorCode;
+    return (doubledDivisor << clockShift) * sampleRate;
+  }
+
+  constexpr u64 sequencePeriod() const {
+    return shortMode ? kShortNoisePeriod : kLongNoisePeriod;
+  }
+};
+
+constexpr NoiseControl decodeNoiseControl(u8 control) {
+  return {static_cast<u8>(control & kNoiseDivisorMask),
+          static_cast<u8>(control >> kNoiseClockShiftPosition), (control & kNoiseWidthFlag) != 0};
+}
+
+constexpr NoiseControl noiseControlForKey(u8 key, bool shortMode) {
+  // MusicPlayer2000 maps keys 21..80 to quantized hardware noise frequencies.
+  constexpr int kLowestNoiseKey = 21;
+  constexpr int kHighestNoiseKey = 80;
+  constexpr int kKeysPerClockShift = 4;
+  constexpr int kShiftedKeyCount = 56;
+  constexpr int kHighestClockShift = 13;
+  constexpr int kHighestDivisorCode = 7;
+  const int keyIndex = std::clamp(static_cast<int>(key) - kLowestNoiseKey,
+                                 0, kHighestNoiseKey - kLowestNoiseKey);
+  if (keyIndex < kShiftedKeyCount) {
+    return {static_cast<u8>(kHighestDivisorCode - keyIndex % kKeysPerClockShift),
+            static_cast<u8>(kHighestClockShift - keyIndex / kKeysPerClockShift), shortMode};
+  }
+  // The four highest keys use divisor codes 3, 2, 1 and 0 with no clock shift.
+  return {static_cast<u8>(kHighestNoiseKey - kLowestNoiseKey - keyIndex), 0, shortMode};
+}
+
+constexpr u32 noiseLoopSamples(NoiseControl control, u32 sampleRate) {
+  const u64 denominator = control.clockDenominator(sampleRate);
+  const u64 clockPeriod = denominator / std::gcd(denominator, kNoiseClockHz);
+  // Repeat only after both the LFSR sequence and fractional clock phase return to their start.
+  return static_cast<u32>(control.sequencePeriod() * clockPeriod);
+}
+
+constexpr u32 noiseSampleRate(NoiseControl control, u32 pwmSampleRate) {
+  u32 sampleRate = pwmSampleRate;
+  // Keep PWM resolution and its aliasing whenever the complete loop fits the sample budget.
+  // Larger loops trade edge precision for memory, with at most 1/512 second of quantization.
+  // At that minimum rate, preserve the full cycle even when it exceeds the target budget.
+  while (sampleRate > kMinNoiseSampleRate && noiseLoopSamples(control, sampleRate) > kTargetNoiseLoopSamples) {
+    sampleRate = std::max(kMinNoiseSampleRate, sampleRate / 2);
+  }
+  return sampleRate;
+}
+
+constexpr u16 advanceNoiseLfsr(u16 state, bool shortMode) {
+  // XOR the two low bits, shift, and feed the result back into the 15-bit register.
+  const u16 feedback = (state ^ (state >> 1)) & 1;
+  state = (state >> 1) | (feedback << kLongNoiseFeedbackBit);
+  if (shortMode) {
+    // Short mode also replaces bit 6, producing the 7-bit sequence.
+    state = (state & ~kShortNoiseFeedbackMask) | (feedback << kShortNoiseFeedbackBit);
+  }
+  return state;
+}
+
 double psgDutyRatio(u8 dutyIndex) {
   constexpr double kDutyRatios[4] = {0.125, 0.25, 0.5, 0.75};
   return kDutyRatios[dutyIndex & kSquareDutyMask];
 }
 }
 
-MP2kPSGColl::MP2kPSGColl(RawFile *file, u32 sampleRate, u32 loopSamples)
+MP2kPSGColl::MP2kPSGColl(RawFile *file, u32 sampleRate, u32 loopSamples, u32 noiseSampleRate)
     : VGMSampColl(MP2kFormat::name, file, 0, 0, "MP2k PSG samples"),
       m_sample_rate(sampleRate),
-      m_loop_samples(loopSamples) {
+      m_loop_samples(loopSamples),
+      m_noise_sample_rate(noiseSampleRate) {
 }
 
 bool MP2kPSGColl::parseSampleInfo() {
@@ -651,6 +744,54 @@ int MP2kPSGColl::makeOrGetProgrammableWave(size_t wavePointer) {
   addSamp<MP2kPSGWaveSamp>(this, wave_offset, kCgbWaveSampleRate, name);
   m_programmable_waves.emplace(wave_offset, sample_id);
   return sample_id;
+}
+
+int MP2kPSGColl::makeOrGetNoise(u8 key, bool shortMode) {
+  const NoiseControl noise = noiseControlForKey(key, shortMode);
+  const u8 control = noise.registerValue();
+  if (const auto found = m_noise_samples.find(control); found != m_noise_samples.end()) {
+    return found->second;
+  }
+
+  const u32 sampleRate = noiseSampleRate(noise, m_noise_sample_rate);
+  const u32 loopSamples = noiseLoopSamples(noise, sampleRate);
+  const int sampleId = static_cast<int>(sampleCount());
+  addSamp<MP2kPSGNoiseSamp>(this, control, sampleRate, loopSamples,
+                           fmt::format("PSG noise {:#04x}", control));
+  m_noise_samples.emplace(control, sampleId);
+  return sampleId;
+}
+
+MP2kPSGNoiseSamp::MP2kPSGNoiseSamp(VGMSampColl* sampColl, u8 control, u32 sampleRate,
+                                 u32 loopSamples, std::string name)
+    : VGMSamp(sampColl, 0, loopSamples * sizeof(s16), 0, loopSamples * sizeof(s16),
+              1, BPS::PCM16, sampleRate, std::move(name)),
+      m_control(control) {
+  setLoopStatus(true);
+  setLoopOffset(0);
+  setLoopLength(loopSamples);
+  setLoopStartMeasure(LM_SAMPLES);
+  setLoopLengthMeasure(LM_SAMPLES);
+  unityKey = kPsgUnityKey;
+  ulUncompressedSize = loopSamples * bytesPerSample();
+}
+
+std::vector<u8> MP2kPSGNoiseSamp::decodeToNativePcm() {
+  std::vector<u8> samples(uncompressedSize());
+  auto* output = reinterpret_cast<s16*>(samples.data());
+  const NoiseControl noise = decodeNoiseControl(m_control);
+  const u64 denominator = noise.clockDenominator(rate);
+  u16 lfsr = kNoiseInitialState;
+  u64 phase = 0;
+  for (u32 i = 0; i < loopLength(); ++i) {
+    output[i] = (lfsr & 1) != 0 ? -32767 : 32767;
+    phase += kNoiseClockHz;
+    while (phase >= denominator) {
+      lfsr = advanceNoiseLfsr(lfsr, noise.shortMode);
+      phase -= denominator;
+    }
+  }
+  return samples;
 }
 
 MP2kPSGSamp::MP2kPSGSamp(VGMSampColl *sampColl, u8 dutyIndex, bool noise,
