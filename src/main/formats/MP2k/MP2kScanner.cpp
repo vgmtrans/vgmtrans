@@ -23,12 +23,12 @@
 #include "VGMMetadataHint.h"
 #include "VGMColl.h"
 
+#include <algorithm>
 #include <array>
 #include <functional>
 #include <memory>
 #include <optional>
 #include <set>
-#include <span>
 #include <string>
 #include <vector>
 
@@ -89,6 +89,9 @@ const VGMMetadataHint* findMP2kMetadataHint(RawFile* file, u32 song_index, u32 s
 
 /* Test if an area of ROM is eligible to be the base pointer */
 static bool test_pointer_validity(RawFile *file, size_t offset, u32 inGBA_length) {
+  if (offset > file->size() || file->size() - offset < 12) {
+    return false;
+  }
   EngineParams params(file->get<u32>(offset));
 
   /* Compute supposed address of song table and check validity */
@@ -102,49 +105,47 @@ static bool test_pointer_validity(RawFile *file, size_t offset, u32 inGBA_length
 
 void MP2kScanner::scan(RawFile *file, void *) {
   /* Detect if the sound engine is actually MP2K */
-  size_t sound_engine_adr = 0;
-  if (auto engine = detectMP2K(file); engine.has_value()) {
-    sound_engine_adr = engine.value();
-  } else {
+  const auto engine = detectMP2K(file);
+  if (!engine) {
     return;
   }
 
-  EngineParams engine_settings(file->get<u32>(sound_engine_adr));
+  EngineParams engine_settings(file->get<u32>(engine->settingsOffset));
   const int engine_sample_rate = samplerate_LUT[engine_settings.sampling_rate_index];
   const u32 psg_sample_rate = engine_sample_rate > 0 ? static_cast<u32>(engine_sample_rate) : 32768;
+  const u8 reverb_mode = file->get<u8>(engine->settingsOffset);
+  const u8 default_reverb = (reverb_mode & 0x80) != 0 ? reverb_mode & 0x7f : 0;
 
-  /* Compute song table location */
-  u32 song_levels = file->get<u32>(sound_engine_adr + 4);  // Read # of song levels
-  u32 song_tbl_ptr = (file->get<u32>(sound_engine_adr + 8) & 0x1FFFFFF) + 12 * song_levels;
-  auto song_tbl = std::span<const u32>(reinterpret_cast<const u32 *>(file->begin() + song_tbl_ptr),
-                                       reinterpret_cast<const u32 *>(file->end()));
-
-  /* Sometimes the song table contains null-pointers (e.g. Fire Emblem).
-   * We will ignore those entries */
-  auto song_entry =
-      std::find_if(song_tbl.begin(), song_tbl.end(), [](u32 pointer) { return pointer != 0; });
-  if (song_entry == song_tbl.end()) {
+  const u32 song_tbl_ptr = engine->songTableOffset;
+  if (song_tbl_ptr >= file->size()) {
     return;
   }
 
-  auto* psg_sampcoll = pRoot->loadVGMFile<MP2kPSGColl>(file, psg_sample_rate, psg_sample_rate);
+  const u32 noise_sample_rate = 32768u << (9 - engine_settings.dac_bits);
+  auto* psg_sampcoll = pRoot->loadVGMFile<MP2kPSGColl>(
+      file, psg_sample_rate, psg_sample_rate, noise_sample_rate);
   if (!psg_sampcoll) {
     return;
   }
 
-  /* First 32 bytes are the pointer, the rest is song info */
+  // Each eight-byte entry contains a sequence pointer and player info.
   std::set<size_t> soundbanks;
   std::map<u32, std::vector<MP2kSeqWithIndex>> seqs;
-  for (auto it = song_entry; it < song_tbl.end(); std::advance(it, 2)) {
-    u32 song_index = static_cast<u32>(std::distance(song_tbl.begin(), it) / 2);
-    u32 song_pointer = *it & 0x1FFFFFF;
-    if (song_pointer >= file->size()) {
-      L_DEBUG("Song pointer is out of bounds {:#x}/{:#x}", *it, file->size());
+  for (size_t entry_offset = song_tbl_ptr; entry_offset + 8 <= file->size(); entry_offset += 8) {
+    const u32 song_index = static_cast<u32>((entry_offset - song_tbl_ptr) / 8);
+    const u32 song_address = file->get<u32>(entry_offset);
+
+    // Empty slots can occur anywhere in the table. Keep their indices for miniGSF metadata.
+    if (song_address == 0) {
+      continue;
+    }
+    if (!isGbaRomAddress(song_address)) {
       break;
     }
 
-    /* Terminate on invalid pointer for safety */
-    if (!song_pointer || song_pointer >= file->size()) {
+    const u32 song_pointer = gbaAddressToOffset(song_address);
+    if (song_pointer >= file->size()) {
+      L_DEBUG("Song pointer is out of bounds {:#x}/{:#x}", song_address, file->size());
       break;
     }
 
@@ -152,7 +153,7 @@ void MP2kScanner::scan(RawFile *file, void *) {
     const bool hasHintTitle = hint != nullptr && hint->tag.hasTitle();
     const auto seq_name = hasHintTitle ? hint->tag.title : std::string("MP2kSeq");
 
-    auto* nseq = pRoot->loadVGMFile<MP2kSeq>(file, song_pointer, seq_name);
+    auto* nseq = pRoot->loadVGMFile<MP2kSeq>(file, song_pointer, seq_name, default_reverb);
     if (!nseq) {
       continue;
     }
@@ -171,31 +172,44 @@ void MP2kScanner::scan(RawFile *file, void *) {
   }
 
   for (auto it = soundbanks.begin(); it != soundbanks.end(); std::advance(it, 1)) {
-    int count = 128;
+    auto seq = seqs.find(*it);
+    if (seq == seqs.end() || *it >= file->size()) {
+      continue;
+    }
+
+    // Banks have no stored length. Reading unused entries can run into adjacent keymaps or samples.
+    u32 required_count = 1;  // Tracks may use the default program without a program-change event.
+    for (const auto& seqval : seq->second) {
+      for (u32 program : seqval.seq->aInstrumentsUsed) {
+        required_count = std::max(required_count, program + 1);
+      }
+    }
+    int count = static_cast<int>(std::min<u32>(128, required_count));
     if (auto next_addr = std::next(it);
         next_addr != soundbanks.end() && (*next_addr - *it) / 12 < 128) {
-      count = (*next_addr - *it) / 12;
+      count = std::min(count, static_cast<int>((*next_addr - *it) / 12));
+    }
+    count = std::min(count, static_cast<int>((file->size() - *it) / 12));
+    if (count == 0) {
+      continue;
     }
 
     auto iset = std::make_unique<MP2kInstrSet>(file, samplerate_LUT[engine_settings.sampling_rate_index], *it, count,
-                                               psg_sampcoll);
+                                               psg_sampcoll, engine->variant);
     auto* rawInstrSet = iset.get();
     if (pRoot->loadVGMFile(std::move(iset))) {
-      auto seq = seqs.find(*it);
-      if (seq != seqs.end()) {
-        for (auto seqval : seq->second) {
-          auto coll = std::make_unique<VGMColl>(seqval.collection_name);
-          coll->attachSeq(seqval.seq);
-          coll->attachInstrSet(rawInstrSet);
-          if (rawInstrSet->sampColl() != nullptr && rawInstrSet->sampColl()->hasSamples()) {
-            coll->attachSampColl(rawInstrSet->sampColl());
-          }
-          coll->attachSampColl(psg_sampcoll);
-
-          pRoot->loadVGMColl(std::move(coll));
+      for (auto seqval : seq->second) {
+        auto coll = std::make_unique<VGMColl>(seqval.collection_name);
+        coll->attachSeq(seqval.seq);
+        coll->attachInstrSet(rawInstrSet);
+        if (rawInstrSet->sampColl() != nullptr && rawInstrSet->sampColl()->hasSamples()) {
+          coll->attachSampColl(rawInstrSet->sampColl());
         }
-        seqs.erase(seq);
+        coll->attachSampColl(psg_sampcoll);
+
+        pRoot->loadVGMColl(std::move(coll));
       }
+      seqs.erase(seq);
     }
   }
 }
@@ -231,7 +245,7 @@ static auto MP2KPatternSearch(RawFile *file, const char *offset) {
   return reinterpret_cast<const char *>(select_song);
 }
 
-std::optional<size_t> MP2kScanner::detectMP2K(RawFile *file) {
+std::optional<MP2kScanner::EngineLocation> MP2kScanner::detectMP2K(RawFile *file) {
   auto select_song = MP2KPatternSearch(file, file->begin());
 
   constexpr u32 M4A_OFFSET_SONGTABLE = 40;
@@ -300,18 +314,39 @@ std::optional<size_t> MP2kScanner::detectMP2K(RawFile *file) {
     main_ofs_tmp--;
   }
 
-  /* Settings location used by most games */
-  bool valid_m16 = test_pointer_validity(file, main_ofs - 16, file->size());
-
-  /* Settings location used by Pok�mon */
-  bool valid_m32 = test_pointer_validity(file, main_ofs - 32, file->size());
-
-  if (!(valid_m16 || valid_m32)) {
+  const u32 songTableOffset = gbaAddressToOffset(
+      file->get<u32>(select_song - file->begin() + M4A_OFFSET_SONGTABLE));
+  std::optional<size_t> settingsOffset;
+  auto variant = MP2kDriverVariant::Standard;
+  for (const u32 distance : {16u, 32u, 28u}) {
+    if (main_ofs < distance || !test_pointer_validity(file, main_ofs - distance, file->size())) {
+      continue;
+    }
+    const size_t candidate = main_ofs - distance;
+    if (distance == 28) {
+      // Bon inserts three extra words before the selection routine. Its player array
+      // must end exactly at the table referenced by that routine.
+      const u32 players = file->get<u32>(candidate + 8);
+      const u32 count = file->get<u32>(candidate + 4);
+      if (!isGbaRomAddress(players) || gbaAddressToOffset(players) + 12 * count != songTableOffset) {
+        continue;
+      }
+      variant = MP2kDriverVariant::Bon;
+    }
+    settingsOffset = candidate;
+    break;
+  }
+  if (!settingsOffset) {
     L_WARN("Couldn't find settings block around {} in {}", main_ofs, file->name());
     return std::nullopt;
   }
 
-  return main_ofs - (valid_m16 ? 16 : 32);
+  // Use the table referenced by the selection routine; it need not follow the player array.
+  return EngineLocation{
+      .settingsOffset = *settingsOffset,
+      .songTableOffset = songTableOffset,
+      .variant = variant,
+  };
 }
 
 bool MP2kScanner::isValidOffset(u32 offset, u32 romsize) {

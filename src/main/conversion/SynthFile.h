@@ -5,6 +5,7 @@
 #include "RiffFile.h"
 
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <utility>
@@ -153,6 +154,9 @@ class SynthRgn {
   s16 fineTuneCents {0};
 
   double attenDb {0};   // attenuation in decibels
+
+  // Maximum CC91-controlled SoundFont reverb send (0..1). Unset retains the synth's default.
+  std::optional<double> reverbSendScale;
 
   SynthSampInfo *sampinfo {nullptr};
   SynthArt *art {nullptr};

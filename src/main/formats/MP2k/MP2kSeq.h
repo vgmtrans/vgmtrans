@@ -16,11 +16,14 @@
 
 class MP2kSeq final : public VGMSeq {
 public:
-  MP2kSeq(RawFile *file, u32 offset, std::string name = "MP2kSeq");
+  MP2kSeq(RawFile *file, u32 offset, std::string name = "MP2kSeq", u8 defaultReverb = 0);
   ~MP2kSeq() = default;
 
   bool parseHeader() override;
   bool parseTrackPointers() override;
+
+private:
+  u8 m_defaultReverb;
 };
 
 class MP2kTrack final : public SeqTrack {
@@ -31,7 +34,7 @@ public:
 
 protected:
   void resetVars() override;
-  void onTickBegin() override;
+  void onTickEnd() override;
 
 private:
   enum class State : u8 {

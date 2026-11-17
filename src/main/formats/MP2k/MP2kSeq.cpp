@@ -41,9 +41,12 @@ const char* mp2kModTypeName(u8 type) {
   }
 }
 
-MP2kSeq::MP2kSeq(RawFile *file, u32 offset, std::string name)
-    : VGMSeq(MP2kFormat::name, file, offset, 0, std::move(name)) {
+MP2kSeq::MP2kSeq(RawFile *file, u32 offset, std::string name, u8 defaultReverb)
+    : VGMSeq(MP2kFormat::name, file, offset, 0, std::move(name)), m_defaultReverb(defaultReverb) {
   setAllowDiscontinuousTrackData(true);
+  // MP2k multiplies track volume and note velocity directly into the PCM amplitude.
+  setUseLinearAmplitudeScale(true);
+  bLoadTickByTick = true;
 }
 
 bool MP2kSeq::parseHeader() {
@@ -67,13 +70,20 @@ bool MP2kSeq::parseHeader() {
   seqHdr->addChild(offset() + 1, 1, "Unknown");
   seqHdr->addChild(offset() + 2, 1, "Priority");
   seqHdr->addChild(offset() + 3, 1, "Reverb");
+  // Bit 7 requests a global reverb change; otherwise retain the engine's initial setting.
+  const u8 reverb = readByte(offset() + 3);
+  setAlwaysWriteInitialReverb((reverb & 0x80) != 0 ? reverb & 0x7f : m_defaultReverb);
 
   u32 dwInstPtr = readWord(offset() + 4);
   seqHdr->addPointer(offset() + 4, 4, dwInstPtr - 0x8000000, true, "Instrument pointer");
   for (u32 i = 0; i < nNumTracks; i++) {
     u32 dwTrackPtrOffset = offset() + 8 + i * 4;
     u32 dwTrackPtr = readWord(dwTrackPtrOffset);
-    seqHdr->addPointer(dwTrackPtrOffset, 4, dwTrackPtr - 0x8000000, true, "Track pointer");
+    if (dwTrackPtr == 0) {
+      seqHdr->addChild(dwTrackPtrOffset, 4, "Empty track slot");
+    } else {
+      seqHdr->addPointer(dwTrackPtrOffset, 4, dwTrackPtr - 0x8000000, true, "Track pointer");
+    }
   }
 
   setPPQN(0x30);
@@ -86,6 +96,9 @@ bool MP2kSeq::parseTrackPointers(void) {
   for (unsigned int i = 0; i < nNumTracks; i++) {
     u32 dwTrackPtrOffset = offset() + 8 + i * 4;
     u32 dwTrackPtr = readWord(dwTrackPtrOffset);
+    if (dwTrackPtr == 0) {
+      continue;
+    }
     addTrack<MP2kTrack>(this, dwTrackPtr - 0x8000000);
   }
 
@@ -124,7 +137,7 @@ void MP2kTrack::resetVars() {
   tremoloLfo.configure(0, kDefaultLfoSpeed, 0);
 }
 
-void MP2kTrack::onTickBegin() {
+void MP2kTrack::onTickEnd() {
   updateLfoFade();
 }
 
@@ -407,18 +420,19 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
         }
       };
 
-      if (subCommand == 0x08 && subParam <= 127) {
+      if (subCommand == 0x08) {
         curOffset++;
         constexpr const char* kEventName = "Pseudo Echo Volume";
         const auto desc = fmt::format("Raw value: {} ({:#04x})", static_cast<unsigned>(subParam),
                                       static_cast<unsigned>(subParam));
         addGenericEvent(beginOffset, curOffset - beginOffset, kEventName, desc, Type::Reverb);
         addEchoTextNoItem(kEventName, desc);
-        addReverbNoItem(subParam);
-      } else if (subCommand == 0x09 && subParam <= 127) {
+        // This is an envelope floor after release, not a send to the reverb effect.
+      } else if (subCommand == 0x09) {
         curOffset++;
         constexpr const char* kEventName = "Pseudo Echo Length";
-        const double seconds = static_cast<double>(subParam) / 60.0;
+        constexpr double kGbaFrameRateHz = 16777216.0 / 280896.0;
+        const double seconds = static_cast<double>(subParam) / kGbaFrameRateHz;
         const auto desc = fmt::format("Raw value: {} ({:#04x}), length: {:.2f}s",
                                       static_cast<unsigned>(subParam),
                                       static_cast<unsigned>(subParam), seconds);
@@ -553,14 +567,15 @@ void MP2kTrack::beginNoteLfo() {
     return;
   }
 
+  // Driver clocks use the same doubled MIDI-tick scale as waits and note durations.
   if (modType == kMp2kModTypeVibrato) {
     emitVibratoDepth(vibratoLfo, 0, false);
     vibratoLfo.setReusableFadeToConfiguredDepth(1);
-    vibratoLfo.beginReusableFadeToConfiguredDepth();
+    vibratoLfo.beginReusableFade(static_cast<u32>(delay) * 2, vibratoLfo.configuredDepth());
   } else if (modType == kMp2kModTypeTremolo) {
     emitTremoloDepth(tremoloLfo, 0, false);
     tremoloLfo.setReusableFadeToConfiguredDepth(1);
-    tremoloLfo.beginReusableFadeToConfiguredDepth();
+    tremoloLfo.beginReusableFade(static_cast<u32>(delay) * 2, tremoloLfo.configuredDepth());
   }
 }
 

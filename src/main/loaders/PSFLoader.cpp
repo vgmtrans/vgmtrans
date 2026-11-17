@@ -89,8 +89,14 @@ void load_with_libs(const PSFFile &psf, const std::filesystem::path &basepath, I
     tryOpenLib(*lib);
 
   if (!psf.exe().empty()) {
-    u32 addr = psf.version() == vgmtrans::psf::PSF1_VERSION ? psf.getExe<u32>(0x18)
-                                                            : psf.getExe<u32>(0);
+    size_t addressOffset = 0;
+    if (psf.version() == vgmtrans::psf::PSF1_VERSION) {
+      addressOffset = 0x18;
+    } else if (psf.version() == vgmtrans::psf::GSF_VERSION) {
+      // GSF stores the entry point before the load address.
+      addressOffset = 0x04;
+    }
+    const u32 addr = psf.getExe<u32>(addressOffset);
     auto off = vgmtrans::psf::dataOffsetForVersion(psf.version());
     if (!off) {
       throw std::runtime_error(fmt::format("Unsupported PSF version {:#x}",
