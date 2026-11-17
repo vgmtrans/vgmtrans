@@ -30,6 +30,8 @@
 * **Sappy (mp2k):** Corrected fixed-rate PCM pitch in ordinary, key-split, and percussion instruments, and restored valid square-wave instruments mistaken for unused entries.
 * **Sappy (mp2k):** Restored per-key PSG square voices and their stored pitch in SoundFont exports.
 * **Sappy (mp2k):** Corrected per-key PSG noise frequencies and short-mode timbre in SoundFont exports.
+* **Sappy (mp2k):** Added Bon driver detection and Golden Sun's PWM, saw, and triangle instruments.
+* **Sappy (mp2k):** Ignored empty track slots instead of creating invalid tracks.
 
 **Nintendo DS (SDAT)**
 

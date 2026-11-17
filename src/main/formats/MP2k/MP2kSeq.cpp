@@ -79,7 +79,11 @@ bool MP2kSeq::parseHeader() {
   for (u32 i = 0; i < nNumTracks; i++) {
     u32 dwTrackPtrOffset = offset() + 8 + i * 4;
     u32 dwTrackPtr = readWord(dwTrackPtrOffset);
-    seqHdr->addPointer(dwTrackPtrOffset, 4, dwTrackPtr - 0x8000000, true, "Track pointer");
+    if (dwTrackPtr == 0) {
+      seqHdr->addChild(dwTrackPtrOffset, 4, "Empty track slot");
+    } else {
+      seqHdr->addPointer(dwTrackPtrOffset, 4, dwTrackPtr - 0x8000000, true, "Track pointer");
+    }
   }
 
   setPPQN(0x30);
@@ -92,6 +96,9 @@ bool MP2kSeq::parseTrackPointers(void) {
   for (unsigned int i = 0; i < nNumTracks; i++) {
     u32 dwTrackPtrOffset = offset() + 8 + i * 4;
     u32 dwTrackPtr = readWord(dwTrackPtrOffset);
+    if (dwTrackPtr == 0) {
+      continue;
+    }
     addTrack<MP2kTrack>(this, dwTrackPtr - 0x8000000);
   }
 

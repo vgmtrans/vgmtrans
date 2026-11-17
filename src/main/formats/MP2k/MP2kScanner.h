@@ -8,6 +8,7 @@
 
 #include "base/Types.h"
 #include "Scanner.h"
+#include "MP2kDriver.h"
 
 #include <optional>
 
@@ -22,6 +23,7 @@ private:
   struct EngineLocation {
     size_t settingsOffset;
     u32 songTableOffset;
+    MP2kDriverVariant variant;
   };
 
   std::optional<EngineLocation> detectMP2K(RawFile *file);

@@ -19,6 +19,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <numbers>
 #include <numeric>
@@ -31,6 +32,11 @@ constexpr u8 kPsgNoiseIndex = kPsgSquareCount;
 constexpr u8 kPsgUnityKey = 69;
 constexpr size_t kGbaRomPointerMask = 0x03FFFFFF;
 constexpr double kGbaFrameRateHz = 16777216.0 / 280896.0;
+constexpr double kBonWaveSamplesPerCycle = 64.0;
+constexpr u32 kBonPwmLoopFrames = 256;
+constexpr u32 kBonPwmPhaseSteps = 256;
+constexpr u32 kBonSawPrerollSamples = 64;
+constexpr double kBonPeriodicLoopSeconds = 2.0;
 
 // Tone records contain a channel number plus independent playback and bank flags.
 enum class VoiceType : u8 {
@@ -176,9 +182,9 @@ bool isGbaRomPointer(size_t pointer) {
 }
 
 MP2kInstrSet::MP2kInstrSet(RawFile *file, int rate, size_t offset, int count,
-                           MP2kPSGColl *psg_samples, const std::string &name)
+                           MP2kPSGColl *psg_samples, MP2kDriverVariant variant, const std::string &name)
     : VGMInstrSet(MP2kFormat::name, file, offset, count * 12, name), m_count(count),
-      m_operating_rate(rate), m_psg_samples(psg_samples) {
+    m_operating_rate(rate), m_variant(variant), m_psg_samples(psg_samples) {
   assert(m_psg_samples != nullptr);
   addSampColl<VGMSampColl>(MP2kFormat::name, file, this, offset);
 }
@@ -299,6 +305,62 @@ int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
   return static_cast<int>(sample_id);
 }
 
+bool MP2kInstrSet::isBonSample(size_t pointer) const {
+  if (m_variant != MP2kDriverVariant::Bon || pointer > rawFile()->size() ||
+      rawFile()->size() - pointer < 24) {
+    return false;
+  }
+  // Bon stores oscillator descriptors in looping WaveData records with no PCM payload.
+  return rawFile()->getBE<u32>(pointer) == 0x40 &&
+         rawFile()->get<u32>(pointer + 8) == 0 &&
+         rawFile()->get<u32>(pointer + 12) == 0 &&
+         rawFile()->get<u32>(pointer + 4) != 0 &&
+         rawFile()->get<u8>(pointer + 16) == 0x80 &&
+         rawFile()->get<u8>(pointer + 17) <= static_cast<u8>(MP2kBonSamp::Shape::Triangle);
+}
+
+int MP2kInstrSet::makeOrGetBonSample(size_t pointer, u8 key) {
+  if (key >= kMidiKeyCount || !isBonSample(pointer) || m_operating_rate <= 0) {
+    return -1;
+  }
+  const auto cacheKey = std::make_pair(pointer, key);
+  if (const auto found = m_bon_samples.find(cacheKey); found != m_bon_samples.end()) {
+    return found->second;
+  }
+  const auto shape = static_cast<MP2kBonSamp::Shape>(rawFile()->get<u8>(pointer + 17));
+  const double middleCFrequency = rawFile()->get<u32>(pointer + 4) / (1024.0 * kBonWaveSamplesPerCycle);
+  const double frequency = middleCFrequency * std::exp2((static_cast<int>(key) - 60) / 12.0);
+  // Sample each key separately to preserve the frame-clock PWM speed across the keyboard.
+  const double seconds = shape == MP2kBonSamp::Shape::Pulse
+                             ? kBonPwmLoopFrames / kGbaFrameRateHz : kBonPeriodicLoopSeconds;
+  const auto count = std::lround(m_operating_rate * seconds);
+  const auto cycles = std::max(1LL, std::llround(frequency * count / m_operating_rate));
+  if (count <= kBonSawPrerollSamples || count > std::numeric_limits<u32>::max() ||
+      cycles > std::numeric_limits<u32>::max()) {
+    return -1;
+  }
+  const double generatedFrequency = static_cast<double>(cycles) * m_operating_rate / count;
+  const auto correction = std::lround(1200.0 * std::log2(frequency / generatedFrequency));
+  // Root-key overrides preserve the fractional-semitone sample correction in both exporters.
+  if (correction < -99 || correction > 99) {
+    return -1;
+  }
+  const MP2kBonSamp::RenderSettings settings{
+      .shape = shape,
+      .pwm = {rawFile()->get<u8>(pointer + 18), rawFile()->get<u8>(pointer + 19),
+              rawFile()->get<u8>(pointer + 20), rawFile()->get<u8>(pointer + 21)},
+      .key = key,
+      .sampleRate = static_cast<u32>(m_operating_rate),
+      .loopSamples = static_cast<u32>(count),
+      .carrierCycles = static_cast<u32>(cycles),
+      .fineTune = static_cast<s16>(correction),
+  };
+  const int sampleId = static_cast<int>(sampColl()->sampleCount());
+  sampColl()->sinkSamp(std::make_unique<MP2kBonSamp>(sampColl(), pointer, settings));
+  m_bon_samples.emplace(cacheKey, sampleId);
+  return sampleId;
+}
+
 MP2kInstr::MP2kInstr(MP2kInstrSet *set, size_t offset, size_t length, u32 bank, u32 number,
                      MP2kInstrData data)
     : VGMInstr(set, offset, length, bank, number), m_data(data) {
@@ -341,6 +403,24 @@ bool MP2kInstr::loadInstr() {
     }
   };
 
+  auto addBonRegions = [this, &instrSet](const Tone& tone, u32 toneOffset, u32 adsr,
+                                        u8 low = 0, u8 high = 127) {
+    const auto pointer = tone.sampleOffset();
+    if (!instrSet.isBonSample(pointer)) {
+      return false;
+    }
+    for (int key = low; key <= high; ++key) {
+      const int sampleId = instrSet.makeOrGetBonSample(pointer, static_cast<u8>(key));
+      if (sampleId == -1) {
+        continue;
+      }
+      auto* region = addRgn(toneOffset, kToneRecordSize, sampleId, key, key);
+      region->setUnityKey(static_cast<u8>(key));
+      setADSR(region, adsr);
+    }
+    return true;
+  };
+
   switch (instrumentVoice(instrument.type)) {
     case VoiceType::Pcm: {
       setName("Single-region instrument");
@@ -351,6 +431,9 @@ bool MP2kInstr::loadInstr() {
       }
 
       const auto sampleOffset = instrument.sampleOffset();
+      if (addBonRegions(instrument, offset(), envelopeOrKeyMap)) {
+        break;
+      }
       if (const int sampleId = instrSet.makeOrGetSample(sampleOffset); sampleId != -1) {
         addPcmRegions(instrument, offset(), sampleId, envelopeOrKeyMap);
       } else {
@@ -422,6 +505,9 @@ bool MP2kInstr::loadInstr() {
             if (tone.sampleOffset() == 0 || !isGbaRomPointer(tone.sampleOrTable)) {
               break;
             }
+            if (addBonRegions(tone, toneOffset, envelope(), keyLow, keyHigh)) {
+              break;
+            }
             if (const int sampleId = instrSet.makeOrGetSample(tone.sampleOffset()); sampleId != -1) {
               addPcmRegions(tone, toneOffset, sampleId, envelope(), keyLow, keyHigh);
             }
@@ -459,6 +545,16 @@ bool MP2kInstr::loadInstr() {
           case VoiceType::Pcm: {
             const u32 sampleOffset = tone.sampleOffset();
             if (sampleOffset == 0 || !isGbaRomPointer(tone.sampleOrTable)) {
+              break;
+            }
+            if (instrSet.isBonSample(sampleOffset)) {
+              const int synthId = instrSet.makeOrGetBonSample(sampleOffset, tone.key);
+              if (synthId == -1) {
+                break;
+              }
+              region = addRgn(offset(), length(), synthId, key, key);
+              region->setUnityKey(static_cast<u8>(key));
+              setADSR(region, envelope());
               break;
             }
             const int sampleId = instrSet.makeOrGetSample(sampleOffset);
@@ -859,4 +955,60 @@ std::vector<u8> MP2kPSGWaveSamp::decodeToNativePcm() {
   }
 
   return samples;
+}
+
+MP2kBonSamp::MP2kBonSamp(VGMSampColl* collection, size_t pointer, const RenderSettings& settings)
+    : VGMSamp(collection, pointer, 24, pointer, 24, 1, BPS::PCM16, settings.sampleRate,
+              fmt::format("Bon synth {} key {}", static_cast<u8>(settings.shape), settings.key)),
+      m_settings(settings) {
+  unityKey = settings.key;
+  fineTune = settings.fineTune;
+  setLoopStatus(true);
+  setLoopOffset(0);
+  setLoopLength(settings.loopSamples);
+  setLoopStartMeasure(LM_SAMPLES);
+  setLoopLengthMeasure(LM_SAMPLES);
+  ulUncompressedSize = settings.loopSamples * sizeof(s16);
+}
+
+std::vector<u8> MP2kBonSamp::decodeToNativePcm() {
+  std::vector<u8> data(uncompressedSize());
+  auto* output = reinterpret_cast<s16*>(data.data());
+  int sawState = 0;
+  const int preroll = m_settings.shape == Shape::Saw ? kBonSawPrerollSamples : 0;
+  for (int i = -preroll; i < static_cast<int>(loopLength()); ++i) {
+    const u64 phasePosition = static_cast<u64>(i + static_cast<int>(loopLength()) + 1) *
+                              m_settings.carrierCycles;
+    const double phase = (phasePosition % loopLength()) / static_cast<double>(loopLength());
+    double amplitude = 0;
+    switch (m_settings.shape) {
+      case Shape::Pulse: {
+        // Duty changes once per driver frame. Byte steps wrap before folding the triangle.
+        const auto& pwm = m_settings.pwm;
+        const u32 frame = static_cast<u64>(i) * kBonPwmLoopFrames / loopLength() + 1;
+        const double modulation = ((pwm.initialPhase + frame * pwm.step) % kBonPwmPhaseSteps) /
+                                  static_cast<double>(kBonPwmPhaseSteps);
+        const double folded = std::min(modulation, 1.0 - modulation);
+        const double rawWidth = (pwm.base + pwm.depth * folded) / kBonPwmPhaseSteps;
+        const double width = rawWidth - std::floor(rawWidth);
+        amplitude = (phase < width ? 1.0 : 0.0) - width;
+        break;
+      }
+      case Shape::Saw: {
+        // The driver's pseudo-saw combines a quantized ramp with a one-pole recurrence.
+        const int ramp = static_cast<int>(std::floor(phase * 256.0)) - 112;
+        const int staircase = static_cast<int>(std::floor(phase * 64.0)) % 32;
+        sawState = ramp - staircase + static_cast<int>(std::floor(sawState * 0.5));
+        amplitude = sawState / 256.0;
+        break;
+      }
+      case Shape::Triangle:
+        amplitude = 1.0 - 4.0 * std::abs(phase - 0.5);
+        break;
+    }
+    if (i >= 0) {
+      output[i] = static_cast<s16>(std::lround(std::clamp(amplitude, -1.0, 1.0) * 32767.0));
+    }
+  }
+  return data;
 }

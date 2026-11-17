@@ -89,6 +89,9 @@ const VGMMetadataHint* findMP2kMetadataHint(RawFile* file, u32 song_index, u32 s
 
 /* Test if an area of ROM is eligible to be the base pointer */
 static bool test_pointer_validity(RawFile *file, size_t offset, u32 inGBA_length) {
+  if (offset > file->size() || file->size() - offset < 12) {
+    return false;
+  }
   EngineParams params(file->get<u32>(offset));
 
   /* Compute supposed address of song table and check validity */
@@ -192,7 +195,7 @@ void MP2kScanner::scan(RawFile *file, void *) {
     }
 
     auto iset = std::make_unique<MP2kInstrSet>(file, samplerate_LUT[engine_settings.sampling_rate_index], *it, count,
-                                               psg_sampcoll);
+                                               psg_sampcoll, engine->variant);
     auto* rawInstrSet = iset.get();
     if (pRoot->loadVGMFile(std::move(iset))) {
       for (auto seqval : seq->second) {
@@ -311,22 +314,38 @@ std::optional<MP2kScanner::EngineLocation> MP2kScanner::detectMP2K(RawFile *file
     main_ofs_tmp--;
   }
 
-  /* Settings location used by most games */
-  bool valid_m16 = test_pointer_validity(file, main_ofs - 16, file->size());
-
-  /* Settings location used by Pok�mon */
-  bool valid_m32 = test_pointer_validity(file, main_ofs - 32, file->size());
-
-  if (!(valid_m16 || valid_m32)) {
+  const u32 songTableOffset = gbaAddressToOffset(
+      file->get<u32>(select_song - file->begin() + M4A_OFFSET_SONGTABLE));
+  std::optional<size_t> settingsOffset;
+  auto variant = MP2kDriverVariant::Standard;
+  for (const u32 distance : {16u, 32u, 28u}) {
+    if (main_ofs < distance || !test_pointer_validity(file, main_ofs - distance, file->size())) {
+      continue;
+    }
+    const size_t candidate = main_ofs - distance;
+    if (distance == 28) {
+      // Bon inserts three extra words before the selection routine. Its player array
+      // must end exactly at the table referenced by that routine.
+      const u32 players = file->get<u32>(candidate + 8);
+      const u32 count = file->get<u32>(candidate + 4);
+      if (!isGbaRomAddress(players) || gbaAddressToOffset(players) + 12 * count != songTableOffset) {
+        continue;
+      }
+      variant = MP2kDriverVariant::Bon;
+    }
+    settingsOffset = candidate;
+    break;
+  }
+  if (!settingsOffset) {
     L_WARN("Couldn't find settings block around {} in {}", main_ofs, file->name());
     return std::nullopt;
   }
 
   // Use the table referenced by the selection routine; it need not follow the player array.
   return EngineLocation{
-      .settingsOffset = main_ofs - (valid_m16 ? 16 : 32),
-      .songTableOffset = gbaAddressToOffset(
-          file->get<u32>(select_song - file->begin() + M4A_OFFSET_SONGTABLE)),
+      .settingsOffset = *settingsOffset,
+      .songTableOffset = songTableOffset,
+      .variant = variant,
   };
 }
 

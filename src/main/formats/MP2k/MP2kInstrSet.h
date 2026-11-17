@@ -11,9 +11,11 @@
 #include "VGMInstrSet.h"
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
+#include "MP2kDriver.h"
 
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 class MP2kPSGColl;
@@ -21,19 +23,24 @@ class MP2kPSGColl;
 class MP2kInstrSet final : public VGMInstrSet {
 public:
   MP2kInstrSet(RawFile *file, int rate, size_t offset, int count, MP2kPSGColl *psg_samples,
+               MP2kDriverVariant variant = MP2kDriverVariant::Standard,
                const std::string &name = "MP2K Instrument bank");
   ~MP2kInstrSet() = default;
 
   bool loadInstrs() override;
   bool parseInstrPointers() override;
   int makeOrGetSample(size_t sample_pointer);
+  bool isBonSample(size_t pointer) const;
+  int makeOrGetBonSample(size_t pointer, u8 key);
   int sampleRate() const noexcept { return m_operating_rate; };
   MP2kPSGColl& psgSampColl() const noexcept;
 
 private:
   int m_count = 0;
   int m_operating_rate = 22050;
+  MP2kDriverVariant m_variant;
   std::map<size_t, int> m_samples;
+  std::map<std::pair<size_t, u8>, int> m_bon_samples;
   MP2kPSGColl* m_psg_samples{};
 };
 
@@ -129,4 +136,32 @@ public:
 private:
   std::vector<u8> decodeToNativePcm() override;
   u8 m_control;
+};
+
+class MP2kBonSamp final : public VGMSamp {
+public:
+  enum class Shape : u8 { Pulse, Saw, Triangle };
+
+  struct PwmSettings {
+    u8 base;
+    u8 step;
+    u8 depth;
+    u8 initialPhase;
+  };
+
+  struct RenderSettings {
+    Shape shape;
+    PwmSettings pwm;
+    u8 key;
+    u32 sampleRate;
+    u32 loopSamples;
+    u32 carrierCycles;
+    s16 fineTune;
+  };
+
+  MP2kBonSamp(VGMSampColl* collection, size_t pointer, const RenderSettings& settings);
+
+private:
+  std::vector<u8> decodeToNativePcm() override;
+  RenderSettings m_settings;
 };
