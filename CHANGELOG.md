@@ -29,6 +29,7 @@
 * **Sappy (mp2k):** Corrected programmable-wave pitch and centered percussion without per-key pan settings.
 * **Sappy (mp2k):** Corrected fixed-rate PCM percussion pitch and restored valid square-wave instruments mistaken for unused entries.
 * **Sappy (mp2k):** Restored per-key PSG square voices and their stored pitch in SoundFont exports.
+* **Sappy (mp2k):** Corrected per-key PSG noise frequencies and short-mode timbre in SoundFont exports.
 
 **Nintendo DS (SDAT)**
 
