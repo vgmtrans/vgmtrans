@@ -320,24 +320,39 @@ bool MP2kInstr::loadInstr() {
   const Tone instrument = decodeTone(m_data);
   const u32 envelopeOrKeyMap = m_data.w2;
   auto& instrSet = *static_cast<MP2kInstrSet*>(parInstrSet);
+  auto addPcmRegions = [this](const Tone& tone, u32 toneOffset, int sampleId, u32 adsr,
+                              u8 keyLow = 0, u8 keyHigh = 127) {
+    auto addRegion = [&](u8 low, u8 high) {
+      auto* region = addRgn(toneOffset, kToneRecordSize, sampleId, low, high);
+      setADSR(region, adsr);
+      return region;
+    };
+    if (!tone.fixedPitch()) {
+      addRegion(keyLow, keyHigh);
+      return;
+    }
+
+    // One-key regions preserve fixed PCM's mixer-rate pitch in both SF2 and DLS.
+    const auto* sample = parInstrSet->sampColl()->sample(sampleId);
+    for (int key = keyLow; key <= keyHigh; ++key) {
+      auto* region = addRegion(static_cast<u8>(key), static_cast<u8>(key));
+      region->setUnityKey(static_cast<u8>(key));
+      region->setFineTune(-sample->fineTune);
+    }
+  };
 
   switch (instrumentVoice(instrument.type)) {
     case VoiceType::Pcm: {
       setName("Single-region instrument");
       setLength(kToneRecordSize);
 
-      // Preserve the existing warning for the plain fixed-PCM type only.
-      if (instrument.type == kFixedPitchFlag) {
-        L_WARN("Ignoring resampling shenaningans!");
-      }
       if (instrument.sampleOrTable == 0 || !isGbaRomPointer(instrument.sampleOrTable)) {
         break;
       }
 
       const auto sampleOffset = instrument.sampleOffset();
       if (const int sampleId = instrSet.makeOrGetSample(sampleOffset); sampleId != -1) {
-        auto* region = addRgn(offset(), length(), sampleId);
-        setADSR(region, envelopeOrKeyMap);
+        addPcmRegions(instrument, offset(), sampleId, envelopeOrKeyMap);
       } else {
         L_WARN("No sample could be loaded for {:#x}", sampleOffset);
         setName(name() + " (sample missing)");
@@ -408,8 +423,7 @@ bool MP2kInstr::loadInstr() {
               break;
             }
             if (const int sampleId = instrSet.makeOrGetSample(tone.sampleOffset()); sampleId != -1) {
-              auto* region = addRgn(toneOffset, kToneRecordSize, sampleId, keyLow, keyHigh);
-              setADSR(region, envelope());
+              addPcmRegions(tone, toneOffset, sampleId, envelope(), keyLow, keyHigh);
             }
             break;
           }
