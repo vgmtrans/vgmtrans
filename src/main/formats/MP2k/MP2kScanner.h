@@ -27,6 +27,7 @@ private:
   };
 
   std::optional<EngineLocation> detectMP2K(RawFile *file);
+  std::optional<EngineLocation> detectNintendoRd1(RawFile* file);
   static bool isValidOffset(u32 offset, u32 romsize);
   static bool isGbaRomAddress(u32 address);
   static u32 gbaAddressToOffset(u32 address);

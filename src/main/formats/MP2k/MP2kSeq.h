@@ -6,6 +6,7 @@
 #pragma once
 
 #include "automation/SeqMidiAutomation.h"
+#include "MP2kDriver.h"
 #include "base/Types.h"
 #include "SeqEvent.h"
 #include "SeqTrack.h"
@@ -16,14 +17,17 @@
 
 class MP2kSeq final : public VGMSeq {
 public:
-  MP2kSeq(RawFile *file, u32 offset, std::string name = "MP2kSeq", u8 defaultReverb = 0);
+  MP2kSeq(RawFile *file, u32 offset, std::string name = "MP2kSeq", u8 defaultReverb = 0,
+          MP2kDriverVariant variant = MP2kDriverVariant::Standard);
   ~MP2kSeq() = default;
 
   bool parseHeader() override;
   bool parseTrackPointers() override;
+  MP2kDriverVariant driverVariant() const noexcept { return m_variant; }
 
 private:
   u8 m_defaultReverb;
+  MP2kDriverVariant m_variant;
 };
 
 class MP2kTrack final : public SeqTrack {

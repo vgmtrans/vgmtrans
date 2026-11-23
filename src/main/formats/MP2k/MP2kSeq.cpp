@@ -27,6 +27,7 @@ DECLARE_FORMAT(MP2k);
 constexpr u8 kMp2kModTypeVibrato = 0;
 constexpr u8 kMp2kModTypeTremolo = 1;
 constexpr u8 kMp2kModTypePan = 2;
+constexpr u32 kGbaRomBase = 0x08000000;
 
 const char* mp2kModTypeName(u8 type) {
   switch (type) {
@@ -41,8 +42,10 @@ const char* mp2kModTypeName(u8 type) {
   }
 }
 
-MP2kSeq::MP2kSeq(RawFile *file, u32 offset, std::string name, u8 defaultReverb)
-    : VGMSeq(MP2kFormat::name, file, offset, 0, std::move(name)), m_defaultReverb(defaultReverb) {
+MP2kSeq::MP2kSeq(RawFile *file, u32 offset, std::string name, u8 defaultReverb,
+                 MP2kDriverVariant variant)
+    : VGMSeq(MP2kFormat::name, file, offset, 0, std::move(name)), m_defaultReverb(defaultReverb),
+      m_variant(variant) {
   setAllowDiscontinuousTrackData(true);
   // MP2k multiplies track volume and note velocity directly into the PCM amplitude.
   setUseLinearAmplitudeScale(true);
@@ -54,7 +57,7 @@ bool MP2kSeq::parseHeader() {
     return false;
   }
 
-  nNumTracks = readShort(offset());
+  nNumTracks = readByte(offset());
 
   // if there are no tracks or there are more tracks than allowed
   // return an error; the sequence shall be deleted
@@ -75,14 +78,20 @@ bool MP2kSeq::parseHeader() {
   setAlwaysWriteInitialReverb((reverb & 0x80) != 0 ? reverb & 0x7f : m_defaultReverb);
 
   u32 dwInstPtr = readWord(offset() + 4);
-  seqHdr->addPointer(offset() + 4, 4, dwInstPtr - 0x8000000, true, "Instrument pointer");
+  if (dwInstPtr < kGbaRomBase || dwInstPtr - kGbaRomBase >= rawFile()->size()) {
+    return false;
+  }
+  seqHdr->addPointer(offset() + 4, 4, dwInstPtr - kGbaRomBase, true, "Instrument pointer");
   for (u32 i = 0; i < nNumTracks; i++) {
     u32 dwTrackPtrOffset = offset() + 8 + i * 4;
     u32 dwTrackPtr = readWord(dwTrackPtrOffset);
     if (dwTrackPtr == 0) {
       seqHdr->addChild(dwTrackPtrOffset, 4, "Empty track slot");
     } else {
-      seqHdr->addPointer(dwTrackPtrOffset, 4, dwTrackPtr - 0x8000000, true, "Track pointer");
+      if (dwTrackPtr < kGbaRomBase || dwTrackPtr - kGbaRomBase >= rawFile()->size()) {
+        return false;
+      }
+      seqHdr->addPointer(dwTrackPtrOffset, 4, dwTrackPtr - kGbaRomBase, true, "Track pointer");
     }
   }
 
@@ -169,7 +178,14 @@ bool MP2kTrack::readEvent() {
       addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Note State", "",
                       Type::ChangeState);
     }
-  } else if (status_byte == 0xB1) { /* End of track */
+  } else if (status_byte == 0xB1 ||
+             (status_byte == 0xB6 &&
+              static_cast<MP2kSeq*>(parentSeq)->driverVariant() == MP2kDriverVariant::NintendoRd1)) {
+    if (static_cast<MP2kSeq*>(parentSeq)->driverVariant() == MP2kDriverVariant::NintendoRd1) {
+      // R&D1 stops this track's voices for both end commands. B6 also notifies its player.
+      constexpr u8 kAllSoundOff = 120;
+      addControllerEventNoItem(kAllSoundOff, 0);
+    }
     addEndOfTrack(beginOffset, curOffset - beginOffset);
     return false;
   } else if (status_byte == 0xB2) { /* Goto */

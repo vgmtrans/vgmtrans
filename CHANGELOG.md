@@ -32,6 +32,7 @@
 * **Sappy (mp2k):** Corrected per-key PSG noise frequencies and short-mode timbre in SoundFont exports.
 * **Sappy (mp2k):** Added Bon driver detection and Golden Sun's PWM, saw, and triangle instruments.
 * **Sappy (mp2k):** Ignored empty track slots instead of creating invalid tracks.
+* **Sappy (mp2k):** Added Nintendo R&D1 driver support for Metroid Fusion, Metroid: Zero Mission, and WarioWare: Twisted!, including track termination commands.
 
 **Nintendo DS (SDAT)**
 

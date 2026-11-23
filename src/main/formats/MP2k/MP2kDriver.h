@@ -8,4 +8,5 @@
 enum class MP2kDriverVariant {
   Standard,
   Bon,
+  NintendoRd1,
 };

@@ -30,6 +30,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <spdlog/fmt/fmt.h>
@@ -105,7 +106,10 @@ static bool test_pointer_validity(RawFile *file, size_t offset, u32 inGBA_length
 
 void MP2kScanner::scan(RawFile *file, void *) {
   /* Detect if the sound engine is actually MP2K */
-  const auto engine = detectMP2K(file);
+  auto engine = detectMP2K(file);
+  if (!engine) {
+    engine = detectNintendoRd1(file);
+  }
   if (!engine) {
     return;
   }
@@ -153,7 +157,8 @@ void MP2kScanner::scan(RawFile *file, void *) {
     const bool hasHintTitle = hint != nullptr && hint->tag.hasTitle();
     const auto seq_name = hasHintTitle ? hint->tag.title : std::string("MP2kSeq");
 
-    auto* nseq = pRoot->loadVGMFile<MP2kSeq>(file, song_pointer, seq_name, default_reverb);
+    auto* nseq = pRoot->loadVGMFile<MP2kSeq>(file, song_pointer, seq_name, default_reverb,
+                                          engine->variant);
     if (!nseq) {
       continue;
     }
@@ -347,6 +352,129 @@ std::optional<MP2kScanner::EngineLocation> MP2kScanner::detectMP2K(RawFile *file
       .songTableOffset = songTableOffset,
       .variant = variant,
   };
+}
+
+std::optional<MP2kScanner::EngineLocation> MP2kScanner::detectNintendoRd1(RawFile* file) {
+  // Nintendo R&D1 has a different loader, but retains MP2k song and voice data.
+  // Its audio initializer's literal pool identifies the hardware registers,
+  // mixer routines, sound mode, and player array in one layout.
+  static constexpr std::array<u8, 12> kAudioRegisters = {
+      0x00, 0x02, 0x00, 0x04,  // Interrupt enable
+      0x84, 0x00, 0x00, 0x04,  // Sound enable
+      0x82, 0x00, 0x00, 0x04,  // Direct Sound control
+  };
+  static const auto searcher = std::boyer_moore_horspool_searcher(
+      kAudioRegisters.begin(), kAudioRegisters.end());
+  constexpr std::array<std::pair<size_t, u32>, 4> kOtherRegisters = {{
+      {0x14, 0x04000089}, {0x18, 0x04000063},
+      {0x1c, 0x04000080}, {0x68, 0x040000d4},
+  }};
+  const auto isRamAddress = [](u32 address) {
+    return (address >= 0x02000000 && address < 0x02040000) ||
+           (address >= 0x03000000 && address < 0x03008000);
+  };
+  const auto isRomAddress = [file](u32 address) {
+    return isGbaRomAddress(address) && gbaAddressToOffset(address) < file->size();
+  };
+  std::optional<EngineLocation> result;
+  const auto* begin = reinterpret_cast<const u8*>(file->begin());
+  const auto* end = reinterpret_cast<const u8*>(file->end());
+  auto cursor = begin;
+  while (cursor != end) {
+    const auto match = std::search(cursor, end, searcher);
+    if (match == end) {
+      break;
+    }
+    cursor = std::next(match);
+    const size_t matchOffset = match - begin;
+    if (matchOffset < 4) {
+      continue;
+    }
+    const size_t pool = matchOffset - 4;
+    if (pool % 4 != 0 || file->size() - pool < 0x70 ||
+        !std::ranges::all_of(kOtherRegisters, [&](const auto& entry) {
+          return file->get<u32>(pool + entry.first) == entry.second;
+        }) ||
+        !std::ranges::all_of(std::array{0u, 0x20u, 0x24u, 0x30u, 0x34u, 0x40u, 0x44u, 0x60u},
+                            [&](u32 offset) { return isRamAddress(file->get<u32>(pool + offset)); }) ||
+        !std::ranges::all_of(std::array{0x28u, 0x38u, 0x48u},
+                            [&](u32 offset) { return isRomAddress(file->get<u32>(pool + offset)); })) {
+      continue;
+    }
+    const u32 soundMode = file->get<u32>(pool + 0x5c);
+    const u32 playerCount = file->get<u32>(pool + 0x58);
+    const u32 playerAddress = file->get<u32>(pool + 0x6c);
+    if (!EngineParams(soundMode).valid() || (soundMode >> 24) > 2 ||
+        playerCount == 0 || playerCount > 32 || !isRomAddress(playerAddress)) {
+      continue;
+    }
+    const u32 players = gbaAddressToOffset(playerAddress);
+    if (playerCount > (file->size() - players) / 12) {
+      continue;
+    }
+    bool validPlayers = true;
+    for (u32 player = 0; player < playerCount; ++player) {
+      const u32 record = players + player * 12;
+      const u32 variables = file->get<u32>(record + 4);
+      const u16 tracks = file->get<u16>(record + 8);
+      if (!isRamAddress(file->get<u32>(record)) ||
+          (variables != 0 && !isRamAddress(variables)) ||
+          tracks == 0 || tracks > 16 || file->get<u16>(record + 10) > 1) {
+        validPlayers = false;
+        break;
+      }
+    }
+    if (!validPlayers) {
+      continue;
+    }
+    // This driver stores its eight-byte song entries directly after the player records.
+    const u32 table = players + playerCount * 12;
+    unsigned validSongs = 0;
+    for (u32 song = 0; song < 32 && table + song * 8 + 8 <= file->size(); ++song) {
+      const u32 slot = table + song * 8;
+      const u32 address = file->get<u32>(slot);
+      if (address == 0) {
+        continue;
+      }
+      if (!isRomAddress(address) || file->get<u16>(slot + 4) >= playerCount ||
+          file->get<u16>(slot + 6) >= playerCount) {
+        break;
+      }
+      const u32 header = gbaAddressToOffset(address);
+      if (file->size() - header < 8) {
+        continue;
+      }
+      const u8 tracks = file->get<u8>(header);
+      if (tracks == 0 || tracks > 24 || file->size() - header < 8 + 4u * tracks ||
+          !isRomAddress(file->get<u32>(header + 4))) {
+        continue;
+      }
+      bool validTracks = true;
+      bool hasTrack = false;
+      for (u32 track = 0; track < tracks; ++track) {
+        const u32 trackAddress = file->get<u32>(header + 8 + 4 * track);
+        if (trackAddress == 0) {
+          continue;
+        }
+        if (!isRomAddress(trackAddress)) {
+          validTracks = false;
+          break;
+        }
+        hasTrack = true;
+      }
+      if (validTracks && hasTrack) {
+        ++validSongs;
+      }
+    }
+    if (validSongs < 2) {
+      continue;
+    }
+    if (result.has_value()) {
+      return std::nullopt;
+    }
+    result = EngineLocation{pool + 0x5c, table, MP2kDriverVariant::NintendoRd1};
+  }
+  return result;
 }
 
 bool MP2kScanner::isValidOffset(u32 offset, u32 romsize) {
