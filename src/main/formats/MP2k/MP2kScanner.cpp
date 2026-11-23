@@ -472,7 +472,22 @@ std::optional<MP2kScanner::EngineLocation> MP2kScanner::detectNintendoRd1(RawFil
     if (result.has_value()) {
       return std::nullopt;
     }
-    result = EngineLocation{pool + 0x5c, table, MP2kDriverVariant::NintendoRd1};
+    // The early note parser reads only key and velocity; its next data byte
+    // starts another running note. Later R&D1 engines also accept a gate extension.
+    static constexpr std::array<u8, 32> kTwoByteNoteParser = {
+        0x62, 0x70, 0x4b, 0x1c, 0x63, 0x62, 0x4a, 0x78,
+        0x01, 0x20, 0x08, 0x56, 0x00, 0x28, 0x02, 0xdb,
+        0xe2, 0x73, 0x58, 0x1c, 0x60, 0x62, 0x21, 0x78,
+        0xf0, 0x20, 0x08, 0x40, 0x3f, 0x28, 0x02, 0xd9,
+    };
+    static const auto noteParserSearcher = std::boyer_moore_horspool_searcher(
+        kTwoByteNoteParser.begin(), kTwoByteNoteParser.end());
+    const auto* parserBegin = begin + (pool > 0x2000 ? pool - 0x2000 : 0);
+    const auto* parserEnd = begin + pool;
+    const auto variant = std::search(parserBegin, parserEnd, noteParserSearcher) != parserEnd
+                            ? MP2kDriverVariant::NintendoRd1TwoByteNotes
+                            : MP2kDriverVariant::NintendoRd1;
+    result = EngineLocation{pool + 0x5c, table, variant};
   }
   return result;
 }

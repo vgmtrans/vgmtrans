@@ -74,7 +74,7 @@ bool MP2kSeq::parseHeader() {
   VGMHeader *seqHdr = addHeader(offset(), 8 + nNumTracks * 4, "Sequence header");
   seqHdr->addChild(offset(), 1, "Number of tracks");
   seqHdr->addChild(offset() + 1, 1,
-                   m_variant == MP2kDriverVariant::NintendoRd1 ? "Header identifier" : "Block count");
+                   isNintendoRd1Driver(m_variant) ? "Header identifier" : "Block count");
   seqHdr->addChild(offset() + 2, 1, "Priority");
   seqHdr->addChild(offset() + 3, 1, "Reverb");
   // Bit 7 requests a global reverb change; otherwise retain the engine's initial setting.
@@ -187,8 +187,8 @@ bool MP2kTrack::readEvent() {
     }
   } else if (status_byte == 0xB1 ||
              (status_byte == 0xB6 &&
-              static_cast<MP2kSeq*>(parentSeq)->driverVariant() == MP2kDriverVariant::NintendoRd1)) {
-    if (static_cast<MP2kSeq*>(parentSeq)->driverVariant() == MP2kDriverVariant::NintendoRd1) {
+              isNintendoRd1Driver(static_cast<MP2kSeq*>(parentSeq)->driverVariant()))) {
+    if (isNintendoRd1Driver(static_cast<MP2kSeq*>(parentSeq)->driverVariant())) {
       // R&D1 stops this track's voices for both end commands. B6 also notifies its player.
       constexpr u8 kAllSoundOff = 120;
       addControllerEventNoItem(kAllSoundOff, 0);
@@ -232,7 +232,8 @@ void MP2kTrack::handleStatusCommand(u32 beginOffset, u8 status_byte) {
       if (readByte(curOffset) <= 0x7F) {
         current_vel = readByte(curOffset++);
         // The optional third byte extends this note's gate in driver ticks.
-        if (readByte(curOffset) <= 0x7F) {
+        if (static_cast<MP2kSeq*>(parentSeq)->hasNoteGateExtension() &&
+            readByte(curOffset) <= 0x7F) {
           duration += readByte(curOffset++) * kMidiTicksPerDriverTick;
         }
       }
@@ -247,7 +248,8 @@ void MP2kTrack::handleStatusCommand(u32 beginOffset, u8 status_byte) {
       /* Velocity update might be needed */
       if (readByte(curOffset) <= 0x7F) {
         current_vel = readByte(curOffset++);
-        if (readByte(curOffset) <= 0x7F) {
+        if (static_cast<MP2kSeq*>(parentSeq)->hasNoteGateExtension() &&
+            readByte(curOffset) <= 0x7F) {
           duration = readByte(curOffset++) * kMidiTicksPerDriverTick;
         }
       }
@@ -344,7 +346,7 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
       // Standard MEMACC operation 0 writes a byte to the player's shared memory.
       // Its operands are data even when their high bit is set.
       const auto variant = static_cast<MP2kSeq*>(parentSeq)->driverVariant();
-      if (variant != MP2kDriverVariant::NintendoRd1 &&
+      if (!isNintendoRd1Driver(variant) &&
           curOffset + 3 <= vgmFile()->endOffset() && readByte(curOffset) == 0) {
         curOffset++;
         const u8 address = readByte(curOffset++);

@@ -9,4 +9,10 @@ enum class MP2kDriverVariant {
   Standard,
   Bon,
   NintendoRd1,
+  NintendoRd1TwoByteNotes,
 };
+
+constexpr bool isNintendoRd1Driver(MP2kDriverVariant variant) noexcept {
+  return variant == MP2kDriverVariant::NintendoRd1 ||
+         variant == MP2kDriverVariant::NintendoRd1TwoByteNotes;
+}

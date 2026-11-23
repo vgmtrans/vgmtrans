@@ -34,6 +34,7 @@
 * **Sappy (mp2k):** Ignored empty track slots instead of creating invalid tracks.
 * **Sappy (mp2k):** Added Nintendo R&D1 driver support for Metroid Fusion, Metroid: Zero Mission, and WarioWare: Twisted!, including track termination commands.
 * **Sappy (mp2k):** Preserved optional note gate extensions and early releases of finite ties in MIDI exports.
+* **Sappy (mp2k):** Preserved running notes in Metroid Fusion's two-byte note dialect.
 * **Sappy (mp2k):** Identified memory-write commands and stopped interpreting their operands as music events.
 
 **Nintendo DS (SDAT)**

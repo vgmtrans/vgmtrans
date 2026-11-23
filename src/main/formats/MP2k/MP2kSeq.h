@@ -24,6 +24,9 @@ public:
   bool parseHeader() override;
   bool parseTrackPointers() override;
   MP2kDriverVariant driverVariant() const noexcept { return m_variant; }
+  bool hasNoteGateExtension() const noexcept {
+    return m_variant != MP2kDriverVariant::NintendoRd1TwoByteNotes;
+  }
 
 private:
   u8 m_defaultReverb;
