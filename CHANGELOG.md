@@ -26,7 +26,7 @@
 * **Sappy (mp2k):** Corrected volume balance and PCM decay/release timing.
 * **Sappy (mp2k):** Restored delayed vibrato/tremolo and matching playback vibrato depth after seeking.
 * **Sappy (mp2k):** Preserved song reverb settings and kept PSG regions dry in exported SoundFonts.
-* **Sappy (mp2k):** Corrected programmable-wave pitch and centered percussion without per-key pan settings.
+* **Sappy (mp2k):** Corrected programmable-wave pitch and percussion panning.
 * **Sappy (mp2k):** Corrected fixed-rate PCM pitch in ordinary, key-split, and percussion instruments, and restored valid square-wave instruments mistaken for unused entries.
 * **Sappy (mp2k):** Restored per-key PSG square voices and their stored pitch in SoundFont exports.
 * **Sappy (mp2k):** Corrected per-key PSG noise frequencies and short-mode timbre in SoundFont exports.

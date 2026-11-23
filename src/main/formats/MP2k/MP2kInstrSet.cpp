@@ -103,9 +103,8 @@ struct Tone {
   constexpr u32 sampleOffset() const { return romOffset(sampleOrTable); }
 
   void applyRhythmPan(VGMRgn* region) const {
-    // Preserve the existing raw pan conversion when the tone requests an override.
     if ((pan & kRhythmPanOverrideFlag) != 0) {
-      region->setPan(pan);
+      region->setPan(pan & ~kRhythmPanOverrideFlag);
     }
   }
 };
