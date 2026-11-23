@@ -18,7 +18,9 @@
 #include "MidiFile.h"
 #include "MP2kFormat.h"
 
+#include <algorithm>
 #include <array>
+#include <ranges>
 
 #include <spdlog/fmt/fmt.h>
 
@@ -28,6 +30,7 @@ constexpr u8 kMp2kModTypeVibrato = 0;
 constexpr u8 kMp2kModTypeTremolo = 1;
 constexpr u8 kMp2kModTypePan = 2;
 constexpr u32 kGbaRomBase = 0x08000000;
+constexpr u32 kMidiTicksPerDriverTick = 2;
 
 const char* mp2kModTypeName(u8 type) {
   switch (type) {
@@ -70,7 +73,8 @@ bool MP2kSeq::parseHeader() {
 
   VGMHeader *seqHdr = addHeader(offset(), 8 + nNumTracks * 4, "Sequence header");
   seqHdr->addChild(offset(), 1, "Number of tracks");
-  seqHdr->addChild(offset() + 1, 1, "Unknown");
+  seqHdr->addChild(offset() + 1, 1,
+                   m_variant == MP2kDriverVariant::NintendoRd1 ? "Header identifier" : "Block count");
   seqHdr->addChild(offset() + 2, 1, "Priority");
   seqHdr->addChild(offset() + 3, 1, "Reverb");
   // Bit 7 requests a global reverb change; otherwise retain the engine's initial setting.
@@ -138,6 +142,7 @@ void MP2kTrack::resetVars() {
   curDuration = 0;
   current_vel = 0;
   loopEndPositions.clear();
+  activeNotes.clear();
   modType = kMp2kModTypeVibrato;
   vibratoLfo.reset();
   tremoloLfo.reset();
@@ -164,16 +169,18 @@ bool MP2kTrack::readEvent() {
   if (status_byte <= 0x7F) {
     handleStatusCommand(beginOffset, status_byte);
   } else if (status_byte >= 0x80 && status_byte <= 0xB0) { /* Rest event */
-    addRest(beginOffset, curOffset - beginOffset, kLengthTable[status_byte - 0x80] * 2);
+    addRest(beginOffset, curOffset - beginOffset,
+            kLengthTable[status_byte - 0x80] * kMidiTicksPerDriverTick);
   } else if (status_byte >= 0xD0) { /* Note duration event */
     state = State::Note;
-    curDuration = kLengthTable[status_byte - 0xCF] * 2;
+    curDuration = kLengthTable[status_byte - 0xCF] * kMidiTicksPerDriverTick;
 
     /* Assume key and velocity values if the next value is greater than 0x7F */
     if (readByte(curOffset) > 0x7F) {
       beginNoteLfo();
       addNoteByDur(beginOffset, curOffset - beginOffset, prevKey, prevVel, curDuration,
                    "Duration Note State + Note On (prev key and vel)");
+      rememberNote(prevKey, true);
     } else {
       addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Note State", "",
                       Type::ChangeState);
@@ -220,35 +227,47 @@ bool MP2kTrack::readEvent() {
 void MP2kTrack::handleStatusCommand(u32 beginOffset, u8 status_byte) {
   switch (state) {
     case State::Note: {
+      u32 duration = curDuration;
       /* Velocity update might be needed */
       if (readByte(curOffset) <= 0x7F) {
         current_vel = readByte(curOffset++);
-        /* If the next value is 0-127, it's unknown (velocity-related?) */
+        // The optional third byte extends this note's gate in driver ticks.
         if (readByte(curOffset) <= 0x7F) {
-          curOffset++;
+          duration += readByte(curOffset++) * kMidiTicksPerDriverTick;
         }
       }
       beginNoteLfo();
-      addNoteByDur(beginOffset, curOffset - beginOffset, status_byte, current_vel, curDuration);
+      addNoteByDur(beginOffset, curOffset - beginOffset, status_byte, current_vel, duration);
+      rememberNote(status_byte, true);
       break;
     }
 
     case State::Tie: {
+      u32 duration = 0;
       /* Velocity update might be needed */
       if (readByte(curOffset) <= 0x7F) {
         current_vel = readByte(curOffset++);
-        /* If the next value is 0-127, it's unknown (velocity-related?) */
         if (readByte(curOffset) <= 0x7F) {
-          curOffset++;
+          duration = readByte(curOffset++) * kMidiTicksPerDriverTick;
         }
       }
       beginNoteLfo();
-      addNoteOn(beginOffset, curOffset - beginOffset, status_byte, current_vel, "Tie");
+      if (duration == 0) {
+        addNoteOn(beginOffset, curOffset - beginOffset, status_byte, current_vel, "Tie");
+      } else {
+        addNoteByDur(beginOffset, curOffset - beginOffset, status_byte, current_vel, duration,
+                     "Tie with gate time");
+      }
+      rememberNote(status_byte, duration != 0);
       break;
     }
 
     case State::TieEnd: {
-      addNoteOff(beginOffset, curOffset - beginOffset, status_byte, "End Tie");
+      prevKey = status_byte;
+      const bool isNewOffset = onEvent(beginOffset, curOffset - beginOffset);
+      recordSeqEvent<NoteOffSeqEvent>(isNewOffset, getTime(), status_byte, beginOffset,
+                                      curOffset - beginOffset, "End Tie");
+      endTie(status_byte);
       break;
     }
 
@@ -317,6 +336,24 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
       if (loopEndPositions.size() != 0) {
         curOffset = loopEndPositions.back();
         loopEndPositions.pop_back();
+      }
+      break;
+    }
+
+    case 0xB9: {
+      // Standard MEMACC operation 0 writes a byte to the player's shared memory.
+      // Its operands are data even when their high bit is set.
+      const auto variant = static_cast<MP2kSeq*>(parentSeq)->driverVariant();
+      if (variant != MP2kDriverVariant::NintendoRd1 &&
+          curOffset + 3 <= vgmFile()->endOffset() && readByte(curOffset) == 0) {
+        curOffset++;
+        const u8 address = readByte(curOffset++);
+        const u8 value = readByte(curOffset++);
+        const auto desc = fmt::format("Player memory offset: {:#04x}, value: {}", address, value);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Memory Write", desc,
+                        Type::ChangeState);
+      } else {
+        addUnknown(beginOffset, curOffset - beginOffset);
       }
       break;
     }
@@ -471,7 +508,7 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
       // yes, this seems to be how the actual driver code handles it.  Ex. Aria of Sorrow
       // (U): 0x80D91C0 - handle 0xCE event
       if (readByte(curOffset) > 0x7F) {
-        addNoteOffNoItem(prevKey);
+        endTie(prevKey);
         addGenericEvent(beginOffset, curOffset - beginOffset, "End Tie State + End Tie", "",
                         Type::Tie);
       } else
@@ -484,6 +521,7 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
       if (readByte(curOffset) > 0x7F) {
         beginNoteLfo();
         addNoteOnNoItem(prevKey, prevVel);
+        rememberNote(prevKey, false, false);
         addGenericEvent(beginOffset, curOffset - beginOffset,
                         "Tie State + Tie (with prev key and vel)", "", Type::Tie);
       } else
@@ -496,6 +534,62 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
       break;
     }
   }
+}
+
+void MP2kTrack::rememberNote(s8 key, bool finite, bool indexed) {
+  if (readMode != READMODE_CONVERT_TO_MIDI) {
+    return;
+  }
+  const u32 now = pMidiTrack->getDelta();
+  std::erase_if(activeNotes, [now](const auto& note) {
+    return note.gateOff != nullptr && note.gateOff->absTime <= now;
+  });
+  const auto& timeline = parentSeq->timedEventIndex();
+  auto index = SeqEventTimeIndex::kInvalidIndex;
+  if (indexed && timeline.size() != 0) {
+    const auto last = timeline.size() - 1;
+    const auto& event = timeline.event(last);
+    if (event.startTick == getTime() &&
+        event.event == findSeqEventAtOffset(m_lastEventOffset, m_lastEventLength)) {
+      index = last;
+    }
+  }
+  activeNotes.push_back({key, static_cast<s8>(key + cKeyCorrection + transpose), index,
+                         finite ? pMidiTrack->previousDurNoteOffs().back() : nullptr});
+}
+
+void MP2kTrack::endTie(s8 key) {
+  if (readMode == READMODE_CONVERT_TO_MIDI) {
+    const u32 now = pMidiTrack->getDelta();
+    auto newestFirst = activeNotes | std::views::reverse;
+    const auto note = std::ranges::find_if(newestFirst, [key, now](const auto& active) {
+      return active.key == key && (active.gateOff == nullptr || active.gateOff->absTime > now);
+    });
+    if (note != newestFirst.end()) {
+      auto* gateOff = note->gateOff;
+      const s8 midiKey = note->midiKey;
+      if (note->timelineIndex != SeqEventTimeIndex::kInvalidIndex) {
+        auto& event = parentSeq->timedEventIndex().event(note->timelineIndex);
+        event.duration = std::max<u32>(1, getTime() - event.startTick);
+        auto indices = m_activeNoteEventIndices.find(key);
+        if (indices != m_activeNoteEventIndices.end()) {
+          std::erase(indices->second, note->timelineIndex);
+          if (indices->second.empty()) {
+            m_activeNoteEventIndices.erase(indices);
+          }
+        }
+      }
+      activeNotes.erase(std::next(note).base());
+      if (gateOff != nullptr) {
+        // Release this voice now; its former deadline must not cut off a later retrigger.
+        gateOff->absTime = now;
+      } else {
+        pMidiTrack->addNoteOff(channel, midiKey);
+      }
+    }
+    return;
+  }
+  addNoteOffNoItem(key);
 }
 
 bool MP2kTrack::lfoOutputsEnabled() const {

@@ -55,6 +55,15 @@ private:
   u32 curDuration = 0;
   u8 current_vel = 0;
 
+  struct ActiveNote {
+    s8 key;
+    s8 midiKey;
+    SeqEventTimeIndex::Index timelineIndex;
+    NoteEvent* gateOff;  // Null for an indefinite tie.
+  };
+  std::vector<ActiveNote> activeNotes;
+  void rememberNote(s8 key, bool finite, bool indexed = true);
+  void endTie(s8 key);
   void beginNoteLfo();
   void updateLfoFade();
   void setLfoSpeed(u8 speed);
