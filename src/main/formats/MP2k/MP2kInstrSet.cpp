@@ -23,6 +23,7 @@
 #include <memory>
 #include <numbers>
 #include <numeric>
+#include <utility>
 
 #include <spdlog/fmt/fmt.h>
 
@@ -335,8 +336,9 @@ int MP2kInstrSet::makeOrGetBonSample(size_t pointer, u8 key) {
                              ? kBonPwmLoopFrames / kGbaFrameRateHz : kBonPeriodicLoopSeconds;
   const auto count = std::lround(m_operating_rate * seconds);
   const auto cycles = std::max(1LL, std::llround(frequency * count / m_operating_rate));
-  if (count <= kBonSawPrerollSamples || count > std::numeric_limits<u32>::max() ||
-      cycles > std::numeric_limits<u32>::max()) {
+  if (std::cmp_less_equal(count, kBonSawPrerollSamples) ||
+      std::cmp_greater(count, std::numeric_limits<u32>::max()) ||
+      std::cmp_greater(cycles, std::numeric_limits<u32>::max())) {
     return -1;
   }
   const double generatedFrequency = static_cast<double>(cycles) * m_operating_rate / count;
@@ -893,7 +895,7 @@ std::vector<u8> MP2kPSGNoiseSamp::decodeToNativePcm() {
   const u64 denominator = noise.clockDenominator(rate);
   u16 lfsr = kNoiseInitialState;
   u64 phase = 0;
-  for (u32 i = 0; i < loopLength(); ++i) {
+  for (int i = 0; i < loopLength(); ++i) {
     output[i] = (lfsr & 1) != 0 ? -32767 : 32767;
     phase += kNoiseClockHz;
     while (phase >= denominator) {
