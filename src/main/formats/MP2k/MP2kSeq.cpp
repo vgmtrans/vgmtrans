@@ -139,6 +139,7 @@ MP2kTrack::MP2kTrack(MP2kSeq *parentFile, u32 offset, u32 length)
 void MP2kTrack::resetVars() {
   SeqTrack::resetVars();
   state = State::Note;
+  runningCommand = 0;
   curDuration = 0;
   current_vel = 0;
   loopEndPositions.clear();
@@ -164,6 +165,10 @@ bool MP2kTrack::readEvent() {
   u32 beginOffset = curOffset;
   u8 status_byte = readByte(curOffset++);
   bool bContinue = true;
+  // Notes and commands from VOICE onward replace native running status; waits do not.
+  if (status_byte >= 0xBD) {
+    runningCommand = status_byte;
+  }
 
   /* Status change event (note, vel (fade), vol, ...) */
   if (status_byte <= 0x7F) {
@@ -225,6 +230,28 @@ bool MP2kTrack::readEvent() {
 }
 
 void MP2kTrack::handleStatusCommand(u32 beginOffset, u8 status_byte) {
+  switch (runningCommand) {
+    case 0xBD:  // Program
+    case 0xC1:  // Pitch-bend range
+    case 0xC2:  // LFO speed
+    case 0xC3:  // LFO delay
+    case 0xC5:  // Modulation type
+    case 0xC8:  // Fine tuning
+      // Reuse the explicit command's fixed-width operand decoder.
+      --curOffset;
+      handleSpecialCommand(beginOffset, runningCommand);
+      return;
+    case 0xC9:
+      if (static_cast<MP2kSeq*>(parentSeq)->driverVariant() ==
+          MP2kDriverVariant::NintendoRd1RandomPitch) {
+        --curOffset;
+        handleSpecialCommand(beginOffset, runningCommand);
+        return;
+      }
+      break;
+    default:
+      break;
+  }
   switch (state) {
     case State::Note: {
       u32 duration = curDuration;
@@ -459,6 +486,18 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
       break;
     }
 
+    case 0xC9: {
+      if (static_cast<MP2kSeq*>(parentSeq)->driverVariant() ==
+          MP2kDriverVariant::NintendoRd1RandomPitch && curOffset < vgmFile()->endOffset()) {
+        // The operand is an unsigned byte; later data bytes repeat this command.
+        const u8 amount = readByte(curOffset++);
+        addRandomPitchRange(beginOffset, amount);
+      } else {
+        addUnknown(beginOffset, curOffset - beginOffset);
+      }
+      break;
+    }
+
     // extend command
     case 0xCD: {
       // This command has a subcommand-byte and its arguments.
@@ -536,6 +575,13 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
       break;
     }
   }
+}
+
+void MP2kTrack::addRandomPitchRange(u32 beginOffset, u8 amount) {
+  // Decode the command without substituting its operand for a running note or controller.
+  // Per-note random pitch is not yet represented in exported MIDI.
+  const auto desc = fmt::format("Range parameter: {}", amount);
+  addGenericEvent(beginOffset, curOffset - beginOffset, "Random Pitch Range", desc, Type::PitchBend);
 }
 
 void MP2kTrack::rememberNote(s8 key, bool finite, bool indexed) {

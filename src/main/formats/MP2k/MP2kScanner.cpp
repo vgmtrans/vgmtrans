@@ -484,9 +484,22 @@ std::optional<MP2kScanner::EngineLocation> MP2kScanner::detectNintendoRd1(RawFil
         kTwoByteNoteParser.begin(), kTwoByteNoteParser.end());
     const auto* parserBegin = begin + (pool > 0x2000 ? pool - 0x2000 : 0);
     const auto* parserEnd = begin + pool;
-    const auto variant = std::search(parserBegin, parserEnd, noteParserSearcher) != parserEnd
-                            ? MP2kDriverVariant::NintendoRd1TwoByteNotes
-                            : MP2kDriverVariant::NintendoRd1;
+    // Twisted's C9 handler clears the random offset, scales its range by 24,
+    // and advances the stream by one byte. Other R&D1 tables leave C9 unused.
+    static constexpr std::array<u8, 30> kRandomPitchHandler = {
+        0x20, 0x1c, 0x22, 0x30, 0x01, 0x70, 0x01, 0x30,
+        0x01, 0x70, 0x48, 0x00, 0x40, 0x18, 0xc0, 0x00,
+        0x20, 0x84, 0x60, 0x6a, 0x01, 0x30, 0x60, 0x62,
+        0x10, 0xbc, 0x01, 0xbc, 0x00, 0x47,
+    };
+    static const auto randomPitchSearcher = std::boyer_moore_horspool_searcher(
+        kRandomPitchHandler.begin(), kRandomPitchHandler.end());
+    auto variant = MP2kDriverVariant::NintendoRd1;
+    if (std::search(parserBegin, parserEnd, noteParserSearcher) != parserEnd) {
+      variant = MP2kDriverVariant::NintendoRd1TwoByteNotes;
+    } else if (std::search(parserBegin, parserEnd, randomPitchSearcher) != parserEnd) {
+      variant = MP2kDriverVariant::NintendoRd1RandomPitch;
+    }
     result = EngineLocation{pool + 0x5c, table, variant};
   }
   return result;

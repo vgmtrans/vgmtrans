@@ -55,6 +55,7 @@ private:
   };
 
   State state = State::Note;
+  u8 runningCommand = 0;
   u32 curDuration = 0;
   u8 current_vel = 0;
 
@@ -67,6 +68,7 @@ private:
   std::vector<ActiveNote> activeNotes;
   void rememberNote(s8 key, bool finite, bool indexed = true);
   void endTie(s8 key);
+  void addRandomPitchRange(u32 beginOffset, u8 amount);
   void beginNoteLfo();
   void updateLfoFade();
   void setLfoSpeed(u8 speed);
