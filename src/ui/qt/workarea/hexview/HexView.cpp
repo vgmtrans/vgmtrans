@@ -356,7 +356,7 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
   setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   viewport()->setAutoFillBackground(false);
 
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
   // With AA_DontCreateNativeWidgetSiblings, the RHI QWindow can cover transient (overlay)
   // scrollbars, so keep HexView's scrollbars non-transient on macOS.
   QtUi::applyNonTransientScrollBarStyle(verticalScrollBar());

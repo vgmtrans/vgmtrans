@@ -255,7 +255,7 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
   setDragDropMode(QAbstractItemView::NoDragDrop);
   setDefaultDropAction(Qt::MoveAction);
 
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
   // On MacOS, a wrapping QListView gives unwanted padding to the scrollbar. This compensates.
   if (isWrapping()) {
     int scrollBarThickness = style()->pixelMetric(QStyle::PM_ScrollBarExtent);
@@ -301,7 +301,7 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
 
 QRect VGMCollListView::searchEmptyStateRect() const {
   QRect rect = viewport()->rect();
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
   if (isWrapping()) {
     rect.setHeight(std::max(0, rect.height() - style()->pixelMetric(QStyle::PM_ScrollBarExtent)));
   }

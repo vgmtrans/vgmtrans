@@ -28,7 +28,7 @@ constexpr int kDockControlsLeadingGap = 28;
 constexpr int kTitleBarToggleButtonWidth = 30;
 constexpr int kTitleBarToggleButtonHeight = 25;
 constexpr int kTitleBarToggleIconSize = 19;
-#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
+#if !defined(Q_OS_MACOS)
 constexpr int kCustomWindowIconButtonWidth = 36;
 constexpr int kCustomWindowButtonWidth = 46;
 constexpr int kCustomWindowIconSize = 18;
@@ -75,7 +75,7 @@ WindowBar::WindowBar(QWidget *parent) : QWidget(parent) {
 
   m_layout = new QHBoxLayout(this);
   m_layout->setContentsMargins(
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+#if defined(Q_OS_MACOS)
       kMacWindowBarLeftMargin, 0, kMacWindowBarRightMargin, 0
 #else
       0, 0, 0, 0
@@ -104,7 +104,7 @@ WindowBar::WindowBar(QWidget *parent) : QWidget(parent) {
   dockControlsLayout->setSpacing(4);
   m_dockControls->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
 
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+#if defined(Q_OS_MACOS)
   m_systemButtonArea = new QWidget(this);
   m_systemButtonArea->setFixedSize(kMacSystemButtonAreaWidth, kTitleBarHeight - 4);
   m_layout->addWidget(m_systemButtonArea, 0, Qt::AlignBottom);
@@ -183,7 +183,7 @@ void WindowBar::setCenterWidget(QWidget *widget) {
 }
 
 void WindowBar::setMenuBarWidget(QWidget *widget) {
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+#if defined(Q_OS_MACOS)
   Q_UNUSED(widget);
   return;
 #else
@@ -312,7 +312,7 @@ void WindowBar::updateResponsiveLayout() {
   const int centerMinimumWidth = std::max(0, m_centerWidget->minimumSizeHint().width());
   const int dockControlsWidth =
       m_dockToggleButtons.isEmpty() ? 0 : m_dockControlsSpacer->sizeHint().width() + m_dockControls->sizeHint().width();
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+#if defined(Q_OS_MACOS)
   const int baseFixedWidth = margins.left() + margins.right() + visibleWidth(m_systemButtonArea);
 #else
   const int baseFixedWidth =
@@ -416,7 +416,7 @@ void WindowBar::refreshDockToggleButtons() {
 }
 
 void WindowBar::syncWindowButtons() {
-#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
+#if !defined(Q_OS_MACOS)
   const bool maximized = window()->isMaximized();
 
 #if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
