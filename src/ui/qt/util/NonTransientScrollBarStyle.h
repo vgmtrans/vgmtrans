@@ -12,7 +12,7 @@
 
 namespace QtUi {
 
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 
 class NonTransientScrollBarStyle final : public QProxyStyle {
 public:

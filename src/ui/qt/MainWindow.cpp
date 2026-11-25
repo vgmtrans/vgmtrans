@@ -279,7 +279,7 @@ void MainWindow::createElements() {
   QFont collSearchFont = collSearchEdit->font();
   collSearchFont.setPointSizeF(collSearchFont.pointSizeF() - 1.0);
   collSearchEdit->setFont(collSearchFont);
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
   collSearchEdit->setAttribute(Qt::WA_MacShowFocusRect, false);
 #endif
   const int searchControlHeight = m_stitchButton->height();
@@ -356,7 +356,7 @@ void MainWindow::createElements() {
   };
   m_windowBar = new WindowBar(this);
 
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+#if defined(Q_OS_MACOS)
   m_menu_bar = new MenuBar(nullptr, viewMenuDocks);
   m_menu_bar->setNativeMenuBar(true);
 #else
@@ -389,7 +389,7 @@ void MainWindow::configureWindowAgent() {
     }
   }
 
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+#if defined(Q_OS_MACOS)
   m_windowAgent->setWindowAttribute(QStringLiteral("no-system-buttons"), false);
   setMenuWidget(m_windowBar);
   m_windowAgent->setSystemButtonArea(m_windowBar->systemButtonArea());
@@ -441,7 +441,7 @@ void MainWindow::showEvent(QShowEvent* event) {
 
   updateDragOverlayGeometry();
 
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+#if defined(Q_OS_MACOS)
   QTimer::singleShot(0, this, [this]() {
     // QMainWindow repositions the menu widget during startup, so rebind the
     // traffic-light anchor once after show to pick up the final rect.

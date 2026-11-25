@@ -49,7 +49,7 @@ VMGFileTreeHeaderView::VMGFileTreeHeaderView(Qt::Orientation orientation, QWidge
 void VMGFileTreeHeaderView::showEvent(QShowEvent *event) {
   QFont headerFont = font();
   headerFont.setPointSize(headerFont.pointSize()-1);
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
   // Hide the splitter that appears on the far right of the header. Oddly, setting border-right
   // does not work, but setting border-top seems to reset the appearance altogether and remove the
   // splitter. The margin and padding settings here get us back to the default appearance.

@@ -38,7 +38,7 @@ ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
   layout->setSpacing(15);
   layout->setContentsMargins(20, 20, 20, 20);
 
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
   /* I know that this is a Qt sin, but the default 
   macOS theme is very inconsistent in squared vs rounded elements */
   this->setStyleSheet(

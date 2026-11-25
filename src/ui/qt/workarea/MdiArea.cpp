@@ -135,7 +135,7 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
     tab_bar->setStyleSheet(QString{"QTabBar::tab { height: %1; }"}.arg(Size::VTab));
     tab_bar->setExpanding(false);
     tab_bar->setUsesScrollButtons(true);
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
     tab_bar->setElideMode(Qt::ElideNone);
 #endif
   }
@@ -148,7 +148,7 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
     connect(sc, &QShortcut::activated, this, slot);
   };
 
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
   // Cmd ⇧ [  /  Cmd ⇧ ]
   addShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_BracketLeft),
               &QMdiArea::activatePreviousSubWindow);
@@ -280,7 +280,7 @@ void MdiArea::newView(VGMFile *file) {
     tab->showMaximized();
     tab->setFocus();
 
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
     auto newTitle = " " + vgmfile_view->windowTitle() + " ";
     vgmfile_view->setWindowTitle(newTitle);
 #endif
