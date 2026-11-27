@@ -249,6 +249,13 @@ void MP2kTrack::handleStatusCommand(u32 beginOffset, u8 status_byte) {
         return;
       }
       break;
+    case 0xCD:
+      if (status_byte == 0x08 || status_byte == 0x09) {
+        --curOffset;
+        handleSpecialCommand(beginOffset, runningCommand);
+        return;
+      }
+      break;
     default:
       break;
   }
@@ -506,7 +513,13 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
       //
       // Probably, some games extend this command by their own code.
 
-      u8 subCommand = readByte(curOffset++);
+      const u32 endOffset = vgmFile()->endOffset();
+      if (curOffset >= endOffset || endOffset - curOffset < 2) {
+        curOffset = endOffset;
+        addUnknown(beginOffset, curOffset - beginOffset);
+        break;
+      }
+      const u8 subCommand = readByte(curOffset++);
       u8 subParam = readByte(curOffset);
       auto addEchoTextNoItem = [this](const std::string &name, const std::string &desc) {
         if (readMode == READMODE_CONVERT_TO_MIDI && !bWriteGenericEventAsTextEvent) {
@@ -534,9 +547,11 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
         addEchoTextNoItem(kEventName, desc);
       } else {
         // Heuristic method
-        while (subParam <= 127) {
+        while (curOffset < vgmFile()->endOffset() && subParam <= 127) {
           curOffset++;
-          subParam = readByte(curOffset);
+          if (curOffset < vgmFile()->endOffset()) {
+            subParam = readByte(curOffset);
+          }
         }
         addGenericEvent(beginOffset, curOffset - beginOffset, "Extend Command", "", Type::Unknown);
       }
