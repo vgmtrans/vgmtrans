@@ -156,6 +156,11 @@ jobs:
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.11
       options: --privileged
+      # Some hosted runners reject renaming image-layer directories, which breaks
+      # Flatpak runtime updates ("Invalid cross-device link"). A named volume is
+      # seeded with the image's installation and lives on a regular filesystem.
+      volumes:
+        - flatpak-data:/var/lib/flatpak
     name: Linux, x64
     permissions:
       id-token: write
@@ -385,7 +390,7 @@ jobs:
 
       - name: Generate preview app token
         id: preview-app-token
-        uses: actions/create-github-app-token@v3.3.0
+        uses: actions/create-github-app-token@v3.4.0
         with:
           # This is https://github.com/apps/vgmtrans-helper
           app-id: ${{ vars.VGMTRANS_HELPER_APP_ID }}
