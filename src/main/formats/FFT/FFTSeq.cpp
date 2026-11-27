@@ -281,6 +281,17 @@ bool FFTTrack::readEvent() {
         }
         break;
 
+        //unknown: 3 argument bytes. With them, every looping track of
+        //Final Fantasy Tactics MUSIC_09 has the same length.
+      case 0x9C: {
+        const auto arg1 = readByte(curOffset++);
+        const auto arg2 = readByte(curOffset++);
+        const auto arg3 = readByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1, arg2, arg3);
+        addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+        break;
+      }
+
         //--------
         //General Event
 
@@ -382,6 +393,14 @@ bool FFTTrack::readEvent() {
         const auto arg1 = readByte(curOffset++);
         desc = describeUnknownEvent(status_byte, arg1);
         addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Attack Rate?", desc, Type::Adsr);
+        break;
+      }
+
+        //unknown: 1 argument byte (seen 0x0D, 0x0E), maybe an ADSR parameter
+      case 0xC3: {
+        const auto arg1 = readByte(curOffset++);
+        desc = describeUnknownEvent(status_byte, arg1);
+        addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
       }
 
