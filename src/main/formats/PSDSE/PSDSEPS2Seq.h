@@ -1,0 +1,99 @@
+#pragma once
+
+#include "PSDSEPS2Header.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <cstdint>
+#include <vector>
+
+class PSDSEPS2Track;
+
+class PSDSEPS2Seq : public VGMSeq {
+public:
+  PSDSEPS2Seq(RawFile* file, const PSDSEPS2::SequenceHeader& header);
+
+  bool parseHeader() override;
+  bool parseTrackPointers() override;
+  void resetVars() override;
+  bool postLoad() override;
+
+  void observeEffectVelocity();
+  [[nodiscard]] uint8_t normalizedEffectVelocity() const;
+
+  PSDSEPS2::SequenceHeader m_header;
+
+private:
+  friend class PSDSEPS2Track;
+
+  void updateChannelNotesOnce();
+  void setChannelSustain(PSDSEPS2Track& source, bool enabled, bool releaseHeld);
+  void endChannelNotes(PSDSEPS2Track& source, int key = -1);
+
+  uint32_t m_peakEffectiveVelocity = 0;
+  uint32_t m_lastChannelNoteTick = 0;
+  bool m_channelNotesUpdated = false;
+};
+
+class PSDSEPS2Track : public SeqTrack {
+public:
+  PSDSEPS2Track(PSDSEPS2Seq* sequence, const PSDSEPS2::SequenceTrackRecord& record);
+
+  void resetVars() override;
+  bool readEvent() override;
+  void loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) override;
+  void endDseNotes(int key = -1);
+
+protected:
+  void setChannelAndGroupFromTrkNum(int trackNum) override;
+
+private:
+  friend class PSDSEPS2Seq;
+
+  struct DseLoopFrame {
+    uint32_t startOffset;
+    uint16_t remainingCount;
+    uint32_t escapeOffset;
+    int8_t startOctave;
+    int8_t exitOctave;
+  };
+  struct SustainedNote {
+    uint8_t key;
+    int8_t transpose;
+  };
+  struct DurationNote {
+    uint8_t key;
+    NoteEvent* noteOff;
+    SeqEventTimeIndex::Index timeIndex;
+    uint32_t gateEnd;
+    bool held;
+  };
+
+  void addDelta(uint32_t offset, uint32_t length, uint32_t ticks, const std::string& name);
+  void addDseBankSelect(uint32_t offset, uint32_t length, const std::string& name);
+  void addDseTuning(uint32_t offset, uint32_t length, int32_t value, const std::string& name);
+  void updateDurationNotes(bool releaseHeld = false);
+  uint16_t readEventU16LE();
+  uint32_t readEventU24LE();
+  std::string readOperands(uint8_t count);
+
+  uint16_t m_version;
+  uint16_t m_defaultBankId;
+  uint16_t m_bankId;
+  bool m_initialBankPending;
+  uint8_t m_channel;
+  uint8_t m_outputGroup;
+  int8_t m_octave;
+  uint32_t m_afterDelta;
+  uint32_t m_gateDelta;
+  uint32_t m_lastNoteDuration;
+  uint8_t m_gateTime;
+  int16_t m_tuning;
+  int16_t m_bender;
+  bool m_sustain;
+  uint32_t m_repeatOffset;
+  int8_t m_repeatOctave;
+  std::vector<DseLoopFrame> m_dseLoopStack;
+  std::vector<SustainedNote> m_sustainedNotes;
+  std::vector<DurationNote> m_durationNotes;
+};
