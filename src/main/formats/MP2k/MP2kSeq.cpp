@@ -18,7 +18,9 @@
 #include "MidiFile.h"
 #include "MP2kFormat.h"
 
+#include <algorithm>
 #include <array>
+#include <ranges>
 
 #include <spdlog/fmt/fmt.h>
 
@@ -27,6 +29,8 @@ DECLARE_FORMAT(MP2k);
 constexpr u8 kMp2kModTypeVibrato = 0;
 constexpr u8 kMp2kModTypeTremolo = 1;
 constexpr u8 kMp2kModTypePan = 2;
+constexpr u32 kGbaRomBase = 0x08000000;
+constexpr u32 kMidiTicksPerDriverTick = 2;
 
 const char* mp2kModTypeName(u8 type) {
   switch (type) {
@@ -41,9 +45,14 @@ const char* mp2kModTypeName(u8 type) {
   }
 }
 
-MP2kSeq::MP2kSeq(RawFile *file, u32 offset, std::string name)
-    : VGMSeq(MP2kFormat::name, file, offset, 0, std::move(name)) {
+MP2kSeq::MP2kSeq(RawFile *file, u32 offset, std::string name, u8 defaultReverb,
+                 MP2kDriverVariant variant)
+    : VGMSeq(MP2kFormat::name, file, offset, 0, std::move(name)), m_defaultReverb(defaultReverb),
+      m_variant(variant) {
   setAllowDiscontinuousTrackData(true);
+  // MP2k multiplies track volume and note velocity directly into the PCM amplitude.
+  setUseLinearAmplitudeScale(true);
+  bLoadTickByTick = true;
 }
 
 bool MP2kSeq::parseHeader() {
@@ -51,7 +60,7 @@ bool MP2kSeq::parseHeader() {
     return false;
   }
 
-  nNumTracks = readShort(offset());
+  nNumTracks = readByte(offset());
 
   // if there are no tracks or there are more tracks than allowed
   // return an error; the sequence shall be deleted
@@ -64,16 +73,30 @@ bool MP2kSeq::parseHeader() {
 
   VGMHeader *seqHdr = addHeader(offset(), 8 + nNumTracks * 4, "Sequence header");
   seqHdr->addChild(offset(), 1, "Number of tracks");
-  seqHdr->addChild(offset() + 1, 1, "Unknown");
+  seqHdr->addChild(offset() + 1, 1,
+                   isNintendoRd1Driver(m_variant) ? "Header identifier" : "Block count");
   seqHdr->addChild(offset() + 2, 1, "Priority");
   seqHdr->addChild(offset() + 3, 1, "Reverb");
+  // Bit 7 requests a global reverb change; otherwise retain the engine's initial setting.
+  const u8 reverb = readByte(offset() + 3);
+  setAlwaysWriteInitialReverb((reverb & 0x80) != 0 ? reverb & 0x7f : m_defaultReverb);
 
   u32 dwInstPtr = readWord(offset() + 4);
-  seqHdr->addPointer(offset() + 4, 4, dwInstPtr - 0x8000000, true, "Instrument pointer");
+  if (dwInstPtr < kGbaRomBase || dwInstPtr - kGbaRomBase >= rawFile()->size()) {
+    return false;
+  }
+  seqHdr->addPointer(offset() + 4, 4, dwInstPtr - kGbaRomBase, true, "Instrument pointer");
   for (u32 i = 0; i < nNumTracks; i++) {
     u32 dwTrackPtrOffset = offset() + 8 + i * 4;
     u32 dwTrackPtr = readWord(dwTrackPtrOffset);
-    seqHdr->addPointer(dwTrackPtrOffset, 4, dwTrackPtr - 0x8000000, true, "Track pointer");
+    if (dwTrackPtr == 0) {
+      seqHdr->addChild(dwTrackPtrOffset, 4, "Empty track slot");
+    } else {
+      if (dwTrackPtr < kGbaRomBase || dwTrackPtr - kGbaRomBase >= rawFile()->size()) {
+        return false;
+      }
+      seqHdr->addPointer(dwTrackPtrOffset, 4, dwTrackPtr - kGbaRomBase, true, "Track pointer");
+    }
   }
 
   setPPQN(0x30);
@@ -86,6 +109,9 @@ bool MP2kSeq::parseTrackPointers(void) {
   for (unsigned int i = 0; i < nNumTracks; i++) {
     u32 dwTrackPtrOffset = offset() + 8 + i * 4;
     u32 dwTrackPtr = readWord(dwTrackPtrOffset);
+    if (dwTrackPtr == 0) {
+      continue;
+    }
     addTrack<MP2kTrack>(this, dwTrackPtr - 0x8000000);
   }
 
@@ -113,9 +139,11 @@ MP2kTrack::MP2kTrack(MP2kSeq *parentFile, u32 offset, u32 length)
 void MP2kTrack::resetVars() {
   SeqTrack::resetVars();
   state = State::Note;
+  runningCommand = 0;
   curDuration = 0;
   current_vel = 0;
   loopEndPositions.clear();
+  activeNotes.clear();
   modType = kMp2kModTypeVibrato;
   vibratoLfo.reset();
   tremoloLfo.reset();
@@ -124,7 +152,7 @@ void MP2kTrack::resetVars() {
   tremoloLfo.configure(0, kDefaultLfoSpeed, 0);
 }
 
-void MP2kTrack::onTickBegin() {
+void MP2kTrack::onTickEnd() {
   updateLfoFade();
 }
 
@@ -137,26 +165,39 @@ bool MP2kTrack::readEvent() {
   u32 beginOffset = curOffset;
   u8 status_byte = readByte(curOffset++);
   bool bContinue = true;
+  // Notes and commands from VOICE onward replace native running status; waits do not.
+  if (status_byte >= 0xBD) {
+    runningCommand = status_byte;
+  }
 
   /* Status change event (note, vel (fade), vol, ...) */
   if (status_byte <= 0x7F) {
     handleStatusCommand(beginOffset, status_byte);
   } else if (status_byte >= 0x80 && status_byte <= 0xB0) { /* Rest event */
-    addRest(beginOffset, curOffset - beginOffset, kLengthTable[status_byte - 0x80] * 2);
+    addRest(beginOffset, curOffset - beginOffset,
+            kLengthTable[status_byte - 0x80] * kMidiTicksPerDriverTick);
   } else if (status_byte >= 0xD0) { /* Note duration event */
     state = State::Note;
-    curDuration = kLengthTable[status_byte - 0xCF] * 2;
+    curDuration = kLengthTable[status_byte - 0xCF] * kMidiTicksPerDriverTick;
 
     /* Assume key and velocity values if the next value is greater than 0x7F */
     if (readByte(curOffset) > 0x7F) {
       beginNoteLfo();
       addNoteByDur(beginOffset, curOffset - beginOffset, prevKey, prevVel, curDuration,
                    "Duration Note State + Note On (prev key and vel)");
+      rememberNote(prevKey, true);
     } else {
       addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Note State", "",
                       Type::ChangeState);
     }
-  } else if (status_byte == 0xB1) { /* End of track */
+  } else if (status_byte == 0xB1 ||
+             (status_byte == 0xB6 &&
+              isNintendoRd1Driver(static_cast<MP2kSeq*>(parentSeq)->driverVariant()))) {
+    if (isNintendoRd1Driver(static_cast<MP2kSeq*>(parentSeq)->driverVariant())) {
+      // R&D1 stops this track's voices for both end commands. B6 also notifies its player.
+      constexpr u8 kAllSoundOff = 120;
+      addControllerEventNoItem(kAllSoundOff, 0);
+    }
     addEndOfTrack(beginOffset, curOffset - beginOffset);
     return false;
   } else if (status_byte == 0xB2) { /* Goto */
@@ -189,37 +230,80 @@ bool MP2kTrack::readEvent() {
 }
 
 void MP2kTrack::handleStatusCommand(u32 beginOffset, u8 status_byte) {
+  switch (runningCommand) {
+    case 0xBD:  // Program
+    case 0xC1:  // Pitch-bend range
+    case 0xC2:  // LFO speed
+    case 0xC3:  // LFO delay
+    case 0xC5:  // Modulation type
+    case 0xC8:  // Fine tuning
+      // Reuse the explicit command's fixed-width operand decoder.
+      --curOffset;
+      handleSpecialCommand(beginOffset, runningCommand);
+      return;
+    case 0xC9:
+      if (static_cast<MP2kSeq*>(parentSeq)->driverVariant() ==
+          MP2kDriverVariant::NintendoRd1RandomPitch) {
+        --curOffset;
+        handleSpecialCommand(beginOffset, runningCommand);
+        return;
+      }
+      break;
+    case 0xCD:
+      if (status_byte == 0x08 || status_byte == 0x09) {
+        --curOffset;
+        handleSpecialCommand(beginOffset, runningCommand);
+        return;
+      }
+      break;
+    default:
+      break;
+  }
   switch (state) {
     case State::Note: {
+      u32 duration = curDuration;
       /* Velocity update might be needed */
       if (readByte(curOffset) <= 0x7F) {
         current_vel = readByte(curOffset++);
-        /* If the next value is 0-127, it's unknown (velocity-related?) */
-        if (readByte(curOffset) <= 0x7F) {
-          curOffset++;
+        // The optional third byte extends this note's gate in driver ticks.
+        if (static_cast<MP2kSeq*>(parentSeq)->hasNoteGateExtension() &&
+            readByte(curOffset) <= 0x7F) {
+          duration += readByte(curOffset++) * kMidiTicksPerDriverTick;
         }
       }
       beginNoteLfo();
-      addNoteByDur(beginOffset, curOffset - beginOffset, status_byte, current_vel, curDuration);
+      addNoteByDur(beginOffset, curOffset - beginOffset, status_byte, current_vel, duration);
+      rememberNote(status_byte, true);
       break;
     }
 
     case State::Tie: {
+      u32 duration = 0;
       /* Velocity update might be needed */
       if (readByte(curOffset) <= 0x7F) {
         current_vel = readByte(curOffset++);
-        /* If the next value is 0-127, it's unknown (velocity-related?) */
-        if (readByte(curOffset) <= 0x7F) {
-          curOffset++;
+        if (static_cast<MP2kSeq*>(parentSeq)->hasNoteGateExtension() &&
+            readByte(curOffset) <= 0x7F) {
+          duration = readByte(curOffset++) * kMidiTicksPerDriverTick;
         }
       }
       beginNoteLfo();
-      addNoteOn(beginOffset, curOffset - beginOffset, status_byte, current_vel, "Tie");
+      if (duration == 0) {
+        addNoteOn(beginOffset, curOffset - beginOffset, status_byte, current_vel, "Tie");
+      } else {
+        addNoteByDur(beginOffset, curOffset - beginOffset, status_byte, current_vel, duration,
+                     "Tie with gate time");
+      }
+      rememberNote(status_byte, duration != 0);
       break;
     }
 
     case State::TieEnd: {
-      addNoteOff(beginOffset, curOffset - beginOffset, status_byte, "End Tie");
+      prevKey = status_byte;
+      const bool isNewOffset = onEvent(beginOffset, curOffset - beginOffset);
+      recordSeqEvent<NoteOffSeqEvent>(isNewOffset, getTime(), status_byte, beginOffset,
+                                      curOffset - beginOffset, "End Tie");
+      endTie(status_byte);
       break;
     }
 
@@ -288,6 +372,24 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
       if (loopEndPositions.size() != 0) {
         curOffset = loopEndPositions.back();
         loopEndPositions.pop_back();
+      }
+      break;
+    }
+
+    case 0xB9: {
+      // Standard MEMACC operation 0 writes a byte to the player's shared memory.
+      // Its operands are data even when their high bit is set.
+      const auto variant = static_cast<MP2kSeq*>(parentSeq)->driverVariant();
+      if (!isNintendoRd1Driver(variant) &&
+          curOffset + 3 <= vgmFile()->endOffset() && readByte(curOffset) == 0) {
+        curOffset++;
+        const u8 address = readByte(curOffset++);
+        const u8 value = readByte(curOffset++);
+        const auto desc = fmt::format("Player memory offset: {:#04x}, value: {}", address, value);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Memory Write", desc,
+                        Type::ChangeState);
+      } else {
+        addUnknown(beginOffset, curOffset - beginOffset);
       }
       break;
     }
@@ -391,6 +493,18 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
       break;
     }
 
+    case 0xC9: {
+      if (static_cast<MP2kSeq*>(parentSeq)->driverVariant() ==
+          MP2kDriverVariant::NintendoRd1RandomPitch && curOffset < vgmFile()->endOffset()) {
+        // The operand is an unsigned byte; later data bytes repeat this command.
+        const u8 amount = readByte(curOffset++);
+        addRandomPitchRange(beginOffset, amount);
+      } else {
+        addUnknown(beginOffset, curOffset - beginOffset);
+      }
+      break;
+    }
+
     // extend command
     case 0xCD: {
       // This command has a subcommand-byte and its arguments.
@@ -399,7 +513,13 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
       //
       // Probably, some games extend this command by their own code.
 
-      u8 subCommand = readByte(curOffset++);
+      const u32 endOffset = vgmFile()->endOffset();
+      if (curOffset >= endOffset || endOffset - curOffset < 2) {
+        curOffset = endOffset;
+        addUnknown(beginOffset, curOffset - beginOffset);
+        break;
+      }
+      const u8 subCommand = readByte(curOffset++);
       u8 subParam = readByte(curOffset);
       auto addEchoTextNoItem = [this](const std::string &name, const std::string &desc) {
         if (readMode == READMODE_CONVERT_TO_MIDI && !bWriteGenericEventAsTextEvent) {
@@ -407,18 +527,19 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
         }
       };
 
-      if (subCommand == 0x08 && subParam <= 127) {
+      if (subCommand == 0x08) {
         curOffset++;
         constexpr const char* kEventName = "Pseudo Echo Volume";
         const auto desc = fmt::format("Raw value: {} ({:#04x})", static_cast<unsigned>(subParam),
                                       static_cast<unsigned>(subParam));
         addGenericEvent(beginOffset, curOffset - beginOffset, kEventName, desc, Type::Reverb);
         addEchoTextNoItem(kEventName, desc);
-        addReverbNoItem(subParam);
-      } else if (subCommand == 0x09 && subParam <= 127) {
+        // This is an envelope floor after release, not a send to the reverb effect.
+      } else if (subCommand == 0x09) {
         curOffset++;
         constexpr const char* kEventName = "Pseudo Echo Length";
-        const double seconds = static_cast<double>(subParam) / 60.0;
+        constexpr double kGbaFrameRateHz = 16777216.0 / 280896.0;
+        const double seconds = static_cast<double>(subParam) / kGbaFrameRateHz;
         const auto desc = fmt::format("Raw value: {} ({:#04x}), length: {:.2f}s",
                                       static_cast<unsigned>(subParam),
                                       static_cast<unsigned>(subParam), seconds);
@@ -426,9 +547,11 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
         addEchoTextNoItem(kEventName, desc);
       } else {
         // Heuristic method
-        while (subParam <= 127) {
+        while (curOffset < vgmFile()->endOffset() && subParam <= 127) {
           curOffset++;
-          subParam = readByte(curOffset);
+          if (curOffset < vgmFile()->endOffset()) {
+            subParam = readByte(curOffset);
+          }
         }
         addGenericEvent(beginOffset, curOffset - beginOffset, "Extend Command", "", Type::Unknown);
       }
@@ -441,7 +564,7 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
       // yes, this seems to be how the actual driver code handles it.  Ex. Aria of Sorrow
       // (U): 0x80D91C0 - handle 0xCE event
       if (readByte(curOffset) > 0x7F) {
-        addNoteOffNoItem(prevKey);
+        endTie(prevKey);
         addGenericEvent(beginOffset, curOffset - beginOffset, "End Tie State + End Tie", "",
                         Type::Tie);
       } else
@@ -454,6 +577,7 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
       if (readByte(curOffset) > 0x7F) {
         beginNoteLfo();
         addNoteOnNoItem(prevKey, prevVel);
+        rememberNote(prevKey, false, false);
         addGenericEvent(beginOffset, curOffset - beginOffset,
                         "Tie State + Tie (with prev key and vel)", "", Type::Tie);
       } else
@@ -466,6 +590,69 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
       break;
     }
   }
+}
+
+void MP2kTrack::addRandomPitchRange(u32 beginOffset, u8 amount) {
+  // Decode the command without substituting its operand for a running note or controller.
+  // Per-note random pitch is not yet represented in exported MIDI.
+  const auto desc = fmt::format("Range parameter: {}", amount);
+  addGenericEvent(beginOffset, curOffset - beginOffset, "Random Pitch Range", desc, Type::PitchBend);
+}
+
+void MP2kTrack::rememberNote(s8 key, bool finite, bool indexed) {
+  if (readMode != READMODE_CONVERT_TO_MIDI) {
+    return;
+  }
+  const u32 now = pMidiTrack->getDelta();
+  std::erase_if(activeNotes, [now](const auto& note) {
+    return note.gateOff != nullptr && note.gateOff->absTime <= now;
+  });
+  const auto& timeline = parentSeq->timedEventIndex();
+  auto index = SeqEventTimeIndex::kInvalidIndex;
+  if (indexed && timeline.size() != 0) {
+    const auto last = timeline.size() - 1;
+    const auto& event = timeline.event(last);
+    if (event.startTick == getTime() &&
+        event.event == findSeqEventAtOffset(m_lastEventOffset, m_lastEventLength)) {
+      index = last;
+    }
+  }
+  activeNotes.push_back({key, static_cast<s8>(key + cKeyCorrection + transpose), index,
+                         finite ? pMidiTrack->previousDurNoteOffs().back() : nullptr});
+}
+
+void MP2kTrack::endTie(s8 key) {
+  if (readMode == READMODE_CONVERT_TO_MIDI) {
+    const u32 now = pMidiTrack->getDelta();
+    auto newestFirst = activeNotes | std::views::reverse;
+    const auto note = std::ranges::find_if(newestFirst, [key, now](const auto& active) {
+      return active.key == key && (active.gateOff == nullptr || active.gateOff->absTime > now);
+    });
+    if (note != newestFirst.end()) {
+      auto* gateOff = note->gateOff;
+      const s8 midiKey = note->midiKey;
+      if (note->timelineIndex != SeqEventTimeIndex::kInvalidIndex) {
+        auto& event = parentSeq->timedEventIndex().event(note->timelineIndex);
+        event.duration = std::max<u32>(1, getTime() - event.startTick);
+        auto indices = m_activeNoteEventIndices.find(key);
+        if (indices != m_activeNoteEventIndices.end()) {
+          std::erase(indices->second, note->timelineIndex);
+          if (indices->second.empty()) {
+            m_activeNoteEventIndices.erase(indices);
+          }
+        }
+      }
+      activeNotes.erase(std::next(note).base());
+      if (gateOff != nullptr) {
+        // Release this voice now; its former deadline must not cut off a later retrigger.
+        gateOff->absTime = now;
+      } else {
+        pMidiTrack->addNoteOff(channel, midiKey);
+      }
+    }
+    return;
+  }
+  addNoteOffNoItem(key);
 }
 
 bool MP2kTrack::lfoOutputsEnabled() const {
@@ -553,14 +740,15 @@ void MP2kTrack::beginNoteLfo() {
     return;
   }
 
+  // Driver clocks use the same doubled MIDI-tick scale as waits and note durations.
   if (modType == kMp2kModTypeVibrato) {
     emitVibratoDepth(vibratoLfo, 0, false);
     vibratoLfo.setReusableFadeToConfiguredDepth(1);
-    vibratoLfo.beginReusableFadeToConfiguredDepth();
+    vibratoLfo.beginReusableFade(static_cast<u32>(delay) * 2, vibratoLfo.configuredDepth());
   } else if (modType == kMp2kModTypeTremolo) {
     emitTremoloDepth(tremoloLfo, 0, false);
     tremoloLfo.setReusableFadeToConfiguredDepth(1);
-    tremoloLfo.beginReusableFadeToConfiguredDepth();
+    tremoloLfo.beginReusableFade(static_cast<u32>(delay) * 2, tremoloLfo.configuredDepth());
   }
 }
 

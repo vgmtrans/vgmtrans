@@ -11,9 +11,11 @@
 #include "VGMInstrSet.h"
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
+#include "MP2kDriver.h"
 
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 class MP2kPSGColl;
@@ -21,19 +23,30 @@ class MP2kPSGColl;
 class MP2kInstrSet final : public VGMInstrSet {
 public:
   MP2kInstrSet(RawFile *file, int rate, size_t offset, int count, MP2kPSGColl *psg_samples,
+               MP2kDriverVariant variant = MP2kDriverVariant::Standard,
                const std::string &name = "MP2K Instrument bank");
   ~MP2kInstrSet() = default;
 
   bool loadInstrs() override;
   bool parseInstrPointers() override;
   int makeOrGetSample(size_t sample_pointer);
+  bool isBonSample(size_t pointer) const;
+  int makeOrGetBonSample(size_t pointer, u8 key);
   int sampleRate() const noexcept { return m_operating_rate; };
+  double pcmGain() const noexcept { return (m_master_volume + 1) / 16.0; }
+  // Mix gains are calibrated against the standard Sappy mixer only; Nintendo R&D1 drivers
+  // route PSG/FIFO output differently and keep their previous levels.
+  bool usesCalibratedMixGain() const noexcept { return !isNintendoRd1Driver(m_variant); }
+  void setPcmMasterVolume(u8 volume);
   MP2kPSGColl& psgSampColl() const noexcept;
 
 private:
   int m_count = 0;
   int m_operating_rate = 22050;
+  u8 m_master_volume = 15;
+  MP2kDriverVariant m_variant;
   std::map<size_t, int> m_samples;
+  std::map<std::pair<size_t, u8>, int> m_bon_samples;
   MP2kPSGColl* m_psg_samples{};
 };
 
@@ -54,8 +67,8 @@ public:
 private:
   void setADSR(VGMRgn *dest, u32 data);
   void setCgbADSR(VGMRgn *dest, u32 data);
+  void splitSteppedPsgRegions(const std::vector<VGMRgn*>& stepped);
 
-  u8 m_type = 0;
   MP2kInstrData m_data;
 };
 
@@ -81,17 +94,20 @@ private:
 
 class MP2kPSGColl final : public VGMSampColl {
 public:
-  MP2kPSGColl(RawFile *file, u32 sampleRate, u32 loopSamples);
+  MP2kPSGColl(RawFile *file, u32 sampleRate, u32 loopSamples, u32 noiseSampleRate = 65536);
   ~MP2kPSGColl() override = default;
 
   int makeOrGetProgrammableWave(size_t wavePointer);
+  int makeOrGetNoise(u8 key, bool shortMode);
 
 private:
   bool parseSampleInfo() override;
 
   u32 m_sample_rate;
   u32 m_loop_samples;
+  u32 m_noise_sample_rate;
   std::map<size_t, int> m_programmable_waves;
+  std::map<u8, int> m_noise_samples;
 };
 
 class MP2kPSGSamp final : public VGMSamp {
@@ -117,4 +133,42 @@ private:
   std::vector<u8> decodeToNativePcm() override;
 
   size_t m_wave_pointer;
+};
+
+class MP2kPSGNoiseSamp final : public VGMSamp {
+public:
+  MP2kPSGNoiseSamp(VGMSampColl* sampColl, u8 control, u32 sampleRate, u32 loopSamples,
+                   std::string name);
+
+private:
+  std::vector<u8> decodeToNativePcm() override;
+  u8 m_control;
+};
+
+class MP2kBonSamp final : public VGMSamp {
+public:
+  enum class Shape : u8 { Pulse, Saw, Triangle };
+
+  struct PwmSettings {
+    u8 base;
+    u8 step;
+    u8 depth;
+    u8 initialPhase;
+  };
+
+  struct RenderSettings {
+    Shape shape;
+    PwmSettings pwm;
+    u8 key;
+    u32 sampleRate;
+    u32 loopSamples;
+    u32 carrierCycles;
+    s16 fineTune;
+  };
+
+  MP2kBonSamp(VGMSampColl* collection, size_t pointer, const RenderSettings& settings);
+
+private:
+  std::vector<u8> decodeToNativePcm() override;
+  RenderSettings m_settings;
 };

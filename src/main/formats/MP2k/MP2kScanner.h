@@ -8,6 +8,7 @@
 
 #include "base/Types.h"
 #include "Scanner.h"
+#include "MP2kDriver.h"
 
 #include <optional>
 
@@ -19,7 +20,14 @@ public:
   void scan(RawFile *file, void *info = 0) override;
 
 private:
-  std::optional<size_t> detectMP2K(RawFile *file);
+  struct EngineLocation {
+    size_t settingsOffset;
+    u32 songTableOffset;
+    MP2kDriverVariant variant;
+  };
+
+  std::optional<EngineLocation> detectMP2K(RawFile *file);
+  std::optional<EngineLocation> detectNintendoRd1(RawFile* file);
   static bool isValidOffset(u32 offset, u32 romsize);
   static bool isGbaRomAddress(u32 address);
   static u32 gbaAddressToOffset(u32 address);

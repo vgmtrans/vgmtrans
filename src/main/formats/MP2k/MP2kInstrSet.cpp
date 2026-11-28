@@ -13,12 +13,20 @@
 #include "VGMColl.h"
 #include "VGMRgn.h"
 #include "VGMSampColl.h"
+#include "ScaleConversion.h"
 
+#include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <memory>
+#include <numbers>
+#include <numeric>
+#include <utility>
+#include <vector>
 
 #include <spdlog/fmt/fmt.h>
 
@@ -27,34 +35,127 @@ constexpr u8 kPsgSquareCount = 4;
 constexpr u8 kPsgNoiseIndex = kPsgSquareCount;
 constexpr u8 kPsgUnityKey = 69;
 constexpr size_t kGbaRomPointerMask = 0x03FFFFFF;
+constexpr double kGbaFrameRateHz = 16777216.0 / 280896.0;
+constexpr double kBonWaveSamplesPerCycle = 64.0;
+constexpr u32 kBonPwmLoopFrames = 256;
+constexpr u32 kBonPwmPhaseSteps = 256;
+constexpr u32 kBonSawPrerollSamples = 64;
+constexpr double kBonPeriodicLoopSeconds = 2.0;
+
+// Tone records contain a channel number plus independent playback and bank flags.
+enum class VoiceType : u8 {
+  Pcm = 0,
+  Square1 = 1,
+  Square2 = 2,
+  Wave = 3,
+  Noise = 4,
+  KeySplit = 0x40,
+  Rhythm = 0x80,
+  Unsupported = 0xff,
+};
+
+constexpr u8 kVoiceChannelMask = 0x07;
+constexpr u8 kFixedPitchFlag = 0x08;
+constexpr u8 kPcmModeFlags = 0x30;
+constexpr u8 kKeySplitFlag = 0x40;
+constexpr u8 kRhythmFlag = 0x80;
+constexpr u8 kRhythmPanOverrideFlag = 0x80;
+constexpr u32 kSquareDutyMask = 0x03;
+constexpr u32 kNoiseShortModeFlag = 0x01;
+constexpr u32 kToneRecordSize = 12;
+constexpr int kMidiKeyCount = 128;
+
+constexpr VoiceType voiceChannel(u8 type) {
+  return static_cast<VoiceType>(type & kVoiceChannelMask);
+}
+
+constexpr bool isNestedBank(u8 type) {
+  return (type & (kKeySplitFlag | kRhythmFlag)) != 0;
+}
+
+constexpr VoiceType instrumentVoice(u8 type) {
+  if (type == kKeySplitFlag) {
+    return VoiceType::KeySplit;
+  }
+  if (type == kRhythmFlag) {
+    return VoiceType::Rhythm;
+  }
+
+  const auto voice = voiceChannel(type);
+  const u8 allowedFlags = voice == VoiceType::Pcm ? kFixedPitchFlag | kPcmModeFlags : kFixedPitchFlag;
+  if ((type & ~(kVoiceChannelMask | allowedFlags)) != 0) {
+    return VoiceType::Unsupported;
+  }
+  return voice;
+}
+
+constexpr u32 romOffset(u32 pointer) {
+  return pointer & kGbaRomPointerMask;
+}
+
+struct Tone {
+  u8 type;
+  u8 key;
+  u8 pan;
+  u32 sampleOrTable;
+
+  constexpr VoiceType voice() const { return voiceChannel(type); }
+  constexpr bool fixedPitch() const { return (type & kFixedPitchFlag) != 0; }
+  constexpr u8 squareDuty() const { return static_cast<u8>(sampleOrTable & kSquareDutyMask); }
+  constexpr bool shortNoise() const { return (sampleOrTable & kNoiseShortModeFlag) != 0; }
+  constexpr u32 sampleOffset() const { return romOffset(sampleOrTable); }
+
+  void applyRhythmPan(VGMRgn* region) const {
+    if ((pan & kRhythmPanOverrideFlag) != 0) {
+      region->setPan(pan & ~kRhythmPanOverrideFlag);
+    }
+  }
+};
+
+constexpr Tone decodeTone(MP2kInstrData data) {
+  return {static_cast<u8>(data.w0), static_cast<u8>(data.w0 >> 8),
+          static_cast<u8>(data.w0 >> 24), data.w1};
+}
+
+Tone readTone(const RawFile* file, u32 offset, u8 type) {
+  return {type, file->get<u8>(offset + 1), file->get<u8>(offset + 3),
+          file->get<u32>(offset + 4)};
+}
+
+struct Envelope {
+  int attack;
+  int decay;
+  int sustain;
+  int release;
+};
+
+constexpr Envelope decodeEnvelope(u32 data) {
+  return {static_cast<u8>(data), static_cast<u8>(data >> 8),
+          static_cast<u8>(data >> 16), static_cast<u8>(data >> 24)};
+}
 
 double mp2kAttackTimeSeconds(int attack) {
   if (attack <= 0) {
     return 0.0;
   }
-  constexpr double kEnvelopeTicksPerSecond = 60.0;
   constexpr double kEnvelopeMaxLevel = 256.0;
-  return kEnvelopeMaxLevel / (kEnvelopeTicksPerSecond * attack);
+  return kEnvelopeMaxLevel / (kGbaFrameRateHz * attack);
 }
 
 double mp2kEnvelopeRateTimeSeconds(int rate) {
   if (rate <= 0) {
     return 0.0;
   }
-  constexpr double kEnvelopeTicksPerSecond = 60.0;
   constexpr double kEnvelopeMaxLevel = 256.0;
-  const double logMaxLevel = std::log(kEnvelopeMaxLevel);
-  return logMaxLevel / (logMaxLevel - std::log(static_cast<double>(rate))) /
-         kEnvelopeTicksPerSecond;
-}
-
-double mp2kDecayTimeSeconds(int decay) {
-  constexpr double kEnvelopeMaxLevel = 256.0;
-  return mp2kEnvelopeRateTimeSeconds(decay) * 10.0 / std::log(kEnvelopeMaxLevel);
+  // Each frame multiplies amplitude by rate/256. SoundFont decay/release times
+  // describe a full 100 dB slope, rather than the time to reach one 8-bit unit.
+  constexpr double kLogAmplitudeRange = 5.0 * std::numbers::ln10;
+  return kLogAmplitudeRange / (kGbaFrameRateHz * std::log(kEnvelopeMaxLevel / rate));
 }
 
 double cgbEnvelopeRateTimeSeconds(int rate) {
-  rate &= 0x07;
+  constexpr int kCgbEnvelopeRateMask = 0x07;
+  rate &= kCgbEnvelopeRateMask;
   if (rate == 0) {
     return 0.0;
   }
@@ -74,6 +175,49 @@ double cgbSustainLevel(int sustain) {
   return sustain / kEnvelopeMaxLevel;
 }
 
+// CGB envelope goal for a note at full track volume and centre pan, following the standard
+// driver: TrkVolPitSet -> ChnVolSetAsm -> CgbModVol. Verified against native captures for
+// velocity, track volume and pan (psg-goal-grid).
+int cgbEnvelopeGoalAtFullVolume(int velocity) {
+  constexpr int kVolumeRight = 127;  // ((0 + 128) * (127 * 64 >> 5)) >> 8
+  constexpr int kVolumeLeft = 126;   // ((127 - 0) * (127 * 64 >> 5)) >> 8
+  const int right = std::min(255, (kVolumeRight * (128 * velocity)) >> 14);
+  const int left = std::min(255, (kVolumeLeft * (127 * velocity)) >> 14);
+  return std::min(15, (right + left) >> 4);
+}
+
+struct CgbVelocityLayer {
+  int goal;
+  u8 velLow;
+  u8 velHigh;
+  double velocityAmplitude;  // linear amplitude the synth's velocity curve gives mid-layer
+};
+
+// Groups MIDI velocities by the integer envelope goal the driver would reach. MIDI velocity is
+// the linear-amplitude conversion of the driver's velocity. Layers cover every MIDI velocity
+// above the silent goal-0 range, so edited velocities always select a layer.
+std::vector<CgbVelocityLayer> cgbVelocityLayers() {
+  std::array<int, 16> highestMidi{};
+  highestMidi.fill(-1);
+  for (int velocity = 1; velocity <= 127; ++velocity) {
+    const int goal = cgbEnvelopeGoalAtFullVolume(velocity);
+    const int midi = convert7bitPercentAmpToStdMidiVal(static_cast<u8>(velocity));
+    highestMidi[goal] = std::max(highestMidi[goal], midi);
+  }
+  std::vector<CgbVelocityLayer> layers;
+  int nextLow = highestMidi[0] + 1;
+  for (int goal = 1; goal <= 15; ++goal) {
+    if (highestMidi[goal] < nextLow) {
+      continue;
+    }
+    const int high = goal == 15 ? 127 : highestMidi[goal];
+    const double middle = (nextLow + high) / 2.0 / 127.0;
+    layers.push_back({goal, static_cast<u8>(nextLow), static_cast<u8>(high), middle * middle});
+    nextLow = high + 1;
+  }
+  return layers;
+}
+
 bool isGbaRomPointer(size_t pointer) {
   constexpr size_t kGbaRomAddressMask = 0x0E000000;
   constexpr size_t kGbaRomAddressMin = 0x08000000;
@@ -84,9 +228,9 @@ bool isGbaRomPointer(size_t pointer) {
 }
 
 MP2kInstrSet::MP2kInstrSet(RawFile *file, int rate, size_t offset, int count,
-                           MP2kPSGColl *psg_samples, const std::string &name)
+                           MP2kPSGColl *psg_samples, MP2kDriverVariant variant, const std::string &name)
     : VGMInstrSet(MP2kFormat::name, file, offset, count * 12, name), m_count(count),
-      m_operating_rate(rate), m_psg_samples(psg_samples) {
+    m_operating_rate(rate), m_variant(variant), m_psg_samples(psg_samples) {
   assert(m_psg_samples != nullptr);
   addSampColl<VGMSampColl>(MP2kFormat::name, file, this, offset);
 }
@@ -94,6 +238,10 @@ MP2kInstrSet::MP2kInstrSet(RawFile *file, int rate, size_t offset, int count,
 MP2kPSGColl& MP2kInstrSet::psgSampColl() const noexcept {
   assert(m_psg_samples != nullptr);
   return *m_psg_samples;
+}
+
+void MP2kInstrSet::setPcmMasterVolume(u8 volume) {
+  m_master_volume = std::min<u8>(volume, 15);
 }
 
 bool MP2kInstrSet::loadInstrs() {
@@ -207,20 +355,73 @@ int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
   return static_cast<int>(sample_id);
 }
 
+bool MP2kInstrSet::isBonSample(size_t pointer) const {
+  if (m_variant != MP2kDriverVariant::Bon || pointer > rawFile()->size() ||
+      rawFile()->size() - pointer < 24) {
+    return false;
+  }
+  // Bon stores oscillator descriptors in looping WaveData records with no PCM payload.
+  return rawFile()->getBE<u32>(pointer) == 0x40 &&
+         rawFile()->get<u32>(pointer + 8) == 0 &&
+         rawFile()->get<u32>(pointer + 12) == 0 &&
+         rawFile()->get<u32>(pointer + 4) != 0 &&
+         rawFile()->get<u8>(pointer + 16) == 0x80 &&
+         rawFile()->get<u8>(pointer + 17) <= static_cast<u8>(MP2kBonSamp::Shape::Triangle);
+}
+
+int MP2kInstrSet::makeOrGetBonSample(size_t pointer, u8 key) {
+  if (key >= kMidiKeyCount || !isBonSample(pointer) || m_operating_rate <= 0) {
+    return -1;
+  }
+  const auto cacheKey = std::make_pair(pointer, key);
+  if (const auto found = m_bon_samples.find(cacheKey); found != m_bon_samples.end()) {
+    return found->second;
+  }
+  const auto shape = static_cast<MP2kBonSamp::Shape>(rawFile()->get<u8>(pointer + 17));
+  const double middleCFrequency = rawFile()->get<u32>(pointer + 4) / (1024.0 * kBonWaveSamplesPerCycle);
+  const double frequency = middleCFrequency * std::exp2((static_cast<int>(key) - 60) / 12.0);
+  // Sample each key separately to preserve the frame-clock PWM speed across the keyboard.
+  const double seconds = shape == MP2kBonSamp::Shape::Pulse
+                             ? kBonPwmLoopFrames / kGbaFrameRateHz : kBonPeriodicLoopSeconds;
+  const auto count = std::lround(m_operating_rate * seconds);
+  const auto cycles = std::max(1LL, std::llround(frequency * count / m_operating_rate));
+  if (std::cmp_less_equal(count, kBonSawPrerollSamples) ||
+      std::cmp_greater(count, std::numeric_limits<u32>::max()) ||
+      std::cmp_greater(cycles, std::numeric_limits<u32>::max())) {
+    return -1;
+  }
+  const double generatedFrequency = static_cast<double>(cycles) * m_operating_rate / count;
+  const auto correction = std::lround(1200.0 * std::log2(frequency / generatedFrequency));
+  // Root-key overrides preserve the fractional-semitone sample correction in both exporters.
+  if (correction < -99 || correction > 99) {
+    return -1;
+  }
+  const MP2kBonSamp::RenderSettings settings{
+      .shape = shape,
+      .pwm = {rawFile()->get<u8>(pointer + 18), rawFile()->get<u8>(pointer + 19),
+              rawFile()->get<u8>(pointer + 20), rawFile()->get<u8>(pointer + 21)},
+      .key = key,
+      .sampleRate = static_cast<u32>(m_operating_rate),
+      .loopSamples = static_cast<u32>(count),
+      .carrierCycles = static_cast<u32>(cycles),
+      .fineTune = static_cast<s16>(correction),
+  };
+  const int sampleId = static_cast<int>(sampColl()->sampleCount());
+  sampColl()->sinkSamp(std::make_unique<MP2kBonSamp>(sampColl(), pointer, settings));
+  m_bon_samples.emplace(cacheKey, sampleId);
+  return sampleId;
+}
+
 MP2kInstr::MP2kInstr(MP2kInstrSet *set, size_t offset, size_t length, u32 bank, u32 number,
                      MP2kInstrData data)
-    : VGMInstr(set, offset, length, bank, number), m_type(data.w0 & 0xFF), m_data(data) {
+    : VGMInstr(set, offset, length, bank, number), m_data(data) {
+  reverb = 0.0f;
 }
 
 bool MP2kInstr::loadInstr() {
-  /* Unused instrument marking */
-  if (m_data.w0 == 0x3c01 && m_data.w1 == 0x02 && m_data.w2 == 0x0F0000) {
-    return true;
-  }
-
   auto& psgSampColl = static_cast<MP2kInstrSet *>(parInstrSet)->psgSampColl();
 
-  auto addPsgRgn = [this](VGMSampColl &psgColl, u8 sampNum, u32 adsr,
+  auto addPsgRgn = [this](VGMSampColl &psgColl, int sampNum, u32 adsr,
                           u8 keyLow = 0, u8 keyHigh = 127) {
     VGMRgn* rgn = this->addRgn(offset(), length(), sampNum, keyLow, keyHigh);
     rgn->sampCollPtr = &psgColl;
@@ -228,221 +429,260 @@ bool MP2kInstr::loadInstr() {
     setCgbADSR(rgn, adsr);
     return rgn;
   };
+  // Square and noise channels step a 4-bit hardware envelope toward an integer goal.
+  std::vector<VGMRgn*> steppedPsgRegions;
+  auto addSteppedPsgRgn = [&](VGMSampColl &psgColl, int sampNum, u32 adsr,
+                              u8 keyLow = 0, u8 keyHigh = 127) {
+    VGMRgn* rgn = addPsgRgn(psgColl, sampNum, adsr, keyLow, keyHigh);
+    steppedPsgRegions.push_back(rgn);
+    return rgn;
+  };
 
-  switch (m_type) {
-    /* Sampled instruments (single region) */
-    case 0x00:
-      [[fallthrough]];
-    case 0x08:
-      [[fallthrough]];
-    case 0x10:
-      [[fallthrough]];
-    case 0x18:
-      [[fallthrough]];
-    case 0x20:
-      [[fallthrough]];
-    case 0x28:
-      [[fallthrough]];
-    case 0x30:
-      [[fallthrough]];
-    case 0x38: {
-      setName("Single-region instrument");
-      setLength(12);
+  const Tone instrument = decodeTone(m_data);
+  const u32 envelopeOrKeyMap = m_data.w2;
+  auto& instrSet = *static_cast<MP2kInstrSet*>(parInstrSet);
+  auto addPcmRegions = [this](const Tone& tone, u32 toneOffset, int sampleId, u32 adsr,
+                              u8 keyLow = 0, u8 keyHigh = 127) {
+    auto addRegion = [&](u8 low, u8 high) {
+      auto* region = addRgn(toneOffset, kToneRecordSize, sampleId, low, high);
+      setADSR(region, adsr);
+      return region;
+    };
+    if (!tone.fixedPitch()) {
+      addRegion(keyLow, keyHigh);
+      return;
+    }
 
-      bool no_resampling = (m_type & 0xFF) == 0x08;
-      if (no_resampling) {
-        L_WARN("Ignoring resampling shenaningans!");
+    // One-key regions preserve fixed PCM's mixer-rate pitch in both SF2 and DLS.
+    const auto* sample = parInstrSet->sampColl()->sample(sampleId);
+    for (int key = keyLow; key <= keyHigh; ++key) {
+      auto* region = addRegion(static_cast<u8>(key), static_cast<u8>(key));
+      region->setUnityKey(static_cast<u8>(key));
+      region->setFineTune(-sample->fineTune);
+    }
+  };
+
+  auto addBonRegions = [this, &instrSet](const Tone& tone, u32 toneOffset, u32 adsr,
+                                        u8 low = 0, u8 high = 127) {
+    const auto pointer = tone.sampleOffset();
+    if (!instrSet.isBonSample(pointer)) {
+      return false;
+    }
+    for (int key = low; key <= high; ++key) {
+      const int sampleId = instrSet.makeOrGetBonSample(pointer, static_cast<u8>(key));
+      if (sampleId == -1) {
+        continue;
       }
+      auto* region = addRgn(toneOffset, kToneRecordSize, sampleId, key, key);
+      region->setUnityKey(static_cast<u8>(key));
+      setADSR(region, adsr);
+    }
+    return true;
+  };
 
-      if (m_data.w1 == 0 || !isGbaRomPointer(m_data.w1)) {
-        /* Sometimes the instrument table can have weird values */
+  switch (instrumentVoice(instrument.type)) {
+    case VoiceType::Pcm: {
+      setName("Single-region instrument");
+      setLength(kToneRecordSize);
+
+      if (instrument.sampleOrTable == 0 || !isGbaRomPointer(instrument.sampleOrTable)) {
         break;
       }
 
-      size_t sample_pointer = m_data.w1 & kGbaRomPointerMask;
-      if (auto sample_id =
-              static_cast<MP2kInstrSet *>(parInstrSet)->makeOrGetSample(sample_pointer);
-          sample_id != -1) {
-        VGMRgn *rgn = addRgn(offset(), length(), sample_id);
-        setADSR(rgn, m_data.w2);
+      const auto sampleOffset = instrument.sampleOffset();
+      if (addBonRegions(instrument, offset(), envelopeOrKeyMap)) {
+        break;
+      }
+      if (const int sampleId = instrSet.makeOrGetSample(sampleOffset); sampleId != -1) {
+        addPcmRegions(instrument, offset(), sampleId, envelopeOrKeyMap);
       } else {
-        L_WARN("No sample could be loaded for {:#x}", sample_pointer);
+        L_WARN("No sample could be loaded for {:#x}", sampleOffset);
         setName(name() + " (sample missing)");
       }
-
       break;
     }
 
-    /* PSQ Square (GameBoy channel 2) */
-    case 0x01:
-      [[fallthrough]];
-    case 0x02:
-      [[fallthrough]];
-    case 0x09:
-      [[fallthrough]];
-    case 0x0a: {
-      static constexpr const char *cycles[] = {"12,5%", "25%", "50%", "75%"};
-      setName(fmt::format("PSG square {}", m_data.w1 < 4 ? cycles[m_data.w1] : "???"));
-      setLength(12);
-      u8 duty = static_cast<u8>(m_data.w1 & 0x03);
-      addPsgRgn(psgSampColl, duty, m_data.w2);
+    case VoiceType::Square1:
+    case VoiceType::Square2: {
+      static constexpr const char* cycles[] = {"12,5%", "25%", "50%", "75%"};
+      setName(fmt::format("PSG square {}", instrument.sampleOrTable < kPsgSquareCount
+                                              ? cycles[instrument.sampleOrTable] : "???"));
+      setLength(kToneRecordSize);
+      addSteppedPsgRgn(psgSampColl, instrument.squareDuty(), envelopeOrKeyMap);
       break;
     }
 
-    /* GameBoy channel 3 (programmable) */
-    case 0x03:
-      [[fallthrough]];
-    case 0x0b: {
+    case VoiceType::Wave: {
       setName("PSG programmable waveform");
-      setLength(12);
-      if (auto sample_id = psgSampColl.makeOrGetProgrammableWave(m_data.w1); sample_id != -1) {
-        addPsgRgn(psgSampColl, sample_id, m_data.w2);
+      setLength(kToneRecordSize);
+      if (const int sampleId = psgSampColl.makeOrGetProgrammableWave(instrument.sampleOrTable); sampleId != -1) {
+        addPsgRgn(psgSampColl, sampleId, envelopeOrKeyMap);
       } else {
-        L_DEBUG("No programmable wave could be loaded for {:#x}", m_data.w1);
+        L_DEBUG("No programmable wave could be loaded for {:#x}", instrument.sampleOrTable);
         setName(name() + " (wave missing)");
       }
       break;
     }
 
-    /* PSG Noise */
-    case 0x04:
-      [[fallthrough]];
-    case 0x0c: {
+    case VoiceType::Noise:
       setName("PSG noise");
-      setLength(12);
-      addPsgRgn(psgSampColl, kPsgNoiseIndex, m_data.w2);
+      setLength(kToneRecordSize);
+      addSteppedPsgRgn(psgSampColl, kPsgNoiseIndex, envelopeOrKeyMap);
       break;
-    }
 
-    /* Multi-region instrument */
-    case 0x40: {
+    case VoiceType::KeySplit: {
       setName("Multi-region instrument");
-      setLength(12);
-
-      u32 base_pointer = m_data.w1 & 0x3ffffff;
-      u32 region_table = m_data.w2 & 0x3ffffff;
-
-      std::vector<u8> split_list, index_list;
-
-      int prev_index = -1;
-      /* Scan the whole table for changes and keep track of splits */
-      for (u8 key = 0; key < 128; key++) {
-        u8 current_index = rawFile()->get<u8>(region_table + key);
-
-        if (prev_index != current_index) {
-          split_list.push_back(key);
-          index_list.push_back(current_index);
-
-          prev_index = current_index;
+      setLength(kToneRecordSize);
+      const u32 toneTable = instrument.sampleOffset();
+      const u32 keyMap = romOffset(envelopeOrKeyMap);
+      std::vector<u8> splitKeys;
+      std::vector<u8> toneIndices;
+      int previousIndex = -1;
+      for (int key = 0; key < kMidiKeyCount; ++key) {
+        const u8 toneIndex = rawFile()->get<u8>(keyMap + key);
+        if (toneIndex != previousIndex) {
+          splitKeys.push_back(static_cast<u8>(key));
+          toneIndices.push_back(toneIndex);
+          previousIndex = toneIndex;
         }
       }
+      splitKeys.push_back(kMidiKeyCount);
 
-      /* Final entry for the last split */
-      split_list.push_back(0x80);
-
-      for (size_t i = 0; i < index_list.size(); i++) {
-        u32 off = base_pointer + 12 * index_list[i];
-
-        auto type = rawFile()->get<u8>(off);
-        if (type & (0x40 | 0x80)) {
+      for (size_t split = 0; split < toneIndices.size(); ++split) {
+        const u32 toneOffset = toneTable + kToneRecordSize * toneIndices[split];
+        const u8 type = rawFile()->get<u8>(toneOffset);
+        if (isNestedBank(type)) {
           L_DEBUG("Recursive split/rhythm instrument in key-split");
           continue;
         }
-
-        u32 raw_sample_pointer = rawFile()->get<u32>(off + 4);
-        u32 sample_pointer = raw_sample_pointer & 0x3ffffff;
-        u8 cgb_type = type & 0x07;
-
-        if (cgb_type == 0) {
-          if (sample_pointer == 0 || !isGbaRomPointer(raw_sample_pointer)) {
-            continue;
+        const Tone tone = readTone(rawFile(), toneOffset, type);
+        const auto envelope = [this, toneOffset] { return rawFile()->get<u32>(toneOffset + 8); };
+        const u8 keyLow = splitKeys[split];
+        const u8 keyHigh = splitKeys[split + 1] - 1;
+        switch (tone.voice()) {
+          case VoiceType::Pcm: {
+            if (tone.sampleOffset() == 0 || !isGbaRomPointer(tone.sampleOrTable)) {
+              break;
+            }
+            if (addBonRegions(tone, toneOffset, envelope(), keyLow, keyHigh)) {
+              break;
+            }
+            if (const int sampleId = instrSet.makeOrGetSample(tone.sampleOffset()); sampleId != -1) {
+              addPcmRegions(tone, toneOffset, sampleId, envelope(), keyLow, keyHigh);
+            }
+            break;
           }
-
-          if (auto sample_id =
-                  static_cast<MP2kInstrSet *>(parInstrSet)->makeOrGetSample(sample_pointer);
-              sample_id != -1) {
-            VGMRgn *rgn = addRgn(off, 12, sample_id, split_list[i], split_list[i + 1] - 1);
-
-            // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl();
-            setADSR(rgn, rawFile()->get<u32>(off + 8));
-          }
-        } else if (cgb_type == 1 || cgb_type == 2) {
-          u8 duty = static_cast<u8>(raw_sample_pointer & 0x03);
-          addPsgRgn(psgSampColl, duty, rawFile()->get<u32>(off + 8), split_list[i],
-                    split_list[i + 1] - 1);
-        } else if (cgb_type == 3) {
-          if (auto sample_id = psgSampColl.makeOrGetProgrammableWave(raw_sample_pointer);
-              sample_id != -1) {
-            addPsgRgn(psgSampColl, sample_id, rawFile()->get<u32>(off + 8), split_list[i],
-                      split_list[i + 1] - 1);
-          }
-        } else if (cgb_type == 4) {
-          addPsgRgn(psgSampColl, kPsgNoiseIndex, rawFile()->get<u32>(off + 8), split_list[i],
-                    split_list[i + 1] - 1);
+          case VoiceType::Square1:
+          case VoiceType::Square2:
+            addSteppedPsgRgn(psgSampColl, tone.squareDuty(), envelope(), keyLow, keyHigh);
+            break;
+          case VoiceType::Wave:
+            if (const int sampleId = psgSampColl.makeOrGetProgrammableWave(tone.sampleOrTable); sampleId != -1) {
+              addPsgRgn(psgSampColl, sampleId, envelope(), keyLow, keyHigh);
+            }
+            break;
+          case VoiceType::Noise:
+            addSteppedPsgRgn(psgSampColl, kPsgNoiseIndex, envelope(), keyLow, keyHigh);
+            break;
+          default:
+            break;
         }
       }
-
       break;
     }
 
-    /* Full-keyboard instrument */
-    case 0x80: {
+    case VoiceType::Rhythm: {
       setName("Full-keyboard instrument");
-      setLength(12);
-
-      u32 base_pointer = m_data.w1 & 0x3ffffff;
-
-      for (int key = 0; key < 128; key++) {
-        u32 off = base_pointer + 12 * key;
-
-        u32 type = rawFile()->get<u8>(off);
-        u32 keynum = rawFile()->get<u8>(off + 1);
-        u32 pan = rawFile()->get<u8>(off + 3);
-
-        u32 raw_sample_pointer = rawFile()->get<u32>(off + 4);
-        u32 sample_pointer = raw_sample_pointer & 0x3ffffff;
-
-        if ((type & 0x0f) == 0 || (type & 0x0f) == 8) {
-          if (sample_pointer == 0 || !isGbaRomPointer(raw_sample_pointer)) {
-            continue;
+      setLength(kToneRecordSize);
+      const u32 toneTable = instrument.sampleOffset();
+      for (int key = 0; key < kMidiKeyCount; ++key) {
+        const u32 toneOffset = toneTable + kToneRecordSize * key;
+        const Tone tone = readTone(rawFile(), toneOffset, rawFile()->get<u8>(toneOffset));
+        const auto envelope = [this, toneOffset] { return rawFile()->get<u32>(toneOffset + 8); };
+        VGMRgn* region = nullptr;
+        switch (tone.voice()) {
+          case VoiceType::Pcm: {
+            const u32 sampleOffset = tone.sampleOffset();
+            if (sampleOffset == 0 || !isGbaRomPointer(tone.sampleOrTable)) {
+              break;
+            }
+            if (instrSet.isBonSample(sampleOffset)) {
+              const int synthId = instrSet.makeOrGetBonSample(sampleOffset, tone.key);
+              if (synthId == -1) {
+                break;
+              }
+              region = addRgn(offset(), length(), synthId, key, key);
+              region->setUnityKey(static_cast<u8>(key));
+              setADSR(region, envelope());
+              break;
+            }
+            const int sampleId = instrSet.makeOrGetSample(sampleOffset);
+            if (sampleId == -1) {
+              break;
+            }
+            region = addRgn(offset(), length(), sampleId, key, key);
+            if (tone.fixedPitch()) {
+              // Fixed PCM advances at the mixer rate, ignoring the tone key and sample tuning.
+              const auto* sample = parInstrSet->sampColl()->sample(sampleId);
+              region->setUnityKey(static_cast<u8>(key));
+              region->setFineTune(-sample->fineTune);
+            } else {
+              const u32 pitch = rawFile()->get<u32>(sampleOffset + 4);
+              const double deltaNote = 12.0 * log2(instrSet.sampleRate() * 1024.0 / pitch);
+              const int rootKey = 60 + int(round(deltaNote));
+              region->setUnityKey(rootKey - tone.key + key);
+            }
+            setADSR(region, envelope());
+            break;
           }
-
-          if (auto sample_id =
-                  static_cast<MP2kInstrSet *>(parInstrSet)->makeOrGetSample(sample_pointer);
-              sample_id != -1) {
-            VGMRgn *rgn = addRgn(offset(), length(), sample_id, key, key);
-            // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl();
-            rgn->setPan(pan);
-
-            u32 pitch = rawFile()->get<u32>(sample_pointer + 4);
-            double delta_note = 12.0 * log2(static_cast<MP2kInstrSet *>(parInstrSet)->sampleRate() *
-                                            1024.0 / pitch);
-            int rootkey = 60 + int(round(delta_note));
-
-            rgn->setUnityKey(rootkey - keynum + key);
-            setADSR(rgn, rawFile()->get<u32>(off + 8));
+          case VoiceType::Square1:
+          case VoiceType::Square2: {
+            region = addSteppedPsgRgn(psgSampColl, tone.squareDuty(), envelope(), key, key);
+            // A rhythm key selects the tone; the tone's key byte determines square pitch.
+            const int rootKey = kPsgUnityKey - static_cast<int>(tone.key) + key;
+            const int storedRootKey = std::clamp(rootKey, 0, 127);
+            region->setUnityKey(static_cast<u8>(storedRootKey));
+            region->coarseTune = static_cast<s16>(storedRootKey - rootKey);
+            break;
           }
-        } else if ((type & 0x0f) == 3 || (type & 0x0f) == 11) {
-          if (auto sample_id = psgSampColl.makeOrGetProgrammableWave(raw_sample_pointer);
-              sample_id != -1) {
-            auto rgn = addPsgRgn(psgSampColl, sample_id, rawFile()->get<u32>(off + 8), key, key);
-            rgn->setPan(pan);
+          case VoiceType::Wave:
+            if (const int sampleId = psgSampColl.makeOrGetProgrammableWave(tone.sampleOrTable); sampleId != -1) {
+              region = addPsgRgn(psgSampColl, sampleId, envelope(), key, key);
+            }
+            break;
+          case VoiceType::Noise: {
+            const int sampleId = psgSampColl.makeOrGetNoise(tone.key, tone.shortNoise());
+            region = addSteppedPsgRgn(psgSampColl, sampleId, envelope(), key, key);
+            region->setUnityKey(static_cast<u8>(key));
+            break;
           }
-        } else if ((type & 0x0f) == 4 || (type & 0x0f) == 12) {
-          auto rgn = addPsgRgn(psgSampColl, kPsgNoiseIndex, rawFile()->get<u32>(off + 8), key, key);
-          rgn->setPan(pan);
+          default:
+            break;
+        }
+        if (region != nullptr) {
+          tone.applyRhythmPan(region);
         }
       }
       break;
     }
 
-    default: {
-      L_WARN("{:x}: Unhandled instrument type {}", offset(), m_type);
+    default:
+      L_WARN("{:x}: Unhandled instrument type {}", offset(), instrument.type);
       return false;
-    }
   }
 
   if (!regions().empty()) {
+    for (auto* rgn : regions()) {
+      const bool isPsg = rgn->sampCollPtr == &psgSampColl;
+      if (instrSet.usesCalibratedMixGain()) {
+        rgn->setVolume(isPsg ? 0.5 : instrSet.pcmGain());
+      }
+      // Only Direct Sound PCM voices enter the driver's reverb mix, including in split banks.
+      rgn->reverbSendScale = isPsg ? 0.0 : 1.0;
+    }
+    if (instrSet.usesCalibratedMixGain()) {
+      splitSteppedPsgRegions(steppedPsgRegions);
+    }
     constexpr double kDefaultLfoFrequencyHz = 60.0 * 22.0 / 256.0;
     constexpr double kVibratoMaxDepthCents = 127.0 * 4.0 * 100.0 / 64.0;
     addStandardVibratoHandling(kVibratoMaxDepthCents, kDefaultLfoFrequencyHz,
@@ -459,10 +699,7 @@ bool MP2kInstr::loadInstr() {
 }
 
 void MP2kInstr::setADSR(VGMRgn *rgn, u32 adsr) {
-  int attack = adsr & 0xFF;
-  int decay = (adsr >> 8) & 0xFF;
-  int sustain = (adsr >> 16) & 0xFF;
-  int release = adsr >> 24;
+  const auto [attack, decay, sustain, release] = decodeEnvelope(adsr);
   constexpr double kEnvelopeMaxLevel = 256.0;
 
   if (attack != 0xFF) {
@@ -471,7 +708,7 @@ void MP2kInstr::setADSR(VGMRgn *rgn, u32 adsr) {
 
   if (sustain != 0xFF) {
     rgn->sustain_level = sustain / kEnvelopeMaxLevel;
-    rgn->decay_time = mp2kDecayTimeSeconds(decay);
+    rgn->decay_time = mp2kEnvelopeRateTimeSeconds(decay);
   }
 
   if (release != 0x00) {
@@ -480,15 +717,61 @@ void MP2kInstr::setADSR(VGMRgn *rgn, u32 adsr) {
 }
 
 void MP2kInstr::setCgbADSR(VGMRgn *rgn, u32 adsr) {
-  int attack = adsr & 0xFF;
-  int decay = (adsr >> 8) & 0xFF;
-  int sustain = (adsr >> 16) & 0xFF;
-  int release = adsr >> 24;
+  const auto [attack, decay, sustain, release] = decodeEnvelope(adsr);
 
   rgn->attack_time = cgbEnvelopeRateTimeSeconds(attack);
   rgn->decay_time = cgbEnvelopeRateTimeSeconds(decay);
   rgn->sustain_level = cgbSustainLevel(sustain);
   rgn->release_time = cgbEnvelopeRateTimeSeconds(release);
+}
+
+void MP2kInstr::splitSteppedPsgRegions(const std::vector<VGMRgn*>& stepped) {
+  static const std::vector<CgbVelocityLayer> layers = cgbVelocityLayers();
+  constexpr double kEnvelopeMaxLevel = 15.0;
+  for (VGMRgn* source : stepped) {
+    const int sustain = static_cast<int>(std::lround(std::clamp(source->sustain_level, 0.0, 1.0) *
+                                                     kEnvelopeMaxLevel));
+    const double fullAttack = source->attack_time;
+    const double fullDecay = source->decay_time;
+    const double fullRelease = source->release_time;
+    const double baseAttenDb = source->attenDb();
+    for (const auto& layer : layers) {
+      VGMRgn* rgn = layer.goal == 15
+          ? source
+          : addRgn(source->offset(), source->length(), static_cast<int>(source->sampNum),
+                   source->keyLow, source->keyHigh);
+      if (rgn != source) {
+        rgn->sampCollPtr = source->sampCollPtr;
+        rgn->unityKey = source->unityKey;
+        rgn->coarseTune = source->coarseTune;
+        rgn->fineTune = source->fineTune;
+        rgn->loop = source->loop;
+        rgn->sampOffset = source->sampOffset;
+        rgn->sampDataLength = source->sampDataLength;
+        rgn->pan = source->pan;
+        rgn->attack_transform = source->attack_transform;
+        rgn->hold_time = source->hold_time;
+        rgn->sustain_time = source->sustain_time;
+        rgn->release_transform = source->release_transform;
+        rgn->reverbSendScale = source->reverbSendScale;
+        rgn->setLfoVibFreqHz(source->lfoVibFreqHz());
+        rgn->setLfoVibDepthCents(source->lfoVibDepthCents());
+        rgn->setLfoVibDelaySeconds(source->lfoVibDelaySeconds());
+      }
+      rgn->velLow = layer.velLow;
+      rgn->velHigh = layer.velHigh;
+      // The hardware moves one envelope step per rate tick, so a lower goal takes fewer steps.
+      const double steps = layer.goal / kEnvelopeMaxLevel;
+      rgn->attack_time = fullAttack * steps;
+      rgn->decay_time = fullDecay * steps;
+      rgn->release_time = fullRelease * steps;
+      const int sustainGoal = (layer.goal * sustain + 15) >> 4;
+      rgn->sustain_level = static_cast<double>(sustainGoal) / layer.goal;
+      // Peak level is goal/15; the synth's velocity curve already supplies velocityAmplitude.
+      const double correction = steps / layer.velocityAmplitude;
+      rgn->setAttenuation(baseAttenDb - 20.0 * std::log10(correction));
+    }
+  }
 }
 
 MP2kSamp::MP2kSamp(VGMSampColl *sampColl, MP2kSampParams params)
@@ -552,16 +835,103 @@ namespace {
 constexpr u8 kCgbWaveRamBytes = 16;
 constexpr u8 kCgbWaveRamSamples = kCgbWaveRamBytes * 2;
 
+constexpr u64 kNoiseClockHz = 524288;
+constexpr u8 kNoiseDivisorMask = 0x07;
+constexpr u8 kNoiseWidthFlag = 0x08;
+constexpr unsigned kNoiseClockShiftPosition = 4;
+constexpr unsigned kLongNoiseFeedbackBit = 14;
+constexpr unsigned kShortNoiseFeedbackBit = 6;
+constexpr u16 kShortNoiseFeedbackMask = u16{1} << kShortNoiseFeedbackBit;
+constexpr u16 kNoiseInitialState = 0x7fff;
+constexpr u64 kLongNoisePeriod = 32767;
+constexpr u64 kShortNoisePeriod = 127;
+constexpr u32 kMinNoiseSampleRate = 512;
+constexpr u32 kTargetNoiseLoopSamples = 512 * 1024;
+
+struct NoiseControl {
+  u8 divisorCode;
+  u8 clockShift;
+  bool shortMode;
+
+  constexpr u8 registerValue() const {
+    const u8 widthFlag = shortMode ? kNoiseWidthFlag : 0;
+    return static_cast<u8>((clockShift << kNoiseClockShiftPosition) | widthFlag | divisorCode);
+  }
+
+  constexpr u64 clockDenominator(u32 sampleRate) const {
+    // Code zero means one half; double all divisors to use an integer clock ratio.
+    const u64 doubledDivisor = divisorCode == 0 ? 1 : 2 * divisorCode;
+    return (doubledDivisor << clockShift) * sampleRate;
+  }
+
+  constexpr u64 sequencePeriod() const {
+    return shortMode ? kShortNoisePeriod : kLongNoisePeriod;
+  }
+};
+
+constexpr NoiseControl decodeNoiseControl(u8 control) {
+  return {static_cast<u8>(control & kNoiseDivisorMask),
+          static_cast<u8>(control >> kNoiseClockShiftPosition), (control & kNoiseWidthFlag) != 0};
+}
+
+constexpr NoiseControl noiseControlForKey(u8 key, bool shortMode) {
+  // MusicPlayer2000 maps keys 21..80 to quantized hardware noise frequencies.
+  constexpr int kLowestNoiseKey = 21;
+  constexpr int kHighestNoiseKey = 80;
+  constexpr int kKeysPerClockShift = 4;
+  constexpr int kShiftedKeyCount = 56;
+  constexpr int kHighestClockShift = 13;
+  constexpr int kHighestDivisorCode = 7;
+  const int keyIndex = std::clamp(static_cast<int>(key) - kLowestNoiseKey,
+                                 0, kHighestNoiseKey - kLowestNoiseKey);
+  if (keyIndex < kShiftedKeyCount) {
+    return {static_cast<u8>(kHighestDivisorCode - keyIndex % kKeysPerClockShift),
+            static_cast<u8>(kHighestClockShift - keyIndex / kKeysPerClockShift), shortMode};
+  }
+  // The four highest keys use divisor codes 3, 2, 1 and 0 with no clock shift.
+  return {static_cast<u8>(kHighestNoiseKey - kLowestNoiseKey - keyIndex), 0, shortMode};
+}
+
+constexpr u32 noiseLoopSamples(NoiseControl control, u32 sampleRate) {
+  const u64 denominator = control.clockDenominator(sampleRate);
+  const u64 clockPeriod = denominator / std::gcd(denominator, kNoiseClockHz);
+  // Repeat only after both the LFSR sequence and fractional clock phase return to their start.
+  return static_cast<u32>(control.sequencePeriod() * clockPeriod);
+}
+
+constexpr u32 noiseSampleRate(NoiseControl control, u32 pwmSampleRate) {
+  u32 sampleRate = pwmSampleRate;
+  // Keep PWM resolution and its aliasing whenever the complete loop fits the sample budget.
+  // Larger loops trade edge precision for memory, with at most 1/512 second of quantization.
+  // At that minimum rate, preserve the full cycle even when it exceeds the target budget.
+  while (sampleRate > kMinNoiseSampleRate && noiseLoopSamples(control, sampleRate) > kTargetNoiseLoopSamples) {
+    sampleRate = std::max(kMinNoiseSampleRate, sampleRate / 2);
+  }
+  return sampleRate;
+}
+
+constexpr u16 advanceNoiseLfsr(u16 state, bool shortMode) {
+  // XOR the two low bits, shift, and feed the result back into the 15-bit register.
+  const u16 feedback = (state ^ (state >> 1)) & 1;
+  state = (state >> 1) | (feedback << kLongNoiseFeedbackBit);
+  if (shortMode) {
+    // Short mode also replaces bit 6, producing the 7-bit sequence.
+    state = (state & ~kShortNoiseFeedbackMask) | (feedback << kShortNoiseFeedbackBit);
+  }
+  return state;
+}
+
 double psgDutyRatio(u8 dutyIndex) {
   constexpr double kDutyRatios[4] = {0.125, 0.25, 0.5, 0.75};
-  return kDutyRatios[dutyIndex & 0x03];
+  return kDutyRatios[dutyIndex & kSquareDutyMask];
 }
 }
 
-MP2kPSGColl::MP2kPSGColl(RawFile *file, u32 sampleRate, u32 loopSamples)
+MP2kPSGColl::MP2kPSGColl(RawFile *file, u32 sampleRate, u32 loopSamples, u32 noiseSampleRate)
     : VGMSampColl(MP2kFormat::name, file, 0, 0, "MP2k PSG samples"),
       m_sample_rate(sampleRate),
-      m_loop_samples(loopSamples) {
+      m_loop_samples(loopSamples),
+      m_noise_sample_rate(noiseSampleRate) {
 }
 
 bool MP2kPSGColl::parseSampleInfo() {
@@ -593,10 +963,60 @@ int MP2kPSGColl::makeOrGetProgrammableWave(size_t wavePointer) {
 
   int sample_id = static_cast<int>(sampleCount());
   auto name = fmt::format("PSG programmable wave {:#x}", wave_offset);
-  constexpr u32 kCgbWaveSampleRate = kCgbWaveRamSamples * 440;
+  // MP2k uses the square-channel timer table for wave voices. The wave channel
+  // has half the square-channel fundamental at the same timer setting.
+  constexpr u32 kCgbWaveSampleRate = (kCgbWaveRamSamples / 2) * 440;
   addSamp<MP2kPSGWaveSamp>(this, wave_offset, kCgbWaveSampleRate, name);
   m_programmable_waves.emplace(wave_offset, sample_id);
   return sample_id;
+}
+
+int MP2kPSGColl::makeOrGetNoise(u8 key, bool shortMode) {
+  const NoiseControl noise = noiseControlForKey(key, shortMode);
+  const u8 control = noise.registerValue();
+  if (const auto found = m_noise_samples.find(control); found != m_noise_samples.end()) {
+    return found->second;
+  }
+
+  const u32 sampleRate = noiseSampleRate(noise, m_noise_sample_rate);
+  const u32 loopSamples = noiseLoopSamples(noise, sampleRate);
+  const int sampleId = static_cast<int>(sampleCount());
+  addSamp<MP2kPSGNoiseSamp>(this, control, sampleRate, loopSamples,
+                           fmt::format("PSG noise {:#04x}", control));
+  m_noise_samples.emplace(control, sampleId);
+  return sampleId;
+}
+
+MP2kPSGNoiseSamp::MP2kPSGNoiseSamp(VGMSampColl* sampColl, u8 control, u32 sampleRate,
+                                 u32 loopSamples, std::string name)
+    : VGMSamp(sampColl, 0, loopSamples * sizeof(s16), 0, loopSamples * sizeof(s16),
+              1, BPS::PCM16, sampleRate, std::move(name)),
+      m_control(control) {
+  setLoopStatus(true);
+  setLoopOffset(0);
+  setLoopLength(loopSamples);
+  setLoopStartMeasure(LM_SAMPLES);
+  setLoopLengthMeasure(LM_SAMPLES);
+  unityKey = kPsgUnityKey;
+  ulUncompressedSize = loopSamples * bytesPerSample();
+}
+
+std::vector<u8> MP2kPSGNoiseSamp::decodeToNativePcm() {
+  std::vector<u8> samples(uncompressedSize());
+  auto* output = reinterpret_cast<s16*>(samples.data());
+  const NoiseControl noise = decodeNoiseControl(m_control);
+  const u64 denominator = noise.clockDenominator(rate);
+  u16 lfsr = kNoiseInitialState;
+  u64 phase = 0;
+  for (int i = 0; i < loopLength(); ++i) {
+    output[i] = (lfsr & 1) != 0 ? -32767 : 32767;
+    phase += kNoiseClockHz;
+    while (phase >= denominator) {
+      lfsr = advanceNoiseLfsr(lfsr, noise.shortMode);
+      phase -= denominator;
+    }
+  }
+  return samples;
 }
 
 MP2kPSGSamp::MP2kPSGSamp(VGMSampColl *sampColl, u8 dutyIndex, bool noise,
@@ -650,4 +1070,60 @@ std::vector<u8> MP2kPSGWaveSamp::decodeToNativePcm() {
   }
 
   return samples;
+}
+
+MP2kBonSamp::MP2kBonSamp(VGMSampColl* collection, size_t pointer, const RenderSettings& settings)
+    : VGMSamp(collection, pointer, 24, pointer, 24, 1, BPS::PCM16, settings.sampleRate,
+              fmt::format("Bon synth {} key {}", static_cast<u8>(settings.shape), settings.key)),
+      m_settings(settings) {
+  unityKey = settings.key;
+  fineTune = settings.fineTune;
+  setLoopStatus(true);
+  setLoopOffset(0);
+  setLoopLength(settings.loopSamples);
+  setLoopStartMeasure(LM_SAMPLES);
+  setLoopLengthMeasure(LM_SAMPLES);
+  ulUncompressedSize = settings.loopSamples * sizeof(s16);
+}
+
+std::vector<u8> MP2kBonSamp::decodeToNativePcm() {
+  std::vector<u8> data(uncompressedSize());
+  auto* output = reinterpret_cast<s16*>(data.data());
+  int sawState = 0;
+  const int preroll = m_settings.shape == Shape::Saw ? kBonSawPrerollSamples : 0;
+  for (int i = -preroll; i < static_cast<int>(loopLength()); ++i) {
+    const u64 phasePosition = static_cast<u64>(i + static_cast<int>(loopLength()) + 1) *
+                              m_settings.carrierCycles;
+    const double phase = (phasePosition % loopLength()) / static_cast<double>(loopLength());
+    double amplitude = 0;
+    switch (m_settings.shape) {
+      case Shape::Pulse: {
+        // Duty changes once per driver frame. Byte steps wrap before folding the triangle.
+        const auto& pwm = m_settings.pwm;
+        const u32 frame = static_cast<u64>(i) * kBonPwmLoopFrames / loopLength() + 1;
+        const double modulation = ((pwm.initialPhase + frame * pwm.step) % kBonPwmPhaseSteps) /
+                                  static_cast<double>(kBonPwmPhaseSteps);
+        const double folded = std::min(modulation, 1.0 - modulation);
+        const double rawWidth = (pwm.base + pwm.depth * folded) / kBonPwmPhaseSteps;
+        const double width = rawWidth - std::floor(rawWidth);
+        amplitude = (phase < width ? 1.0 : 0.0) - width;
+        break;
+      }
+      case Shape::Saw: {
+        // The driver's pseudo-saw combines a quantized ramp with a one-pole recurrence.
+        const int ramp = static_cast<int>(std::floor(phase * 256.0)) - 112;
+        const int staircase = static_cast<int>(std::floor(phase * 64.0)) % 32;
+        sawState = ramp - staircase + static_cast<int>(std::floor(sawState * 0.5));
+        amplitude = sawState / 256.0;
+        break;
+      }
+      case Shape::Triangle:
+        amplitude = 1.0 - 4.0 * std::abs(phase - 0.5);
+        break;
+    }
+    if (i >= 0) {
+      output[i] = static_cast<s16>(std::lround(std::clamp(amplitude, -1.0, 1.0) * 32767.0));
+    }
+  }
+  return data;
 }

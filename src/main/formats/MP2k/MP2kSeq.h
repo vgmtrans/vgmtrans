@@ -6,6 +6,7 @@
 #pragma once
 
 #include "automation/SeqMidiAutomation.h"
+#include "MP2kDriver.h"
 #include "base/Types.h"
 #include "SeqEvent.h"
 #include "SeqTrack.h"
@@ -16,11 +17,20 @@
 
 class MP2kSeq final : public VGMSeq {
 public:
-  MP2kSeq(RawFile *file, u32 offset, std::string name = "MP2kSeq");
+  MP2kSeq(RawFile *file, u32 offset, std::string name = "MP2kSeq", u8 defaultReverb = 0,
+          MP2kDriverVariant variant = MP2kDriverVariant::Standard);
   ~MP2kSeq() = default;
 
   bool parseHeader() override;
   bool parseTrackPointers() override;
+  MP2kDriverVariant driverVariant() const noexcept { return m_variant; }
+  bool hasNoteGateExtension() const noexcept {
+    return m_variant != MP2kDriverVariant::NintendoRd1TwoByteNotes;
+  }
+
+private:
+  u8 m_defaultReverb;
+  MP2kDriverVariant m_variant;
 };
 
 class MP2kTrack final : public SeqTrack {
@@ -31,7 +41,7 @@ public:
 
 protected:
   void resetVars() override;
-  void onTickBegin() override;
+  void onTickEnd() override;
 
 private:
   enum class State : u8 {
@@ -45,9 +55,20 @@ private:
   };
 
   State state = State::Note;
+  u8 runningCommand = 0;
   u32 curDuration = 0;
   u8 current_vel = 0;
 
+  struct ActiveNote {
+    s8 key;
+    s8 midiKey;
+    SeqEventTimeIndex::Index timelineIndex;
+    NoteEvent* gateOff;  // Null for an indefinite tie.
+  };
+  std::vector<ActiveNote> activeNotes;
+  void rememberNote(s8 key, bool finite, bool indexed = true);
+  void endTie(s8 key);
+  void addRandomPitchRange(u32 beginOffset, u8 amount);
   void beginNoteLfo();
   void updateLfoFade();
   void setLfoSpeed(u8 speed);

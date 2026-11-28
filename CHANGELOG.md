@@ -22,6 +22,25 @@
 * **Sappy (mp2k):** When possible, track names from GSF files are used instead of the song table index.
 * **Sappy (mp2k):** Fixed sequences being exported 0.45% faster than they should be.
 * **Sappy (mp2k):** Fixed instruments potentially having very long release times.
+* **Sappy (mp2k):** Restored missing tracks in GSF files and sparse song tables, including Super Mario Advance and Castlevania: Circle of the Moon.
+* **Sappy (mp2k):** Corrected volume balance and PCM decay/release timing.
+* **Sappy (mp2k):** Restored delayed vibrato/tremolo and matching playback vibrato depth after seeking.
+* **Sappy (mp2k):** Preserved song reverb settings and kept PSG regions dry in exported SoundFonts.
+* **Sappy (mp2k):** Corrected programmable-wave pitch and percussion panning.
+* **Sappy (mp2k):** Corrected fixed-rate PCM pitch in ordinary, key-split, and percussion instruments, and restored valid square-wave instruments mistaken for unused entries.
+* **Sappy (mp2k):** Restored per-key PSG square voices and their stored pitch in SoundFont exports.
+* **Sappy (mp2k):** Corrected per-key PSG noise frequencies and short-mode timbre in SoundFont exports.
+* **Sappy (mp2k):** Added Bon driver detection and Golden Sun's PWM, saw, and triangle instruments.
+* **Sappy (mp2k):** Ignored empty track slots instead of creating invalid tracks.
+* **Sappy (mp2k):** Added Nintendo R&D1 driver support for Metroid Fusion, Metroid: Zero Mission, and WarioWare: Twisted!, including track termination commands.
+* **Sappy (mp2k):** Preserved optional note gate extensions and early releases of finite ties in MIDI exports.
+* **Sappy (mp2k):** Preserved running notes in Metroid Fusion's two-byte note dialect.
+* **Sappy (mp2k):** Recognized running-status program, bend-range, LFO, modulation-type, and tuning commands.
+* **Sappy (mp2k):** Restored tracks muted by repeated echo-setting commands being interpreted as volume changes.
+* **Sappy (mp2k):** Matched instrument volumes to the console mix, including the driver master volume and the PSG/sample balance.
+* **Sappy (mp2k):** Added velocity layers to square and noise instruments so quiet notes follow the hardware's stepped envelope levels.
+* **Sappy (mp2k):** Labeled WarioWare: Twisted! pitch-randomization commands without treating their parameters as notes or controllers.
+* **Sappy (mp2k):** Identified memory-write commands and stopped interpreting their operands as music events.
 
 **Nintendo DS (SDAT)**
 
@@ -50,10 +69,12 @@
 * **Stitched Export:** Added stitched export for collection chunks. You can now drag collections into a stitch queue, reorder them, and export them as a merged MIDI + SF2.
 * **Hotkeys:** The space-bar hotkey to toggle playback no longer requires clicking on a collection first.
 * **Bug Reporting:** Added an in-app dialog to help with reporting bugs.
+* **Export:** Preserved periods in collection filenames to prevent files being overwritten.
 
 ### General
 
 * **SF2:** Compensated SF2 attenuation to improve sound compatibility with most synths and players.
+* **MIDI:** Preserved final note-offs, control changes, and trailing rests in sequences without detected infinite loops.
 * **Crash Fix:** Fixed a crash when removing a collection that was currently being played.
 * **Memory Leaks:** Fixed various memory leaks, most notably one which occurred during collection playback.
 
