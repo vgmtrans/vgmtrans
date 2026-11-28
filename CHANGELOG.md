@@ -37,6 +37,7 @@
 * **Sappy (mp2k):** Preserved running notes in Metroid Fusion's two-byte note dialect.
 * **Sappy (mp2k):** Recognized running-status program, bend-range, LFO, modulation-type, and tuning commands.
 * **Sappy (mp2k):** Restored tracks muted by repeated echo-setting commands being interpreted as volume changes.
+* **Sappy (mp2k):** Matched instrument volumes to the console mix, including the driver master volume and the PSG/sample balance.
 * **Sappy (mp2k):** Labeled WarioWare: Twisted! pitch-randomization commands without treating their parameters as notes or controllers.
 * **Sappy (mp2k):** Identified memory-write commands and stopped interpreting their operands as music events.
 

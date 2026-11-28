@@ -201,6 +201,7 @@ void MP2kScanner::scan(RawFile *file, void *) {
 
     auto iset = std::make_unique<MP2kInstrSet>(file, samplerate_LUT[engine_settings.sampling_rate_index], *it, count,
                                                psg_sampcoll, engine->variant);
+    iset->setPcmMasterVolume(static_cast<u8>(engine_settings.main_vol));
     auto* rawInstrSet = iset.get();
     if (pRoot->loadVGMFile(std::move(iset))) {
       for (auto seqval : seq->second) {

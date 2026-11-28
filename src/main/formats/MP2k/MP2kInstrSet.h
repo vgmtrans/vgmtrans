@@ -33,11 +33,17 @@ public:
   bool isBonSample(size_t pointer) const;
   int makeOrGetBonSample(size_t pointer, u8 key);
   int sampleRate() const noexcept { return m_operating_rate; };
+  double pcmGain() const noexcept { return (m_master_volume + 1) / 16.0; }
+  // Mix gains are calibrated against the standard Sappy mixer only; Nintendo R&D1 drivers
+  // route PSG/FIFO output differently and keep their previous levels.
+  bool usesCalibratedMixGain() const noexcept { return !isNintendoRd1Driver(m_variant); }
+  void setPcmMasterVolume(u8 volume);
   MP2kPSGColl& psgSampColl() const noexcept;
 
 private:
   int m_count = 0;
   int m_operating_rate = 22050;
+  u8 m_master_volume = 15;
   MP2kDriverVariant m_variant;
   std::map<size_t, int> m_samples;
   std::map<std::pair<size_t, u8>, int> m_bon_samples;

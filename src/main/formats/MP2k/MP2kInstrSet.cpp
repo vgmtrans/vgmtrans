@@ -194,6 +194,10 @@ MP2kPSGColl& MP2kInstrSet::psgSampColl() const noexcept {
   return *m_psg_samples;
 }
 
+void MP2kInstrSet::setPcmMasterVolume(u8 volume) {
+  m_master_volume = std::min<u8>(volume, 15);
+}
+
 bool MP2kInstrSet::loadInstrs() {
   auto instrs = releaseInstrs();
   reserveInstrs(instrs.size());
@@ -615,8 +619,12 @@ bool MP2kInstr::loadInstr() {
 
   if (!regions().empty()) {
     for (auto* rgn : regions()) {
+      const bool isPsg = rgn->sampCollPtr == &psgSampColl;
+      if (instrSet.usesCalibratedMixGain()) {
+        rgn->setVolume(isPsg ? 0.5 : instrSet.pcmGain());
+      }
       // Only Direct Sound PCM voices enter the driver's reverb mix, including in split banks.
-      rgn->reverbSendScale = rgn->sampCollPtr == &psgSampColl ? 0.0 : 1.0;
+      rgn->reverbSendScale = isPsg ? 0.0 : 1.0;
     }
     constexpr double kDefaultLfoFrequencyHz = 60.0 * 22.0 / 256.0;
     constexpr double kVibratoMaxDepthCents = 127.0 * 4.0 * 100.0 / 64.0;
