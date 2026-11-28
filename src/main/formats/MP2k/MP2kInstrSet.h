@@ -67,6 +67,7 @@ public:
 private:
   void setADSR(VGMRgn *dest, u32 data);
   void setCgbADSR(VGMRgn *dest, u32 data);
+  void splitSteppedPsgRegions(const std::vector<VGMRgn*>& stepped);
 
   MP2kInstrData m_data;
 };

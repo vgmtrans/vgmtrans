@@ -13,8 +13,10 @@
 #include "VGMColl.h"
 #include "VGMRgn.h"
 #include "VGMSampColl.h"
+#include "ScaleConversion.h"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -24,6 +26,7 @@
 #include <numbers>
 #include <numeric>
 #include <utility>
+#include <vector>
 
 #include <spdlog/fmt/fmt.h>
 
@@ -170,6 +173,49 @@ double cgbSustainLevel(int sustain) {
     return 1.0;
   }
   return sustain / kEnvelopeMaxLevel;
+}
+
+// CGB envelope goal for a note at full track volume and centre pan, following the standard
+// driver: TrkVolPitSet -> ChnVolSetAsm -> CgbModVol. Verified against native captures for
+// velocity, track volume and pan (psg-goal-grid).
+int cgbEnvelopeGoalAtFullVolume(int velocity) {
+  constexpr int kVolumeRight = 127;  // ((0 + 128) * (127 * 64 >> 5)) >> 8
+  constexpr int kVolumeLeft = 126;   // ((127 - 0) * (127 * 64 >> 5)) >> 8
+  const int right = std::min(255, (kVolumeRight * (128 * velocity)) >> 14);
+  const int left = std::min(255, (kVolumeLeft * (127 * velocity)) >> 14);
+  return std::min(15, (right + left) >> 4);
+}
+
+struct CgbVelocityLayer {
+  int goal;
+  u8 velLow;
+  u8 velHigh;
+  double velocityAmplitude;  // linear amplitude the synth's velocity curve gives mid-layer
+};
+
+// Groups MIDI velocities by the integer envelope goal the driver would reach. MIDI velocity is
+// the linear-amplitude conversion of the driver's velocity. Layers cover every MIDI velocity
+// above the silent goal-0 range, so edited velocities always select a layer.
+std::vector<CgbVelocityLayer> cgbVelocityLayers() {
+  std::array<int, 16> highestMidi{};
+  highestMidi.fill(-1);
+  for (int velocity = 1; velocity <= 127; ++velocity) {
+    const int goal = cgbEnvelopeGoalAtFullVolume(velocity);
+    const int midi = convert7bitPercentAmpToStdMidiVal(static_cast<u8>(velocity));
+    highestMidi[goal] = std::max(highestMidi[goal], midi);
+  }
+  std::vector<CgbVelocityLayer> layers;
+  int nextLow = highestMidi[0] + 1;
+  for (int goal = 1; goal <= 15; ++goal) {
+    if (highestMidi[goal] < nextLow) {
+      continue;
+    }
+    const int high = goal == 15 ? 127 : highestMidi[goal];
+    const double middle = (nextLow + high) / 2.0 / 127.0;
+    layers.push_back({goal, static_cast<u8>(nextLow), static_cast<u8>(high), middle * middle});
+    nextLow = high + 1;
+  }
+  return layers;
 }
 
 bool isGbaRomPointer(size_t pointer) {
@@ -383,6 +429,14 @@ bool MP2kInstr::loadInstr() {
     setCgbADSR(rgn, adsr);
     return rgn;
   };
+  // Square and noise channels step a 4-bit hardware envelope toward an integer goal.
+  std::vector<VGMRgn*> steppedPsgRegions;
+  auto addSteppedPsgRgn = [&](VGMSampColl &psgColl, int sampNum, u32 adsr,
+                              u8 keyLow = 0, u8 keyHigh = 127) {
+    VGMRgn* rgn = addPsgRgn(psgColl, sampNum, adsr, keyLow, keyHigh);
+    steppedPsgRegions.push_back(rgn);
+    return rgn;
+  };
 
   const Tone instrument = decodeTone(m_data);
   const u32 envelopeOrKeyMap = m_data.w2;
@@ -454,7 +508,7 @@ bool MP2kInstr::loadInstr() {
       setName(fmt::format("PSG square {}", instrument.sampleOrTable < kPsgSquareCount
                                               ? cycles[instrument.sampleOrTable] : "???"));
       setLength(kToneRecordSize);
-      addPsgRgn(psgSampColl, instrument.squareDuty(), envelopeOrKeyMap);
+      addSteppedPsgRgn(psgSampColl, instrument.squareDuty(), envelopeOrKeyMap);
       break;
     }
 
@@ -473,7 +527,7 @@ bool MP2kInstr::loadInstr() {
     case VoiceType::Noise:
       setName("PSG noise");
       setLength(kToneRecordSize);
-      addPsgRgn(psgSampColl, kPsgNoiseIndex, envelopeOrKeyMap);
+      addSteppedPsgRgn(psgSampColl, kPsgNoiseIndex, envelopeOrKeyMap);
       break;
 
     case VoiceType::KeySplit: {
@@ -520,7 +574,7 @@ bool MP2kInstr::loadInstr() {
           }
           case VoiceType::Square1:
           case VoiceType::Square2:
-            addPsgRgn(psgSampColl, tone.squareDuty(), envelope(), keyLow, keyHigh);
+            addSteppedPsgRgn(psgSampColl, tone.squareDuty(), envelope(), keyLow, keyHigh);
             break;
           case VoiceType::Wave:
             if (const int sampleId = psgSampColl.makeOrGetProgrammableWave(tone.sampleOrTable); sampleId != -1) {
@@ -528,7 +582,7 @@ bool MP2kInstr::loadInstr() {
             }
             break;
           case VoiceType::Noise:
-            addPsgRgn(psgSampColl, kPsgNoiseIndex, envelope(), keyLow, keyHigh);
+            addSteppedPsgRgn(psgSampColl, kPsgNoiseIndex, envelope(), keyLow, keyHigh);
             break;
           default:
             break;
@@ -583,7 +637,7 @@ bool MP2kInstr::loadInstr() {
           }
           case VoiceType::Square1:
           case VoiceType::Square2: {
-            region = addPsgRgn(psgSampColl, tone.squareDuty(), envelope(), key, key);
+            region = addSteppedPsgRgn(psgSampColl, tone.squareDuty(), envelope(), key, key);
             // A rhythm key selects the tone; the tone's key byte determines square pitch.
             const int rootKey = kPsgUnityKey - static_cast<int>(tone.key) + key;
             const int storedRootKey = std::clamp(rootKey, 0, 127);
@@ -598,7 +652,7 @@ bool MP2kInstr::loadInstr() {
             break;
           case VoiceType::Noise: {
             const int sampleId = psgSampColl.makeOrGetNoise(tone.key, tone.shortNoise());
-            region = addPsgRgn(psgSampColl, sampleId, envelope(), key, key);
+            region = addSteppedPsgRgn(psgSampColl, sampleId, envelope(), key, key);
             region->setUnityKey(static_cast<u8>(key));
             break;
           }
@@ -625,6 +679,9 @@ bool MP2kInstr::loadInstr() {
       }
       // Only Direct Sound PCM voices enter the driver's reverb mix, including in split banks.
       rgn->reverbSendScale = isPsg ? 0.0 : 1.0;
+    }
+    if (instrSet.usesCalibratedMixGain()) {
+      splitSteppedPsgRegions(steppedPsgRegions);
     }
     constexpr double kDefaultLfoFrequencyHz = 60.0 * 22.0 / 256.0;
     constexpr double kVibratoMaxDepthCents = 127.0 * 4.0 * 100.0 / 64.0;
@@ -666,6 +723,55 @@ void MP2kInstr::setCgbADSR(VGMRgn *rgn, u32 adsr) {
   rgn->decay_time = cgbEnvelopeRateTimeSeconds(decay);
   rgn->sustain_level = cgbSustainLevel(sustain);
   rgn->release_time = cgbEnvelopeRateTimeSeconds(release);
+}
+
+void MP2kInstr::splitSteppedPsgRegions(const std::vector<VGMRgn*>& stepped) {
+  static const std::vector<CgbVelocityLayer> layers = cgbVelocityLayers();
+  constexpr double kEnvelopeMaxLevel = 15.0;
+  for (VGMRgn* source : stepped) {
+    const int sustain = static_cast<int>(std::lround(std::clamp(source->sustain_level, 0.0, 1.0) *
+                                                     kEnvelopeMaxLevel));
+    const double fullAttack = source->attack_time;
+    const double fullDecay = source->decay_time;
+    const double fullRelease = source->release_time;
+    const double baseAttenDb = source->attenDb();
+    for (const auto& layer : layers) {
+      VGMRgn* rgn = layer.goal == 15
+          ? source
+          : addRgn(source->offset(), source->length(), static_cast<int>(source->sampNum),
+                   source->keyLow, source->keyHigh);
+      if (rgn != source) {
+        rgn->sampCollPtr = source->sampCollPtr;
+        rgn->unityKey = source->unityKey;
+        rgn->coarseTune = source->coarseTune;
+        rgn->fineTune = source->fineTune;
+        rgn->loop = source->loop;
+        rgn->sampOffset = source->sampOffset;
+        rgn->sampDataLength = source->sampDataLength;
+        rgn->pan = source->pan;
+        rgn->attack_transform = source->attack_transform;
+        rgn->hold_time = source->hold_time;
+        rgn->sustain_time = source->sustain_time;
+        rgn->release_transform = source->release_transform;
+        rgn->reverbSendScale = source->reverbSendScale;
+        rgn->setLfoVibFreqHz(source->lfoVibFreqHz());
+        rgn->setLfoVibDepthCents(source->lfoVibDepthCents());
+        rgn->setLfoVibDelaySeconds(source->lfoVibDelaySeconds());
+      }
+      rgn->velLow = layer.velLow;
+      rgn->velHigh = layer.velHigh;
+      // The hardware moves one envelope step per rate tick, so a lower goal takes fewer steps.
+      const double steps = layer.goal / kEnvelopeMaxLevel;
+      rgn->attack_time = fullAttack * steps;
+      rgn->decay_time = fullDecay * steps;
+      rgn->release_time = fullRelease * steps;
+      const int sustainGoal = (layer.goal * sustain + 15) >> 4;
+      rgn->sustain_level = static_cast<double>(sustainGoal) / layer.goal;
+      // Peak level is goal/15; the synth's velocity curve already supplies velocityAmplitude.
+      const double correction = steps / layer.velocityAmplitude;
+      rgn->setAttenuation(baseAttenDb - 20.0 * std::log10(correction));
+    }
+  }
 }
 
 MP2kSamp::MP2kSamp(VGMSampColl *sampColl, MP2kSampParams params)
